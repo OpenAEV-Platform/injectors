@@ -1,5 +1,6 @@
 from typing import List
 
+
 from pyobas.contracts import ContractBuilder
 from pyobas.contracts.contract_config import (
     Contract,
@@ -18,6 +19,13 @@ from pyobas.contracts.contract_config import (
     prepare_contracts,
 )
 
+from constants_nmap import (
+    TARGET_SELECTOR_KEY,
+    ASSETS_KEY,
+    TARGET_PROPERTY_SELECTOR_KEY,
+    TARGETS_KEY,
+)
+
 TYPE = "openbas_nmap"
 TCP_SYN_SCAN_CONTRACT = "0b7f3674-ac5d-4b95-b749-6665e74a211f"
 TCP_CONNECT_SCAN_CONTRACT = "93d27459-68d0-43b1-ad65-eacc3cfa5cf7"
@@ -28,7 +36,7 @@ class NmapContracts:
 
     @staticmethod
     def build_contract():
-        # Config
+        # -- CONFIG --
         contract_config = ContractConfig(
             type=TYPE,
             label={
@@ -39,43 +47,48 @@ class NmapContracts:
             color_light="#00bcd4",
             expose=True,
         )
+
+        # -- FIELDS --
         target_selector = ContractSelect(
-            key="target_selector",
+            key=TARGET_SELECTOR_KEY,
             label="Type of targets",
             defaultValue=["assets"],
             mandatory=True,
-            mandatoryGroups=["assets", "targets"],
             choices={"assets": "Assets", "manual": "Manual"},
         )
         targets_assets = ContractAsset(
             cardinality=ContractCardinality.Multiple,
-            key="assets",
+            key=ASSETS_KEY,
             label="Targeted assets",
-            mandatory=True,
-            linkedFields=[target_selector],
-            linkedValues=["assets"],
+            mandatory=False,
+            mandatoryConditionFields=[target_selector.key],
+            mandatoryConditionValues={target_selector.key: "assets"},
+            visibleConditionFields=[target_selector.key],
+            visibleConditionValues={target_selector.key: "assets"},
         )
         target_property_selector = ContractSelect(
-            key="target_property_selector",
-            label="Targeted property",
+            key=TARGET_PROPERTY_SELECTOR_KEY,
+            label="Targeted assets property",
             defaultValue=["seen_ip"],
-            mandatory=True,
             choices={
                 "seen_ip": "Seen IP",
                 "local_ip": "Local IP (first)",
                 "hostname": "Hostname",
             },
-            linkedFields=[target_selector],
-            linkedValues=["assets"],
+            mandatory=False,
+            mandatoryConditionFields=[target_selector.key],
+            mandatoryConditionValues={target_selector.key: "assets"},
+            visibleConditionFields=[target_selector.key],
+            visibleConditionValues={target_selector.key: "assets"},
         )
         targets_manual = ContractText(
-            key="targets",
-            label="Targeted hostnames or IPs (separated by commas)",
+            key=TARGETS_KEY,
+            label="Manual targets (comma-separated)",
             mandatory=False,
-            mandatoryConditionField="target_selector",
-            mandatoryConditionValue="manual",
-            linkedFields=[target_selector],
-            linkedValues=["manual"],
+            mandatoryConditionFields=[target_selector.key],
+            mandatoryConditionValues={target_selector.key: "manual"},
+            visibleConditionFields=[target_selector.key],
+            visibleConditionValues={target_selector.key: "manual"},
         )
         expectations = ContractExpectations(
             key="expectations",
@@ -93,7 +106,7 @@ class NmapContracts:
             ],
         )
 
-        # Output
+        # -- OUTPUTS --
         output_ports_scans = ContractOutputElement(
             type=ContractOutputType.PortsScan,
             field="scan_results",
