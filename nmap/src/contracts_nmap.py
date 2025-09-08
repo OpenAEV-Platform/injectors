@@ -1,6 +1,11 @@
 from typing import List
 
-
+from constants_nmap import (
+    TARGET_SELECTOR_KEY,
+    ASSETS_KEY,
+    TARGET_PROPERTY_SELECTOR_KEY,
+    TARGETS_KEY,
+)
 from pyobas.contracts import ContractBuilder
 from pyobas.contracts.contract_config import (
     Contract,
@@ -17,13 +22,6 @@ from pyobas.contracts.contract_config import (
     ExpectationType,
     SupportedLanguage,
     prepare_contracts,
-)
-
-from constants_nmap import (
-    TARGET_SELECTOR_KEY,
-    ASSETS_KEY,
-    TARGET_PROPERTY_SELECTOR_KEY,
-    TARGETS_KEY,
 )
 
 TYPE = "openbas_nmap"
