@@ -1,9 +1,9 @@
 from typing import List
 
 from constants_nmap import (
-    TARGET_SELECTOR_KEY,
     ASSETS_KEY,
     TARGET_PROPERTY_SELECTOR_KEY,
+    TARGET_SELECTOR_KEY,
     TARGETS_KEY,
 )
 from pyobas.contracts import ContractBuilder
