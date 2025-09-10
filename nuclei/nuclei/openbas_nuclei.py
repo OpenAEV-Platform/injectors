@@ -1,4 +1,5 @@
 import json
+import os
 import subprocess
 import time
 from typing import Dict
@@ -8,11 +9,13 @@ from pyobas.helpers import OpenBASConfigHelper, OpenBASInjectorHelper
 from nuclei.helpers.nuclei_command_builder import NucleiCommandBuilder
 from nuclei.helpers.nuclei_output_parser import NucleiOutputParser
 from nuclei.helpers.nuclei_process import NucleiProcess
+from nuclei.nuclei_contracts.external_contracts import ExternalContractsManager
 from nuclei.nuclei_contracts.nuclei_contracts import NucleiContracts
 
 
 class OpenBASNuclei:
     def __init__(self):
+        print(os.getenv("PATH"))
         self.config = OpenBASConfigHelper(
             __file__,
             {
@@ -129,6 +132,9 @@ class OpenBASNuclei:
 
     def start(self):
         self.helper.listen(message_callback=self.process_message)
+        ExternalContractsManager(
+            self.helper.api, self.config.get_conf("injector_id")
+        ).start()
 
 
 if __name__ == "__main__":
