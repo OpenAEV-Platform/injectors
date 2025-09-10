@@ -38,9 +38,8 @@ class TargetExtractionResult:
 class NucleiContracts:
 
     @staticmethod
-    def build_contracts():
-        # -- CONFIG --
-        contract_config = ContractConfig(
+    def base_contract_config():
+        return ContractConfig(
             type=TYPE,
             label={
                 SupportedLanguage.en: "Nuclei Scan",
@@ -51,6 +50,8 @@ class NucleiContracts:
             expose=True,
         )
 
+    @staticmethod
+    def base_contract_fields():
         # -- FIELDS --
         target_selector = ContractSelect(
             key=TARGET_SELECTOR_KEY,
@@ -103,6 +104,26 @@ class NucleiContracts:
             ],
         )
 
+        return (
+            ContractBuilder()
+            .add_fields(
+                [
+                    target_selector,
+                    targets_assets,
+                    target_property_selector,
+                    targets_manual,
+                    template_manual,
+                    expectations,
+                ]
+            )
+            .build_fields()
+        )
+
+    @staticmethod
+    def build_contracts():
+        # -- CONFIG --
+        contract_config = NucleiContracts.base_contract_config()
+
         # -- OUTPUTS --
         output_vulns = ContractOutputElement(
             type=ContractOutputType.CVE,
@@ -119,20 +140,7 @@ class NucleiContracts:
             labels=["nuclei"],
         )
 
-        fields: List[ContractElement] = (
-            ContractBuilder()
-            .add_fields(
-                [
-                    target_selector,
-                    targets_assets,
-                    target_property_selector,
-                    targets_manual,
-                    template_manual,
-                    expectations,
-                ]
-            )
-            .build_fields()
-        )
+        fields: List[ContractElement] = NucleiContracts.base_contract_fields()
         nuclei_contract_outputs: List[ContractOutputElement] = (
             ContractBuilder().add_outputs([output_vulns, output_others]).build_outputs()
         )
