@@ -1,15 +1,33 @@
 import json
 import sched
 import time
+import uuid
 from multiprocessing import Process
 
 import requests
+from nuclei_contracts.nuclei_contracts import NucleiContracts
 from pyobas.apis.inputs.search import (
     Filter,
     FilterGroup,
     InjectorContractSearchPaginationInput,
 )
 from pyobas.client import OpenBAS
+from pyobas.contracts.contract_config import (
+    Contract,
+    ContractAsset,
+    ContractCardinality,
+    ContractConfig,
+    ContractElement,
+    ContractExpectations,
+    ContractOutputElement,
+    ContractOutputType,
+    ContractSelect,
+    ContractText,
+    Expectation,
+    ExpectationType,
+    SupportedLanguage,
+    prepare_contracts,
+)
 
 
 class ExternalContractsManager:
@@ -41,9 +59,7 @@ class ExternalContractsManager:
 
     def manage_contracts(self):
         cve_templates_metadata = self.fetch_nuclei_cve_templates_list()
-        print("cves templates", cve_templates_metadata)
         current_contracts = self.fetch_all_current_contracts()
-        print("final contracts", current_contracts)
 
         template_to_create_contract = []
         for template in cve_templates_metadata:
@@ -54,10 +70,41 @@ class ExternalContractsManager:
                     current_contracts.remove(contract)
                     cve_templates_metadata.remove(template)
                     break
-            template_to_create_contract.append(template)
+            template_to_create_contract.append(self.make_contract(template))
         contracts_to_delete = current_contracts
 
+        for contract in template_to_create_contract:
+            try:
+                self._api_client.injector_contract.create(contract)
+            except:
+                continue
+
         print("finished outersect")
+
+    def make_contract(self, template):
+        config = NucleiContracts.base_contract_config()
+        fields = NucleiContracts.core_contract_fields() + [
+            [
+                ContractText(
+                    key="template",
+                    label="Manual template path (-t)",
+                    mandatory=False,
+                    defaultValue=template["file_path"],
+                )
+            ]
+        ]
+        outputs = NucleiContracts.core_outputs()
+        contract = NucleiContracts.build_contract(
+            str(uuid.uuid4()),
+            self.theoretical_external_id(template),
+            config,
+            fields,
+            outputs,
+            template["ID"],
+            template["ID"],
+        )
+        contract.add_vulnerability(template["ID"])
+        return contract.to_contract_add_input(self._injector_id)
 
     def external_id_prefix(self):
         return "external-injector-contract_{}".format(self._injector_id)
@@ -80,7 +127,18 @@ class ExternalContractsManager:
 
         while not last:
             page = self.get_page_of_contracts(page_number=current_page)
-            contracts.extend(page["content"])
+            contracts.extend(
+                [
+                    contract
+                    for contract in page["content"]
+                    # filter out any contract not found to have been created by this process
+                    # we could not do this via API since injector_contract_external_id should
+                    # not be exposed as a filter
+                    if str(contract["injector_contract_external_id"]).startswith(
+                        self.external_id_prefix()
+                    )
+                ]
+            )
             last = page["last"]
             current_page += 1
 
@@ -95,12 +153,6 @@ class ExternalContractsManager:
                 [
                     Filter(
                         "injector_contract_injector", "and", "eq", [self._injector_id]
-                    ),
-                    Filter(
-                        "injector_contract_external_id",
-                        "and",
-                        "starts_with",
-                        [self.external_id_prefix()],
                     ),
                 ],
             ),

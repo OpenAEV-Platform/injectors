@@ -34,7 +34,9 @@ class OpenBASNuclei:
                     "file_path": ["injector", "type"],
                     "default": "openbas_nuclei",
                 },
-                "injector_contracts": {"data": NucleiContracts.build_contracts()},
+                "injector_contracts": {
+                    "data": NucleiContracts.build_static_contracts()
+                },
             },
         )
         self.helper = OpenBASInjectorHelper(
