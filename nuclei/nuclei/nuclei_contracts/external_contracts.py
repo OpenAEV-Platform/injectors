@@ -88,7 +88,7 @@ class ExternalContractsManager:
                 key="template",
                 label="Manual template path (-t)",
                 mandatory=False,
-                defaultValue=template["file_path"],
+                defaultValue=[template["file_path"]],
             )
         ]
         outputs = NucleiContracts.core_outputs()
