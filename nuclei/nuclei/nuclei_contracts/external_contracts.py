@@ -12,22 +12,7 @@ from pyobas.apis.inputs.search import (
     InjectorContractSearchPaginationInput,
 )
 from pyobas.client import OpenBAS
-from pyobas.contracts.contract_config import (
-    Contract,
-    ContractAsset,
-    ContractCardinality,
-    ContractConfig,
-    ContractElement,
-    ContractExpectations,
-    ContractOutputElement,
-    ContractOutputType,
-    ContractSelect,
-    ContractText,
-    Expectation,
-    ExpectationType,
-    SupportedLanguage,
-    prepare_contracts,
-)
+from pyobas.contracts.contract_config import ContractText
 
 
 class ExternalContractsManager:
@@ -76,6 +61,14 @@ class ExternalContractsManager:
         for contract in template_to_create_contract:
             try:
                 self._api_client.injector_contract.create(contract)
+            except:
+                continue
+
+        for contract in contracts_to_delete:
+            try:
+                self._api_client.injector_contract.delete(
+                    contract["injector_contract_id"]
+                )
             except:
                 continue
 

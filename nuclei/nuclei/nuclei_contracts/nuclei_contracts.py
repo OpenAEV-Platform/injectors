@@ -7,7 +7,6 @@ from pyobas.contracts.contract_config import (
     ContractAsset,
     ContractCardinality,
     ContractConfig,
-    ContractElement,
     ContractExpectations,
     ContractOutputElement,
     ContractOutputType,
