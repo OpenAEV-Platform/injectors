@@ -5,7 +5,7 @@ import uuid
 from multiprocessing import Process
 
 import requests
-from nuclei_contracts.nuclei_contracts import NucleiContracts
+from nuclei.nuclei_contracts.nuclei_contracts import NucleiContracts
 from pyobas.apis.inputs.search import (
     Filter,
     FilterGroup,
@@ -107,6 +107,7 @@ class ExternalContractsManager:
         response = requests.Session().get(
             "https://raw.githubusercontent.com/projectdiscovery/nuclei-templates/refs/heads/main/cves.json"
         )
+        response.raise_for_status()
         # response is not json, but a file with one serialised json object per line
         return [json.loads(line) for line in response.iter_lines()]
 
