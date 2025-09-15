@@ -1,7 +1,7 @@
 version: '3'
 services:
   injector-aws:
-    image: openbas/injector-aws:1.18.18
+    image: openbas/injector-aws:1.18.19
     environment:
       - OPENBAS_URL=http://localhost
       - OPENBAS_TOKEN=ChangeMe
