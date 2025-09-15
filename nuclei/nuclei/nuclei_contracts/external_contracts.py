@@ -5,7 +5,6 @@ import uuid
 from multiprocessing import Process
 
 import requests
-from nuclei.nuclei_contracts.nuclei_contracts import NucleiContracts
 from pyobas.apis.inputs.search import (
     Filter,
     FilterGroup,
@@ -14,17 +13,24 @@ from pyobas.apis.inputs.search import (
 from pyobas.client import OpenBAS
 from pyobas.contracts.contract_config import ContractText
 
+from nuclei.nuclei_contracts.nuclei_contracts import NucleiContracts
+
 
 class ExternalContractsManager:
-    def __init__(self, api_client: OpenBAS, injector_id: str):
+    def __init__(self, api_client: OpenBAS, injector_id: str, period: int, logger):
         self.scheduler = sched.scheduler(time.time, time.sleep)
         self._api_client = api_client
         self._injector_id = injector_id
+        self._period = period
+        self._logger = logger
 
     def start(self):
         self.spawn_process()
         self.scheduler.enter(
-            1, 1, self.__schedule, argument=(self.scheduler, self.spawn_process, 1)
+            delay=self._period,
+            priority=1,
+            action=self.__schedule,
+            argument=(self.scheduler, self.spawn_process, self._period),
         )
         self.scheduler.run()
 
@@ -48,20 +54,23 @@ class ExternalContractsManager:
 
         template_to_create_contract = []
         for template in cve_templates_metadata:
+            found = False
             for contract in current_contracts:
                 if contract[
                     "injector_contract_external_id"
                 ] == self.theoretical_external_id(template):
                     current_contracts.remove(contract)
-                    cve_templates_metadata.remove(template)
+                    found = True
                     break
-            template_to_create_contract.append(self.make_contract(template))
+            if not found:
+                template_to_create_contract.append(self.make_contract(template))
         contracts_to_delete = current_contracts
 
         for contract in template_to_create_contract:
             try:
                 self._api_client.injector_contract.create(contract)
-            except:
+            except Exception as e:
+                self._logger.error(e)
                 continue
 
         for contract in contracts_to_delete:
@@ -69,10 +78,11 @@ class ExternalContractsManager:
                 self._api_client.injector_contract.delete(
                     contract["injector_contract_id"]
                 )
-            except:
+            except Exception as e:
+                self._logger.error(e)
                 continue
 
-        print("finished outersect")
+        self._logger.info("Done maintaining external contracts.")
 
     def make_contract(self, template):
         config = NucleiContracts.base_contract_config()

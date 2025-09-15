@@ -37,6 +37,20 @@ class OpenBASNuclei:
                 "injector_contracts": {
                     "data": NucleiContracts.build_static_contracts()
                 },
+                "injector_external_contracts_maintenance_schedule_seconds": {
+                    "env": "INJECTOR_EXTERNAL_CONTRACTS_MAINTENANCE_SCHEDULE_SECONDS",
+                    "file_path": [
+                        "injector",
+                        "external_contracts_maintenance_schedule_seconds",
+                    ],
+                    "default": 86400,
+                    "is_number": True,
+                },
+                "injector_log_level": {
+                    "env": "INJECTOR_LOG_LEVEL",
+                    "file_path": ["injector", "log_level"],
+                    "default": "warn",
+                },
             },
         )
         self.helper = OpenBASInjectorHelper(
@@ -135,7 +149,12 @@ class OpenBASNuclei:
     def start(self):
         self.helper.listen(message_callback=self.process_message)
         ExternalContractsManager(
-            self.helper.api, self.config.get_conf("injector_id")
+            self.helper.api,
+            self.config.get_conf("injector_id"),
+            self.config.get_conf(
+                "injector_external_contracts_maintenance_schedule_seconds"
+            ),
+            self.helper.injector_logger,
         ).start()
 
 
