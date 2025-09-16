@@ -1,7 +1,7 @@
 import unittest
 import uuid
 from unittest import mock
-from unittest.mock import ANY, MagicMock, call
+from unittest.mock import MagicMock, call
 
 from requests.exceptions import HTTPError
 
