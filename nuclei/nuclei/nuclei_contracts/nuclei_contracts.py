@@ -169,7 +169,6 @@ class NucleiContracts:
             ]
         )
 
-
     @staticmethod
     def extract_targets(data: Dict) -> TargetExtractionResult:
         targets = []
@@ -180,7 +179,7 @@ class NucleiContracts:
             selector = content[TARGET_PROPERTY_SELECTOR_KEY]
             if selector == "automatic":
                 for asset in data[ASSETS_KEY]:
-                    target, asset_id = NucleiContracts.extract_preferred_target(asset)
+                    target, asset_id = NucleiContracts.extract_property_target_value(asset)
                     targets.append(target)
                     ip_to_asset_id_map[target] = asset_id
             else:
@@ -206,9 +205,9 @@ class NucleiContracts:
         return TargetExtractionResult(targets=targets, ip_to_asset_id_map=ip_to_asset_id_map)
 
     @staticmethod
-    def extract_preferred_target(asset: Dict) -> Tuple[str, str]:
+    def extract_property_target_value(asset: Dict) -> Tuple[str, str]:
         """
-        Extracts the preferred target value from an asset based on priority:
+        Extracts the target value from an asset based on priority:
         1. endpoint_hostname
         2. endpoint_seen_ip
         3. first of endpoint_ips
