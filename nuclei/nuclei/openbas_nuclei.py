@@ -61,8 +61,6 @@ class OpenBASNuclei:
             raise RuntimeError(
                 "Nuclei is not installed or is not accessible from your PATH."
             )
-        self._update_templates()
-
         self.command_builder = NucleiCommandBuilder()
         self.parser = NucleiOutputParser()
 
@@ -137,14 +135,6 @@ class OpenBASNuclei:
             return True
         except (FileNotFoundError, subprocess.CalledProcessError):
             return False
-
-    def _update_templates(self):
-        self.helper.injector_logger.info("Updating templates...")
-        try:
-            NucleiProcess.nuclei_update_templates()
-            self.helper.injector_logger.info("Templates updated successfully.")
-        except subprocess.CalledProcessError as e:
-            self.helper.injector_logger.error(f"Template update failed: {e}")
 
     def start(self):
         self.helper.listen(message_callback=self.process_message)

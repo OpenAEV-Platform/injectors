@@ -1,5 +1,6 @@
 import json
 import sched
+import subprocess
 import time
 import uuid
 from multiprocessing import Process
@@ -51,7 +52,7 @@ class ExternalContractsManager:
 
     def manage_contracts(self):
         self._logger.info("Start maintaining external contracts in the background...")
-        NucleiProcess.nuclei_update_templates()
+        self._update_templates()
         cve_templates_metadata = self.fetch_nuclei_cve_templates_list()
         current_contracts = self.fetch_all_current_contracts()
 
@@ -165,3 +166,11 @@ class ExternalContractsManager:
         )
 
         return self._api_client.injector_contract.search(search_input)
+
+    def _update_templates(self):
+        self._logger.info("Updating templates...")
+        try:
+            NucleiProcess.nuclei_update_templates()
+            self._logger.info("Templates updated successfully.")
+        except subprocess.CalledProcessError as e:
+            self._logger.error(f"Template update failed: {e}")
