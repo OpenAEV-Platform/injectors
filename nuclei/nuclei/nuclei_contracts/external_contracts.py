@@ -13,6 +13,7 @@ from pyobas.apis.inputs.search import (
 from pyobas.client import OpenBAS
 from pyobas.contracts.contract_config import ContractText
 
+from nuclei.helpers.nuclei_process import NucleiProcess
 from nuclei.nuclei_contracts.nuclei_contracts import NucleiContracts
 
 
@@ -49,6 +50,8 @@ class ExternalContractsManager:
         process.join()
 
     def manage_contracts(self):
+        self._logger.info("Start maintaining external contracts in the background...")
+        NucleiProcess.nuclei_update_templates()
         cve_templates_metadata = self.fetch_nuclei_cve_templates_list()
         current_contracts = self.fetch_all_current_contracts()
 
@@ -82,7 +85,7 @@ class ExternalContractsManager:
                 self._logger.error(e)
                 continue
 
-        self._logger.info("Done maintaining external contracts.")
+        self._logger.info("Done maintaining external contracts in the background.")
 
     def make_contract(self, template):
         config = NucleiContracts.base_contract_config()
