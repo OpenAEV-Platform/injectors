@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import Dict, List
+from typing import Dict, List, Tuple
 
 from pyobas.contracts import ContractBuilder
 from pyobas.contracts.contract_config import (
@@ -72,9 +72,10 @@ class NucleiContracts:
         target_property_selector = ContractSelect(
             key=TARGET_PROPERTY_SELECTOR_KEY,
             label="Targeted assets property",
-            defaultValue=["hostname"],
+            defaultValue=["automatic"],
             mandatory=False,
             choices={
+                "automatic": "Automatic",
                 "hostname": "Hostname",
                 "seen_ip": "Seen IP",
                 "local_ip": "Local IP (first)",
@@ -168,29 +169,59 @@ class NucleiContracts:
             ]
         )
 
+
     @staticmethod
     def extract_targets(data: Dict) -> TargetExtractionResult:
         targets = []
         ip_to_asset_id_map = {}
         content = data["injection"]["inject_content"]
+
         if content[TARGET_SELECTOR_KEY] == "assets" and data.get(ASSETS_KEY):
             selector = content[TARGET_PROPERTY_SELECTOR_KEY]
-            for asset in data[ASSETS_KEY]:
-                if selector == "seen_ip":
-                    ip_to_asset_id_map[asset["endpoint_seen_ip"]] = asset["asset_id"]
-                    targets.append(asset["endpoint_seen_ip"])
-                elif selector == "local_ip":
-                    if not asset["endpoint_ips"]:
-                        raise ValueError("No IP found for this endpoint")
-                    ip_to_asset_id_map[asset["endpoint_ips"][0]] = asset["asset_id"]
-                    targets.append(asset["endpoint_ips"][0])
-                else:
-                    ip_to_asset_id_map[asset["endpoint_hostname"]] = asset["asset_id"]
-                    targets.append(asset["endpoint_hostname"])
+            if selector == "automatic":
+                for asset in data[ASSETS_KEY]:
+                    target, asset_id = NucleiContracts.extract_preferred_target(asset)
+                    targets.append(target)
+                    ip_to_asset_id_map[target] = asset_id
+            else:
+                for asset in data[ASSETS_KEY]:
+                    if selector == "seen_ip":
+                        ip_to_asset_id_map[asset["endpoint_seen_ip"]] = asset["asset_id"]
+                        targets.append(asset["endpoint_seen_ip"])
+                    elif selector == "local_ip":
+                        if not asset["endpoint_ips"]:
+                            raise ValueError("No IP found for this endpoint")
+                        ip_to_asset_id_map[asset["endpoint_ips"][0]] = asset["asset_id"]
+                        targets.append(asset["endpoint_ips"][0])
+                    else:
+                        ip_to_asset_id_map[asset["endpoint_hostname"]] = asset["asset_id"]
+                        targets.append(asset["endpoint_hostname"])
+
         elif content[TARGET_SELECTOR_KEY] == "manual":
             targets = [t.strip() for t in content[TARGETS_KEY].split(",") if t.strip()]
+
         else:
             raise ValueError("No targets provided for this injection")
-        return TargetExtractionResult(
-            targets=targets, ip_to_asset_id_map=ip_to_asset_id_map
-        )
+
+        return TargetExtractionResult(targets=targets, ip_to_asset_id_map=ip_to_asset_id_map)
+
+    @staticmethod
+    def extract_preferred_target(asset: Dict) -> Tuple[str, str]:
+        """
+        Extracts the preferred target value from an asset based on priority:
+        1. endpoint_hostname
+        2. endpoint_seen_ip
+        3. first of endpoint_ips
+        """
+        if asset.get("endpoint_hostname"):
+            return asset["endpoint_hostname"], asset["asset_id"]
+
+        if asset.get("endpoint_seen_ip"):
+            return asset["endpoint_seen_ip"], asset["asset_id"]
+
+        if asset.get("endpoint_ips"):
+            if not asset["endpoint_ips"]:
+                raise ValueError(f"Asset {asset['asset_id']} has empty endpoint_ips list")
+            return asset["endpoint_ips"][0], asset["asset_id"]
+
+        raise ValueError(f"No valid target property found for asset {asset['asset_id']}")
