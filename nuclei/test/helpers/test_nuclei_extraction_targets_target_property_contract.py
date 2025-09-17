@@ -8,7 +8,6 @@ from nuclei.nuclei_contracts.nuclei_constants import (
 )
 from nuclei.nuclei_contracts.nuclei_contracts import (
     NucleiContracts,
-    TargetExtractionResult,
 )
 
 
