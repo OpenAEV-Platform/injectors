@@ -216,11 +216,8 @@ class NucleiContracts:
         """Filter out loopback, unspecified, and link-local addresses."""
         try:
             ip_obj = ipaddress.ip_address(ip)
-            return not (
-                ip_obj.is_loopback or ip_obj.is_unspecified or ip_obj.is_link_local
-            )
+            return not (ip_obj.is_loopback or ip_obj.is_unspecified)
         except ValueError:
-            # Not a valid IP
             return False
 
     @staticmethod
@@ -247,7 +244,7 @@ class NucleiContracts:
                 if NucleiContracts.is_valid_ip(ip):
                     return ip, asset_id
 
-            # Fallback: no valid IPs but hostname exists
+            # No valid IPs but hostname exists
             if hostname:
                 return hostname, asset_id
 
