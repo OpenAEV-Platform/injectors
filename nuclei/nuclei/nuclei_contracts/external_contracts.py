@@ -57,6 +57,7 @@ class ExternalContractsManager:
         current_contracts = self.fetch_all_current_contracts()
 
         template_to_create_contract = []
+        template_to_update_contract = {}
         for template in cve_templates_metadata:
             found = False
             for contract in current_contracts:
@@ -64,23 +65,48 @@ class ExternalContractsManager:
                     "injector_contract_external_id"
                 ] == self.theoretical_external_id(template):
                     current_contracts.remove(contract)
+                    template_to_update_contract[
+                        contract["injector_contract_external_id"]
+                    ] = self.make_contract_update(
+                        contract["injector_contract_id"], template
+                    )
                     found = True
                     break
             if not found:
-                template_to_create_contract.append(self.make_contract(template))
+                template_to_create_contract.append(
+                    self.make_contract_create(str(uuid.uuid4()), template)
+                )
         contracts_to_delete = current_contracts
 
         for contract in template_to_create_contract:
             try:
+                self._logger.info(
+                    "Creating external contract: {}".format(
+                        contract["external_contract_id"]
+                    )
+                )
                 self._api_client.injector_contract.create(contract)
+            except Exception as e:
+                self._logger.error(e)
+                continue
+
+        for key, contract in template_to_update_contract.items():
+            try:
+                self._logger.info("Updating external contract: {}".format(key))
+                self._api_client.injector_contract.update(key, contract)
             except Exception as e:
                 self._logger.error(e)
                 continue
 
         for contract in contracts_to_delete:
             try:
+                self._logger.info(
+                    "Deleting external contract: {}".format(
+                        contract["injector_contract_external_id"]
+                    )
+                )
                 self._api_client.injector_contract.delete(
-                    contract["injector_contract_id"]
+                    contract["injector_contract_external_id"]
                 )
             except Exception as e:
                 self._logger.error(e)
@@ -88,7 +114,15 @@ class ExternalContractsManager:
 
         self._logger.info("Done maintaining external contracts in the background.")
 
-    def make_contract(self, template):
+    def make_contract_create(self, contract_id, template):
+        return self._make_contract(contract_id, template).to_contract_add_input(
+            self._injector_id
+        )
+
+    def make_contract_update(self, contract_id, template):
+        return self._make_contract(contract_id, template).to_contract_update_input()
+
+    def _make_contract(self, contract_id: str, template):
         config = NucleiContracts.base_contract_config()
         fields = NucleiContracts.core_contract_fields() + [
             ContractText(
@@ -100,7 +134,7 @@ class ExternalContractsManager:
         ]
         outputs = NucleiContracts.core_outputs()
         contract = NucleiContracts.build_contract(
-            str(uuid.uuid4()),
+            contract_id,
             self.theoretical_external_id(template),
             config,
             fields,
@@ -109,7 +143,7 @@ class ExternalContractsManager:
             template["ID"],
         )
         contract.add_vulnerability(template["ID"])
-        return contract.to_contract_add_input(self._injector_id)
+        return contract
 
     def external_id_prefix(self):
         return "external-injector-contract_{}".format(self._injector_id)
