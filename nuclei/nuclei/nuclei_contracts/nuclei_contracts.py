@@ -185,7 +185,9 @@ class NucleiContracts:
                         ip_to_asset_id_map[target] = asset_id
                 else:
                     if selector == "seen_ip":
-                        ip_to_asset_id_map[asset["endpoint_seen_ip"]] = asset["asset_id"]
+                        ip_to_asset_id_map[asset["endpoint_seen_ip"]] = asset[
+                            "asset_id"
+                        ]
                         targets.append(asset["endpoint_seen_ip"])
                     elif selector == "local_ip":
                         if not asset["endpoint_ips"]:
@@ -193,7 +195,9 @@ class NucleiContracts:
                         ip_to_asset_id_map[asset["endpoint_ips"][0]] = asset["asset_id"]
                         targets.append(asset["endpoint_ips"][0])
                     else:
-                        ip_to_asset_id_map[asset["endpoint_hostname"]] = asset["asset_id"]
+                        ip_to_asset_id_map[asset["endpoint_hostname"]] = asset[
+                            "asset_id"
+                        ]
                         targets.append(asset["endpoint_hostname"])
 
         elif content[TARGET_SELECTOR_KEY] == "manual":
@@ -202,7 +206,9 @@ class NucleiContracts:
         else:
             raise ValueError("No targets provided for this injection")
 
-        return TargetExtractionResult(targets=targets, ip_to_asset_id_map=ip_to_asset_id_map)
+        return TargetExtractionResult(
+            targets=targets, ip_to_asset_id_map=ip_to_asset_id_map
+        )
 
     @staticmethod
     def extract_property_target_value(asset: Dict) -> Tuple[str, str]:
