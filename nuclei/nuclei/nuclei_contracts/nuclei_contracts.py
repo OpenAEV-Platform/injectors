@@ -19,6 +19,7 @@ from pyobas.contracts.contract_config import (
     SupportedLanguage,
     prepare_contracts,
 )
+from pyobas.helpers import OpenBASInjectorHelper
 
 from nuclei.nuclei_contracts.nuclei_constants import (
     ASSETS_KEY,
@@ -171,7 +172,9 @@ class NucleiContracts:
         )
 
     @staticmethod
-    def extract_targets(data: Dict) -> TargetExtractionResult:
+    def extract_targets(
+        data: Dict, helper: OpenBASInjectorHelper
+    ) -> TargetExtractionResult:
         targets = []
         ip_to_asset_id_map = {}
         content = data["injection"]["inject_content"]
@@ -184,6 +187,11 @@ class NucleiContracts:
                         target, asset_id = result
                         targets.append(target)
                         ip_to_asset_id_map[target] = asset_id
+                    else:
+                        helper.injector_logger.warning(
+                            f"No valid target found for asset_id={asset.get('asset_id')} "
+                            f"(hostname={asset.get('endpoint_hostname')}, ips={asset.get('endpoint_ips')})"
+                        )
                 else:
                     if selector == "seen_ip":
                         ip_to_asset_id_map[asset["endpoint_seen_ip"]] = asset[
