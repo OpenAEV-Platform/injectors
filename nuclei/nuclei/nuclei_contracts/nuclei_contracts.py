@@ -1,3 +1,4 @@
+import ipaddress
 from dataclasses import dataclass
 from typing import Dict, List, Tuple
 
@@ -211,22 +212,36 @@ class NucleiContracts:
         )
 
     @staticmethod
+    def is_valid_ip(ip: str) -> bool:
+        """Filter out loopback, unspecified, and link-local addresses."""
+        try:
+            ip_obj = ipaddress.ip_address(ip)
+            return not (
+                ip_obj.is_loopback or ip_obj.is_unspecified or ip_obj.is_link_local
+            )
+        except ValueError:
+            # Not a valid IP
+            return False
+
+    @staticmethod
     def extract_property_target_value(asset: Dict) -> Tuple[str, str]:
         """
-        Extracts the target value from an asset based on priority:
-        1. endpoint_hostname
-        2. endpoint_seen_ip
-        3. first of endpoint_ips
+        Extract target value from asset based on conditions:
+        - Agentless + hostname => hostname
+        - Other case => Ip
         """
-        if asset.get("endpoint_hostname"):
-            return asset["endpoint_hostname"], asset["asset_id"]
+        asset_id = asset.get("asset_id")
+        agents = asset.get("asset_agents", [])
+        hostname = asset.get("endpoint_hostname")
+        endpoint_ips = asset.get("endpoint_ips", [])
 
-        if asset.get("endpoint_seen_ip"):
-            return asset["endpoint_seen_ip"], asset["asset_id"]
+        # Case 1: Agentless + hostname
+        if not agents and hostname:
+            return hostname, asset_id
 
-        if asset.get("endpoint_ips"):
-            if not asset["endpoint_ips"]:
-                return None
-            return asset["endpoint_ips"][0], asset["asset_id"]
+        # Other Case
+        for ip in endpoint_ips:
+            if NucleiContracts.is_valid_ip(ip):
+                return ip, asset_id
 
         return None
