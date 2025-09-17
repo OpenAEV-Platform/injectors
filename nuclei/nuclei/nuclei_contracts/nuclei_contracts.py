@@ -1,6 +1,6 @@
 import ipaddress
 from dataclasses import dataclass
-from typing import Dict, List, Tuple
+from typing import Dict, List, Optional, Tuple
 
 from pyobas.contracts import ContractBuilder
 from pyobas.contracts.contract_config import (
@@ -224,7 +224,7 @@ class NucleiContracts:
             return False
 
     @staticmethod
-    def extract_property_target_value(asset: Dict) -> Tuple[str, str]:
+    def extract_property_target_value(asset: Dict) -> Optional[Tuple[str, str]]:
         """
         Extract target value from asset based on conditions:
         - Agentless + hostname => hostname

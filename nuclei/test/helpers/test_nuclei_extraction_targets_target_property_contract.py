@@ -25,7 +25,7 @@ class NucleiExtractPropertyTargetValueTest(TestCase):
             "asset_id": "a2",
             "endpoint_hostname": "host.nia.local",
             "endpoint_ips": [],
-            "asset_agents": [{"agent_id": "x"}],  # has agent
+            "asset_agents": [{"agent_id": "x"}],  # has agent no endpoints
         }
         self.asset_local_ip = {
             "asset_id": "a3",
