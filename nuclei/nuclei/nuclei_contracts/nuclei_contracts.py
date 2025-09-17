@@ -87,7 +87,7 @@ class NucleiContracts:
         target_property_selector = ContractSelect(
             key=TARGET_PROPERTY_SELECTOR_KEY,
             label="Targeted assets property",
-            defaultValue=["automatic"],
+            defaultValue=[TargetProperty.AUTOMATIC.name.lower()],
             mandatory=False,
             choices=target_property_choices_dict,
             mandatoryConditionFields=[target_selector.key],
