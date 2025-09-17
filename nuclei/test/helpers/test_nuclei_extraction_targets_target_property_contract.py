@@ -40,6 +40,8 @@ class NucleiExtractPropertyTargetValueTest(TestCase):
             "endpoint_ips": [],
         }
 
+    # ---------- extract_property_target_value ----------
+
     def test_extract_property_target_value_hostname(self):
         target, asset_id = NucleiContracts.extract_property_target_value(
             self.asset_hostname
