@@ -174,16 +174,16 @@ class NucleiContracts:
         targets = []
         ip_to_asset_id_map = {}
         content = data["injection"]["inject_content"]
-
         if content[TARGET_SELECTOR_KEY] == "assets" and data.get(ASSETS_KEY):
             selector = content[TARGET_PROPERTY_SELECTOR_KEY]
-            if selector == "automatic":
-                for asset in data[ASSETS_KEY]:
-                    target, asset_id = NucleiContracts.extract_property_target_value(asset)
-                    targets.append(target)
-                    ip_to_asset_id_map[target] = asset_id
-            else:
-                for asset in data[ASSETS_KEY]:
+            for asset in data[ASSETS_KEY]:
+                if selector == "automatic":
+                    result = NucleiContracts.extract_property_target_value(asset)
+                    if result:
+                        target, asset_id = result
+                        targets.append(target)
+                        ip_to_asset_id_map[target] = asset_id
+                else:
                     if selector == "seen_ip":
                         ip_to_asset_id_map[asset["endpoint_seen_ip"]] = asset["asset_id"]
                         targets.append(asset["endpoint_seen_ip"])
@@ -220,7 +220,7 @@ class NucleiContracts:
 
         if asset.get("endpoint_ips"):
             if not asset["endpoint_ips"]:
-                raise ValueError(f"Asset {asset['asset_id']} has empty endpoint_ips list")
+                return None
             return asset["endpoint_ips"][0], asset["asset_id"]
 
-        raise ValueError(f"No valid target property found for asset {asset['asset_id']}")
+        return None

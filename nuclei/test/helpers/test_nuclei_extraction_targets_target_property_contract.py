@@ -1,11 +1,12 @@
 from unittest import TestCase
 
-from nuclei.nuclei_contracts.nuclei_contracts import NucleiContracts, TargetExtractionResult
+from nuclei.nuclei_contracts.nuclei_constants import TARGET_SELECTOR_KEY, TARGET_PROPERTY_SELECTOR_KEY, \
+    ASSETS_KEY, TARGETS_KEY
 
-TARGET_SELECTOR_KEY = "target_selector"
-TARGET_PROPERTY_SELECTOR_KEY = "target_property_selector"
-TARGETS_KEY = "targets"
-ASSETS_KEY = "assets"
+from nuclei.nuclei_contracts.nuclei_contracts import NucleiContracts
+
+from nuclei.nuclei_contracts.nuclei_contracts import TargetExtractionResult
+
 
 class NucleiExtractPropertyTargetValueTest(TestCase):
 
@@ -53,10 +54,10 @@ class NucleiExtractPropertyTargetValueTest(TestCase):
         self.assertEqual(asset_id, "a3")
     
     def test_extract_property_target_value_no_valid_field(self):
-        with self.assertRaises(ValueError):
-            NucleiContracts.extract_property_target_value(self.empty_asset_ips)
-    
-    # ---------- extract_targets ----------
+        target = NucleiContracts.extract_property_target_value(self.empty_asset_ips)
+        self.assertEqual(target, None)
+
+# ---------- extract_targets ----------
     
     def test_extract_targets_automatic(self):
         data = {
