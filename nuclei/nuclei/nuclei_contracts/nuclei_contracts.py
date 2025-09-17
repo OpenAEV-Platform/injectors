@@ -225,9 +225,7 @@ class NucleiContracts:
         """
         Extract target value from asset based on conditions:
         - Agentless + hostname => hostname
-        - Agent with IPs => first valid IP
-        - Agent with no valid IPs + hostname => hostname
-        - Otherwise => None
+        - Otherwise => first valid IP
         """
         asset_id = asset.get("asset_id")
         agents = asset.get("asset_agents", [])
@@ -239,18 +237,6 @@ class NucleiContracts:
             return hostname, asset_id
 
         # Case 2: Agent present => try IPs
-        if agents:
-            for ip in endpoint_ips:
-                if NucleiContracts.is_valid_ip(ip):
-                    return ip, asset_id
-
-            # No valid IPs but hostname exists
-            if hostname:
-                return hostname, asset_id
-
-        # Case 3: No agent + no hostname => IPs only
         for ip in endpoint_ips:
             if NucleiContracts.is_valid_ip(ip):
                 return ip, asset_id
-
-        return None

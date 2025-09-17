@@ -6,9 +6,7 @@ from nuclei.nuclei_contracts.nuclei_constants import (
     TARGET_SELECTOR_KEY,
     TARGETS_KEY,
 )
-from nuclei.nuclei_contracts.nuclei_contracts import (
-    NucleiContracts,
-)
+from nuclei.nuclei_contracts.nuclei_contracts import NucleiContracts
 
 
 class NucleiExtractPropertyTargetValueTest(TestCase):
@@ -20,23 +18,17 @@ class NucleiExtractPropertyTargetValueTest(TestCase):
             "endpoint_ips": ["10.0.0.1"],
             "asset_agents": [],  # agentless
         }
-        self.asset_with_agent_no_ips = {
-            "asset_id": "a2",
-            "endpoint_hostname": "host.nia.local",
-            "endpoint_ips": [],
-            "asset_agents": [{"agent_id": "x"}],  # has agent no endpoints
-        }
         self.asset_local_ip = {
-            "asset_id": "a3",
+            "asset_id": "a2",
             "endpoint_hostname": None,
-            "endpoint_ips": ["10.0.0.3"],
-            "asset_agents": [{"agent_id": "y"}],  # has agent
+            "endpoint_ips": ["10.0.0.2"],
+            "asset_agents": [{"agent_id": "x"}],  # has agent
         }
         self.empty_asset_ips = {
-            "asset_id": "a4",
+            "asset_id": "a3",
             "endpoint_hostname": None,
             "endpoint_ips": [],  # no ips
-            "asset_agents": [{"agent_id": "z"}],
+            "asset_agents": [{"agent_id": "y"}],
         }
 
     # ---------- extract_property_target_value ----------
@@ -48,19 +40,12 @@ class NucleiExtractPropertyTargetValueTest(TestCase):
         self.assertEqual(target, "host.local")
         self.assertEqual(asset_id, "a1")
 
-    def test_extract_property_target_value_with_agent(self):
-        target, asset_id = NucleiContracts.extract_property_target_value(
-            self.asset_with_agent_no_ips
-        )
-        self.assertEqual(target, "host.nia.local")
-        self.assertEqual(asset_id, "a2")
-
     def test_extract_property_target_value_local_ip(self):
         target, asset_id = NucleiContracts.extract_property_target_value(
             self.asset_local_ip
         )
-        self.assertEqual(target, "10.0.0.3")
-        self.assertEqual(asset_id, "a3")
+        self.assertEqual(target, "10.0.0.2")
+        self.assertEqual(asset_id, "a2")
 
     def test_extract_property_target_value_no_valid_field(self):
         target = NucleiContracts.extract_property_target_value(self.empty_asset_ips)
@@ -78,15 +63,12 @@ class NucleiExtractPropertyTargetValueTest(TestCase):
             },
             ASSETS_KEY: [
                 self.asset_hostname,
-                self.asset_with_agent_no_ips,
                 self.asset_local_ip,
             ],
         }
         result = NucleiContracts.extract_targets(data)
-        self.assertCountEqual(
-            result.targets, ["host.local", "host.nia.local", "10.0.0.3"]
-        )
-        self.assertEqual(len(result.ip_to_asset_id_map), 3)
+        self.assertCountEqual(result.targets, ["host.local", "10.0.0.2"])
+        self.assertEqual(len(result.ip_to_asset_id_map), 2)
 
     def test_extract_targets_local_ip(self):
         data = {
@@ -99,8 +81,8 @@ class NucleiExtractPropertyTargetValueTest(TestCase):
             ASSETS_KEY: [self.asset_local_ip],
         }
         result = NucleiContracts.extract_targets(data)
-        self.assertEqual(result.targets, ["10.0.0.3"])
-        self.assertEqual(result.ip_to_asset_id_map, {"10.0.0.3": "a3"})
+        self.assertEqual(result.targets, ["10.0.0.2"])
+        self.assertEqual(result.ip_to_asset_id_map, {"10.0.0.2": "a2"})
 
     def test_extract_targets_local_ip_no_ips(self):
         data = {
