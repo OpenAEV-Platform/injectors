@@ -1,11 +1,15 @@
 from unittest import TestCase
 
-from nuclei.nuclei_contracts.nuclei_constants import TARGET_SELECTOR_KEY, TARGET_PROPERTY_SELECTOR_KEY, \
-    ASSETS_KEY, TARGETS_KEY
-
-from nuclei.nuclei_contracts.nuclei_contracts import NucleiContracts
-
-from nuclei.nuclei_contracts.nuclei_contracts import TargetExtractionResult
+from nuclei.nuclei_contracts.nuclei_constants import (
+    ASSETS_KEY,
+    TARGET_PROPERTY_SELECTOR_KEY,
+    TARGET_SELECTOR_KEY,
+    TARGETS_KEY,
+)
+from nuclei.nuclei_contracts.nuclei_contracts import (
+    NucleiContracts,
+    TargetExtractionResult,
+)
 
 
 class NucleiExtractPropertyTargetValueTest(TestCase):
