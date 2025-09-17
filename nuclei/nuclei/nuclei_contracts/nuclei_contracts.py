@@ -213,7 +213,7 @@ class NucleiContracts:
 
     @staticmethod
     def is_valid_ip(ip: str) -> bool:
-        """Filter out loopback, unspecified, and link-local addresses."""
+        """Filter out loopback, unspecified"""
         try:
             ip_obj = ipaddress.ip_address(ip)
             return not (ip_obj.is_loopback or ip_obj.is_unspecified)
