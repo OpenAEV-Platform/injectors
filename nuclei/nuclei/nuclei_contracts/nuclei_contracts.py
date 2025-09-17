@@ -1,5 +1,6 @@
 import ipaddress
 from dataclasses import dataclass
+from enum import Enum
 from typing import Dict, List, Optional, Tuple
 
 from pyobas.contracts import ContractBuilder
@@ -35,6 +36,18 @@ from nuclei.nuclei_contracts.nuclei_constants import (
 class TargetExtractionResult:
     targets: List[str]
     ip_to_asset_id_map: Dict[str, str]
+
+
+class TargetProperty(Enum):
+    AUTOMATIC = "Automatic"
+    HOSTNAME = "Hostname"
+    SEEN_IP = "Seen IP"
+    LOCAL_IP = "Local IP (first)"
+
+
+target_property_choices_dict = {
+    property.name.lower(): property.value for property in TargetProperty
+}
 
 
 class NucleiContracts:
@@ -76,12 +89,7 @@ class NucleiContracts:
             label="Targeted assets property",
             defaultValue=["automatic"],
             mandatory=False,
-            choices={
-                "automatic": "Automatic",
-                "hostname": "Hostname",
-                "seen_ip": "Seen IP",
-                "local_ip": "Local IP (first)",
-            },
+            choices=target_property_choices_dict,
             mandatoryConditionFields=[target_selector.key],
             mandatoryConditionValues={target_selector.key: "assets"},
             visibleConditionFields=[target_selector.key],
