@@ -240,3 +240,5 @@ class NucleiContracts:
         for ip in endpoint_ips:
             if NucleiContracts.is_valid_ip(ip):
                 return ip, asset_id
+
+        return None
