@@ -232,7 +232,7 @@ class NucleiContracts:
         """Filter out loopback, unspecified"""
         try:
             ip_obj = ipaddress.ip_address(ip)
-            return not (ip_obj.is_loopback or ip_obj.is_unspecified)
+            return not (ip_obj.is_loopback or ip_obj.is_unspecified or ip_obj.is_link_local)
         except ValueError:
             return False
 
