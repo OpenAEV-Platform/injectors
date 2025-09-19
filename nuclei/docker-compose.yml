@@ -6,7 +6,8 @@ services:
       - OPENBAS_URL=http://localhost
       - OPENBAS_TOKEN=ChangeMe
       - INJECTOR_ID=ChangeMe
-      - "INJECTOR_NAME=Nuclei"
+      - INJECTOR_NAME=Nuclei
+      - INJECTOR_LOG_LEVEL=WARN
     restart: always
     depends_on:
       openbas:

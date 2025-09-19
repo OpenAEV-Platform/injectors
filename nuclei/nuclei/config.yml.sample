@@ -5,4 +5,4 @@ openbas:
 injector:
   id: 'ChangeMe'
   name: 'Nuclei'
-  log_level: 'info'
+  log_level: 'WARN'
