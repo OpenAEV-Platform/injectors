@@ -57,7 +57,7 @@ class ExternalContractsManager:
 
     def manage_contracts(self):
         # unfortunately, need to reenable module-level configs in spawned process
-        setup_logging_config(self._logger._log_level, self._logger._json_logging)
+        setup_logging_config(self._logger.log_level, self._logger.json_logging)
 
         self._logger.info("Start maintaining external contracts in the background...")
         self._update_templates()
