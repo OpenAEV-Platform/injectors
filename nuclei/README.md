@@ -46,11 +46,12 @@ Configuration is provided either through environment variables (Docker) or a con
 
 ### Base injector environment variables
 
-| Parameter      | config.yml | Docker environment variable | Default | Mandatory | Description                                                                            |
-|----------------|------------|-----------------------------|---------|-----------|----------------------------------------------------------------------------------------|
-| Injector ID    | id         | `INJECTOR_ID`               | /       | Yes       | A unique `UUIDv4` identifier for this injector instance.                               |
-| Injector Name  | name       | `INJECTOR_NAME`             |         | Yes       | Name of the injector.                                                                  |
-| Log Level      | log_level  | `INJECTOR_LOG_LEVEL`        | info    | Yes       | Determines the verbosity of the logs. Options: `debug`, `info`, `warn`, or `error`.   |
+| Parameter                               | config.yml                                      | Docker environment variable                                | Default | Mandatory | Description                                                                                       |
+|-----------------------------------------|-------------------------------------------------|------------------------------------------------------------|---------|-----------|---------------------------------------------------------------------------------------------------|
+| Injector ID                             | id                                              | `INJECTOR_ID`                                              | /       | Yes       | A unique `UUIDv4` identifier for this injector instance.                                          |
+| Injector Name                           | name                                            | `INJECTOR_NAME`                                            |         | Yes       | Name of the injector.                                                                             |
+| Log Level                               | log_level                                       | `INJECTOR_LOG_LEVEL`                                       | info    | Yes       | Determines the verbosity of the logs. Options: `debug`, `info`, `warn`, or `error`.               |
+| External contracts maintenance schedule | external_contracts_maintenance_schedule_seconds | `INJECTOR_EXTERNAL_CONTRACTS_MAINTENANCE_SCHEDULE_SECONDS` | 86400   | No        | With every tick, trigger a maintenance of the external contracts (e.g. based on Nuclei templates) |
 
 ---
 
