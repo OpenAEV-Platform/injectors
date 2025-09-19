@@ -1,4 +1,5 @@
 import json
+import multiprocessing
 import os
 import subprocess
 import time
@@ -9,7 +10,7 @@ from pyobas.helpers import OpenBASConfigHelper, OpenBASInjectorHelper
 from nuclei.helpers.nuclei_command_builder import NucleiCommandBuilder
 from nuclei.helpers.nuclei_output_parser import NucleiOutputParser
 from nuclei.helpers.nuclei_process import NucleiProcess
-from nuclei.nuclei_contracts.external_contracts import ExternalContractsManager
+from nuclei.nuclei_contracts.external_contracts import ExternalContractsScheduler
 from nuclei.nuclei_contracts.nuclei_contracts import NucleiContracts
 
 
@@ -138,7 +139,7 @@ class OpenBASNuclei:
 
     def start(self):
         self.helper.listen(message_callback=self.process_message)
-        ExternalContractsManager(
+        ExternalContractsScheduler(
             self.helper.api,
             self.config.get_conf("injector_id"),
             self.config.get_conf(

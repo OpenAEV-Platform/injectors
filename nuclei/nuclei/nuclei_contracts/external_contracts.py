@@ -13,26 +13,24 @@ from pyobas.apis.inputs.search import (
 )
 from pyobas.client import OpenBAS
 from pyobas.contracts.contract_config import ContractText
+from pyobas.utils import setup_logging_config
 
 from nuclei.helpers.nuclei_process import NucleiProcess
 from nuclei.nuclei_contracts.nuclei_contracts import NucleiContracts
 
 
-class ExternalContractsManager:
+class ExternalContractsScheduler:
     def __init__(self, api_client: OpenBAS, injector_id: str, period: int, logger):
         self.scheduler = sched.scheduler(time.time, time.sleep)
-        self._api_client = api_client
-        self._injector_id = injector_id
+        self.manager = ExternalContractsManager(api_client, injector_id, logger)
         self._period = period
-        self._logger = logger
 
     def start(self):
-        self.spawn_process()
         self.scheduler.enter(
-            delay=self._period,
+            delay=0,
             priority=1,
             action=self.__schedule,
-            argument=(self.scheduler, self.spawn_process, self._period),
+            argument=(self.scheduler, self.manager.spawn_process, self._period),
         )
         self.scheduler.run()
 
@@ -45,12 +43,22 @@ class ExternalContractsManager:
             argument=(scheduler, callback, delay),
         )
 
+
+class ExternalContractsManager:
+    def __init__(self, api_client: OpenBAS, injector_id: str, logger):
+        self._api_client = api_client
+        self._injector_id = injector_id
+        self._logger = logger
+
     def spawn_process(self):
         process = Process(target=self.manage_contracts)
         process.start()
         process.join()
 
     def manage_contracts(self):
+        # unfortunately, need to reenable module-level configs in spawned process
+        setup_logging_config(self._logger._log_level, self._logger._json_logging)
+
         self._logger.info("Start maintaining external contracts in the background...")
         self._update_templates()
         cve_templates_metadata = self.fetch_nuclei_cve_templates_list()
