@@ -1,4 +1,5 @@
 import json
+import os
 import subprocess
 import time
 from typing import Dict
@@ -8,11 +9,13 @@ from pyobas.helpers import OpenBASConfigHelper, OpenBASInjectorHelper
 from nuclei.helpers.nuclei_command_builder import NucleiCommandBuilder
 from nuclei.helpers.nuclei_output_parser import NucleiOutputParser
 from nuclei.helpers.nuclei_process import NucleiProcess
+from nuclei.nuclei_contracts.external_contracts import ExternalContractsScheduler
 from nuclei.nuclei_contracts.nuclei_contracts import NucleiContracts
 
 
 class OpenBASNuclei:
     def __init__(self):
+        print(os.getenv("PATH"))
         self.config = OpenBASConfigHelper(
             __file__,
             {
@@ -31,7 +34,23 @@ class OpenBASNuclei:
                     "file_path": ["injector", "type"],
                     "default": "openbas_nuclei",
                 },
-                "injector_contracts": {"data": NucleiContracts.build_contracts()},
+                "injector_contracts": {
+                    "data": NucleiContracts.build_static_contracts()
+                },
+                "injector_external_contracts_maintenance_schedule_seconds": {
+                    "env": "INJECTOR_EXTERNAL_CONTRACTS_MAINTENANCE_SCHEDULE_SECONDS",
+                    "file_path": [
+                        "injector",
+                        "external_contracts_maintenance_schedule_seconds",
+                    ],
+                    "default": 86400,
+                    "is_number": True,
+                },
+                "injector_log_level": {
+                    "env": "INJECTOR_LOG_LEVEL",
+                    "file_path": ["injector", "log_level"],
+                    "default": "warn",
+                },
             },
         )
         self.helper = OpenBASInjectorHelper(
@@ -42,8 +61,6 @@ class OpenBASNuclei:
             raise RuntimeError(
                 "Nuclei is not installed or is not accessible from your PATH."
             )
-        self._update_templates()
-
         self.command_builder = NucleiCommandBuilder()
         self.parser = NucleiOutputParser()
 
@@ -119,16 +136,16 @@ class OpenBASNuclei:
         except (FileNotFoundError, subprocess.CalledProcessError):
             return False
 
-    def _update_templates(self):
-        self.helper.injector_logger.info("Updating templates...")
-        try:
-            NucleiProcess.nuclei_update_templates()
-            self.helper.injector_logger.info("Templates updated successfully.")
-        except subprocess.CalledProcessError as e:
-            self.helper.injector_logger.error(f"Template update failed: {e}")
-
     def start(self):
         self.helper.listen(message_callback=self.process_message)
+        ExternalContractsScheduler(
+            self.helper.api,
+            self.config.get_conf("injector_id"),
+            self.config.get_conf(
+                "injector_external_contracts_maintenance_schedule_seconds"
+            ),
+            self.helper.injector_logger,
+        ).start()
 
 
 if __name__ == "__main__":

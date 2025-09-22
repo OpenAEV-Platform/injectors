@@ -39,8 +39,6 @@ class NucleiCommandBuilder:
             # Add -t "/" only if no template is specified in the content
             if not (content.get("template") or content.get("template_path")):
                 args += ["-t", "/"]
-        else:
-            raise ValueError("Unknown contract ID")
 
         template = content.get("template") or content.get("template_path")
         if template:

@@ -9,7 +9,6 @@ from pyobas.contracts.contract_config import (
     ContractAsset,
     ContractCardinality,
     ContractConfig,
-    ContractElement,
     ContractExpectations,
     ContractOutputElement,
     ContractOutputType,
@@ -53,9 +52,8 @@ target_property_choices_dict = {
 class NucleiContracts:
 
     @staticmethod
-    def build_contracts():
-        # -- CONFIG --
-        contract_config = ContractConfig(
+    def base_contract_config():
+        return ContractConfig(
             type=TYPE,
             label={
                 SupportedLanguage.en: "Nuclei Scan",
@@ -66,6 +64,8 @@ class NucleiContracts:
             expose=True,
         )
 
+    @staticmethod
+    def core_contract_fields():
         # -- FIELDS --
         target_selector = ContractSelect(
             key=TARGET_SELECTOR_KEY,
@@ -104,11 +104,6 @@ class NucleiContracts:
             visibleConditionFields=[target_selector.key],
             visibleConditionValues={target_selector.key: "manual"},
         )
-        template_manual = ContractText(
-            key="template",
-            label="Manual template path (-t)",
-            mandatory=False,
-        )
         expectations = ContractExpectations(
             key="expectations",
             label="Expectations",
@@ -125,7 +120,16 @@ class NucleiContracts:
             ],
         )
 
-        # -- OUTPUTS --
+        return [
+            target_selector,
+            targets_assets,
+            target_property_selector,
+            targets_manual,
+            expectations,
+        ]
+
+    @staticmethod
+    def core_outputs():
         output_vulns = ContractOutputElement(
             type=ContractOutputType.CVE,
             field="cve",
@@ -140,41 +144,51 @@ class NucleiContracts:
             isFindingCompatible=True,
             labels=["nuclei"],
         )
+        return [output_vulns, output_others]
 
-        fields: List[ContractElement] = (
-            ContractBuilder()
-            .add_fields(
-                [
-                    target_selector,
-                    targets_assets,
-                    target_property_selector,
-                    targets_manual,
-                    template_manual,
-                    expectations,
-                ]
-            )
-            .build_fields()
+    @staticmethod
+    def build_contract(
+        contract_id,
+        external_id,
+        contract_config,
+        contract_fields,
+        contract_outputs,
+        label_en,
+        label_fr,
+    ):
+        return Contract(
+            contract_id=contract_id,
+            external_id=external_id,
+            config=contract_config,
+            label={
+                SupportedLanguage.en: label_en,
+                SupportedLanguage.fr: label_fr,
+            },
+            fields=ContractBuilder().add_fields(contract_fields).build_fields(),
+            outputs=ContractBuilder().add_outputs(contract_outputs).build_outputs(),
+            manual=False,
         )
-        nuclei_contract_outputs: List[ContractOutputElement] = (
-            ContractBuilder().add_outputs([output_vulns, output_others]).build_outputs()
-        )
 
-        def build_contract(contract_id, label_en, label_fr):
-            return Contract(
-                contract_id=contract_id,
-                config=contract_config,
-                label={
-                    SupportedLanguage.en: label_en,
-                    SupportedLanguage.fr: label_fr,
-                },
-                fields=fields,
-                outputs=nuclei_contract_outputs,
-                manual=False,
-            )
-
+    @staticmethod
+    def build_static_contracts():
         return prepare_contracts(
             [
-                build_contract(cid, f"Nuclei - {en}", f"Nuclei - {fr}")
+                NucleiContracts.build_contract(
+                    cid,
+                    None,
+                    NucleiContracts.base_contract_config(),
+                    NucleiContracts.core_contract_fields()
+                    + [
+                        ContractText(
+                            key="template",
+                            label="Manual template path (-t)",
+                            mandatory=False,
+                        )
+                    ],
+                    NucleiContracts.core_outputs(),
+                    f"Nuclei - {en}",
+                    f"Nuclei - {fr}",
+                )
                 for cid, (en, fr) in CONTRACT_LABELS.items()
             ]
         )
