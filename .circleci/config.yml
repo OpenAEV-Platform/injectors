@@ -125,9 +125,9 @@ jobs:
       - setup_remote_docker
       - run: sudo apt-get update -qq && sudo apt install curl gettext-base
       - run:
-         working_directory: ~/openaev
-         name: Replace pyoaev requirement of stable version with latest main branch code
-         command: find . -name requirements.txt -exec sed 's|^pyoaev==.*$|pyoaev @ git+https://github.com/OpenAEV-Platform/client-python@main|' -i {} \;
+          working_directory: ~/openaev
+          name: Replace pyoaev requirement of stable version with latest main branch code
+          command: find . -name requirements.txt -exec sed 's|^pyoaev==.*$|pyoaev @ git+https://github.com/OpenAEV-Platform/client-python@main|' -i {} \;
       - run:
           working_directory: ~/openaev/http-query
           name: Build Docker image openaev/injector-http-query
