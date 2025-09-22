@@ -54,9 +54,9 @@ jobs:
           name: Overwrite pyobas with correct version from CI
           command: |
             if [ "${CIRCLE_BRANCH}" = "release/current" ]; then
-              pip install git+https://github.com/OpenBAS-Platform/client-python.git@release/current
+              pip install --force-reinstall git+https://github.com/OpenBAS-Platform/client-python.git@release/current
             else
-              pip install git+https://github.com/OpenBAS-Platform/client-python.git@main
+              pip install --force-reinstall git+https://github.com/OpenBAS-Platform/client-python.git@main
             fi
       - run:
           working_directory: ~/openbas/nuclei
