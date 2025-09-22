@@ -50,7 +50,7 @@ jobs:
           name: Install dependencies for nuclei injector
           command: pip install -r requirements.txt
       - run:
-          working_directory: ~/openbas/crowdstrike
+          working_directory: ~/openbas/nuclei
           name: Overwrite pyobas with correct version from CI
           command: |
             if [ "${CIRCLE_BRANCH}" = "release/current" ]; then
