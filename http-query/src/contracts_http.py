@@ -1,7 +1,7 @@
 from typing import List
 
-from pyobas.contracts import ContractBuilder
-from pyobas.contracts.contract_config import (
+from pyoaev.contracts import ContractBuilder
+from pyoaev.contracts.contract_config import (
     Contract,
     ContractAttachment,
     ContractCardinality,

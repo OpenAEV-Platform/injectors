@@ -33,7 +33,7 @@ from contracts_aws import (
     AWSContracts,
 )
 from helpers.pacu_executor import PacuExecutor
-from pyobas.helpers import OpenBASConfigHelper, OpenBASInjectorHelper
+from pyoaev.helpers import OpenBASConfigHelper, OpenBASInjectorHelper
 
 
 class OpenBASAWS:

@@ -49,7 +49,7 @@ class ExternalContractsTest(unittest.TestCase):
         self.assertEqual(str(http_error.exception), expected_exception_message)
 
     @mock.patch("requests.Session.get")
-    @mock.patch("pyobas.client.OpenBAS")
+    @mock.patch("pyoaev.client.OpenBAS")
     @mock.patch("uuid.uuid4")
     def test_when_no_preexisting_contract_create_all_from_templates(
         self, mock_uuid4, mock_obas_client, mock_requests_get
@@ -217,7 +217,7 @@ class ExternalContractsTest(unittest.TestCase):
         )
 
     @mock.patch("requests.Session.get")
-    @mock.patch("pyobas.client.OpenBAS")
+    @mock.patch("pyoaev.client.OpenBAS")
     @mock.patch("uuid.uuid4")
     def test_when_some_preexisting_contract_create_rest_from_templates(
         self, mock_uuid4, mock_obas_client, mock_requests_get

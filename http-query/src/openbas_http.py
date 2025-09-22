@@ -11,7 +11,7 @@ from contracts_http import (
     HTTP_RAW_PUT_CONTRACT,
     HttpContracts,
 )
-from pyobas.helpers import OpenBASConfigHelper, OpenBASInjectorHelper
+from pyoaev.helpers import OpenBASConfigHelper, OpenBASInjectorHelper
 
 
 class OpenBASHttp:

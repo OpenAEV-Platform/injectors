@@ -4,7 +4,7 @@ import subprocess
 import time
 from typing import Dict
 
-from pyobas.helpers import OpenBASConfigHelper, OpenBASInjectorHelper
+from pyoaev.helpers import OpenBASConfigHelper, OpenBASInjectorHelper
 
 from nuclei.helpers.nuclei_command_builder import NucleiCommandBuilder
 from nuclei.helpers.nuclei_output_parser import NucleiOutputParser

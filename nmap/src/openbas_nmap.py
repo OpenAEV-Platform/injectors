@@ -9,7 +9,7 @@ from contracts_nmap import (
     TCP_SYN_SCAN_CONTRACT,
     NmapContracts,
 )
-from pyobas.helpers import OpenBASConfigHelper, OpenBASInjectorHelper
+from pyoaev.helpers import OpenBASConfigHelper, OpenBASInjectorHelper
 
 
 class OpenBASNmap:

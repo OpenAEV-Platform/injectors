@@ -74,13 +74,13 @@ os.system(
     + "/g' @"
 )
 
-# pyobas==x.x.x -> requirements.txt
+# pyoaev==x.x.x -> requirements.txt
 os.system(
-    "grep -rli 'pyobas=="
+    "grep -rli 'pyoaev=="
     + previous_version
-    + "' * | xargs -i@ sed -i 's/pyobas=="
+    + "' * | xargs -i@ sed -i 's/pyoaev=="
     + previous_version.replace(".", "\\.")
-    + "/pyobas=="
+    + "/pyoaev=="
     + new_version.replace(".", "\\.")
     + "/g' @"
 )
