@@ -60,14 +60,20 @@ class HttpContracts:
             label="Username",
             defaultValue="",
             mandatory=False,
-            linkedFields=[basic_auth_field],
+            mandatoryConditionFields=[basic_auth_field.key],
+            mandatoryConditionValues={basic_auth_field.key: True},
+            visibleConditionFields=[basic_auth_field.key],
+            visibleConditionValues={basic_auth_field.key: True},
         )
         basic_password = ContractText(
             key="basicPassword",
             label="Password",
             defaultValue="",
             mandatory=False,
-            linkedFields=[basic_auth_field],
+            mandatoryConditionFields=[basic_auth_field.key],
+            mandatoryConditionValues={basic_auth_field.key: True},
+            visibleConditionFields=[basic_auth_field.key],
+            visibleConditionValues={basic_auth_field.key: True},
         )
         auth_fields = [basic_auth_field, username_field, basic_password]
         # Post contract raw

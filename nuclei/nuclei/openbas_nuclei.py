@@ -72,7 +72,7 @@ class OpenBASNuclei:
         ]
         content = data["injection"]["inject_content"]
 
-        target_results = NucleiContracts.extract_targets(data)
+        target_results = NucleiContracts.extract_targets(data, self.helper)
         nuclei_args = self.command_builder.build_args(
             contract_id, content, target_results.targets
         )
