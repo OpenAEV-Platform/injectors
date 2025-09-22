@@ -6,6 +6,7 @@ from unittest.mock import MagicMock, call
 from pyobas.contracts.contract_config import SupportedLanguage
 from requests.exceptions import HTTPError
 
+from nuclei.helpers.nuclei_process import NucleiProcess
 from nuclei.nuclei_contracts.external_contracts import ExternalContractsManager
 
 
@@ -23,6 +24,8 @@ class ExternalContractsTest(unittest.TestCase):
 
     def setUp(self):
         self.LOGGER.log_level = "INFO"
+        # permanently disable actual nuclei subprocess command
+        NucleiProcess.nuclei_update_templates = lambda: None
 
     def default_repository_templates_fetch(self, mock_session_get):
         mock_response = MagicMock()
