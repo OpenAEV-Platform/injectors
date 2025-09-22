@@ -3,8 +3,8 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import Dict, List, Optional, Tuple
 
-from pyobas.contracts import ContractBuilder
-from pyobas.contracts.contract_config import (
+from pyoaev.contracts import ContractBuilder
+from pyoaev.contracts.contract_config import (
     Contract,
     ContractAsset,
     ContractCardinality,
@@ -19,7 +19,7 @@ from pyobas.contracts.contract_config import (
     SupportedLanguage,
     prepare_contracts,
 )
-from pyobas.helpers import OpenBASInjectorHelper
+from pyoaev.helpers import OpenBASInjectorHelper
 
 from nuclei.nuclei_contracts.nuclei_constants import (
     ASSETS_KEY,

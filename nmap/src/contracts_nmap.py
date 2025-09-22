@@ -6,8 +6,8 @@ from constants_nmap import (
     TARGET_SELECTOR_KEY,
     TARGETS_KEY,
 )
-from pyobas.contracts import ContractBuilder
-from pyobas.contracts.contract_config import (
+from pyoaev.contracts import ContractBuilder
+from pyoaev.contracts.contract_config import (
     Contract,
     ContractAsset,
     ContractCardinality,
