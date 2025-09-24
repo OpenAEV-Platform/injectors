@@ -1,7 +1,7 @@
 version: '3'
 services:
   injector-nmap:
-    image: openbas/injector-nmap:1.18.19
+    image: openbas/injector-nmap:1.18.20
     environment:
       - OPENBAS_URL=http://localhost
       - OPENBAS_TOKEN=ChangeMe
