@@ -33,19 +33,19 @@ from contracts_aws import (
     AWSContracts,
 )
 from helpers.pacu_executor import PacuExecutor
-from pyobas.helpers import OpenBASConfigHelper, OpenBASInjectorHelper
+from pyoaev.helpers import OpenAEVConfigHelper, OpenAEVInjectorHelper
 
 
-class OpenBASAWS:
+class OpenAEVAWS:
     def __init__(self):
-        self.config = OpenBASConfigHelper(
+        self.config = OpenAEVConfigHelper(
             __file__,
             {
                 # API information
-                "openbas_url": {"env": "OPENBAS_URL", "file_path": ["openbas", "url"]},
-                "openbas_token": {
-                    "env": "OPENBAS_TOKEN",
-                    "file_path": ["openbas", "token"],
+                "openaev_url": {"env": "OPENAEV_URL", "file_path": ["openaev", "url"]},
+                "openaev_token": {
+                    "env": "OPENAEV_TOKEN",
+                    "file_path": ["openaev", "token"],
                 },
                 # Config information
                 "injector_id": {"env": "INJECTOR_ID", "file_path": ["injector", "id"]},
@@ -56,7 +56,7 @@ class OpenBASAWS:
                 "injector_type": {
                     "env": "INJECTOR_TYPE",
                     "file_path": ["injector", "type"],
-                    "default": "openbas_aws",
+                    "default": "openaev_aws",
                 },
                 "injector_log_level": {
                     "env": "INJECTOR_LOG_LEVEL",
@@ -67,7 +67,7 @@ class OpenBASAWS:
             },
         )
 
-        self.helper = OpenBASInjectorHelper(self.config, open("img/icon-aws.png", "rb"))
+        self.helper = OpenAEVInjectorHelper(self.config, open("img/icon-aws.png", "rb"))
         self.pacu_executor = PacuExecutor(logger=self.helper.injector_logger)
 
     def aws_execution(self, start: float, data: Dict) -> Dict:
@@ -292,7 +292,7 @@ class OpenBASAWS:
                 # If it's a 500 error, log that we need to check server logs
                 if "500" in error_str:
                     self.helper.injector_logger.error(
-                        "Server returned 500 - check OpenBAS server logs for details"
+                        "Server returned 500 - check OpenAEV server logs for details"
                     )
         except Exception as e:
             error_msg = f"Error executing AWS module: {e}"
@@ -329,5 +329,5 @@ class OpenBASAWS:
 
 
 if __name__ == "__main__":
-    openBASAWS = OpenBASAWS()
-    openBASAWS.start()
+    openAEVAWS = OpenAEVAWS()
+    openAEVAWS.start()

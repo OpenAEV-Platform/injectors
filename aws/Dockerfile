@@ -10,10 +10,10 @@ RUN apt-get update && apt-get install -y \
     && rm -rf /var/lib/apt/lists/*
 
 # Create working directory
-WORKDIR /opt/openbas-injector-aws
+WORKDIR /opt/openaev-injector-aws
 
 # Copy the injector source code
-COPY src /opt/openbas-injector-aws
+COPY src /opt/openaev-injector-aws
 
 # Install Python dependencies
 RUN pip3 install --no-cache-dir -r requirements.txt

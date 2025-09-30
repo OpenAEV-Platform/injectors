@@ -3,7 +3,7 @@ import logging
 import os
 
 import requests
-from OBAS_utils.release_utils import closeRelease
+from OAEV_utils.release_utils import closeRelease
 
 logging.basicConfig(encoding="utf-8", level=logging.INFO)
 
@@ -54,33 +54,33 @@ os.system(
 
 # -> README.md
 os.system(
-    "grep -rli 'OpenBAS Platform >= "
+    "grep -rli 'OpenAEV Platform >= "
     + previous_version
-    + "' * | xargs -i@ sed -i 's/OpenBAS Platform >= "
+    + "' * | xargs -i@ sed -i 's/OpenAEV Platform >= "
     + previous_version.replace(".", "\\.")
-    + "/OpenBAS Platform >= "
+    + "/OpenAEV Platform >= "
     + new_version.replace(".", "\\.")
     + "/g' @"
 )
 
-# image: openbas/****:x.x.x -> docker-compose.yml
+# image: openaev/****:x.x.x -> docker-compose.yml
 os.system(
     r"grep -rli '"
     + previous_version
-    + "' * | xargs -i@ sed -i -E 's/openbas\/(.*)\:"
+    + "' * | xargs -i@ sed -i -E 's/openaev\/(.*)\:"
     + previous_version.replace(".", "\\.")
-    + "/openbas\/\\1:"
+    + "/openaev\/\\1:"
     + new_version.replace(".", "\\.")
     + "/g' @"
 )
 
-# pyobas==x.x.x -> requirements.txt
+# pyoaev==x.x.x -> requirements.txt
 os.system(
-    "grep -rli 'pyobas=="
+    "grep -rli 'pyoaev=="
     + previous_version
-    + "' * | xargs -i@ sed -i 's/pyobas=="
+    + "' * | xargs -i@ sed -i 's/pyoaev=="
     + previous_version.replace(".", "\\.")
-    + "/pyobas=="
+    + "/pyoaev=="
     + new_version.replace(".", "\\.")
     + "/g' @"
 )
@@ -103,7 +103,7 @@ os.system("gren release > /dev/null 2>&1")
 # Modify the release note
 logging.info("[injectors] Getting the current release note")
 release = requests.get(
-    "https://api.github.com/repos/OpenBAS-Platform/injectors/releases/latest",
+    "https://api.github.com/repos/OpenAEV-Platform/injectors/releases/latest",
     headers={
         "Accept": "application/vnd.github+json",
         "Authorization": "Bearer " + github_token,
@@ -115,7 +115,7 @@ release_body = release_data["body"]
 
 logging.info("[injectors] Generating the new release note")
 github_release_note = requests.post(
-    "https://api.github.com/repos/OpenBAS-Platform/injectors/releases/generate-notes",
+    "https://api.github.com/repos/OpenAEV-Platform/injectors/releases/generate-notes",
     headers={
         "Accept": "application/vnd.github+json",
         "Authorization": "Bearer " + github_token,
@@ -138,7 +138,7 @@ else:
 
 logging.info("[injectors] Updating the release")
 requests.patch(
-    "https://api.github.com/repos/OpenBAS-Platform/injectors/releases/"
+    "https://api.github.com/repos/OpenAEV-Platform/injectors/releases/"
     + str(release_data["id"]),
     headers={
         "Accept": "application/vnd.github+json",
@@ -149,6 +149,6 @@ requests.patch(
 )
 
 closeRelease(
-    "https://api.github.com/repos/OpenBAS-Platform/injectors", new_version, github_token
+    "https://api.github.com/repos/OpenAEV-Platform/injectors", new_version, github_token
 )
 logging.info("[injectors] Release done!")

@@ -39,31 +39,31 @@ jobs:
           event: fail
           template: basic_fail_1
   test:
-    working_directory: ~/openbas
+    working_directory: ~/openaev
     docker:
       - image: cimg/python:3.13
     steps:
       - checkout
       - setup_remote_docker
       - run:
-          working_directory: ~/openbas/nuclei
+          working_directory: ~/openaev/nuclei
           name: Install dependencies for nuclei injector
           command: pip install -r requirements.txt
       - run:
-          working_directory: ~/openbas/nuclei
-          name: Overwrite pyobas with correct version from CI
+          working_directory: ~/openaev/nuclei
+          name: Overwrite pyoaev with correct version from CI
           command: |
             if [ "${CIRCLE_BRANCH}" = "release/current" ]; then
-              pip install --force-reinstall git+https://github.com/OpenBAS-Platform/client-python.git@release/current
+              pip install --force-reinstall git+https://github.com/OpenAEV-Platform/client-python.git@release/current
             else
-              pip install --force-reinstall git+https://github.com/OpenBAS-Platform/client-python.git@main
+              pip install --force-reinstall git+https://github.com/OpenAEV-Platform/client-python.git@main
             fi
       - run:
-          working_directory: ~/openbas/nuclei
+          working_directory: ~/openaev/nuclei
           name: Tests for nuclei injector
           command: python -m unittest
   build_1:
-    working_directory: ~/openbas
+    working_directory: ~/openaev
     docker:
       - image: cimg/base:stable-20.04
     environment:
@@ -74,50 +74,50 @@ jobs:
       - setup_remote_docker
       - run: sudo apt-get update -qq && sudo apt install curl gettext-base
       - run:
-          working_directory: ~/openbas/http-query
-          name: Build Docker image openbas/injector-http-query
+          working_directory: ~/openaev/http-query
+          name: Build Docker image openaev/injector-http-query
           command: |
-            TAGS="-t openbas/injector-http-query:${CIRCLE_TAG}"
-            $IS_LATEST && TAGS="$TAGS -t openbas/injector-http-query:latest"
+            TAGS="-t openaev/injector-http-query:${CIRCLE_TAG} -t openbas/injector-http-query:${CIRCLE_TAG}"
+            $IS_LATEST && TAGS="$TAGS -t openaev/injector-http-query:latest -t openbas/injector-http-query:latest"
             docker build --progress=plain $TAGS .
       - run:
-          working_directory: ~/openbas/nmap
-          name: Build Docker image openbas/injector-nmap
+          working_directory: ~/openaev/nmap
+          name: Build Docker image openaev/injector-nmap
           command: |
-            TAGS="-t openbas/injector-nmap:${CIRCLE_TAG}"
-            $IS_LATEST && TAGS="$TAGS -t openbas/injector-nmap:latest"
+            TAGS="-t openaev/injector-nmap:${CIRCLE_TAG} -t openbas/injector-nmap:${CIRCLE_TAG}"
+            $IS_LATEST && TAGS="$TAGS -t openaev/injector-nmap:latest -t openbas/injector-nmap:latest"
             docker build --progress=plain $TAGS .
       - run:
-          working_directory: ~/openbas/nuclei
-          name: Build Docker image openbas/injector-nuclei
+          working_directory: ~/openaev/nuclei
+          name: Build Docker image openaev/injector-nuclei
           command: |
-            TAGS="-t openbas/injector-nuclei:${CIRCLE_TAG}"
-            $IS_LATEST && TAGS="$TAGS -t openbas/injector-nuclei:latest"
+            TAGS="-t openaev/injector-nuclei:${CIRCLE_TAG} -t openbas/injector-nuclei:${CIRCLE_TAG}"
+            $IS_LATEST && TAGS="$TAGS -t openaev/injector-nuclei:latest -t openbas/injector-nuclei:latest"
             docker build --progress=plain $TAGS .
       - run:
-          working_directory: ~/openbas/aws
-          name: Build Docker image openbas/injector-aws
+          working_directory: ~/openaev/aws
+          name: Build Docker image openaev/injector-aws
           command: |
-            TAGS="-t openbas/injector-aws:${CIRCLE_TAG}"
-            $IS_LATEST && TAGS="$TAGS -t openbas/injector-aws:latest"
+            TAGS="-t openaev/injector-aws:${CIRCLE_TAG} -t openbas/injector-aws:${CIRCLE_TAG}"
+            $IS_LATEST && TAGS="$TAGS -t openaev/injector-aws:latest -t openbas/injector-aws:latest"
             docker build --progress=plain $TAGS .
       - run:
           name: Publish Docker Image to Docker Hub
           command: |
             echo "$DOCKERHUB_PASS" | docker login -u "$DOCKERHUB_USERNAME" --password-stdin
-            $IS_LATEST && docker push openbas/injector-http-query:latest
-            docker push openbas/injector-http-query:${CIRCLE_TAG}
-            $IS_LATEST && docker push openbas/injector-nmap:latest
-            docker push openbas/injector-nmap:${CIRCLE_TAG}
-            $IS_LATEST && docker push openbas/injector-nuclei:latest
-            docker push openbas/injector-nuclei:${CIRCLE_TAG}
-            $IS_LATEST && docker push openbas/injector-aws:latest
-            docker push openbas/injector-aws:${CIRCLE_TAG}
+            $IS_LATEST && docker push openaev/injector-http-query:latest && docker push openbas/injector-http-query:latest
+            docker push openaev/injector-http-query:${CIRCLE_TAG} && docker push openbas/injector-http-query:${CIRCLE_TAG}
+            $IS_LATEST && docker push openaev/injector-nmap:latest && docker push openbas/injector-nmap:latest
+            docker push openaev/injector-nmap:${CIRCLE_TAG} && docker push openbas/injector-nmap:${CIRCLE_TAG}
+            $IS_LATEST && docker push openaev/injector-nuclei:latest && docker push openbas/injector-nuclei:latest
+            docker push openaev/injector-nuclei:${CIRCLE_TAG} && docker push openbas/injector-nuclei:${CIRCLE_TAG}
+            $IS_LATEST && docker push openaev/injector-aws:latest && docker push openbas/injector-aws:latest
+            docker push openaev/injector-aws:${CIRCLE_TAG} && docker push openbas/injector-aws:${CIRCLE_TAG}
       - slack/notify:
           event: fail
           template: basic_fail_1
   build_rolling_1:
-    working_directory: ~/openbas
+    working_directory: ~/openaev
     docker:
       - image: cimg/base:stable-20.04
     steps:
@@ -125,38 +125,38 @@ jobs:
       - setup_remote_docker
       - run: sudo apt-get update -qq && sudo apt install curl gettext-base
       - run:
-         working_directory: ~/openbas
-         name: Replace pyobas requirement of stable version with latest main branch code
-         command: find . -name requirements.txt -exec sed 's|^pyobas==.*$|pyobas @ git+https://github.com/OpenBAS-Platform/client-python@main|' -i {} \;
+         working_directory: ~/openaev
+         name: Replace pyoaev requirement of stable version with latest main branch code
+         command: find . -name requirements.txt -exec sed 's|^pyoaev==.*$|pyoaev @ git+https://github.com/OpenAEV-Platform/client-python@main|' -i {} \;
       - run:
-          working_directory: ~/openbas/http-query
-          name: Build Docker image openbas/injector-http-query
-          command: docker build --progress=plain -t openbas/injector-http-query:rolling .
+          working_directory: ~/openaev/http-query
+          name: Build Docker image openaev/injector-http-query
+          command: docker build --progress=plain -t openaev/injector-http-query:rolling -t openbas/injector-http-query:rolling .
       - run:
-          working_directory: ~/openbas/nmap
-          name: Build Docker image openbas/injector-nmap
-          command: docker build --progress=plain -t openbas/injector-nmap:rolling .
+          working_directory: ~/openaev/nmap
+          name: Build Docker image openaev/injector-nmap
+          command: docker build --progress=plain -t openaev/injector-nmap:rolling -t openbas/injector-nmap:rolling .
       - run:
-          working_directory: ~/openbas/nuclei
-          name: Build Docker image openbas/injector-nuclei
-          command: docker build --progress=plain -t openbas/injector-nuclei:rolling .
+          working_directory: ~/openaev/nuclei
+          name: Build Docker image openaev/injector-nuclei
+          command: docker build --progress=plain -t openaev/injector-nuclei:rolling -t openbas/injector-nuclei:rolling .
       - run:
-          working_directory: ~/openbas/aws
-          name: Build Docker image openbas/injector-aws
-          command: docker build --progress=plain -t openbas/injector-aws:rolling .
+          working_directory: ~/openaev/aws
+          name: Build Docker image openaev/injector-aws
+          command: docker build --progress=plain -t openaev/injector-aws:rolling -t openbas/injector-aws:rolling .
       - run:
           name: Publish Docker Image to Docker Hub
           command: |
             echo "$DOCKERHUB_PASS" | docker login -u "$DOCKERHUB_USERNAME" --password-stdin
-            docker push openbas/injector-http-query:rolling
-            docker push openbas/injector-nmap:rolling
-            docker push openbas/injector-nuclei:rolling
-            docker push openbas/injector-aws:rolling
+            docker push openaev/injector-http-query:rolling && docker push openbas/injector-http-query:rolling 
+            docker push openaev/injector-nmap:rolling && docker push openbas/injector-nmap:rolling
+            docker push openaev/injector-nuclei:rolling && docker push openbas/injector-nuclei:rolling
+            docker push openaev/injector-aws:rolling && docker push openbas/injector-aws:rolling
       - slack/notify:
           event: fail
           template: basic_fail_1
   build_prerelease_1:
-    working_directory: ~/openbas
+    working_directory: ~/openaev
     docker:
       - image: cimg/base:stable-20.04
     steps:
@@ -164,34 +164,34 @@ jobs:
       - setup_remote_docker
       - run: sudo apt-get update -qq && sudo apt install curl gettext-base
       - run:
-          working_directory: ~/openbas
-          name: Replace pyobas requirement of stable version with latest release branch code
+          working_directory: ~/openaev
+          name: Replace pyoaev requirement of stable version with latest release branch code
           # We safely expand the CIRCLE_BRANCH variable because the CircleCI filters already enforce a strict release/x.x.x pattern using regex
-          command: find . -name requirements.txt -exec sed "s|^pyobas==.*$|pyobas @ git+https://github.com/OpenBAS-Platform/client-python@${CIRCLE_BRANCH}|" -i {} \;
+          command: find . -name requirements.txt -exec sed "s|^pyoaev==.*$|pyoaev @ git+https://github.com/OpenAEV-Platform/client-python@${CIRCLE_BRANCH}|" -i {} \;
       - run:
-          working_directory: ~/openbas/http-query
-          name: Build Docker image openbas/injector-http-query
-          command: docker build --progress=plain -t openbas/injector-http-query:prerelease .
+          working_directory: ~/openaev/http-query
+          name: Build Docker image openaev/injector-http-query
+          command: docker build --progress=plain -t openaev/injector-http-query:prerelease -t openbas/injector-http-query:prerelease .
       - run:
-          working_directory: ~/openbas/nmap
-          name: Build Docker image openbas/injector-nmap
-          command: docker build --progress=plain -t openbas/injector-nmap:prerelease .
+          working_directory: ~/openaev/nmap
+          name: Build Docker image openaev/injector-nmap
+          command: docker build --progress=plain -t openaev/injector-nmap:prerelease -t openbas/injector-nmap:prerelease .
       - run:
-          working_directory: ~/openbas/nuclei
-          name: Build Docker image openbas/injector-nuclei
-          command: docker build --progress=plain -t openbas/injector-nuclei:prerelease .
+          working_directory: ~/openaev/nuclei
+          name: Build Docker image openaev/injector-nuclei
+          command: docker build --progress=plain -t openaev/injector-nuclei:prerelease -t openbas/injector-nuclei:prerelease .
       - run:
-          working_directory: ~/openbas/aws
-          name: Build Docker image openbas/injector-aws
-          command: docker build --progress=plain -t openbas/injector-aws:prerelease .
+          working_directory: ~/openaev/aws
+          name: Build Docker image openaev/injector-aws
+          command: docker build --progress=plain -t openaev/injector-aws:prerelease -t openbas/injector-aws:prerelease .
       - run:
           name: Publish Docker Image to Docker Hub
           command: |
             echo "$DOCKERHUB_PASS" | docker login -u "$DOCKERHUB_USERNAME" --password-stdin
-            docker push openbas/injector-http-query:prerelease
-            docker push openbas/injector-nmap:prerelease
-            docker push openbas/injector-nuclei:prerelease
-            docker push openbas/injector-aws:prerelease
+            docker push openaev/injector-http-query:prerelease && docker push openbas/injector-http-query:prerelease
+            docker push openaev/injector-nmap:prerelease && docker push openbas/injector-nmap:prerelease
+            docker push openaev/injector-nuclei:prerelease && docker push openbas/injector-nuclei:prerelease
+            docker push openaev/injector-aws:prerelease && docker push openbas/injector-aws:prerelease
       - slack/notify:
           event: fail
           template: basic_fail_1
@@ -201,14 +201,14 @@ jobs:
     steps:
       - checkout
       - kubernetes/install-kubectl
-      - run: kubectl --server=https://api.staging.eu-west.filigran.io --token=$K8S_TOKEN -n customer-testing-obas rollout restart deployment -l app=injector
+      - run: kubectl --server=https://api.staging.eu-west.filigran.io --token=$K8S_TOKEN -n customer-testing-oaev rollout restart deployment -l app=injector
   deploy_prerelease:
     docker:
       - image: cimg/base:stable
     steps:
       - checkout
       - kubernetes/install-kubectl
-      - run: kubectl --server=https://api.staging.eu-west.filigran.io --token=$K8S_TOKEN_PRE_RELEASE -n customer-prerelease-obas rollout restart deployment -l app=injector
+      - run: kubectl --server=https://api.staging.eu-west.filigran.io --token=$K8S_TOKEN_PRE_RELEASE -n customer-prerelease-oaev rollout restart deployment -l app=injector
   notify_rolling:
     docker:
       - image: "cimg/base:stable"
@@ -227,7 +227,7 @@ jobs:
           template: basic_success_1
 workflows:
   version: 2
-  openbas:
+  openaev:
     jobs:
       - ensure_formatting
       - linter

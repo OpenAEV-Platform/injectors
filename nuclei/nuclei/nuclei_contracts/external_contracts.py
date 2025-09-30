@@ -6,21 +6,21 @@ import uuid
 from multiprocessing import Process
 
 import requests
-from pyobas.apis.inputs.search import (
+from pyoaev.apis.inputs.search import (
     Filter,
     FilterGroup,
     InjectorContractSearchPaginationInput,
 )
-from pyobas.client import OpenBAS
-from pyobas.contracts.contract_config import ContractText
-from pyobas.utils import setup_logging_config
+from pyoaev.client import OpenAEV
+from pyoaev.contracts.contract_config import ContractText
+from pyoaev.utils import setup_logging_config
 
 from nuclei.helpers.nuclei_process import NucleiProcess
 from nuclei.nuclei_contracts.nuclei_contracts import NucleiContracts
 
 
 class ExternalContractsScheduler:
-    def __init__(self, api_client: OpenBAS, injector_id: str, period: int, logger):
+    def __init__(self, api_client: OpenAEV, injector_id: str, period: int, logger):
         self.scheduler = sched.scheduler(time.time, time.sleep)
         self.manager = ExternalContractsManager(api_client, injector_id, logger)
         self._period = period
@@ -45,7 +45,7 @@ class ExternalContractsScheduler:
 
 
 class ExternalContractsManager:
-    def __init__(self, api_client: OpenBAS, injector_id: str, logger):
+    def __init__(self, api_client: OpenAEV, injector_id: str, logger):
         self._api_client = api_client
         self._injector_id = injector_id
         self._logger = logger

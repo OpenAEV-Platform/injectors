@@ -1,11 +1,11 @@
-# OpenBAS Nuclei Injector
+# OpenAEV Nuclei Injector
 
 ## Table of Contents
 
-- [OpenBAS Nuclei Injector](#openbas-nuclei-injector)
+- [OpenAEV Nuclei Injector](#openaev-nuclei-injector)
   - [Prerequisites](#prerequisites)
   - [Configuration variables](#configuration-variables)
-    - [OpenBAS environment variables](#openbas-environment-variables)
+    - [OpenAEV environment variables](#openaev-environment-variables)
     - [Base injector environment variables](#base-injector-environment-variables)
   - [Deployment](#deployment)
     - [Docker Deployment](#docker-deployment)
@@ -28,8 +28,8 @@ Depending on your deployment method:
 
 In both cases, for the injector to operate correctly:
 
-- It **must be able to reach the OpenBAS platform** via the URL you provide (through `OPENBAS_URL` or `config.yml`).
-- It **must be able to reach the RabbitMQ broker** used by the OpenBAS platform.
+- It **must be able to reach the OpenAEV platform** via the URL you provide (through `OPENAEV_URL` or `config.yml`).
+- It **must be able to reach the RabbitMQ broker** used by the OpenAEV platform.
 
 ---
 
@@ -37,12 +37,12 @@ In both cases, for the injector to operate correctly:
 
 Configuration is provided either through environment variables (Docker) or a config file (`config.yml`, manual).
 
-### OpenBAS environment variables
+### OpenAEV environment variables
 
 | Parameter     | config.yml | Docker environment variable | Mandatory | Description                                          |
 |---------------|------------|-----------------------------|-----------|------------------------------------------------------|
-| OpenBAS URL   | url        | `OPENBAS_URL`               | Yes       | The URL of the OpenBAS platform.                     |
-| OpenBAS Token | token      | `OPENBAS_TOKEN`             | Yes       | The default admin token set in the OpenBAS platform. |
+| OpenAEV URL   | url        | `OPENAEV_URL`               | Yes       | The URL of the OpenAEV platform.                     |
+| OpenAEV Token | token      | `OPENAEV_TOKEN`             | Yes       | The default admin token set in the OpenAEV platform. |
 
 ### Base injector environment variables
 
@@ -62,10 +62,10 @@ Configuration is provided either through environment variables (Docker) or a con
 Build the Docker image using the provided `Dockerfile`.
 
 ```bash
-docker build . -t openbas/injector-nuclei:latest
+docker build . -t openaev/injector-nuclei:latest
 ````
 
-Edit the `docker-compose.yml` file with your OpenBAS configuration, then start the container:
+Edit the `docker-compose.yml` file with your OpenAEV configuration, then start the container:
 
 ```bash
 docker compose up -d
@@ -95,7 +95,7 @@ pip3 install -r src/requirements.txt
 
 ```bash
 cd src
-python3 openbas_nuclei.py
+python3 openaev_nuclei.py
 ```
 
 ---

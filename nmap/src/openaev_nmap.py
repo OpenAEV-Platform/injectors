@@ -9,19 +9,19 @@ from contracts_nmap import (
     TCP_SYN_SCAN_CONTRACT,
     NmapContracts,
 )
-from pyobas.helpers import OpenBASConfigHelper, OpenBASInjectorHelper
+from pyoaev.helpers import OpenAEVConfigHelper, OpenAEVInjectorHelper
 
 
-class OpenBASNmap:
+class OpenAEVNmap:
     def __init__(self):
-        self.config = OpenBASConfigHelper(
+        self.config = OpenAEVConfigHelper(
             __file__,
             {
                 # API information
-                "openbas_url": {"env": "OPENBAS_URL", "file_path": ["openbas", "url"]},
-                "openbas_token": {
-                    "env": "OPENBAS_TOKEN",
-                    "file_path": ["openbas", "token"],
+                "openaev_url": {"env": "OPENAEV_URL", "file_path": ["openaev", "url"]},
+                "openaev_token": {
+                    "env": "OPENAEV_TOKEN",
+                    "file_path": ["openaev", "token"],
                 },
                 # Config information
                 "injector_id": {"env": "INJECTOR_ID", "file_path": ["injector", "id"]},
@@ -32,12 +32,12 @@ class OpenBASNmap:
                 "injector_type": {
                     "env": "INJECTOR_TYPE",
                     "file_path": ["injector", "type"],
-                    "default": "openbas_nmap",
+                    "default": "openaev_nmap",
                 },
                 "injector_contracts": {"data": NmapContracts.build_contract()},
             },
         )
-        self.helper = OpenBASInjectorHelper(
+        self.helper = OpenAEVInjectorHelper(
             self.config, open("img/icon-nmap.png", "rb")
         )
 
@@ -167,5 +167,5 @@ class OpenBASNmap:
 
 
 if __name__ == "__main__":
-    openBASNmap = OpenBASNmap()
-    openBASNmap.start()
+    openAEVNmap = OpenAEVNmap()
+    openAEVNmap.start()
