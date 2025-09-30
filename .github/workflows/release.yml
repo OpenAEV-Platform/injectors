@@ -30,7 +30,7 @@ jobs:
       - name: checkout repo content
         uses: actions/checkout@v4
         with:
-          repository: OpenBAS-Platform/injectors
+          repository: OpenAEV-Platform/injectors
           ref: ${{ inputs.branch_injectors }}
       - name: setup python
         uses: actions/setup-python@v5

@@ -17,7 +17,7 @@ from pyoaev.contracts.contract_config import (
     prepare_contracts,
 )
 
-TYPE = "openbas_http"
+TYPE = "openaev_http"
 HTTP_RAW_POST_CONTRACT = "5948c96c-4064-4c0d-b079-51ec33f31b91"
 HTTP_RAW_PUT_CONTRACT = "bb503f7c-1f17-49e1-ac31-f4c2e99fd704"
 HTTP_FORM_POST_CONTRACT = "a4794081-ccb5-41ef-9855-304ad5fdf4a9"

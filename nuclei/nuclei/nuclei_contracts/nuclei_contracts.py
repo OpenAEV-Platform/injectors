@@ -19,7 +19,7 @@ from pyoaev.contracts.contract_config import (
     SupportedLanguage,
     prepare_contracts,
 )
-from pyoaev.helpers import OpenBASInjectorHelper
+from pyoaev.helpers import OpenAEVInjectorHelper
 
 from nuclei.nuclei_contracts.nuclei_constants import (
     ASSETS_KEY,
@@ -195,7 +195,7 @@ class NucleiContracts:
 
     @staticmethod
     def extract_targets(
-        data: Dict, helper: OpenBASInjectorHelper
+        data: Dict, helper: OpenAEVInjectorHelper
     ) -> TargetExtractionResult:
         targets = []
         ip_to_asset_id_map = {}

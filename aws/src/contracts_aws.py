@@ -17,7 +17,7 @@ from pyoaev.contracts.contract_config import (
     prepare_contracts,
 )
 
-TYPE = "openbas_aws"
+TYPE = "openaev_aws"
 
 # Contract IDs for different AWS modules
 IAM_ENUM_PERMISSIONS_CONTRACT = "a1b2c3d4-e5f6-7890-abcd-ef1234567890"

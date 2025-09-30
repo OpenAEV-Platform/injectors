@@ -24,7 +24,7 @@ from pyoaev.contracts.contract_config import (
     prepare_contracts,
 )
 
-TYPE = "openbas_nmap"
+TYPE = "openaev_nmap"
 TCP_SYN_SCAN_CONTRACT = "0b7f3674-ac5d-4b95-b749-6665e74a211f"
 TCP_CONNECT_SCAN_CONTRACT = "93d27459-68d0-43b1-ad65-eacc3cfa5cf7"
 FIN_SCAN_CONTRACT = "6f4d7e18-c730-484a-bb09-c9c321820c0a"

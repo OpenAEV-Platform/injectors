@@ -1,5 +1,5 @@
 """
-Helper module for executing Pacu modules within OpenBAS injector.
+Helper module for executing Pacu modules within OpenAEV injector.
 This module handles the execution of Pacu commands and parsing of results.
 """
 
@@ -53,15 +53,15 @@ class PacuExecutor:
             self.logger.info(f"Executing via Pacu CLI: {module_name}")
         try:
             # First check if session exists, if not create it
-            if not self._check_session_exists("openbas_session"):
+            if not self._check_session_exists("openaev_session"):
                 if self.logger:
-                    self.logger.info("Creating new Pacu session: openbas_session")
-                self._create_session("openbas_session")
+                    self.logger.info("Creating new Pacu session: openaev_session")
+                self._create_session("openaev_session")
 
             cmd = [
                 "pacu",
                 "--session",
-                "openbas_session",
+                "openaev_session",
                 "--module-name",
                 module_name,
                 "--exec",
@@ -496,13 +496,13 @@ class PacuExecutor:
 
     def parse_results(self, results: Dict) -> Dict:
         """
-        Parse Pacu execution results into OpenBAS format
+        Parse Pacu execution results into OpenAEV format
 
         Args:
             results: Raw results from Pacu module execution
 
         Returns:
-            Formatted results for OpenBAS with structured outputs
+            Formatted results for OpenAEV with structured outputs
         """
 
         if not results.get("success"):

@@ -1,8 +1,8 @@
-# OpenBAS AWS Injector
+# OpenAEV AWS Injector
 
 ## Overview
 
-The OpenBAS injector allows security teams to perform comprehensive AWS security assessments directly from OpenBAS.
+The OpenAEV injector allows security teams to perform comprehensive AWS security assessments directly from OpenAEV.
 
 ## Features
 
@@ -92,7 +92,7 @@ The injector supports all current AWS regions including:
 1. Build the Docker image:
 ```bash
 cd aws
-docker build -t openbas/injector-aws:latest .
+docker build -t openaev/injector-aws:latest .
 ```
 
 2. Run with docker-compose:
@@ -116,20 +116,20 @@ pip install aws
 3. Configure the injector:
 ```bash
 cp config.yml.sample config.yml
-# Edit config.yml with your OpenBAS connection details
+# Edit config.yml with your OpenAEV connection details
 ```
 
 4. Run the injector:
 ```bash
-python openbas_aws.py
+python openaev_aws.py
 ```
 
 ## Configuration
 
 ### Environment Variables
 
-- `OPENBAS_URL`: URL of your OpenBAS instance
-- `OPENBAS_TOKEN`: Authentication token for OpenBAS API
+- `OPENAEV_URL`: URL of your OpenAEV instance
+- `OPENAEV_TOKEN`: Authentication token for OpenAEV API
 - `INJECTOR_ID`: Unique identifier for this injector instance
 - `INJECTOR_NAME`: Display name for the injector (default: "AWS")
 - `INJECTOR_LOG_LEVEL`: Logging level (info, warning, error) - debug logging has been removed for production use
@@ -139,9 +139,9 @@ python openbas_aws.py
 Create a `config.yml` file based on the provided sample:
 
 ```yaml
-openbas:
+openaev:
   url: 'http://localhost:3001'
-  token: 'your-openbas-token'
+  token: 'your-openaev-token'
 
 injector:
   id: 'unique-injector-id'
@@ -149,24 +149,24 @@ injector:
   log_level: 'info'
 ```
 
-## Usage in OpenBAS
+## Usage in OpenAEV
 
 1. **Deploy the Injector**: Start the AWS injector using Docker or manual installation
-2. **Verify Registration**: Check that the injector appears in OpenBAS under Integrations > Injectors
+2. **Verify Registration**: Check that the injector appears in OpenAEV under Integrations > Injectors
 3. **Create Injects**: Use the AWS contracts to create AWS security assessment injects
 4. **Provide AWS Credentials**: Each inject requires:
    - AWS Access Key ID
    - AWS Secret Access Key
    - AWS Session Token (optional, for temporary credentials)
    - AWS Region (40+ regions supported)
-5. **Execute and Monitor**: Run the injects and monitor results in OpenBAS
+5. **Execute and Monitor**: Run the injects and monitor results in OpenAEV
 
 ## Technical Details
 
 ### Session Management
 
 The injector automatically manages AWS sessions:
-- Creates a session named `openbas_session` if it doesn't exist
+- Creates a session named `openaev_session` if it doesn't exist
 - Handles Windows-specific readline issues with non-interactive execution
 - Properly manages AWS credentials through environment variables
 
@@ -201,7 +201,7 @@ The AWS credentials used with this injector should have appropriate read-only pe
 ### Network Security
 
 - Run the injector in a secure, isolated network segment
-- Use TLS/SSL for communication with OpenBAS
+- Use TLS/SSL for communication with OpenAEV
 - Implement proper firewall rules
 - No debug logging in production to avoid credential exposure
 
@@ -214,7 +214,7 @@ To add support for additional AWS modules:
 1. Add new contract IDs in `contracts_aws.py`
 2. Define the contract with appropriate fields and outputs using the `make_contract` helper
 3. Implement the execution method in `helpers/aws_executor.py`
-4. Map the contract to the execution method in `openbas_aws.py`
+4. Map the contract to the execution method in `openaev_aws.py`
 5. Update the module name mapping in `_get_module_name()`
 
 ### Testing
@@ -231,8 +231,8 @@ injector:
 
 ### Common Issues
 
-1. **Injector not appearing in OpenBAS**
-   - Verify network connectivity to OpenBAS
+1. **Injector not appearing in OpenAEV**
+   - Verify network connectivity to OpenAEV
    - Check authentication token is valid
    - Review logs for connection errors
 
@@ -286,14 +286,14 @@ Contributions are welcome! Please:
 
 ## License
 
-This injector is released under the same license as OpenBAS. See the LICENSE file for details.
+This injector is released under the same license as OpenAEV. See the LICENSE file for details.
 
 ## Support
 
 For issues and questions:
-- OpenBAS Documentation: https://docs.openbas.io
+- OpenAEV Documentation: https://docs.openaev.io
 - AWS Documentation: https://github.com/RhinoSecurityLabs/aws/wiki
-- Submit issues: https://github.com/OpenBAS-Platform/injectors/issues
+- Submit issues: https://github.com/OpenAEV-Platform/injectors/issues
 
 ## Changelog
 

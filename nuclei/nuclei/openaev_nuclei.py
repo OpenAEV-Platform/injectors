@@ -4,7 +4,7 @@ import subprocess
 import time
 from typing import Dict
 
-from pyoaev.helpers import OpenBASConfigHelper, OpenBASInjectorHelper
+from pyoaev.helpers import OpenAEVConfigHelper, OpenAEVInjectorHelper
 
 from nuclei.helpers.nuclei_command_builder import NucleiCommandBuilder
 from nuclei.helpers.nuclei_output_parser import NucleiOutputParser
@@ -13,16 +13,16 @@ from nuclei.nuclei_contracts.external_contracts import ExternalContractsSchedule
 from nuclei.nuclei_contracts.nuclei_contracts import NucleiContracts
 
 
-class OpenBASNuclei:
+class OpenAEVNuclei:
     def __init__(self):
         print(os.getenv("PATH"))
-        self.config = OpenBASConfigHelper(
+        self.config = OpenAEVConfigHelper(
             __file__,
             {
-                "openbas_url": {"env": "OPENBAS_URL", "file_path": ["openbas", "url"]},
-                "openbas_token": {
-                    "env": "OPENBAS_TOKEN",
-                    "file_path": ["openbas", "token"],
+                "openaev_url": {"env": "OPENAEV_URL", "file_path": ["openaev", "url"]},
+                "openaev_token": {
+                    "env": "OPENAEV_TOKEN",
+                    "file_path": ["openaev", "token"],
                 },
                 "injector_id": {"env": "INJECTOR_ID", "file_path": ["injector", "id"]},
                 "injector_name": {
@@ -32,7 +32,7 @@ class OpenBASNuclei:
                 "injector_type": {
                     "env": "INJECTOR_TYPE",
                     "file_path": ["injector", "type"],
-                    "default": "openbas_nuclei",
+                    "default": "openaev_nuclei",
                 },
                 "injector_contracts": {
                     "data": NucleiContracts.build_static_contracts()
@@ -53,7 +53,7 @@ class OpenBASNuclei:
                 },
             },
         )
-        self.helper = OpenBASInjectorHelper(
+        self.helper = OpenAEVInjectorHelper(
             self.config, open("nuclei/img/nuclei.jpg", "rb")
         )
 
@@ -149,4 +149,4 @@ class OpenBASNuclei:
 
 
 if __name__ == "__main__":
-    OpenBASNuclei().start()
+    OpenAEVNuclei().start()

@@ -1,11 +1,11 @@
-# OpenBAS Nmap Injector
+# OpenAEV Nmap Injector
 
 Table of Contents
 
-- [OpenBAS Nmap Injector](#openbas-nmap-injector)
+- [OpenAEV Nmap Injector](#openaev-nmap-injector)
     - [Prerequisites](#prerequisites)
     - [Configuration variables](#configuration-variables)
-        - [OpenBAS environment variables](#openbas-environment-variables)
+        - [OpenAEV environment variables](#openaev-environment-variables)
         - [Base injector environment variables](#base-injector-environment-variables)
     - [Deployment](#deployment)
         - [Docker Deployment](#docker-deployment)
@@ -14,7 +14,7 @@ Table of Contents
 
 ## Prerequisites
 
-Injectors are reaching RabbitMQ based the RabbitMQ configuration provided by the OpenBAS platform. The
+Injectors are reaching RabbitMQ based the RabbitMQ configuration provided by the OpenAEV platform. The
 injector must be able to reach RabbitMQ on the specified hostname and port.
 
 ## Configuration variables
@@ -22,14 +22,14 @@ injector must be able to reach RabbitMQ on the specified hostname and port.
 There are a number of configuration options, which are set either in `docker-compose.yml` (for Docker) or
 in `config.yml` (for manual deployment).
 
-### OpenBAS environment variables
+### OpenAEV environment variables
 
-Below are the parameters you'll need to set for OpenBAS:
+Below are the parameters you'll need to set for OpenAEV:
 
 | Parameter     | config.yml | Docker environment variable | Mandatory | Description                                          |
 |---------------|------------|-----------------------------|-----------|------------------------------------------------------|
-| OpenBAS URL   | url        | `OPENBAS_URL`               | Yes       | The URL of the OpenBAS platform.                     |
-| OpenBAS Token | token      | `OPENBAS_TOKEN`             | Yes       | The default admin token set in the OpenBAS platform. |
+| OpenAEV URL   | url        | `OPENAEV_URL`               | Yes       | The URL of the OpenAEV platform.                     |
+| OpenAEV Token | token      | `OPENAEV_TOKEN`             | Yes       | The default admin token set in the OpenAEV platform. |
 
 ### Base injector environment variables
 
@@ -84,7 +84,7 @@ pip3 install -r requirements.txt
 Then, start the injector:
 
 ```shell
-python3 openbas_nmap.py
+python3 openaev_nmap.py
 ```
 
 ## Behavior
