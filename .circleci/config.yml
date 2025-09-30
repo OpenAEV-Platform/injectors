@@ -46,11 +46,11 @@ jobs:
       - checkout
       - setup_remote_docker
       - run:
-          working_directory: ~/e/nuclei
+          working_directory: ~/openaev/nuclei
           name: Install dependencies for nuclei injector
           command: pip install -r requirements.txt
       - run:
-          working_directory: ~/e/nuclei
+          working_directory: ~/openaev/nuclei
           name: Overwrite pyoaev with correct version from CI
           command: |
             if [ "${CIRCLE_BRANCH}" = "release/current" ]; then
