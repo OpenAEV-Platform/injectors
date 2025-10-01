@@ -106,13 +106,13 @@ jobs:
           command: |
             echo "$DOCKERHUB_PASS" | docker login -u "$DOCKERHUB_USERNAME" --password-stdin
             $IS_LATEST && docker push openbas/injector-http-query:latest
-            docker push docker push openbas/injector-http-query:${CIRCLE_TAG}
+            docker push openbas/injector-http-query:${CIRCLE_TAG}
             $IS_LATEST && docker push openbas/injector-nmap:latest
-            docker push docker push openbas/injector-nmap:${CIRCLE_TAG}
+            docker push openbas/injector-nmap:${CIRCLE_TAG}
             $IS_LATEST && docker push openbas/injector-nuclei:latest
-            docker push docker push openbas/injector-nuclei:${CIRCLE_TAG}
+            docker push openbas/injector-nuclei:${CIRCLE_TAG}
             $IS_LATEST && docker push openbas/injector-aws:latest
-            docker push docker push openbas/injector-aws:${CIRCLE_TAG}
+            docker push openbas/injector-aws:${CIRCLE_TAG}
       - slack/notify:
           event: fail
           template: basic_fail_1
@@ -185,27 +185,27 @@ jobs:
       - run:
           working_directory: ~/openaev/http-query
           name: Build Docker image openaev/injector-http-query
-          command: docker build --progress=plain -t openaev/injector-http-query:rolling -t openbas/injector-http-query:rolling .
+          command: docker build --progress=plain -t openbas/injector-http-query:rolling .
       - run:
           working_directory: ~/openaev/nmap
           name: Build Docker image openaev/injector-nmap
-          command: docker build --progress=plain -t openaev/injector-nmap:rolling -t openbas/injector-nmap:rolling .
+          command: docker build --progress=plain -t openbas/injector-nmap:rolling .
       - run:
           working_directory: ~/openaev/nuclei
           name: Build Docker image openaev/injector-nuclei
-          command: docker build --progress=plain -t openaev/injector-nuclei:rolling -t openbas/injector-nuclei:rolling .
+          command: docker build --progress=plain -t openbas/injector-nuclei:rolling .
       - run:
           working_directory: ~/openaev/aws
           name: Build Docker image openaev/injector-aws
-          command: docker build --progress=plain -t openaev/injector-aws:rolling -t openbas/injector-aws:rolling .
+          command: docker build --progress=plain -t openbas/injector-aws:rolling .
       - run:
           name: Publish Docker Image to Docker Hub
           command: |
             echo "$DOCKERHUB_PASS" | docker login -u "$DOCKERHUB_USERNAME" --password-stdin
-            docker push openaev/injector-http-query:rolling && docker push openbas/injector-http-query:rolling 
-            docker push openaev/injector-nmap:rolling && docker push openbas/injector-nmap:rolling
-            docker push openaev/injector-nuclei:rolling && docker push openbas/injector-nuclei:rolling
-            docker push openaev/injector-aws:rolling && docker push openbas/injector-aws:rolling
+            docker push openbas/injector-http-query:rolling 
+            docker push openbas/injector-nmap:rolling
+            docker push openbas/injector-nuclei:rolling
+            docker push openbas/injector-aws:rolling
       - slack/notify:
           event: fail
           template: basic_fail_1
@@ -281,10 +281,10 @@ jobs:
           name: Publish Docker Image to Docker Hub
           command: |
             echo "$DOCKERHUB_PASS" | docker login -u "$DOCKERHUB_USERNAME" --password-stdin
-            docker push docker push openbas/injector-http-query:prerelease
-            docker push docker push openbas/injector-nmap:prerelease
-            docker push docker push openbas/injector-nuclei:prerelease
-            docker push docker push openbas/injector-aws:prerelease
+            docker push openbas/injector-http-query:prerelease
+            docker push openbas/injector-nmap:prerelease
+            docker push openbas/injector-nuclei:prerelease
+            docker push openbas/injector-aws:prerelease
       - slack/notify:
           event: fail
           template: basic_fail_1
