@@ -84,18 +84,18 @@ docker compose up -d
 
 #### Configuration
 
-1. Copy `config.yml.sample` to `config.yml` and edit the relevant values.
+1. Copy `nuclei/config.yml.sample` to `nuclei/config.yml` and edit the relevant values.
 2. Install Python dependencies (ideally in a virtual environment):
 
 ```bash
-pip3 install -r src/requirements.txt
+pip3 install -r requirements.txt
 ```
 
 3. Run the injector:
 
 ```bash
 cd src
-python3 openaev_nuclei.py
+python3 -m nuclei.openaev_nuclei
 ```
 
 ---
@@ -120,17 +120,25 @@ The CVE scan uses the `-tags cve` argument and enforces JSON output.
 
 The Template scan accepts a manual template via `-t <template>` or `template_path`.
 
+Additionally, contracts specific to individual CVEs may be provisioned in OpenAEV if two conditions are met:
+
+* A scan for the CVE is supported by a Nuclei template (part of the Nuclei distribution),
+* A vulnerability taxonomy entry exists in OpenAEV for that same CVE (under Settings > Taxonomies > Vulnerabilities).
+
+These CVE-specific contracts are set up out of the box to use the Nuclei template (with the `-t` argument)
+relevant to the CVE.
+
 ### Target Selection
 
 Targets are selected based on the `target_selector` field.
 
 #### If target type is **Assets**:
 
-| Selected Property | Uses Asset Field         |
-|-------------------|-------------------------|
-| Seen IP           | endpoint_seen_ip         |
+| Selected Property | Uses Asset Field           |
+|-------------------|----------------------------|
+| Seen IP           | endpoint_seen_ip           |
 | Local IP          | First IP from endpoint_ips |
-| Hostname          | endpoint_hostname       |
+| Hostname          | endpoint_hostname          |
 
 #### If target type is **Manual**:
 
