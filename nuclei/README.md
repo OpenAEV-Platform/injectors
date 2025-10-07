@@ -35,7 +35,8 @@ In both cases, for the injector to operate correctly:
 
 ## Configuration variables
 
-Configuration is provided either through environment variables (Docker) or a config file (`config.yml`, manual).
+Configuration is provided either through environment variables (Docker) or a config
+file (`config.yml`, manual).
 
 ### OpenAEV environment variables
 
@@ -102,7 +103,8 @@ python3 -m nuclei.openaev_nuclei
 
 ## Behavior
 
-The Nuclei injector supports contract-based scans by dynamically constructing and executing Nuclei commands based on provided tags or templates.
+The Nuclei injector supports contract-based scans by dynamically constructing and executing Nuclei
+commands based on provided tags or templates.
 
 ### Supported Contracts
 
@@ -120,7 +122,8 @@ The CVE scan uses the `-tags cve` argument and enforces JSON output.
 
 The Template scan accepts a manual template via `-t <template>` or `template_path`.
 
-Additionally, contracts specific to individual CVEs may be provisioned in OpenAEV if two conditions are met:
+Additionally, contracts dedicated to scanning for a single, specific CVE may be provisioned in OpenAEV if
+two conditions are met:
 
 * A scan for the CVE is supported by a Nuclei template (part of the Nuclei distribution),
 * A vulnerability taxonomy entry exists in OpenAEV for that same CVE (under Settings > Taxonomies > Vulnerabilities).
