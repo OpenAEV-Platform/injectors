@@ -192,11 +192,10 @@ class OpenAEVNmap:
                 "or",
                 [
                     Filter(
-                        "asset_groups", "and", "eq", [self._injector_id]
+                        "asset_groups", "and", "eq", []
                     ),
                 ],
             ),
-            include_full_details=False,
         )
         return self.helper.api.endpoint.searchTargets(search_input)
 
