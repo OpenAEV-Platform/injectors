@@ -6,8 +6,12 @@ from typing import Dict
 from common.pagination import Pagination
 from pyoaev.helpers import OpenAEVConfigHelper, OpenAEVInjectorHelper
 
-from contracts_nmap import (FIN_SCAN_CONTRACT, TCP_CONNECT_SCAN_CONTRACT,
-                            TCP_SYN_SCAN_CONTRACT, NmapContracts)
+from contracts_nmap import (
+    FIN_SCAN_CONTRACT,
+    TCP_CONNECT_SCAN_CONTRACT,
+    TCP_SYN_SCAN_CONTRACT,
+    NmapContracts,
+)
 
 
 class OpenAEVNmap:
