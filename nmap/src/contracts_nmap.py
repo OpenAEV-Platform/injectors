@@ -54,7 +54,11 @@ class NmapContracts:
             label="Type of targets",
             defaultValue=["asset-groups"],
             mandatory=True,
-            choices={"assets": "Assets", "manual": "Manual", "asset-groups": "Asset groups"},
+            choices={
+                "assets": "Assets",
+                "manual": "Manual",
+                "asset-groups": "Asset groups",
+            },
         )
         targets_assets = ContractAsset(
             cardinality=ContractCardinality.Multiple,

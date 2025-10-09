@@ -5,16 +5,19 @@ from pyoaev.apis.inputs.search import (
     SearchPaginationInput,
 )
 
+
 class Pagination:
 
     @staticmethod
-    def get_page_of_contracts(helper, page_number: int = 0, page_size: int = 20) -> Dict[str, Any]:
+    def get_page_of_contracts(
+        helper, page_number: int = 0, page_size: int = 20
+    ) -> Dict[str, Any]:
         search_input = SearchPaginationInput(
             page_number,
             page_size,
-            FilterGroup("or", [Filter("asset_groups", "and", "eq", ['test targets'])]),
+            FilterGroup("or", [Filter("asset_groups", "and", "eq", ["test targets"])]),
             None,
-            None
+            None,
         )
         return helper.api.endpoint.searchTargets(search_input)
 
