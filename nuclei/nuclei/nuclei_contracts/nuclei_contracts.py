@@ -23,8 +23,8 @@ from pyoaev.contracts.contract_config import (
 from pyoaev.helpers import OpenAEVInjectorHelper
 
 from nuclei.nuclei_contracts.nuclei_constants import (
-    ASSETS_KEY,
     ASSET_GROUPS_KEY,
+    ASSETS_KEY,
     CONTRACT_LABELS,
     TARGET_PROPERTY_SELECTOR_KEY,
     TARGET_SELECTOR_KEY,

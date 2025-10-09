@@ -4,6 +4,8 @@ import time
 from typing import Dict
 
 from common.pagination import Pagination
+from pyoaev.apis.inputs.search import Filter, FilterGroup, SearchPaginationInput
+from pyoaev.helpers import OpenAEVConfigHelper, OpenAEVInjectorHelper
 
 from contracts_nmap import (
     FIN_SCAN_CONTRACT,
@@ -11,12 +13,6 @@ from contracts_nmap import (
     TCP_SYN_SCAN_CONTRACT,
     NmapContracts,
 )
-from pyoaev.apis.inputs.search import (
-    Filter,
-    FilterGroup,
-    SearchPaginationInput,
-)
-from pyoaev.helpers import OpenAEVConfigHelper, OpenAEVInjectorHelper
 
 
 class OpenAEVNmap:

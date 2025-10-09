@@ -1,9 +1,6 @@
-from typing import Dict, Any, List
-from pyoaev.apis.inputs.search import (
-    Filter,
-    FilterGroup,
-    SearchPaginationInput,
-)
+from typing import Any, Dict, List
+
+from pyoaev.apis.inputs.search import Filter, FilterGroup, SearchPaginationInput
 
 
 class Pagination:

@@ -1,12 +1,5 @@
 from typing import List
 
-from constants_nmap import (
-    ASSETS_KEY,
-    ASSET_GROUPS_KEY,
-    TARGET_PROPERTY_SELECTOR_KEY,
-    TARGET_SELECTOR_KEY,
-    TARGETS_KEY,
-)
 from pyoaev.contracts import ContractBuilder
 from pyoaev.contracts.contract_config import (
     Contract,
@@ -24,6 +17,14 @@ from pyoaev.contracts.contract_config import (
     ExpectationType,
     SupportedLanguage,
     prepare_contracts,
+)
+
+from constants_nmap import (
+    ASSET_GROUPS_KEY,
+    ASSETS_KEY,
+    TARGET_PROPERTY_SELECTOR_KEY,
+    TARGET_SELECTOR_KEY,
+    TARGETS_KEY,
 )
 
 TYPE = "openaev_nmap"
