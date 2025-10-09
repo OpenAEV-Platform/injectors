@@ -9,6 +9,11 @@ from contracts_nmap import (
     TCP_SYN_SCAN_CONTRACT,
     NmapContracts,
 )
+from pyoaev.apis.inputs.search import (
+    Filter,
+    FilterGroup,
+    SearchPaginationInput,
+)
 from pyoaev.helpers import OpenAEVConfigHelper, OpenAEVInjectorHelper
 
 
@@ -134,6 +139,10 @@ class OpenAEVNmap:
         inject_id = data["injection"]["inject_id"]
         # Notify API of reception and expected number of operations
         reception_data = {"tracking_total_count": 1}
+
+        self.helper.api.endpoint.searchTargets(
+            inject_id=inject_id, data=reception_data
+        )
         self.helper.api.inject.execution_reception(
             inject_id=inject_id, data=reception_data
         )
@@ -160,6 +169,36 @@ class OpenAEVNmap:
             self.helper.api.inject.execution_callback(
                 inject_id=inject_id, data=callback_data
             )
+
+    def fetch_all_targets(self):
+        targets = []
+
+        current_page = 0
+        last = False
+
+        while not last:
+            page = self.get_page_of_contracts(page_number=current_page)
+            targets.extend(page["content"])
+            last = page["last"]
+            current_page += 1
+
+        return targets
+
+    def get_page_of_contracts(self, page_number=0):
+        search_input = SearchPaginationInput(
+            page_number,
+            20,
+            FilterGroup(
+                "or",
+                [
+                    Filter(
+                        "asset_groups", "and", "eq", [self._injector_id]
+                    ),
+                ],
+            ),
+            include_full_details=False,
+        )
+        return self.helper.api.endpoint.searchTargets(search_input)
 
     # Start the main loop
     def start(self):
