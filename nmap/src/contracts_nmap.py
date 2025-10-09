@@ -52,7 +52,7 @@ class NmapContracts:
         target_selector = ContractSelect(
             key=TARGET_SELECTOR_KEY,
             label="Type of targets",
-            defaultValue=["assets"],
+            defaultValue=["asset-groups"],
             mandatory=True,
             choices={"assets": "Assets", "manual": "Manual", "asset-groups": "Asset groups"},
         )
