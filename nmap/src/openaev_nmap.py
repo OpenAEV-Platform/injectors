@@ -4,8 +4,6 @@ import time
 from typing import Dict
 
 from common.pagination import Pagination
-from pyoaev.apis.inputs.search import (Filter, FilterGroup,
-                                       SearchPaginationInput)
 from pyoaev.helpers import OpenAEVConfigHelper, OpenAEVInjectorHelper
 
 from contracts_nmap import (FIN_SCAN_CONTRACT, TCP_CONNECT_SCAN_CONTRACT,
