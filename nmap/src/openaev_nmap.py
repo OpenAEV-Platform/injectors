@@ -3,6 +3,8 @@ import subprocess
 import time
 from typing import Dict
 
+from common.pagination import Pagination
+
 from contracts_nmap import (
     FIN_SCAN_CONTRACT,
     TCP_CONNECT_SCAN_CONTRACT,
@@ -140,7 +142,7 @@ class OpenAEVNmap:
         # Notify API of reception and expected number of operations
         reception_data = {"tracking_total_count": 1}
 
-        target2execute = self.fetch_all_targets()
+        target2execute = Pagination.fetch_all_targets()
         print(target2execute)
 
         self.helper.api.inject.execution_reception(
@@ -169,37 +171,6 @@ class OpenAEVNmap:
             self.helper.api.inject.execution_callback(
                 inject_id=inject_id, data=callback_data
             )
-
-    def fetch_all_targets(self):
-        targets = []
-
-        current_page = 0
-        last = False
-
-        while not last:
-            page = self.get_page_of_contracts(page_number=current_page)
-            targets.extend(page["content"])
-            last = page["last"]
-            current_page += 1
-
-        return targets
-
-    def get_page_of_contracts(self, page_number=0):
-        search_input = SearchPaginationInput(
-            page_number,
-            20,
-            FilterGroup(
-                "or",
-                [
-                    Filter(
-                        "asset_groups", "and", "eq", []
-                    ),
-                ],
-            ),
-            None,
-            None
-        )
-        return self.helper.api.endpoint.searchTargets(search_input)
 
     # Start the main loop
     def start(self):
