@@ -7,11 +7,11 @@ from typing import Dict
 from common.targets import Targets
 from pyoaev.helpers import OpenAEVConfigHelper, OpenAEVInjectorHelper
 
-from nuclei.nuclei.helpers.nuclei_command_builder import NucleiCommandBuilder
-from nuclei.nuclei.helpers.nuclei_output_parser import NucleiOutputParser
-from nuclei.nuclei.helpers.nuclei_process import NucleiProcess
-from nuclei.nuclei.nuclei_contracts.external_contracts import ExternalContractsScheduler
-from nuclei.nuclei.nuclei_contracts.nuclei_contracts import NucleiContracts
+from nuclei.helpers.nuclei_command_builder import NucleiCommandBuilder
+from nuclei.helpers.nuclei_output_parser import NucleiOutputParser
+from nuclei.helpers.nuclei_process import NucleiProcess
+from nuclei.nuclei_contracts.external_contracts import ExternalContractsScheduler
+from nuclei.nuclei_contracts.nuclei_contracts import NucleiContracts
 
 
 class OpenAEVNuclei:

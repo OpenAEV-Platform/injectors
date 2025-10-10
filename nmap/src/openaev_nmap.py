@@ -45,12 +45,11 @@ class OpenAEVNmap:
         contract_id = data["injection"]["inject_injector_contract"]["convertedContent"][
             "contract_id"
         ]
-        content = data["injection"]["inject_content"]
 
         target_results = Targets.extract_targets(data, self.helper)
         asset_list = list(target_results.ip_to_asset_id_map.values())
         nmap_args = NmapCommandBuilder.build_args(
-            contract_id, content, target_results.targets
+            contract_id, target_results.targets
         )
 
         self.helper.injector_logger.info(
