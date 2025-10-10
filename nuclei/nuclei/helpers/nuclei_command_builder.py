@@ -1,14 +1,16 @@
 from typing import Dict, List
 
-from nuclei.nuclei_contracts.nuclei_constants import (CLOUD_SCAN_CONTRACT,
-                                                      CVE_SCAN_CONTRACT,
-                                                      EXPOSURE_SCAN_CONTRACT,
-                                                      HTTP_SCAN_CONTRACT,
-                                                      MISCONFIG_SCAN_CONTRACT,
-                                                      PANEL_SCAN_CONTRACT,
-                                                      TEMPLATE_SCAN_CONTRACT,
-                                                      WORDPRESS_SCAN_CONTRACT,
-                                                      XSS_SCAN_CONTRACT)
+from nuclei.nuclei_contracts.nuclei_constants import (
+    CLOUD_SCAN_CONTRACT,
+    CVE_SCAN_CONTRACT,
+    EXPOSURE_SCAN_CONTRACT,
+    HTTP_SCAN_CONTRACT,
+    MISCONFIG_SCAN_CONTRACT,
+    PANEL_SCAN_CONTRACT,
+    TEMPLATE_SCAN_CONTRACT,
+    WORDPRESS_SCAN_CONTRACT,
+    XSS_SCAN_CONTRACT,
+)
 
 
 class NucleiCommandBuilder:
@@ -22,6 +24,7 @@ class NucleiCommandBuilder:
         HTTP_SCAN_CONTRACT: "http",
     }
 
+    @staticmethod
     def build_args(
         self, contract_id: str, content: Dict, targets: List[str]
     ) -> List[str]:

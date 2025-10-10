@@ -2,7 +2,11 @@ from unittest import TestCase
 from unittest.mock import MagicMock
 
 from nuclei.nuclei_contracts.nuclei_constants import (
-    ASSETS_KEY, TARGET_PROPERTY_SELECTOR_KEY, TARGET_SELECTOR_KEY, TARGETS_KEY)
+    ASSETS_KEY,
+    TARGET_PROPERTY_SELECTOR_KEY,
+    TARGET_SELECTOR_KEY,
+    TARGETS_KEY,
+)
 from nuclei.nuclei_contracts.nuclei_contracts import NucleiContracts
 
 
