@@ -3,15 +3,11 @@ import subprocess
 import time
 from typing import Dict
 
-from common.pagination import Pagination
+from contracts_nmap import (FIN_SCAN_CONTRACT, TCP_CONNECT_SCAN_CONTRACT,
+                            TCP_SYN_SCAN_CONTRACT, NmapContracts)
 from pyoaev.helpers import OpenAEVConfigHelper, OpenAEVInjectorHelper
 
-from contracts_nmap import (
-    FIN_SCAN_CONTRACT,
-    TCP_CONNECT_SCAN_CONTRACT,
-    TCP_SYN_SCAN_CONTRACT,
-    NmapContracts,
-)
+from common.pagination import Pagination
 
 
 class OpenAEVNmap:
@@ -56,6 +52,8 @@ class OpenAEVNmap:
         elif contract_id == FIN_SCAN_CONTRACT:
             nmap_args.append("-sF")
         nmap_args = nmap_args + ["-oX", "-"]
+
+        target_results = NucleiContracts.extract_targets(data, self.helper)
 
         asset_list = []
         if data["injection"]["inject_content"]["target_selector"] == "assets":
@@ -136,9 +134,6 @@ class OpenAEVNmap:
         inject_id = data["injection"]["inject_id"]
         # Notify API of reception and expected number of operations
         reception_data = {"tracking_total_count": 1}
-
-        target2execute = Pagination.fetch_all_targets(self.helper)
-        print(target2execute)
 
         self.helper.api.inject.execution_reception(
             inject_id=inject_id, data=reception_data
