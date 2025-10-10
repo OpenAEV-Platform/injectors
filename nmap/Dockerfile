@@ -1,5 +1,8 @@
 FROM python:3.13-alpine
 
+# Copy the common library
+COPY ../common /opt/openaev-injector-common
+
 # Copy the injector
 COPY src /opt/openaev-injector-nmap
 
