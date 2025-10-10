@@ -1,3 +1,17 @@
+[project]
+name = "injector-common"
+dynamic = ["version"]
+description = "Python library for injectors OpenAEV."
+authors = [
+    {name = "Filigran", email = "contact@filigran.io"}
+]
+maintainers = [
+    {name = "Filigran", email = "contact@filigran.io"}
+]
+license = { text = "Apache-2.0" }
+readme = "README.md"
+requires-python = ">=3.11"
+
 [tool.isort]
 profile = "black"
 known_local_folder = ["common"]
