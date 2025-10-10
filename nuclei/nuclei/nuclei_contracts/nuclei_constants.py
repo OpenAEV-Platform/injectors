@@ -19,10 +19,3 @@ CONTRACT_LABELS = {
     WORDPRESS_SCAN_CONTRACT: ("Wordpress Scan", "Scan Wordpress"),
     TEMPLATE_SCAN_CONTRACT: ("TEMPLATES Scan", "Scan TEMPLATES"),
 }
-
-# -- KEY FIELDS --
-TARGET_SELECTOR_KEY = "target_selector"
-TARGET_PROPERTY_SELECTOR_KEY = "target_property_selector"
-ASSETS_KEY = "assets"
-ASSET_GROUPS_KEY = "asset-groups"
-TARGETS_KEY = "targets"

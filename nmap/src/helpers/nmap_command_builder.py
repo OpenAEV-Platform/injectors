@@ -1,8 +1,13 @@
 from typing import List
 
+from nmap.src.contracts.nmap_constants import (
+    FIN_SCAN_CONTRACT,
+    TCP_CONNECT_SCAN_CONTRACT,
+    TCP_SYN_SCAN_CONTRACT,
+)
+
 
 class NmapCommandBuilder:
-
     @staticmethod
     def build_args(contract_id: str, targets: List[str]) -> List[str]:
         args = ["nmap", "-Pn"]
