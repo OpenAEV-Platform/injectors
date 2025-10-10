@@ -5,7 +5,7 @@ from typing import Dict
 from common.targets import Targets
 from pyoaev.helpers import OpenAEVConfigHelper, OpenAEVInjectorHelper
 
-from nmap.src.contracts_nmap import NmapContracts
+from nmap.src.contracts.nmap_contracts import NmapContracts
 from nmap.src.helpers.nmap_command_builder import NmapCommandBuilder
 from nmap.src.helpers.nmap_output_parser import NmapOutputParser
 from nmap.src.helpers.nmap_process import NmapProcess

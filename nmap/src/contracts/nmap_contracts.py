@@ -1,5 +1,12 @@
 from typing import List
 
+from common.constants import (
+    ASSET_GROUPS_KEY,
+    ASSETS_KEY,
+    TARGET_PROPERTY_SELECTOR_KEY,
+    TARGET_SELECTOR_KEY,
+    TARGETS_KEY,
+)
 from common.targets import TargetProperty, target_property_choices_dict
 from pyoaev.contracts import ContractBuilder
 from pyoaev.contracts.contract_config import (
@@ -20,18 +27,12 @@ from pyoaev.contracts.contract_config import (
     prepare_contracts,
 )
 
-from constants_nmap import (
-    ASSET_GROUPS_KEY,
-    ASSETS_KEY,
-    TARGET_PROPERTY_SELECTOR_KEY,
-    TARGET_SELECTOR_KEY,
-    TARGETS_KEY,
+from nmap.src.contracts.nmap_constants import (
+    FIN_SCAN_CONTRACT,
+    TCP_CONNECT_SCAN_CONTRACT,
+    TCP_SYN_SCAN_CONTRACT,
+    TYPE,
 )
-
-TYPE = "openaev_nmap"
-TCP_SYN_SCAN_CONTRACT = "0b7f3674-ac5d-4b95-b749-6665e74a211f"
-TCP_CONNECT_SCAN_CONTRACT = "93d27459-68d0-43b1-ad65-eacc3cfa5cf7"
-FIN_SCAN_CONTRACT = "6f4d7e18-c730-484a-bb09-c9c321820c0a"
 
 
 class NmapContracts:

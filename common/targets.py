@@ -3,6 +3,15 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import Dict, List, Optional, Tuple
 
+from pyoaev.helpers import OpenAEVInjectorHelper
+
+from common.constants import (
+    ASSETS_KEY,
+    TARGET_PROPERTY_SELECTOR_KEY,
+    TARGET_SELECTOR_KEY,
+    TARGETS_KEY,
+)
+
 
 @dataclass
 class TargetExtractionResult:
@@ -21,11 +30,12 @@ target_property_choices_dict = {
     property.name.lower(): property.value for property in TargetProperty
 }
 
+
 class Targets:
 
     @staticmethod
     def extract_targets(
-            data: Dict, helper: OpenAEVInjectorHelper
+        data: Dict, helper: OpenAEVInjectorHelper
     ) -> TargetExtractionResult:
         targets = []
         ip_to_asset_id_map = {}
@@ -100,7 +110,7 @@ class Targets:
 
         # Case 2: Agent present => try IPs
         for ip in endpoint_ips:
-            if Properties.is_valid_ip(ip):
+            if Targets.is_valid_ip(ip):
                 return ip, asset_id
 
         return None
