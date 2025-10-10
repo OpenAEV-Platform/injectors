@@ -15,8 +15,8 @@ from pyoaev.client import OpenAEV
 from pyoaev.contracts.contract_config import ContractText
 from pyoaev.utils import setup_logging_config
 
-from nuclei.helpers.nuclei_process import NucleiProcess
-from nuclei.nuclei_contracts.nuclei_contracts import NucleiContracts
+from nuclei.nuclei.helpers.nuclei_process import NucleiProcess
+from nuclei.nuclei.nuclei_contracts.nuclei_contracts import NucleiContracts
 
 
 class ExternalContractsScheduler:
