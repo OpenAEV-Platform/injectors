@@ -3,6 +3,10 @@ FROM python:3.13-alpine
 ENV NUCLEI_VERSION=3.4.3
 ENV NUCLEI_URL=https://github.com/projectdiscovery/nuclei/releases/download/v${NUCLEI_VERSION}/nuclei_${NUCLEI_VERSION}_linux_amd64.zip
 
+WORKDIR /opt/common
+
+COPY --from=common ./ ./
+
 WORKDIR /opt/openaev-injector-nuclei
 
 # Copy the injector
