@@ -1,8 +1,8 @@
-import ipaddress
 from dataclasses import dataclass
 from enum import Enum
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List
 
+from common.properties import Properties
 from pyoaev.contracts import ContractBuilder
 from pyoaev.contracts.contract_config import (
     Contract,
@@ -221,7 +221,7 @@ class NucleiContracts:
             selector = content[TARGET_PROPERTY_SELECTOR_KEY]
             for asset in data[ASSETS_KEY]:
                 if selector == "automatic":
-                    result = NucleiContracts.extract_property_target_value(asset)
+                    result = Properties.extract_property_target_value(asset)
                     if result:
                         target, asset_id = result
                         targets.append(target)
@@ -257,37 +257,3 @@ class NucleiContracts:
         return TargetExtractionResult(
             targets=targets, ip_to_asset_id_map=ip_to_asset_id_map
         )
-
-    @staticmethod
-    def is_valid_ip(ip: str) -> bool:
-        """Filter out loopback, unspecified"""
-        try:
-            ip_obj = ipaddress.ip_address(ip)
-            return not (
-                ip_obj.is_loopback or ip_obj.is_unspecified or ip_obj.is_link_local
-            )
-        except ValueError:
-            return False
-
-    @staticmethod
-    def extract_property_target_value(asset: Dict) -> Optional[Tuple[str, str]]:
-        """
-        Extract target value from asset based on conditions:
-        - Agentless + hostname => hostname
-        - Otherwise => first valid IP
-        """
-        asset_id = asset.get("asset_id")
-        agents = asset.get("asset_agents", [])
-        hostname = asset.get("endpoint_hostname")
-        endpoint_ips = asset.get("endpoint_ips", [])
-
-        # Case 1: Agentless + hostname
-        if not agents and hostname:
-            return hostname, asset_id
-
-        # Case 2: Agent present => try IPs
-        for ip in endpoint_ips:
-            if NucleiContracts.is_valid_ip(ip):
-                return ip, asset_id
-
-        return None
