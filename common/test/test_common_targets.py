@@ -1,16 +1,11 @@
 from unittest import TestCase
 from unittest.mock import MagicMock
 
-from nuclei.nuclei_contracts.nuclei_constants import (
-    ASSETS_KEY,
-    TARGET_PROPERTY_SELECTOR_KEY,
-    TARGET_SELECTOR_KEY,
-    TARGETS_KEY,
-)
-from nuclei.nuclei_contracts.nuclei_contracts import NucleiContracts
+from common.constants import TARGET_SELECTOR_KEY, TARGETS_KEY, TARGET_PROPERTY_SELECTOR_KEY, ASSETS_KEY
+from common.targets import Targets
 
 
-class NucleiExtractPropertyTargetValueTest(TestCase):
+class CommonTargetsTest(TestCase):
 
     def setUp(self):
         self.asset_hostname = {
@@ -37,21 +32,21 @@ class NucleiExtractPropertyTargetValueTest(TestCase):
     # ---------- extract_property_target_value ----------
 
     def test_extract_property_target_value_hostname(self):
-        target, asset_id = NucleiContracts.extract_property_target_value(
+        target, asset_id = Targets.extract_property_target_value(
             self.asset_hostname
         )
         self.assertEqual(target, "host.local")
         self.assertEqual(asset_id, "a1")
 
     def test_extract_property_target_value_local_ip(self):
-        target, asset_id = NucleiContracts.extract_property_target_value(
+        target, asset_id = Targets.extract_property_target_value(
             self.asset_local_ip
         )
         self.assertEqual(target, "10.0.0.2")
         self.assertEqual(asset_id, "a2")
 
     def test_extract_property_target_value_no_valid_field(self):
-        target = NucleiContracts.extract_property_target_value(self.empty_asset_ips)
+        target = Targets.extract_property_target_value(self.empty_asset_ips)
         self.assertIsNone(target)
 
         # ---------- extract_targets ----------
@@ -69,7 +64,7 @@ class NucleiExtractPropertyTargetValueTest(TestCase):
                 self.asset_local_ip,
             ],
         }
-        result = NucleiContracts.extract_targets(data, helper=self.mock_helper)
+        result = Targets.extract_targets(data, helper=self.mock_helper)
         self.assertCountEqual(result.targets, ["host.local", "10.0.0.2"])
         self.assertEqual(len(result.ip_to_asset_id_map), 2)
 
@@ -83,7 +78,7 @@ class NucleiExtractPropertyTargetValueTest(TestCase):
             },
             ASSETS_KEY: [self.asset_local_ip],
         }
-        result = NucleiContracts.extract_targets(data, helper=self.mock_helper)
+        result = Targets.extract_targets(data, helper=self.mock_helper)
         self.assertEqual(result.targets, ["10.0.0.2"])
         self.assertEqual(result.ip_to_asset_id_map, {"10.0.0.2": "a2"})
 
@@ -98,7 +93,7 @@ class NucleiExtractPropertyTargetValueTest(TestCase):
             ASSETS_KEY: [self.empty_asset_ips],
         }
         with self.assertRaises(ValueError):
-            NucleiContracts.extract_targets(data, helper=self.mock_helper)
+            Targets.extract_targets(data, helper=self.mock_helper)
 
     def test_extract_targets_hostname(self):
         data = {
@@ -110,7 +105,7 @@ class NucleiExtractPropertyTargetValueTest(TestCase):
             },
             ASSETS_KEY: [self.asset_hostname],
         }
-        result = NucleiContracts.extract_targets(data, helper=self.mock_helper)
+        result = Targets.extract_targets(data, helper=self.mock_helper)
         self.assertEqual(result.targets, ["host.local"])
         self.assertEqual(result.ip_to_asset_id_map, {"host.local": "a1"})
 
@@ -123,11 +118,11 @@ class NucleiExtractPropertyTargetValueTest(TestCase):
                 }
             },
         }
-        result = NucleiContracts.extract_targets(data, helper=self.mock_helper)
+        result = Targets.extract_targets(data, helper=self.mock_helper)
         self.assertEqual(result.targets, ["titi.com", "toto.com", "foo.com"])
         self.assertEqual(result.ip_to_asset_id_map, {})
 
     def test_extract_targets_no_targets(self):
         data = {"injection": {"inject_content": {TARGET_SELECTOR_KEY: "unknown"}}}
         with self.assertRaises(ValueError):
-            NucleiContracts.extract_targets(data, helper=self.mock_helper)
+            Targets.extract_targets(data, helper=self.mock_helper)

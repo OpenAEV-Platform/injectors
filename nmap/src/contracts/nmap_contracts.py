@@ -1,15 +1,18 @@
 from typing import List
 
-from constants_nmap import (
+from common.constants import (
+    ASSET_GROUPS_KEY,
     ASSETS_KEY,
     TARGET_PROPERTY_SELECTOR_KEY,
     TARGET_SELECTOR_KEY,
     TARGETS_KEY,
 )
+from common.targets import TargetProperty, target_property_choices_dict
 from pyoaev.contracts import ContractBuilder
 from pyoaev.contracts.contract_config import (
     Contract,
     ContractAsset,
+    ContractAssetGroup,
     ContractCardinality,
     ContractConfig,
     ContractElement,
@@ -24,10 +27,12 @@ from pyoaev.contracts.contract_config import (
     prepare_contracts,
 )
 
-TYPE = "openaev_nmap"
-TCP_SYN_SCAN_CONTRACT = "0b7f3674-ac5d-4b95-b749-6665e74a211f"
-TCP_CONNECT_SCAN_CONTRACT = "93d27459-68d0-43b1-ad65-eacc3cfa5cf7"
-FIN_SCAN_CONTRACT = "6f4d7e18-c730-484a-bb09-c9c321820c0a"
+from nmap.src.contracts.nmap_constants import (
+    FIN_SCAN_CONTRACT,
+    TCP_CONNECT_SCAN_CONTRACT,
+    TCP_SYN_SCAN_CONTRACT,
+    TYPE,
+)
 
 
 class NmapContracts:
@@ -50,9 +55,13 @@ class NmapContracts:
         target_selector = ContractSelect(
             key=TARGET_SELECTOR_KEY,
             label="Type of targets",
-            defaultValue=["assets"],
+            defaultValue=["asset-groups"],
             mandatory=True,
-            choices={"assets": "Assets", "manual": "Manual"},
+            choices={
+                "assets": "Assets",
+                "manual": "Manual",
+                "asset-groups": "Asset groups",
+            },
         )
         targets_assets = ContractAsset(
             cardinality=ContractCardinality.Multiple,
@@ -64,20 +73,26 @@ class NmapContracts:
             visibleConditionFields=[target_selector.key],
             visibleConditionValues={target_selector.key: "assets"},
         )
+        target_asset_groups = ContractAssetGroup(
+            cardinality=ContractCardinality.Multiple,
+            key=ASSET_GROUPS_KEY,
+            label="Targeted asset groups",
+            mandatory=False,
+            mandatoryConditionFields=[target_selector.key],
+            mandatoryConditionValues={target_selector.key: "asset-groups"},
+            visibleConditionFields=[target_selector.key],
+            visibleConditionValues={target_selector.key: "asset-groups"},
+        )
         target_property_selector = ContractSelect(
             key=TARGET_PROPERTY_SELECTOR_KEY,
             label="Targeted assets property",
-            defaultValue=["seen_ip"],
-            choices={
-                "seen_ip": "Seen IP",
-                "local_ip": "Local IP (first)",
-                "hostname": "Hostname",
-            },
+            defaultValue=[TargetProperty.AUTOMATIC.name.lower()],
+            choices=target_property_choices_dict,
             mandatory=False,
             mandatoryConditionFields=[target_selector.key],
-            mandatoryConditionValues={target_selector.key: "assets"},
+            mandatoryConditionValues={target_selector.key: ["assets", "asset-groups"]},
             visibleConditionFields=[target_selector.key],
-            visibleConditionValues={target_selector.key: "assets"},
+            visibleConditionValues={target_selector.key: ["assets", "asset-groups"]},
         )
         targets_manual = ContractText(
             key=TARGETS_KEY,
@@ -126,6 +141,7 @@ class NmapContracts:
                 [
                     target_selector,
                     targets_assets,
+                    target_asset_groups,
                     target_property_selector,
                     targets_manual,
                     expectations,

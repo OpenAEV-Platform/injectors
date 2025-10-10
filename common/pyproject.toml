@@ -1,0 +1,11 @@
+[project]
+name="common"
+version="1.0.0"
+
+[tool.isort]
+profile = "black"
+known_local_folder = ["common"]
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["common*"]

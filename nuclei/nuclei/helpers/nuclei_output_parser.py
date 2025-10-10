@@ -5,6 +5,7 @@ from typing import Dict
 
 
 class NucleiOutputParser:
+    @staticmethod
     def parse(self, stdout: str, ip_to_asset_id_map: dict) -> Dict:
         grouped = defaultdict(
             lambda: {"asset_id": set(), "host": set(), "severity": None}
