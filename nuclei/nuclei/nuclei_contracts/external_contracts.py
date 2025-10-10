@@ -6,11 +6,8 @@ import uuid
 from multiprocessing import Process
 
 import requests
-from pyoaev.apis.inputs.search import (
-    Filter,
-    FilterGroup,
-    InjectorContractSearchPaginationInput,
-)
+from pyoaev.apis.inputs.search import (Filter, FilterGroup,
+                                       InjectorContractSearchPaginationInput)
 from pyoaev.client import OpenAEV
 from pyoaev.contracts.contract_config import ContractText
 from pyoaev.utils import setup_logging_config
