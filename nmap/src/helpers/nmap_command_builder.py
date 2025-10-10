@@ -21,6 +21,6 @@ class NmapCommandBuilder:
         args = args + ["-oX", "-"]
 
         for target in targets:
-            args += ["-u", target]
+            args += [target]
 
         return args
