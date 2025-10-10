@@ -1,21 +1,32 @@
+from common.targets import TargetProperty, target_property_choices_dict
 from pyoaev.contracts import ContractBuilder
-from pyoaev.contracts.contract_config import (Contract, ContractAsset,
-                                              ContractAssetGroup,
-                                              ContractCardinality,
-                                              ContractConfig,
-                                              ContractExpectations,
-                                              ContractOutputElement,
-                                              ContractOutputType,
-                                              ContractSelect, ContractText,
-                                              Expectation, ExpectationType,
-                                              SupportedLanguage,
-                                              prepare_contracts)
+from pyoaev.contracts.contract_config import (
+    Contract,
+    ContractAsset,
+    ContractAssetGroup,
+    ContractCardinality,
+    ContractConfig,
+    ContractExpectations,
+    ContractOutputElement,
+    ContractOutputType,
+    ContractSelect,
+    ContractText,
+    Expectation,
+    ExpectationType,
+    SupportedLanguage,
+    prepare_contracts,
+)
 from pyoaev.helpers import OpenAEVInjectorHelper
 
-from common.targets import TargetProperty, target_property_choices_dict
 from nuclei.nuclei_contracts.nuclei_constants import (
-    ASSET_GROUPS_KEY, ASSETS_KEY, CONTRACT_LABELS,
-    TARGET_PROPERTY_SELECTOR_KEY, TARGET_SELECTOR_KEY, TARGETS_KEY, TYPE)
+    ASSET_GROUPS_KEY,
+    ASSETS_KEY,
+    CONTRACT_LABELS,
+    TARGET_PROPERTY_SELECTOR_KEY,
+    TARGET_SELECTOR_KEY,
+    TARGETS_KEY,
+    TYPE,
+)
 
 
 class NucleiContracts:

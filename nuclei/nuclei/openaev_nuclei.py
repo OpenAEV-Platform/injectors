@@ -4,13 +4,13 @@ import subprocess
 import time
 from typing import Dict
 
+from common.targets import Targets
 from pyoaev.helpers import OpenAEVConfigHelper, OpenAEVInjectorHelper
 
 from nuclei.helpers.nuclei_command_builder import NucleiCommandBuilder
 from nuclei.helpers.nuclei_output_parser import NucleiOutputParser
 from nuclei.helpers.nuclei_process import NucleiProcess
-from nuclei.nuclei_contracts.external_contracts import \
-    ExternalContractsScheduler
+from nuclei.nuclei_contracts.external_contracts import ExternalContractsScheduler
 from nuclei.nuclei_contracts.nuclei_contracts import NucleiContracts
 
 
@@ -62,8 +62,6 @@ class OpenAEVNuclei:
             raise RuntimeError(
                 "Nuclei is not installed or is not accessible from your PATH."
             )
-        self.command_builder = NucleiCommandBuilder()
-        self.parser = NucleiOutputParser()
 
     def nuclei_execution(self, start: float, data: Dict) -> Dict:
         inject_id = data["injection"]["inject_id"]
@@ -72,8 +70,8 @@ class OpenAEVNuclei:
         ]
         content = data["injection"]["inject_content"]
 
-        target_results = NucleiContracts.extract_targets(data, self.helper)
-        nuclei_args = self.command_builder.build_args(
+        target_results = Targets.extract_targets(data, self.helper)
+        nuclei_args = NucleiCommandBuilder.build_args(
             contract_id, content, target_results.targets
         )
         input_data = "\n".join(target_results.targets).encode("utf-8")
@@ -81,18 +79,19 @@ class OpenAEVNuclei:
         self.helper.injector_logger.info(
             "Executing nuclei with: " + " ".join(nuclei_args)
         )
+        callback_data = {
+            "execution_message": " ".join(nuclei_args),
+            "execution_status": "INFO",
+            "execution_duration": int(time.time() - start),
+            "execution_action": "command_execution",
+        }
         self.helper.api.inject.execution_callback(
             inject_id=inject_id,
-            data={
-                "execution_message": " ".join(nuclei_args),
-                "execution_status": "INFO",
-                "execution_duration": int(time.time() - start),
-                "execution_action": "command_execution",
-            },
+            data=callback_data,
         )
 
         result = NucleiProcess.nuclei_execute(nuclei_args, input_data)
-        return self.parser.parse(
+        return NucleiOutputParser.parse(
             result.stdout.decode("utf-8"), target_results.ip_to_asset_id_map
         )
 

@@ -1,13 +1,14 @@
 import json
-import subprocess
 import time
 from typing import Dict
 
-from contracts_nmap import (FIN_SCAN_CONTRACT, TCP_CONNECT_SCAN_CONTRACT,
-                            TCP_SYN_SCAN_CONTRACT, NmapContracts)
+from common.targets import Targets
 from pyoaev.helpers import OpenAEVConfigHelper, OpenAEVInjectorHelper
 
-from common.pagination import Pagination
+from nmap.src.contracts_nmap import NmapContracts
+from nmap.src.helpers.nmap_command_builder import NmapCommandBuilder
+from nmap.src.helpers.nmap_output_parser import NmapOutputParser
+from nmap.src.helpers.nmap_process import NmapProcess
 
 
 class OpenAEVNmap:
@@ -44,36 +45,13 @@ class OpenAEVNmap:
         contract_id = data["injection"]["inject_injector_contract"]["convertedContent"][
             "contract_id"
         ]
-        nmap_args = ["nmap", "-Pn"]
-        if contract_id == TCP_SYN_SCAN_CONTRACT:
-            nmap_args.append("-sS")
-        elif contract_id == TCP_CONNECT_SCAN_CONTRACT:
-            nmap_args.append("-sT")
-        elif contract_id == FIN_SCAN_CONTRACT:
-            nmap_args.append("-sF")
-        nmap_args = nmap_args + ["-oX", "-"]
+        content = data["injection"]["inject_content"]
 
-        target_results = NucleiContracts.extract_targets(data, self.helper)
-
-        asset_list = []
-        if data["injection"]["inject_content"]["target_selector"] == "assets":
-            target_property_selector = data["injection"]["inject_content"][
-                "target_property_selector"
-            ]
-            for asset in data["assets"]:
-                asset_list.append(asset["asset_id"])
-                if target_property_selector == "seen_ip":
-                    nmap_args.append(asset["endpoint_seen_ip"])
-                elif target_property_selector == "local_ip":
-                    if len(asset["endpoint_ips"]) == 0:
-                        raise ValueError("No IP found for this endpoint")
-                    nmap_args.append(asset["endpoint_ips"][0])
-                else:
-                    nmap_args.append(asset["endpoint_hostname"])
-        else:
-            for target in data["injection"]["inject_content"]["targets"].split(","):
-                asset_list.append(target.strip())
-                nmap_args.append(target.strip())
+        target_results = Targets.extract_targets(data, self.helper)
+        asset_list = list(target_results.ip_to_asset_id_map.values())
+        nmap_args = NmapCommandBuilder.build_args(
+            contract_id, content, target_results.targets
+        )
 
         self.helper.injector_logger.info(
             "Executing nmap with command: " + " ".join(nmap_args)
@@ -87,47 +65,12 @@ class OpenAEVNmap:
         self.helper.api.inject.execution_callback(
             inject_id=inject_id, data=callback_data
         )
-        nmap = subprocess.run(
-            nmap_args,
-            check=True,
-            capture_output=True,
-        )
-        jc = subprocess.run(
-            ["jc", "--xml", "-p"], input=nmap.stdout, capture_output=True
-        )
+
+        nmap_result = NmapProcess.nmap_execute(nmap_args)
+        jc = NmapProcess.js_execute(["jc", "--xml", "-p"], nmap_result)
         result = json.loads(jc.stdout.decode("utf-8").strip())
-        run = result["nmaprun"]
-        if not isinstance(run["host"], list):
-            run["host"] = [run["host"]]
 
-        ports_scans_results = []
-        ports_results = []
-        for idx, host in enumerate(run["host"]):
-            if "ports" in host and "port" in host["ports"]:
-                for port in host["ports"]["port"]:
-                    if port["state"]["@state"] == "open":
-                        ports_results.append(int(port["@portid"]))
-                        port_result = {
-                            "port": int(port["@portid"]),
-                            "service": port["service"]["@name"],
-                        }
-                        if (
-                            data["injection"]["inject_content"]["target_selector"]
-                            == "assets"
-                        ):
-                            port_result["asset_id"] = asset_list[idx]
-                            port_result["host"] = host["address"]["@addr"]
-                        else:
-                            port_result["asset_id"] = None
-                            port_result["host"] = asset_list[idx]
-                        ports_scans_results.append(port_result)
-
-        return {
-            "message": "Targets successfully scanned ("
-            + str(len(ports_results))
-            + " ports found )",
-            "outputs": {"scan_results": ports_scans_results, "ports": ports_results},
-        }
+        return NmapOutputParser.parse(data, result, asset_list)
 
     def process_message(self, data: Dict) -> None:
         start = time.time()
