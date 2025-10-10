@@ -62,7 +62,7 @@ Configuration is provided either through environment variables (Docker) or a con
 Build the Docker image using the provided `Dockerfile`.
 
 ```bash
-docker build . -t openaev/injector-nuclei:latest
+docker build docker build --build-context common=../common .  -t openaev/injector-nuclei:latest
 ````
 
 Edit the `docker-compose.yml` file with your OpenAEV configuration, then start the container:

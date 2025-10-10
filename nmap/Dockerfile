@@ -1,10 +1,13 @@
 FROM python:3.13-alpine
 
-# Copy the common library
-COPY ../common /opt/openaev-injector-common
 
+WORKDIR /opt/common
+
+COPY --from=common ./ ./
+
+WORKDIR /opt/openaev-injector-nmap
 # Copy the injector
-COPY src /opt/openaev-injector-nmap
+COPY src ./
 
 # Install Python modules
 # hadolint ignore=DL3003
