@@ -112,8 +112,10 @@ class Targets:
 
         elif selector == "seen_ip":
             seen_ip = asset.get("endpoint_seen_ip")
-            if seen_ip:
+            if Targets.is_valid_ip(seen_ip):
                 return seen_ip, asset_id
+            else:
+                return None
 
         elif selector == "local_ip":
             endpoint_ips = asset.get("endpoint_ips") or []
@@ -151,12 +153,12 @@ class Targets:
         - Otherwise => first valid IP
         """
         asset_id = asset.get("asset_id")
-        agents = asset.get("asset_agents", [])
+        has_agent = asset.get("has_agent", False)
         hostname = asset.get("endpoint_hostname")
         endpoint_ips = asset.get("endpoint_ips", [])
 
         # Case 1: Agentless + hostname
-        if not agents and hostname:
+        if not has_agent and hostname:
             return hostname, asset_id
 
         # Case 2: Agent present => try IPs
