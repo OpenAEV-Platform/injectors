@@ -1,13 +1,13 @@
 from unittest import TestCase
 from unittest.mock import MagicMock
 
-from common.constants import (
-    ASSETS_KEY,
+from common.common.constants import (
+    ASSETS_KEY_RABBITMQ,
     TARGET_PROPERTY_SELECTOR_KEY,
     TARGET_SELECTOR_KEY,
     TARGETS_KEY,
 )
-from common.targets import Targets
+from common.common.targets import Targets
 
 
 class CommonTargetsTest(TestCase):
@@ -17,19 +17,19 @@ class CommonTargetsTest(TestCase):
             "asset_id": "a1",
             "endpoint_hostname": "host.local",
             "endpoint_ips": ["10.0.0.1"],
-            "asset_agents": [],  # agentless
+            "asset_agents": False,  # agentless
         }
         self.asset_local_ip = {
             "asset_id": "a2",
             "endpoint_hostname": None,
             "endpoint_ips": ["10.0.0.2"],
-            "asset_agents": [{"agent_id": "x"}],  # has agent
+            "asset_agents": True,  # has agent
         }
         self.empty_asset_ips = {
             "asset_id": "a3",
             "endpoint_hostname": None,
             "endpoint_ips": [],  # no ips
-            "asset_agents": [{"agent_id": "y"}],
+            "asset_agents": True,
         }
 
         self.mock_helper = MagicMock()
@@ -60,12 +60,14 @@ class CommonTargetsTest(TestCase):
                     TARGET_PROPERTY_SELECTOR_KEY: "automatic",
                 }
             },
-            ASSETS_KEY: [
+            ASSETS_KEY_RABBITMQ: [
                 self.asset_hostname,
                 self.asset_local_ip,
             ],
         }
-        result = Targets.extract_targets(data, helper=self.mock_helper)
+        result = Targets.extract_targets(
+            "assets", "automatic", data, helper=self.mock_helper
+        )
         self.assertCountEqual(result.targets, ["host.local", "10.0.0.2"])
         self.assertEqual(len(result.ip_to_asset_id_map), 2)
 
@@ -77,9 +79,11 @@ class CommonTargetsTest(TestCase):
                     TARGET_PROPERTY_SELECTOR_KEY: "local_ip",
                 }
             },
-            ASSETS_KEY: [self.asset_local_ip],
+            ASSETS_KEY_RABBITMQ: [self.asset_local_ip],
         }
-        result = Targets.extract_targets(data, helper=self.mock_helper)
+        result = Targets.extract_targets(
+            "assets", "local_ip", data, helper=self.mock_helper
+        )
         self.assertEqual(result.targets, ["10.0.0.2"])
         self.assertEqual(result.ip_to_asset_id_map, {"10.0.0.2": "a2"})
 
@@ -91,10 +95,12 @@ class CommonTargetsTest(TestCase):
                     TARGET_PROPERTY_SELECTOR_KEY: "local_ip",
                 }
             },
-            ASSETS_KEY: [self.empty_asset_ips],
+            ASSETS_KEY_RABBITMQ: [self.empty_asset_ips],
         }
-        with self.assertRaises(ValueError):
-            Targets.extract_targets(data, helper=self.mock_helper)
+        result = Targets.extract_targets(
+            "assets", "local_ip", data, helper=self.mock_helper
+        )
+        self.assertEqual(result.targets, [])
 
     def test_extract_targets_hostname(self):
         data = {
@@ -104,9 +110,11 @@ class CommonTargetsTest(TestCase):
                     TARGET_PROPERTY_SELECTOR_KEY: "hostname",
                 }
             },
-            ASSETS_KEY: [self.asset_hostname],
+            ASSETS_KEY_RABBITMQ: [self.asset_hostname],
         }
-        result = Targets.extract_targets(data, helper=self.mock_helper)
+        result = Targets.extract_targets(
+            "assets", "hostname", data, helper=self.mock_helper
+        )
         self.assertEqual(result.targets, ["host.local"])
         self.assertEqual(result.ip_to_asset_id_map, {"host.local": "a1"})
 
@@ -119,11 +127,11 @@ class CommonTargetsTest(TestCase):
                 }
             },
         }
-        result = Targets.extract_targets(data, helper=self.mock_helper)
+        result = Targets.extract_targets("manual", None, data, helper=self.mock_helper)
         self.assertEqual(result.targets, ["titi.com", "toto.com", "foo.com"])
         self.assertEqual(result.ip_to_asset_id_map, {})
 
     def test_extract_targets_no_targets(self):
         data = {"injection": {"inject_content": {TARGET_SELECTOR_KEY: "unknown"}}}
         with self.assertRaises(ValueError):
-            Targets.extract_targets(data, helper=self.mock_helper)
+            Targets.extract_targets("unknown", None, data, helper=self.mock_helper)
