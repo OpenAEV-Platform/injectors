@@ -2,8 +2,8 @@ import json
 import time
 from typing import Dict
 
-from common.constants import TARGET_SELECTOR_KEY
-from common.targets import Targets
+from common.common.constants import TARGET_SELECTOR_KEY
+from common.common.targets import Targets
 from pyoaev.helpers import OpenAEVConfigHelper, OpenAEVInjectorHelper
 
 from contracts.nmap_contracts import NmapContracts
@@ -59,12 +59,14 @@ class OpenAEVNmap:
             "Executing nmap with command: " + " ".join(nmap_args)
         )
 
+        message = Targets.build_execution_message(
+            selector_key=selector_key,
+            data=data,
+            command_args=nmap_args,
+        )
+
         callback_data = {
-            "execution_message": Targets.build_execution_message(
-                selector_key=selector_key,
-                data=data,
-                command_args=nmap_args,
-            ),
+            "execution_message": message,
             "execution_status": "INFO",
             "execution_duration": int(time.time() - start),
             "execution_action": "command_execution",
