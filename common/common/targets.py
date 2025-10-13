@@ -37,13 +37,12 @@ class Targets:
 
     @staticmethod
     def extract_targets(
-        data: Dict, helper: OpenAEVInjectorHelper
+        selector_key: str, data: Dict, helper: OpenAEVInjectorHelper
     ) -> TargetExtractionResult:
         targets: List[str] = []
         ip_to_asset_id_map: Dict[str, str] = {}
         content = data["injection"]["inject_content"]
 
-        selector_key = content[TARGET_SELECTOR_KEY]
         selector = content.get(TARGET_PROPERTY_SELECTOR_KEY)
 
         if selector_key == "asset-groups" and data[ASSET_GROUPS_KEY]:
