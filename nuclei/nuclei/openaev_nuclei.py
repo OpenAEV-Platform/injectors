@@ -68,9 +68,11 @@ class OpenAEVNuclei:
         contract_id = data["injection"]["inject_injector_contract"]["convertedContent"][
             "contract_id"
         ]
+        content = data["injection"]["inject_content"]
+
         target_results = Targets.extract_targets(data, self.helper)
         nuclei_args = NucleiCommandBuilder.build_args(
-            contract_id, target_results.targets
+            self, contract_id, content, target_results.targets
         )
         input_data = "\n".join(target_results.targets).encode("utf-8")
 
