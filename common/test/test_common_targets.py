@@ -50,7 +50,7 @@ class CommonTargetsTest(TestCase):
         target = Targets.extract_property_target_value(self.empty_asset_ips)
         self.assertIsNone(target)
 
-        # ---------- extract_targets ----------
+    # ---------- extract_targets ----------
 
     def test_extract_targets_automatic(self):
         data = {
@@ -135,3 +135,5 @@ class CommonTargetsTest(TestCase):
         data = {"injection": {"inject_content": {TARGET_SELECTOR_KEY: "unknown"}}}
         with self.assertRaises(ValueError):
             Targets.extract_targets("unknown", None, data, helper=self.mock_helper)
+
+    # ---------- asset groups call Pagination.fetch_all_targets ----------
