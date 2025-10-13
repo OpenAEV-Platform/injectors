@@ -75,6 +75,10 @@ class OpenAEVNuclei:
         target_results = Targets.extract_targets(selector_key, data, self.helper)
         # Deduplicate targets
         unique_targets = list(dict.fromkeys(target_results.targets))
+        # --- Handle empty targets as an error ---
+        if not unique_targets:
+            message = "No target identified for the property ".join(selector_key)
+            raise ValueError(message)
         # Build Arguments to execute
         nuclei_args = NucleiCommandBuilder.build_args(
             self, contract_id, content, unique_targets
