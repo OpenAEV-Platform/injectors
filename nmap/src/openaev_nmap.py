@@ -52,7 +52,7 @@ class OpenAEVNmap:
         asset_list = list(target_results.ip_to_asset_id_map.values())
         # Deduplicate targets
         unique_targets = list(dict.fromkeys(target_results.targets))
-        # --- Handle empty targets as an error ---
+        # Handle empty targets as an error
         if not unique_targets:
             message = f"No target identified for the property {selector_key}"
             raise ValueError(message)

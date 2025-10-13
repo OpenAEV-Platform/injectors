@@ -75,7 +75,7 @@ class OpenAEVNuclei:
         target_results = Targets.extract_targets(selector_key, data, self.helper)
         # Deduplicate targets
         unique_targets = list(dict.fromkeys(target_results.targets))
-        # --- Handle empty targets as an error ---
+        # Handle empty targets as an error
         if not unique_targets:
             message = f"No target identified for the property {selector_key}"
             raise ValueError(message)
