@@ -5,14 +5,14 @@ from typing import Dict, List, Optional, Tuple
 
 from pyoaev.helpers import OpenAEVInjectorHelper
 
-from common.constants import (
+from common.common.constants import (
     ASSET_GROUPS_KEY,
     ASSETS_KEY,
     TARGET_PROPERTY_SELECTOR_KEY,
     TARGET_SELECTOR_KEY,
     TARGETS_KEY,
 )
-from common.pagination import Pagination
+from common.common.pagination import Pagination
 
 
 @dataclass
@@ -178,7 +178,7 @@ class Targets:
         """
         if selector_key == "asset-groups":
             asset_group_names = [
-                g.get("name") for g in data.get(ASSET_GROUPS_KEY, []) if g.get("name")
+                g["asset_group_name"] for g in data[ASSET_GROUPS_KEY] if g["asset_group_name"]
             ]
             return ", ".join(asset_group_names)
         else:
