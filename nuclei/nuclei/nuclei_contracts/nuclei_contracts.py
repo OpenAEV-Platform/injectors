@@ -1,6 +1,4 @@
 from common.constants import (
-    ASSET_GROUPS_KEY,
-    ASSETS_KEY,
     TARGET_PROPERTY_SELECTOR_KEY,
     TARGET_SELECTOR_KEY,
     TARGETS_KEY,
@@ -58,7 +56,6 @@ class NucleiContracts:
         )
         targets_assets = ContractAsset(
             cardinality=ContractCardinality.Multiple,
-            key=ASSETS_KEY,
             label="Targeted assets",
             mandatory=False,
             mandatoryConditionFields=[target_selector.key],
@@ -68,7 +65,6 @@ class NucleiContracts:
         )
         target_asset_groups = ContractAssetGroup(
             cardinality=ContractCardinality.Multiple,
-            key=ASSET_GROUPS_KEY,
             label="Targeted asset groups",
             mandatory=False,
             mandatoryConditionFields=[target_selector.key],

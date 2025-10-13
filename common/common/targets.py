@@ -6,10 +6,9 @@ from typing import Dict, List, Optional, Tuple
 from pyoaev.helpers import OpenAEVInjectorHelper
 
 from common.common.constants import (
-    ASSET_GROUPS_KEY,
-    ASSETS_KEY,
+    ASSET_GROUPS_KEY_RABBITMQ,
+    ASSETS_KEY_RABBITMQ,
     TARGET_PROPERTY_SELECTOR_KEY,
-    TARGET_SELECTOR_KEY,
     TARGETS_KEY,
 )
 from common.common.pagination import Pagination
@@ -45,19 +44,19 @@ class Targets:
 
         selector = content.get(TARGET_PROPERTY_SELECTOR_KEY)
 
-        if selector_key == "asset-groups" and data[ASSET_GROUPS_KEY]:
+        if selector_key == "asset-groups" and data[ASSET_GROUPS_KEY_RABBITMQ]:
             helper.injector_logger.info(
                 "Fetching all endpoint targets from asset groups with pagination"
             )
-            asset_group_ids = [g["asset_group_id"] for g in data[ASSET_GROUPS_KEY]]
+            asset_group_ids = [g["asset_group_id"] for g in data[ASSET_GROUPS_KEY_RABBITMQ]]
             assets = Pagination.fetch_all_targets(helper, asset_group_ids)
             helper.injector_logger.info(f"Fetched {len(assets)} assets from groups.")
             Targets.process_targets(
                 assets, selector, helper, targets, ip_to_asset_id_map
             )
 
-        elif selector_key == "assets" and data[ASSETS_KEY]:
-            assets = data[ASSETS_KEY]
+        elif selector_key == "assets" and data[ASSETS_KEY_RABBITMQ]:
+            assets = data[ASSETS_KEY_RABBITMQ]
             Targets.process_targets(
                 assets, selector, helper, targets, ip_to_asset_id_map
             )
@@ -178,7 +177,7 @@ class Targets:
         """
         if selector_key == "asset-groups":
             asset_group_names = [
-                g["asset_group_name"] for g in data[ASSET_GROUPS_KEY] if g["asset_group_name"]
+                g["asset_group_name"] for g in data[ASSET_GROUPS_KEY_RABBITMQ] if g["asset_group_name"]
             ]
             return ", ".join(asset_group_names)
         else:

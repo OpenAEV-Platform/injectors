@@ -1,8 +1,6 @@
 from typing import List
 
 from common.common.constants import (
-    ASSET_GROUPS_KEY,
-    ASSETS_KEY,
     TARGET_PROPERTY_SELECTOR_KEY,
     TARGET_SELECTOR_KEY,
     TARGETS_KEY,
@@ -65,7 +63,6 @@ class NmapContracts:
         )
         targets_assets = ContractAsset(
             cardinality=ContractCardinality.Multiple,
-            key=ASSETS_KEY,
             label="Targeted assets",
             mandatory=False,
             mandatoryConditionFields=[target_selector.key],
@@ -75,7 +72,6 @@ class NmapContracts:
         )
         target_asset_groups = ContractAssetGroup(
             cardinality=ContractCardinality.Multiple,
-            key=ASSET_GROUPS_KEY,
             label="Targeted asset groups",
             mandatory=False,
             mandatoryConditionFields=[target_selector.key],
