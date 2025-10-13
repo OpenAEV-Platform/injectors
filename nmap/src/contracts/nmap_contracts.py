@@ -27,7 +27,7 @@ from pyoaev.contracts.contract_config import (
     prepare_contracts,
 )
 
-from nmap.src.contracts.nmap_constants import (
+from contracts.nmap_constants import (
     FIN_SCAN_CONTRACT,
     TCP_CONNECT_SCAN_CONTRACT,
     TCP_SYN_SCAN_CONTRACT,
