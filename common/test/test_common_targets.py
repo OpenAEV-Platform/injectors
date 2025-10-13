@@ -1,7 +1,12 @@
 from unittest import TestCase
 from unittest.mock import MagicMock
 
-from common.constants import TARGET_SELECTOR_KEY, TARGETS_KEY, TARGET_PROPERTY_SELECTOR_KEY, ASSETS_KEY
+from common.constants import (
+    ASSETS_KEY,
+    TARGET_PROPERTY_SELECTOR_KEY,
+    TARGET_SELECTOR_KEY,
+    TARGETS_KEY,
+)
 from common.targets import Targets
 
 
@@ -32,16 +37,12 @@ class CommonTargetsTest(TestCase):
     # ---------- extract_property_target_value ----------
 
     def test_extract_property_target_value_hostname(self):
-        target, asset_id = Targets.extract_property_target_value(
-            self.asset_hostname
-        )
+        target, asset_id = Targets.extract_property_target_value(self.asset_hostname)
         self.assertEqual(target, "host.local")
         self.assertEqual(asset_id, "a1")
 
     def test_extract_property_target_value_local_ip(self):
-        target, asset_id = Targets.extract_property_target_value(
-            self.asset_local_ip
-        )
+        target, asset_id = Targets.extract_property_target_value(self.asset_local_ip)
         self.assertEqual(target, "10.0.0.2")
         self.assertEqual(asset_id, "a2")
 
