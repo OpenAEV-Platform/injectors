@@ -2,9 +2,8 @@ import json
 import time
 from typing import Dict
 
+from common.common.constants import TARGET_SELECTOR_KEY
 from common.targets import Targets
-
-from common.common.constants import TARGET_SELECTOR_KEY, ASSET_GROUPS_KEY
 from pyoaev.helpers import OpenAEVConfigHelper, OpenAEVInjectorHelper
 
 from contracts.nmap_contracts import NmapContracts
@@ -54,30 +53,19 @@ class OpenAEVNmap:
         # Deduplicate targets
         unique_targets = list(dict.fromkeys(target_results.targets))
         # Build Arguments to execute
-        nmap_args = NmapCommandBuilder.build_args(
-            contract_id, unique_targets
-        )
+        nmap_args = NmapCommandBuilder.build_args(contract_id, unique_targets)
 
         self.helper.injector_logger.info(
             "Executing nmap with command: " + " ".join(nmap_args)
         )
 
-        # Build callback message based on selector_key
-        if selector_key == "asset-groups":
-            asset_group_names = [g.get("name") for g in data.get(ASSET_GROUPS_KEY, []) if g.get("name")]
-            execution_message = ", ".join(asset_group_names)
-        else:
-            # For "assets" or "manual", use nuclei_args
-            execution_message = " ".join(nmap_args)
-
-        callback_data = {
-            "execution_message": execution_message,
-            "execution_status": "INFO",
-            "execution_duration": int(time.time() - start),
-            "execution_action": "command_execution",
-        }
         self.helper.api.inject.execution_callback(
-            inject_id=inject_id, data=callback_data
+            inject_id=inject_id,
+            data=Targets.build_execution_message(
+                selector_key=target_results.selector_key,
+                data=data,
+                command_args=nmap_args,
+            ),
         )
 
         nmap_result = NmapProcess.nmap_execute(nmap_args)
