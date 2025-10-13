@@ -36,13 +36,11 @@ class Targets:
 
     @staticmethod
     def extract_targets(
-        selector_key: str, data: Dict, helper: OpenAEVInjectorHelper
+        selector_key: str, selector_property: str, data: Dict, helper: OpenAEVInjectorHelper
     ) -> TargetExtractionResult:
         targets: List[str] = []
         ip_to_asset_id_map: Dict[str, str] = {}
         content = data["injection"]["inject_content"]
-
-        selector = content.get(TARGET_PROPERTY_SELECTOR_KEY)
 
         if selector_key == "asset-groups" and data[ASSET_GROUPS_KEY_RABBITMQ]:
             helper.injector_logger.info(
@@ -52,13 +50,13 @@ class Targets:
             assets = Pagination.fetch_all_targets(helper, asset_group_ids)
             helper.injector_logger.info(f"Fetched {len(assets)} assets from groups.")
             Targets.process_targets(
-                assets, selector, helper, targets, ip_to_asset_id_map
+                assets, selector_property, helper, targets, ip_to_asset_id_map
             )
 
         elif selector_key == "assets" and data[ASSETS_KEY_RABBITMQ]:
             assets = data[ASSETS_KEY_RABBITMQ]
             Targets.process_targets(
-                assets, selector, helper, targets, ip_to_asset_id_map
+                assets, selector_property, helper, targets, ip_to_asset_id_map
             )
 
         elif selector_key == "manual":

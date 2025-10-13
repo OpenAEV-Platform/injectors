@@ -2,7 +2,7 @@ import json
 import time
 from typing import Dict
 
-from common.common.constants import TARGET_SELECTOR_KEY
+from common.common.constants import TARGET_SELECTOR_KEY, TARGET_PROPERTY_SELECTOR_KEY
 from common.common.targets import Targets
 from pyoaev.helpers import OpenAEVConfigHelper, OpenAEVInjectorHelper
 
@@ -46,15 +46,17 @@ class OpenAEVNmap:
         contract_id = data["injection"]["inject_injector_contract"]["convertedContent"][
             "contract_id"
         ]
-        selector_key = data["injection"]["inject_content"][TARGET_SELECTOR_KEY]
+        content = data["injection"]["inject_content"]
+        selector_key = content[TARGET_SELECTOR_KEY]
+        selector_property = content[TARGET_PROPERTY_SELECTOR_KEY]
 
-        target_results = Targets.extract_targets(selector_key, data, self.helper)
+        target_results = Targets.extract_targets(selector_key, selector_property, data, self.helper)
         asset_list = list(target_results.ip_to_asset_id_map.values())
         # Deduplicate targets
         unique_targets = list(dict.fromkeys(target_results.targets))
         # Handle empty targets as an error
         if not unique_targets:
-            message = f"No target identified for the property {selector_key}"
+            message = f"No target identified for the property {selector_property}"
             raise ValueError(message)
 
         # Build Arguments to execute
@@ -117,6 +119,7 @@ class OpenAEVNmap:
                 "execution_duration": int(time.time() - start),
                 "execution_action": "complete",
             }
+            self.helper.injector_logger.error(str(e))
             self.helper.api.inject.execution_callback(
                 inject_id=inject_id, data=callback_data
             )

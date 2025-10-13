@@ -4,7 +4,7 @@ import subprocess
 import time
 from typing import Dict
 
-from common.common.constants import TARGET_SELECTOR_KEY
+from common.common.constants import TARGET_SELECTOR_KEY, TARGET_PROPERTY_SELECTOR_KEY
 from common.common.targets import Targets
 from pyoaev.helpers import OpenAEVConfigHelper, OpenAEVInjectorHelper
 
@@ -71,13 +71,15 @@ class OpenAEVNuclei:
         ]
         content = data["injection"]["inject_content"]
         selector_key = content[TARGET_SELECTOR_KEY]
+        selector_property = content[TARGET_PROPERTY_SELECTOR_KEY]
 
         target_results = Targets.extract_targets(selector_key, data, self.helper)
         # Deduplicate targets
         unique_targets = list(dict.fromkeys(target_results.targets))
         # Handle empty targets as an error
         if not unique_targets:
-            message = f"No target identified for the property {selector_key}"
+            message = "No target identified for the property " + selector_property
+            self.helper.injector_logger.error(message)
             raise ValueError(message)
         # Build Arguments to execute
         nuclei_args = NucleiCommandBuilder.build_args(
@@ -140,6 +142,7 @@ class OpenAEVNuclei:
                 "execution_duration": int(time.time() - start),
                 "execution_action": "complete",
             }
+            self.helper.injector_logger.error(str(e))
             self.helper.api.inject.execution_callback(
                 inject_id=inject_id, data=callback_data
             )
