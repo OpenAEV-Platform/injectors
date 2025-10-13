@@ -3,7 +3,7 @@ import time
 from typing import Dict
 
 from common.common.constants import TARGET_SELECTOR_KEY, TARGET_PROPERTY_SELECTOR_KEY
-from common.common.targets import Targets
+from common.common.targets import Targets, TargetProperty
 from pyoaev.helpers import OpenAEVConfigHelper, OpenAEVInjectorHelper
 
 from contracts.nmap_contracts import NmapContracts
@@ -56,7 +56,7 @@ class OpenAEVNmap:
         unique_targets = list(dict.fromkeys(target_results.targets))
         # Handle empty targets as an error
         if not unique_targets:
-            message = f"No target identified for the property {selector_property}"
+            message = f"No target identified for the property {TargetProperty[selector_property.upper()].value}"
             raise ValueError(message)
 
         # Build Arguments to execute

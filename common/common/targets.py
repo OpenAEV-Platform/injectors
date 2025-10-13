@@ -134,7 +134,7 @@ class Targets:
 
     @staticmethod
     def is_valid_ip(ip: str) -> bool:
-        """Filter out loopback, unspecified"""
+        """Filter out loopback, unspecified ip"""
         try:
             ip_obj = ipaddress.ip_address(ip)
             return not (

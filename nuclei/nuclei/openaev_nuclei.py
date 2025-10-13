@@ -5,7 +5,7 @@ import time
 from typing import Dict
 
 from common.common.constants import TARGET_SELECTOR_KEY, TARGET_PROPERTY_SELECTOR_KEY
-from common.common.targets import Targets
+from common.common.targets import Targets, TargetProperty
 from pyoaev.helpers import OpenAEVConfigHelper, OpenAEVInjectorHelper
 
 from nuclei.helpers.nuclei_command_builder import NucleiCommandBuilder
@@ -78,8 +78,7 @@ class OpenAEVNuclei:
         unique_targets = list(dict.fromkeys(target_results.targets))
         # Handle empty targets as an error
         if not unique_targets:
-            message = "No target identified for the property " + selector_property
-            self.helper.injector_logger.error(message)
+            message = f"No target identified for the property {TargetProperty[selector_property.upper()].value}"
             raise ValueError(message)
         # Build Arguments to execute
         nuclei_args = NucleiCommandBuilder.build_args(
