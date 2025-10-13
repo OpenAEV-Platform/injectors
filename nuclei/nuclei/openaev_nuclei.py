@@ -5,6 +5,8 @@ import time
 from typing import Dict
 
 from common.targets import Targets
+
+from common.common.constants import TARGET_SELECTOR_KEY, ASSET_GROUPS_KEY
 from pyoaev.helpers import OpenAEVConfigHelper, OpenAEVInjectorHelper
 
 from nuclei.helpers.nuclei_command_builder import NucleiCommandBuilder
@@ -69,8 +71,9 @@ class OpenAEVNuclei:
             "contract_id"
         ]
         content = data["injection"]["inject_content"]
+        selector_key = content[TARGET_SELECTOR_KEY]
 
-        target_results = Targets.extract_targets(data, self.helper)
+        target_results = Targets.extract_targets(selector_key, data, self.helper)
         # Deduplicate targets
         unique_targets = list(dict.fromkeys(target_results.targets))
         # Build Arguments to execute
@@ -82,8 +85,16 @@ class OpenAEVNuclei:
         self.helper.injector_logger.info(
             "Executing nuclei with: " + " ".join(nuclei_args)
         )
+        # Build callback message based on selector_key
+        if selector_key == ASSET_GROUPS_KEY:
+            asset_group_names = [g.get("name") for g in data.get(ASSET_GROUPS_KEY, []) if g.get("name")]
+            execution_message = ", ".join(asset_group_names)
+        else:
+            # For "assets" or "manual", use nuclei_args
+            execution_message = " ".join(nuclei_args)
+
         callback_data = {
-            "execution_message": " ".join(nuclei_args),
+            "execution_message": execution_message,
             "execution_status": "INFO",
             "execution_duration": int(time.time() - start),
             "execution_action": "command_execution",
