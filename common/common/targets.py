@@ -74,11 +74,11 @@ class Targets:
 
     @staticmethod
     def process_targets(
-            assets: List[Dict],
-            selector: str,
-            helper: "OpenAEVInjectorHelper",
-            targets: List[str],
-            ip_to_asset_id_map: Dict[str, str],
+        assets: List[Dict],
+        selector: str,
+        helper: "OpenAEVInjectorHelper",
+        targets: List[str],
+        ip_to_asset_id_map: Dict[str, str],
     ) -> None:
         """Extract property based on TARGET_PROPERTY."""
 
@@ -166,3 +166,20 @@ class Targets:
                 return ip, asset_id
 
         return None
+
+    @staticmethod
+    def build_execution_message(
+        selector_key: str, data: Dict, command_args: List[str]
+    ) -> str:
+        """
+        Return the execution message depending on selector_key.
+        - For 'asset-groups': returns a comma-separated list of asset group names.
+        - For others ('assets', 'manual', etc.): returns the command arguments joined as a string.
+        """
+        if selector_key == "asset-groups":
+            asset_group_names = [
+                g.get("name") for g in data.get(ASSET_GROUPS_KEY, []) if g.get("name")
+            ]
+            return ", ".join(asset_group_names)
+        else:
+            return " ".join(command_args)
