@@ -8,11 +8,11 @@ from common.common.constants import TARGET_SELECTOR_KEY, TARGET_PROPERTY_SELECTO
 from common.common.targets import Targets, TargetProperty
 from pyoaev.helpers import OpenAEVConfigHelper, OpenAEVInjectorHelper
 
-from nuclei.helpers.nuclei_command_builder import NucleiCommandBuilder
-from nuclei.helpers.nuclei_output_parser import NucleiOutputParser
-from nuclei.helpers.nuclei_process import NucleiProcess
-from nuclei.nuclei_contracts.external_contracts import ExternalContractsScheduler
-from nuclei.nuclei_contracts.nuclei_contracts import NucleiContracts
+from nuclei.nuclei.helpers.nuclei_command_builder import NucleiCommandBuilder
+from nuclei.nuclei.helpers.nuclei_output_parser import NucleiOutputParser
+from nuclei.nuclei.helpers.nuclei_process import NucleiProcess
+from nuclei.nuclei.nuclei_contracts.external_contracts import ExternalContractsScheduler
+from nuclei.nuclei.nuclei_contracts.nuclei_contracts import NucleiContracts
 
 
 class OpenAEVNuclei:
@@ -56,7 +56,7 @@ class OpenAEVNuclei:
             },
         )
         self.helper = OpenAEVInjectorHelper(
-            self.config, open("nuclei/img/nuclei.jpg", "rb")
+            self.config, open("img/nuclei.jpg", "rb")
         )
 
         if not self._check_nuclei_installed():
@@ -73,7 +73,7 @@ class OpenAEVNuclei:
         selector_key = content[TARGET_SELECTOR_KEY]
         selector_property = content[TARGET_PROPERTY_SELECTOR_KEY]
 
-        target_results = Targets.extract_targets(selector_key, data, self.helper)
+        target_results = Targets.extract_targets(selector_key, selector_property, data, self.helper)
         # Deduplicate targets
         unique_targets = list(dict.fromkeys(target_results.targets))
         # Handle empty targets as an error
