@@ -5,7 +5,7 @@ import time
 from typing import Dict
 
 from common.common.constants import TARGET_SELECTOR_KEY
-from common.targets import Targets
+from common.common.targets import Targets
 from pyoaev.helpers import OpenAEVConfigHelper, OpenAEVInjectorHelper
 
 from nuclei.helpers.nuclei_command_builder import NucleiCommandBuilder
