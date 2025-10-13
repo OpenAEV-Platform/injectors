@@ -119,7 +119,6 @@ class OpenAEVNmap:
                 "execution_duration": int(time.time() - start),
                 "execution_action": "complete",
             }
-            self.helper.injector_logger.error(str(e))
             self.helper.api.inject.execution_callback(
                 inject_id=inject_id, data=callback_data
             )
