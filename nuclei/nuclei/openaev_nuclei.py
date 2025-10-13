@@ -85,13 +85,20 @@ class OpenAEVNuclei:
             "Executing nuclei with: " + " ".join(nuclei_args)
         )
 
-        self.helper.api.inject.execution_callback(
-            inject_id=inject_id,
-            data=Targets.build_execution_message(
+        callback_data = {
+            "execution_message": Targets.build_execution_message(
                 selector_key=selector_key,
                 data=data,
                 command_args=nuclei_args,
             ),
+            "execution_status": "INFO",
+            "execution_duration": int(time.time() - start),
+            "execution_action": "command_execution",
+        }
+
+        self.helper.api.inject.execution_callback(
+            inject_id=inject_id,
+            data=callback_data,
         )
 
         result = NucleiProcess.nuclei_execute(nuclei_args, input_data)

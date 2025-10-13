@@ -59,13 +59,20 @@ class OpenAEVNmap:
             "Executing nmap with command: " + " ".join(nmap_args)
         )
 
-        self.helper.api.inject.execution_callback(
-            inject_id=inject_id,
-            data=Targets.build_execution_message(
+        callback_data = {
+            "execution_message": Targets.build_execution_message(
                 selector_key=selector_key,
                 data=data,
                 command_args=nmap_args,
             ),
+            "execution_status": "INFO",
+            "execution_duration": int(time.time() - start),
+            "execution_action": "command_execution",
+        }
+
+        self.helper.api.inject.execution_callback(
+            inject_id=inject_id,
+            data=callback_data,
         )
 
         nmap_result = NmapProcess.nmap_execute(nmap_args)
