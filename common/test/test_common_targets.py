@@ -135,5 +135,3 @@ class CommonTargetsTest(TestCase):
         data = {"injection": {"inject_content": {TARGET_SELECTOR_KEY: "unknown"}}}
         with self.assertRaises(ValueError):
             Targets.extract_targets("unknown", None, data, helper=self.mock_helper)
-
-    # ---------- asset groups call Pagination.fetch_all_targets ----------
