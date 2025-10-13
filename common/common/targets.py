@@ -179,6 +179,8 @@ class Targets:
             asset_group_names = [
                 g["asset_group_name"] for g in data[ASSET_GROUPS_KEY_RABBITMQ] if g["asset_group_name"]
             ]
-            return ", ".join(asset_group_names)
+            group_str = ", ".join(asset_group_names)
+            command_str = " ".join(command_args)
+            return f"The inject was executed in {group_str} with command {command_str}"
         else:
             return " ".join(command_args)
