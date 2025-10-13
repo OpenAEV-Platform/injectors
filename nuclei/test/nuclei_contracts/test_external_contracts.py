@@ -263,6 +263,7 @@ class ExternalContractsTest(unittest.TestCase):
 
         tested.manage_contracts()
 
+        self.assertEqual(len(mock_oaev_client.injector_contract.delete.mock_calls), 1)
         mock_oaev_client.injector_contract.delete.assert_has_calls(
             calls=[
                 call(
@@ -273,6 +274,7 @@ class ExternalContractsTest(unittest.TestCase):
             ]
         )
 
+        self.assertEqual(len(mock_oaev_client.injector_contract.update.mock_calls), 2)
         mock_oaev_client.injector_contract.update.assert_has_calls(
             calls=[
                 call(
@@ -320,6 +322,7 @@ class ExternalContractsTest(unittest.TestCase):
             ]
         )
 
+        self.assertEqual(len(mock_oaev_client.injector_contract.create.mock_calls), 3)
         mock_oaev_client.injector_contract.create.assert_has_calls(
             calls=[
                 call(

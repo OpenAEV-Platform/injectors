@@ -64,8 +64,6 @@ class ExternalContractsManager:
         cve_templates_metadata = self.fetch_nuclei_cve_templates_list()
         current_contracts = self.fetch_all_current_contracts()
 
-        template_to_create_contract = []
-        template_to_update_contract = {}
         for template in cve_templates_metadata:
             found = False
             for contract in current_contracts:
@@ -73,38 +71,40 @@ class ExternalContractsManager:
                     "injector_contract_external_id"
                 ] == self.theoretical_external_id(template):
                     current_contracts.remove(contract)
-                    template_to_update_contract[
-                        contract["injector_contract_external_id"]
-                    ] = self.make_contract_update(
-                        contract["injector_contract_id"], template
-                    )
-                    found = True
-                    break
+                    try:
+                        self._logger.info(
+                            "Updating external contract: {}".format(
+                                contract["injector_contract_external_id"]
+                            )
+                        )
+                        self._api_client.injector_contract.update(
+                            contract["injector_contract_external_id"],
+                            self.make_contract_update(
+                                contract["injector_contract_id"], template
+                            ),
+                        )
+                    except Exception as e:
+                        self._logger.error(e)
+                    finally:
+                        # we found a match and updated it (or an error occurred)
+                        # therefore we should exit the inner loop
+                        found = True
+                        break
+            # when we exit the above inner loop, we need to check
+            # whether we had a match or not
             if not found:
-                template_to_create_contract.append(
-                    self.make_contract_create(str(uuid.uuid4()), template)
-                )
-        contracts_to_delete = current_contracts
-
-        for contract in template_to_create_contract:
-            try:
-                self._logger.info(
-                    "Creating external contract: {}".format(
-                        contract["external_contract_id"]
+                try:
+                    self._logger.info(
+                        "Creating external contract: {}".format(
+                            self.theoretical_external_id(template)
+                        )
                     )
-                )
-                self._api_client.injector_contract.create(contract)
-            except Exception as e:
-                self._logger.error(e)
-                continue
-
-        for key, contract in template_to_update_contract.items():
-            try:
-                self._logger.info("Updating external contract: {}".format(key))
-                self._api_client.injector_contract.update(key, contract)
-            except Exception as e:
-                self._logger.error(e)
-                continue
+                    self._api_client.injector_contract.create(
+                        self.make_contract_create(str(uuid.uuid4()), template)
+                    )
+                except Exception as e:
+                    self._logger.error(e)
+        contracts_to_delete = current_contracts
 
         for contract in contracts_to_delete:
             try:
