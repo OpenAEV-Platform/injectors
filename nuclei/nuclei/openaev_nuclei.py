@@ -92,7 +92,7 @@ class OpenAEVNuclei:
 
         result = NucleiProcess.nuclei_execute(nuclei_args, input_data)
         return NucleiOutputParser.parse(
-            result.stdout.decode("utf-8"), target_results.ip_to_asset_id_map
+            self, result.stdout.decode("utf-8"), target_results.ip_to_asset_id_map
         )
 
     def process_message(self, data: Dict) -> None:
