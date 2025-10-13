@@ -88,7 +88,7 @@ class OpenAEVNuclei:
         self.helper.api.inject.execution_callback(
             inject_id=inject_id,
             data=Targets.build_execution_message(
-                selector_key=target_results.selector_key,
+                selector_key=selector_key,
                 data=data,
                 command_args=nuclei_args,
             ),
