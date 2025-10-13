@@ -48,8 +48,11 @@ class OpenAEVNmap:
 
         target_results = Targets.extract_targets(data, self.helper)
         asset_list = list(target_results.ip_to_asset_id_map.values())
+        # Deduplicate targets
+        unique_targets = list(dict.fromkeys(target_results.targets))
+        # Build Arguments to execute
         nmap_args = NmapCommandBuilder.build_args(
-            contract_id, target_results.targets
+            contract_id, unique_targets
         )
 
         self.helper.injector_logger.info(
