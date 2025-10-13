@@ -2,7 +2,7 @@ import json
 import time
 from typing import Dict
 
-from common.common.constants import TARGET_SELECTOR_KEY
+from common.constants import TARGET_SELECTOR_KEY
 from common.targets import Targets
 from pyoaev.helpers import OpenAEVConfigHelper, OpenAEVInjectorHelper
 
@@ -62,7 +62,7 @@ class OpenAEVNmap:
         self.helper.api.inject.execution_callback(
             inject_id=inject_id,
             data=Targets.build_execution_message(
-                selector_key=target_results.selector_key,
+                selector_key=selector_key,
                 data=data,
                 command_args=nmap_args,
             ),
