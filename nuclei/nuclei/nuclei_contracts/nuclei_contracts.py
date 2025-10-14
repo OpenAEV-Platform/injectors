@@ -22,7 +22,7 @@ from pyoaev.contracts.contract_config import (
     prepare_contracts,
 )
 
-from nuclei.nuclei.nuclei_contracts.nuclei_constants import CONTRACT_LABELS, TYPE
+from nuclei.nuclei_contracts.nuclei_constants import CONTRACT_LABELS, TYPE
 
 
 class NucleiContracts:

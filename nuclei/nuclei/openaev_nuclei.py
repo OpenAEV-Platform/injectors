@@ -4,15 +4,15 @@ import subprocess
 import time
 from typing import Dict
 
-from common.common.constants import TARGET_PROPERTY_SELECTOR_KEY, TARGET_SELECTOR_KEY
-from common.common.targets import TargetProperty, Targets
+from common.constants import TARGET_PROPERTY_SELECTOR_KEY, TARGET_SELECTOR_KEY
+from common.targets import TargetProperty, Targets
 from pyoaev.helpers import OpenAEVConfigHelper, OpenAEVInjectorHelper
 
-from nuclei.nuclei.helpers.nuclei_command_builder import NucleiCommandBuilder
-from nuclei.nuclei.helpers.nuclei_output_parser import NucleiOutputParser
-from nuclei.nuclei.helpers.nuclei_process import NucleiProcess
-from nuclei.nuclei.nuclei_contracts.external_contracts import ExternalContractsScheduler
-from nuclei.nuclei.nuclei_contracts.nuclei_contracts import NucleiContracts
+from nuclei.helpers.nuclei_command_builder import NucleiCommandBuilder
+from nuclei.helpers.nuclei_output_parser import NucleiOutputParser
+from nuclei.helpers.nuclei_process import NucleiProcess
+from nuclei.nuclei_contracts.external_contracts import ExternalContractsScheduler
+from nuclei.nuclei_contracts.nuclei_contracts import NucleiContracts
 
 
 class OpenAEVNuclei:
@@ -55,7 +55,9 @@ class OpenAEVNuclei:
                 },
             },
         )
-        self.helper = OpenAEVInjectorHelper(self.config, open("img/nuclei.jpg", "rb"))
+        self.helper = OpenAEVInjectorHelper(
+            self.config, open("nuclei/img/nuclei.jpg", "rb")
+        )
 
         if not self._check_nuclei_installed():
             raise RuntimeError(
