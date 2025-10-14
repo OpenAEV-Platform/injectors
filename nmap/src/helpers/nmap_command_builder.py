@@ -10,6 +10,7 @@ from contracts.nmap_constants import (
 class NmapCommandBuilder:
     @staticmethod
     def build_args(contract_id: str, targets: List[str]) -> List[str]:
+        """Build a list of nmap command-line arguments for a given contract."""
         args = ["nmap", "-Pn"]
 
         if contract_id == TCP_SYN_SCAN_CONTRACT:
