@@ -6,7 +6,6 @@ from injector_common.constants import ASSET_GROUPS_KEY_RABBITMQ
 
 
 class Pagination:
-
     @staticmethod
     def get_page_of_endpoint_targets(
         helper,

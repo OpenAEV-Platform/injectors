@@ -32,7 +32,6 @@ target_property_choices_dict = {
 
 
 class Targets:
-
     @staticmethod
     def extract_targets(
         selector_key: str,
@@ -40,6 +39,7 @@ class Targets:
         data: Dict,
         helper: OpenAEVInjectorHelper,
     ) -> TargetExtractionResult:
+        """Return TargetExtractionResults built from target id and target property."""
         targets: List[str] = []
         ip_to_asset_id_map: Dict[str, str] = {}
         content = data["injection"]["inject_content"]
@@ -82,7 +82,6 @@ class Targets:
         ip_to_asset_id_map: Dict[str, str],
     ) -> None:
         """Extract property based on TARGET_PROPERTY."""
-
         # Process all assets
         for asset in assets:
             try:
