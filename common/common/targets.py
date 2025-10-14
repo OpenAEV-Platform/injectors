@@ -151,12 +151,12 @@ class Targets:
         - Otherwise => first valid IP
         """
         asset_id = asset.get("asset_id")
-        has_agent = asset.get("has_agent", False)
+        agents = asset.get("asset_agents", [])
         hostname = asset.get("endpoint_hostname")
         endpoint_ips = asset.get("endpoint_ips", [])
 
         # Case 1: Agentless + hostname
-        if not has_agent and hostname:
+        if not agents and hostname:
             return hostname, asset_id
 
         # Case 2: Agent present => try IPs
