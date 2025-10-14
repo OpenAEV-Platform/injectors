@@ -20,13 +20,17 @@ class NucleiCommandBuilderTest(TestCase):
 
     def test_cloud_contract(self):
         builder = NucleiCommandBuilder()
-        args = builder.build_args(self, CLOUD_SCAN_CONTRACT, {}, ["https://example.com"])
+        args = builder.build_args(
+            self, CLOUD_SCAN_CONTRACT, {}, ["https://example.com"]
+        )
         expected_args = ["nuclei", "-tags", "cloud", "-u", "https://example.com"]
         assert args == expected_args
 
     def test_scan_contract(self):
         builder = NucleiCommandBuilder()
-        args = builder.build_args(self, TEMPLATE_SCAN_CONTRACT, {}, ["https://example.com"])
+        args = builder.build_args(
+            self, TEMPLATE_SCAN_CONTRACT, {}, ["https://example.com"]
+        )
         expected_args = ["nuclei", "-t", "/", "-u", "https://example.com"]
         assert args == expected_args
 
