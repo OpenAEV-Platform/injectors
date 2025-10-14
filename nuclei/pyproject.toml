@@ -3,5 +3,5 @@ profile = "black"
 known_local_folder = ["nuclei"]
 
 dependencies = [
-    "injector-common",
+    "injector-injector_common",
 ]

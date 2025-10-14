@@ -1,15 +1,21 @@
 from typing import List
 
 from pyoaev.contracts import ContractBuilder
-from pyoaev.contracts.contract_config import (Contract, ContractAttachment,
-                                              ContractCardinality,
-                                              ContractCheckbox, ContractConfig,
-                                              ContractElement,
-                                              ContractOutputElement,
-                                              ContractOutputType, ContractText,
-                                              ContractTextArea, ContractTuple,
-                                              SupportedLanguage,
-                                              prepare_contracts)
+from pyoaev.contracts.contract_config import (
+    Contract,
+    ContractAttachment,
+    ContractCardinality,
+    ContractCheckbox,
+    ContractConfig,
+    ContractElement,
+    ContractOutputElement,
+    ContractOutputType,
+    ContractText,
+    ContractTextArea,
+    ContractTuple,
+    SupportedLanguage,
+    prepare_contracts,
+)
 
 TYPE = "openaev_http"
 HTTP_RAW_POST_CONTRACT = "5948c96c-4064-4c0d-b079-51ec33f31b91"

@@ -1,9 +1,8 @@
 from typing import Any, Dict, List
 
-from pyoaev.apis.inputs.search import (Filter, FilterGroup,
-                                       SearchPaginationInput)
+from pyoaev.apis.inputs.search import Filter, FilterGroup, SearchPaginationInput
 
-from common.injector_common.constants import ASSET_GROUPS_KEY_RABBITMQ
+from injector_common.constants import ASSET_GROUPS_KEY_RABBITMQ
 
 
 class Pagination:

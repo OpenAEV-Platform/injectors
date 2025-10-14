@@ -1,15 +1,21 @@
 from typing import List
 
 from pyoaev.contracts import ContractBuilder
-from pyoaev.contracts.contract_config import (Contract, ContractCardinality,
-                                              ContractConfig, ContractElement,
-                                              ContractExpectations,
-                                              ContractOutputElement,
-                                              ContractOutputType,
-                                              ContractSelect, ContractText,
-                                              Expectation, ExpectationType,
-                                              SupportedLanguage,
-                                              prepare_contracts)
+from pyoaev.contracts.contract_config import (
+    Contract,
+    ContractCardinality,
+    ContractConfig,
+    ContractElement,
+    ContractExpectations,
+    ContractOutputElement,
+    ContractOutputType,
+    ContractSelect,
+    ContractText,
+    Expectation,
+    ExpectationType,
+    SupportedLanguage,
+    prepare_contracts,
+)
 
 TYPE = "openaev_aws"
 

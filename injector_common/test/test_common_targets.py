@@ -1,10 +1,13 @@
 from unittest import TestCase
 from unittest.mock import MagicMock
 
-from common.constants import (ASSETS_KEY_RABBITMQ,
-                              TARGET_PROPERTY_SELECTOR_KEY,
-                              TARGET_SELECTOR_KEY, TARGETS_KEY)
-from common.targets import Targets
+from injector_common.constants import (
+    ASSETS_KEY_RABBITMQ,
+    TARGET_PROPERTY_SELECTOR_KEY,
+    TARGET_SELECTOR_KEY,
+    TARGETS_KEY,
+)
+from injector_common.targets import Targets
 
 
 class CommonTargetsTest(TestCase):

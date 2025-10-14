@@ -63,7 +63,7 @@ file (`config.yml`, manual).
 Build the Docker image using the provided `Dockerfile`.
 
 ```bash
-docker build docker build --build-context common=../common .  -t openaev/injector-nuclei:latest
+docker build docker build --build-context injector_common=../injector_common .  -t openaev/injector-nuclei:latest
 ````
 
 Edit the `docker-compose.yml` file with your OpenAEV configuration, then start the container:

@@ -1,7 +1,7 @@
 FROM python:3.13-alpine
 
 
-WORKDIR /opt/common
+WORKDIR /opt/injector_common
 
 COPY --from=common ./ ./
 

@@ -8,8 +8,8 @@ from helpers.nmap_output_parser import NmapOutputParser
 from helpers.nmap_process import NmapProcess
 from pyoaev.helpers import OpenAEVConfigHelper, OpenAEVInjectorHelper
 
-from common.constants import TARGET_PROPERTY_SELECTOR_KEY, TARGET_SELECTOR_KEY
-from common.targets import TargetProperty, Targets
+from injector_common.constants import TARGET_PROPERTY_SELECTOR_KEY, TARGET_SELECTOR_KEY
+from injector_common.targets import TargetProperty, Targets
 
 
 class OpenAEVNmap:

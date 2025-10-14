@@ -6,13 +6,12 @@ from typing import Dict
 
 from pyoaev.helpers import OpenAEVConfigHelper, OpenAEVInjectorHelper
 
-from common.constants import TARGET_PROPERTY_SELECTOR_KEY, TARGET_SELECTOR_KEY
-from common.targets import TargetProperty, Targets
+from injector_common.constants import TARGET_PROPERTY_SELECTOR_KEY, TARGET_SELECTOR_KEY
+from injector_common.targets import TargetProperty, Targets
 from nuclei.helpers.nuclei_command_builder import NucleiCommandBuilder
 from nuclei.helpers.nuclei_output_parser import NucleiOutputParser
 from nuclei.helpers.nuclei_process import NucleiProcess
-from nuclei.nuclei_contracts.external_contracts import \
-    ExternalContractsScheduler
+from nuclei.nuclei_contracts.external_contracts import ExternalContractsScheduler
 from nuclei.nuclei_contracts.nuclei_contracts import NucleiContracts
 
 
