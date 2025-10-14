@@ -8,7 +8,6 @@ from pyoaev.helpers import OpenAEVInjectorHelper
 from common.common.constants import (
     ASSET_GROUPS_KEY_RABBITMQ,
     ASSETS_KEY_RABBITMQ,
-    TARGET_PROPERTY_SELECTOR_KEY,
     TARGETS_KEY,
 )
 from common.common.pagination import Pagination
@@ -36,7 +35,10 @@ class Targets:
 
     @staticmethod
     def extract_targets(
-        selector_key: str, selector_property: str, data: Dict, helper: OpenAEVInjectorHelper
+        selector_key: str,
+        selector_property: str,
+        data: Dict,
+        helper: OpenAEVInjectorHelper,
     ) -> TargetExtractionResult:
         targets: List[str] = []
         ip_to_asset_id_map: Dict[str, str] = {}
@@ -46,7 +48,9 @@ class Targets:
             helper.injector_logger.info(
                 "Fetching all endpoint targets from asset groups with pagination"
             )
-            asset_group_ids = [g["asset_group_id"] for g in data[ASSET_GROUPS_KEY_RABBITMQ]]
+            asset_group_ids = [
+                g["asset_group_id"] for g in data[ASSET_GROUPS_KEY_RABBITMQ]
+            ]
             assets = Pagination.fetch_all_targets(helper, asset_group_ids)
             helper.injector_logger.info(f"Fetched {len(assets)} assets from groups.")
             Targets.process_targets(
@@ -177,7 +181,9 @@ class Targets:
         """
         if selector_key == "asset-groups":
             asset_group_names = [
-                g["asset_group_name"] for g in data[ASSET_GROUPS_KEY_RABBITMQ] if g["asset_group_name"]
+                g["asset_group_name"]
+                for g in data[ASSET_GROUPS_KEY_RABBITMQ]
+                if g["asset_group_name"]
             ]
             group_str = ", ".join(asset_group_names)
             command_str = " ".join(command_args)

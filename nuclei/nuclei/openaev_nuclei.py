@@ -4,8 +4,8 @@ import subprocess
 import time
 from typing import Dict
 
-from common.common.constants import TARGET_SELECTOR_KEY, TARGET_PROPERTY_SELECTOR_KEY
-from common.common.targets import Targets, TargetProperty
+from common.common.constants import TARGET_PROPERTY_SELECTOR_KEY, TARGET_SELECTOR_KEY
+from common.common.targets import TargetProperty, Targets
 from pyoaev.helpers import OpenAEVConfigHelper, OpenAEVInjectorHelper
 
 from nuclei.nuclei.helpers.nuclei_command_builder import NucleiCommandBuilder
@@ -55,9 +55,7 @@ class OpenAEVNuclei:
                 },
             },
         )
-        self.helper = OpenAEVInjectorHelper(
-            self.config, open("img/nuclei.jpg", "rb")
-        )
+        self.helper = OpenAEVInjectorHelper(self.config, open("img/nuclei.jpg", "rb"))
 
         if not self._check_nuclei_installed():
             raise RuntimeError(
@@ -73,7 +71,9 @@ class OpenAEVNuclei:
         selector_key = content[TARGET_SELECTOR_KEY]
         selector_property = content[TARGET_PROPERTY_SELECTOR_KEY]
 
-        target_results = Targets.extract_targets(selector_key, selector_property, data, self.helper)
+        target_results = Targets.extract_targets(
+            selector_key, selector_property, data, self.helper
+        )
         # Deduplicate targets
         unique_targets = list(dict.fromkeys(target_results.targets))
         # Handle empty targets as an error

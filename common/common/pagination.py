@@ -1,7 +1,8 @@
 from typing import Any, Dict, List
 
-from common.common.constants import ASSET_GROUPS_KEY_RABBITMQ
 from pyoaev.apis.inputs.search import Filter, FilterGroup, SearchPaginationInput
+
+from common.common.constants import ASSET_GROUPS_KEY_RABBITMQ
 
 
 class Pagination:
@@ -17,7 +18,8 @@ class Pagination:
             page_number,
             page_size,
             FilterGroup(
-                "or", [Filter(ASSET_GROUPS_KEY_RABBITMQ, "or", "contains", asset_group_ids)]
+                "or",
+                [Filter(ASSET_GROUPS_KEY_RABBITMQ, "or", "contains", asset_group_ids)],
             ),
             None,
             None,

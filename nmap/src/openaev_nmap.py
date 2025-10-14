@@ -2,8 +2,8 @@ import json
 import time
 from typing import Dict
 
-from common.common.constants import TARGET_SELECTOR_KEY, TARGET_PROPERTY_SELECTOR_KEY
-from common.common.targets import Targets, TargetProperty
+from common.common.constants import TARGET_PROPERTY_SELECTOR_KEY, TARGET_SELECTOR_KEY
+from common.common.targets import TargetProperty, Targets
 from pyoaev.helpers import OpenAEVConfigHelper, OpenAEVInjectorHelper
 
 from contracts.nmap_contracts import NmapContracts
@@ -50,7 +50,9 @@ class OpenAEVNmap:
         selector_key = content[TARGET_SELECTOR_KEY]
         selector_property = content[TARGET_PROPERTY_SELECTOR_KEY]
 
-        target_results = Targets.extract_targets(selector_key, selector_property, data, self.helper)
+        target_results = Targets.extract_targets(
+            selector_key, selector_property, data, self.helper
+        )
         asset_list = list(target_results.ip_to_asset_id_map.values())
         # Deduplicate targets
         unique_targets = list(dict.fromkeys(target_results.targets))
