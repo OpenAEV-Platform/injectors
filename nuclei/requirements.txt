@@ -1,2 +1,2 @@
 pyoaev==1.18.20
--e ../common
+../../injector-common

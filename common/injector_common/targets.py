@@ -5,12 +5,9 @@ from typing import Dict, List, Optional, Tuple
 
 from pyoaev.helpers import OpenAEVInjectorHelper
 
-from common.common.constants import (
-    ASSET_GROUPS_KEY_RABBITMQ,
-    ASSETS_KEY_RABBITMQ,
-    TARGETS_KEY,
-)
-from common.common.pagination import Pagination
+from common.injector_common.constants import (ASSET_GROUPS_KEY_RABBITMQ,
+                                              ASSETS_KEY_RABBITMQ, TARGETS_KEY)
+from common.injector_common.pagination import Pagination
 
 
 @dataclass
