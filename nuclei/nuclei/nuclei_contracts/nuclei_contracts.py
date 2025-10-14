@@ -1,9 +1,3 @@
-from common.common.constants import (
-    TARGET_PROPERTY_SELECTOR_KEY,
-    TARGET_SELECTOR_KEY,
-    TARGETS_KEY,
-)
-from common.common.targets import TargetProperty, target_property_choices_dict
 from pyoaev.contracts import ContractBuilder
 from pyoaev.contracts.contract_config import (
     Contract,
@@ -22,6 +16,12 @@ from pyoaev.contracts.contract_config import (
     prepare_contracts,
 )
 
+from common.common.constants import (
+    TARGET_PROPERTY_SELECTOR_KEY,
+    TARGET_SELECTOR_KEY,
+    TARGETS_KEY,
+)
+from common.common.targets import TargetProperty, target_property_choices_dict
 from nuclei.nuclei_contracts.nuclei_constants import CONTRACT_LABELS, TYPE
 
 

@@ -4,10 +4,10 @@ import subprocess
 import time
 from typing import Dict
 
-from common.constants import TARGET_PROPERTY_SELECTOR_KEY, TARGET_SELECTOR_KEY
-from common.targets import TargetProperty, Targets
 from pyoaev.helpers import OpenAEVConfigHelper, OpenAEVInjectorHelper
 
+from common.constants import TARGET_PROPERTY_SELECTOR_KEY, TARGET_SELECTOR_KEY
+from common.targets import TargetProperty, Targets
 from nuclei.helpers.nuclei_command_builder import NucleiCommandBuilder
 from nuclei.helpers.nuclei_output_parser import NucleiOutputParser
 from nuclei.helpers.nuclei_process import NucleiProcess
