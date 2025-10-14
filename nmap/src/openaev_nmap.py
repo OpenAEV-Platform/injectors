@@ -2,7 +2,8 @@ import json
 import time
 from typing import Dict
 
-from common.common.constants import TARGET_PROPERTY_SELECTOR_KEY, TARGET_SELECTOR_KEY
+from common.common.constants import (TARGET_PROPERTY_SELECTOR_KEY,
+                                     TARGET_SELECTOR_KEY)
 from common.common.targets import TargetProperty, Targets
 from pyoaev.helpers import OpenAEVConfigHelper, OpenAEVInjectorHelper
 
