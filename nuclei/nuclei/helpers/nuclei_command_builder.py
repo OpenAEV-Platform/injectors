@@ -24,7 +24,6 @@ class NucleiCommandBuilder:
         HTTP_SCAN_CONTRACT: "http",
     }
 
-    @staticmethod
     def build_args(
         self, contract_id: str, content: Dict, targets: List[str]
     ) -> List[str]:

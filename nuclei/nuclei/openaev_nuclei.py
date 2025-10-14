@@ -63,6 +63,8 @@ class OpenAEVNuclei:
             raise RuntimeError(
                 "Nuclei is not installed or is not accessible from your PATH."
             )
+        self.command_builder = NucleiCommandBuilder()
+        self.parser = NucleiOutputParser()
 
     def nuclei_execution(self, start: float, data: Dict) -> Dict:
         inject_id = data["injection"]["inject_id"]
@@ -83,8 +85,8 @@ class OpenAEVNuclei:
             message = f"No target identified for the property {TargetProperty[selector_property.upper()].value}"
             raise ValueError(message)
         # Build Arguments to execute
-        nuclei_args = NucleiCommandBuilder.build_args(
-            self, contract_id, content, unique_targets
+        nuclei_args = self.command_builder.build_args(
+            contract_id, content, unique_targets
         )
         input_data = "\n".join(unique_targets).encode("utf-8")
 
@@ -109,8 +111,8 @@ class OpenAEVNuclei:
         )
 
         result = NucleiProcess.nuclei_execute(nuclei_args, input_data)
-        return NucleiOutputParser.parse(
-            self, result.stdout.decode("utf-8"), target_results.ip_to_asset_id_map
+        return self.parser.parse(
+            result.stdout.decode("utf-8"), target_results.ip_to_asset_id_map
         )
 
     def process_message(self, data: Dict) -> None:
