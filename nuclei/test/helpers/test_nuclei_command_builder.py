@@ -14,19 +14,19 @@ class NucleiCommandBuilderTest(TestCase):
     def test_cve_contract(self):
         builder = NucleiCommandBuilder()
         targets = ["https://example.com"]
-        args = builder.build_args(CVE_SCAN_CONTRACT, {}, targets)
+        args = builder.build_args(self, CVE_SCAN_CONTRACT, {}, targets)
         expected_args = ["nuclei", "-tags", "cve", "-j", "-u", "https://example.com"]
         assert args == expected_args
 
     def test_cloud_contract(self):
         builder = NucleiCommandBuilder()
-        args = builder.build_args(CLOUD_SCAN_CONTRACT, {}, ["https://example.com"])
+        args = builder.build_args(self, CLOUD_SCAN_CONTRACT, {}, ["https://example.com"])
         expected_args = ["nuclei", "-tags", "cloud", "-u", "https://example.com"]
         assert args == expected_args
 
     def test_scan_contract(self):
         builder = NucleiCommandBuilder()
-        args = builder.build_args(TEMPLATE_SCAN_CONTRACT, {}, ["https://example.com"])
+        args = builder.build_args(self, TEMPLATE_SCAN_CONTRACT, {}, ["https://example.com"])
         expected_args = ["nuclei", "-t", "/", "-u", "https://example.com"]
         assert args == expected_args
 
@@ -34,7 +34,7 @@ class NucleiCommandBuilderTest(TestCase):
         builder = NucleiCommandBuilder()
         content = {"template": "cves/2021/1234.yaml"}
         targets = ["https://example.com"]
-        args = builder.build_args(HTTP_SCAN_CONTRACT, content, targets)
+        args = builder.build_args(self, HTTP_SCAN_CONTRACT, content, targets)
         expected_args = [
             "nuclei",
             "-tags",
