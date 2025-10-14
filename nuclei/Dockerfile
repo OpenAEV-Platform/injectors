@@ -5,7 +5,7 @@ ENV NUCLEI_URL=https://github.com/projectdiscovery/nuclei/releases/download/v${N
 
 WORKDIR /opt/injector_common
 
-COPY --from=common ./ ./
+COPY --from=injector_common ./ ./
 
 WORKDIR /opt/openaev-injector-nuclei
 

@@ -97,7 +97,6 @@ class OpenAEVNmap:
         inject_id = data["injection"]["inject_id"]
         # Notify API of reception and expected number of operations
         reception_data = {"tracking_total_count": 1}
-
         self.helper.api.inject.execution_reception(
             inject_id=inject_id, data=reception_data
         )

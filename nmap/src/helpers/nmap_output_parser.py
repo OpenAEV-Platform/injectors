@@ -3,6 +3,7 @@ from typing import Dict
 
 class NmapOutputParser:
     def parse(data: Dict, result: str, asset_list: []) -> Dict:
+        """Parse nmap results and extract open ports."""
         run = result["nmaprun"]
         if not isinstance(run["host"], list):
             run["host"] = [run["host"]]
