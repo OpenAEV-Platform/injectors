@@ -1,7 +1,3 @@
 [tool.isort]
 profile = "black"
 known_local_folder = ["nuclei"]
-
-dependencies = [
-    "injector_common (>=1.0.0)",
-]
