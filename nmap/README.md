@@ -84,6 +84,7 @@ pip3 install -r requirements.txt
 Then, start the injector:
 
 ```shell
+cd src
 python3 openaev_nmap.py
 ```
 

@@ -7,7 +7,7 @@ COPY --from=injector_common ./ ./
 
 WORKDIR /opt/openaev-injector-nmap
 # Copy the injector
-COPY src ./
+COPY ./ ./
 
 # Install Python modules
 # hadolint ignore=DL3003
