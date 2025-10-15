@@ -1,0 +1,26 @@
+[project]
+name="injector_common"
+version="1.0.0"
+
+dependencies = [
+    "pyoaev (>=1.18.20)",
+]
+[project.optional-dependencies]
+dev = [
+    "black (>=25.1.0,<25.2.0)",
+    "wheel (>=0.45.1,<0.46.0)"
+]
+
+[build-system]
+requires = ["setuptools", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+include-package-data = true
+
+[tool.setuptools.packages.find]
+
+
+[tool.isort]
+profile = "black"
+known_local_folder = ["injector_common"]

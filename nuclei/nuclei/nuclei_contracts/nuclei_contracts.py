@@ -1,12 +1,8 @@
-import ipaddress
-from dataclasses import dataclass
-from enum import Enum
-from typing import Dict, List, Optional, Tuple
-
 from pyoaev.contracts import ContractBuilder
 from pyoaev.contracts.contract_config import (
     Contract,
     ContractAsset,
+    ContractAssetGroup,
     ContractCardinality,
     ContractConfig,
     ContractExpectations,
@@ -19,34 +15,14 @@ from pyoaev.contracts.contract_config import (
     SupportedLanguage,
     prepare_contracts,
 )
-from pyoaev.helpers import OpenAEVInjectorHelper
 
-from nuclei.nuclei_contracts.nuclei_constants import (
-    ASSETS_KEY,
-    CONTRACT_LABELS,
+from injector_common.constants import (
     TARGET_PROPERTY_SELECTOR_KEY,
     TARGET_SELECTOR_KEY,
     TARGETS_KEY,
-    TYPE,
 )
-
-
-@dataclass
-class TargetExtractionResult:
-    targets: List[str]
-    ip_to_asset_id_map: Dict[str, str]
-
-
-class TargetProperty(Enum):
-    AUTOMATIC = "Automatic"
-    HOSTNAME = "Hostname"
-    SEEN_IP = "Seen IP"
-    LOCAL_IP = "Local IP (first)"
-
-
-target_property_choices_dict = {
-    property.name.lower(): property.value for property in TargetProperty
-}
+from injector_common.targets import TargetProperty, target_property_choices_dict
+from nuclei.nuclei_contracts.nuclei_constants import CONTRACT_LABELS, TYPE
 
 
 class NucleiContracts:
@@ -70,19 +46,31 @@ class NucleiContracts:
         target_selector = ContractSelect(
             key=TARGET_SELECTOR_KEY,
             label="Type of targets",
-            defaultValue=["assets"],
+            defaultValue=["asset-groups"],
             mandatory=True,
-            choices={"assets": "Assets", "manual": "Manual"},
+            choices={
+                "assets": "Assets",
+                "manual": "Manual",
+                "asset-groups": "Asset groups",
+            },
         )
         targets_assets = ContractAsset(
             cardinality=ContractCardinality.Multiple,
-            key=ASSETS_KEY,
             label="Targeted assets",
             mandatory=False,
             mandatoryConditionFields=[target_selector.key],
             mandatoryConditionValues={target_selector.key: "assets"},
             visibleConditionFields=[target_selector.key],
             visibleConditionValues={target_selector.key: "assets"},
+        )
+        target_asset_groups = ContractAssetGroup(
+            cardinality=ContractCardinality.Multiple,
+            label="Targeted asset groups",
+            mandatory=False,
+            mandatoryConditionFields=[target_selector.key],
+            mandatoryConditionValues={target_selector.key: "asset-groups"},
+            visibleConditionFields=[target_selector.key],
+            visibleConditionValues={target_selector.key: "asset-groups"},
         )
         target_property_selector = ContractSelect(
             key=TARGET_PROPERTY_SELECTOR_KEY,
@@ -91,9 +79,9 @@ class NucleiContracts:
             mandatory=False,
             choices=target_property_choices_dict,
             mandatoryConditionFields=[target_selector.key],
-            mandatoryConditionValues={target_selector.key: "assets"},
+            mandatoryConditionValues={target_selector.key: ["assets", "asset-groups"]},
             visibleConditionFields=[target_selector.key],
-            visibleConditionValues={target_selector.key: "assets"},
+            visibleConditionValues={target_selector.key: ["assets", "asset-groups"]},
         )
         targets_manual = ContractText(
             key=TARGETS_KEY,
@@ -123,6 +111,7 @@ class NucleiContracts:
         return [
             target_selector,
             targets_assets,
+            target_asset_groups,
             target_property_selector,
             targets_manual,
             expectations,
@@ -192,85 +181,3 @@ class NucleiContracts:
                 for cid, (en, fr) in CONTRACT_LABELS.items()
             ]
         )
-
-    @staticmethod
-    def extract_targets(
-        data: Dict, helper: OpenAEVInjectorHelper
-    ) -> TargetExtractionResult:
-        targets = []
-        ip_to_asset_id_map = {}
-        content = data["injection"]["inject_content"]
-        if content[TARGET_SELECTOR_KEY] == "assets" and data.get(ASSETS_KEY):
-            selector = content[TARGET_PROPERTY_SELECTOR_KEY]
-            for asset in data[ASSETS_KEY]:
-                if selector == "automatic":
-                    result = NucleiContracts.extract_property_target_value(asset)
-                    if result:
-                        target, asset_id = result
-                        targets.append(target)
-                        ip_to_asset_id_map[target] = asset_id
-                    else:
-                        helper.injector_logger.warning(
-                            f"No valid target found for asset_id={asset.get('asset_id')} "
-                            f"(hostname={asset.get('endpoint_hostname')}, ips={asset.get('endpoint_ips')})"
-                        )
-                else:
-                    if selector == "seen_ip":
-                        ip_to_asset_id_map[asset["endpoint_seen_ip"]] = asset[
-                            "asset_id"
-                        ]
-                        targets.append(asset["endpoint_seen_ip"])
-                    elif selector == "local_ip":
-                        if not asset["endpoint_ips"]:
-                            raise ValueError("No IP found for this endpoint")
-                        ip_to_asset_id_map[asset["endpoint_ips"][0]] = asset["asset_id"]
-                        targets.append(asset["endpoint_ips"][0])
-                    else:
-                        ip_to_asset_id_map[asset["endpoint_hostname"]] = asset[
-                            "asset_id"
-                        ]
-                        targets.append(asset["endpoint_hostname"])
-
-        elif content[TARGET_SELECTOR_KEY] == "manual":
-            targets = [t.strip() for t in content[TARGETS_KEY].split(",") if t.strip()]
-
-        else:
-            raise ValueError("No targets provided for this injection")
-
-        return TargetExtractionResult(
-            targets=targets, ip_to_asset_id_map=ip_to_asset_id_map
-        )
-
-    @staticmethod
-    def is_valid_ip(ip: str) -> bool:
-        """Filter out loopback, unspecified"""
-        try:
-            ip_obj = ipaddress.ip_address(ip)
-            return not (
-                ip_obj.is_loopback or ip_obj.is_unspecified or ip_obj.is_link_local
-            )
-        except ValueError:
-            return False
-
-    @staticmethod
-    def extract_property_target_value(asset: Dict) -> Optional[Tuple[str, str]]:
-        """
-        Extract target value from asset based on conditions:
-        - Agentless + hostname => hostname
-        - Otherwise => first valid IP
-        """
-        asset_id = asset.get("asset_id")
-        agents = asset.get("asset_agents", [])
-        hostname = asset.get("endpoint_hostname")
-        endpoint_ips = asset.get("endpoint_ips", [])
-
-        # Case 1: Agentless + hostname
-        if not agents and hostname:
-            return hostname, asset_id
-
-        # Case 2: Agent present => try IPs
-        for ip in endpoint_ips:
-            if NucleiContracts.is_valid_ip(ip):
-                return ip, asset_id
-
-        return None

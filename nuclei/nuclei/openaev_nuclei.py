@@ -6,6 +6,8 @@ from typing import Dict
 
 from pyoaev.helpers import OpenAEVConfigHelper, OpenAEVInjectorHelper
 
+from injector_common.constants import TARGET_PROPERTY_SELECTOR_KEY, TARGET_SELECTOR_KEY
+from injector_common.targets import TargetProperty, Targets
 from nuclei.helpers.nuclei_command_builder import NucleiCommandBuilder
 from nuclei.helpers.nuclei_output_parser import NucleiOutputParser
 from nuclei.helpers.nuclei_process import NucleiProcess
@@ -70,24 +72,42 @@ class OpenAEVNuclei:
             "contract_id"
         ]
         content = data["injection"]["inject_content"]
+        selector_key = content[TARGET_SELECTOR_KEY]
+        selector_property = content[TARGET_PROPERTY_SELECTOR_KEY]
 
-        target_results = NucleiContracts.extract_targets(data, self.helper)
-        nuclei_args = self.command_builder.build_args(
-            contract_id, content, target_results.targets
+        target_results = Targets.extract_targets(
+            selector_key, selector_property, data, self.helper
         )
-        input_data = "\n".join(target_results.targets).encode("utf-8")
+        # Deduplicate targets
+        unique_targets = list(dict.fromkeys(target_results.targets))
+        # Handle empty targets as an error
+        if not unique_targets:
+            message = f"No target identified for the property {TargetProperty[selector_property.upper()].value}"
+            raise ValueError(message)
+        # Build Arguments to execute
+        nuclei_args = self.command_builder.build_args(
+            contract_id, content, unique_targets
+        )
+        input_data = "\n".join(unique_targets).encode("utf-8")
 
         self.helper.injector_logger.info(
             "Executing nuclei with: " + " ".join(nuclei_args)
         )
+
+        callback_data = {
+            "execution_message": Targets.build_execution_message(
+                selector_key=selector_key,
+                data=data,
+                command_args=nuclei_args,
+            ),
+            "execution_status": "INFO",
+            "execution_duration": int(time.time() - start),
+            "execution_action": "command_execution",
+        }
+
         self.helper.api.inject.execution_callback(
             inject_id=inject_id,
-            data={
-                "execution_message": " ".join(nuclei_args),
-                "execution_status": "INFO",
-                "execution_duration": int(time.time() - start),
-                "execution_action": "command_execution",
-            },
+            data=callback_data,
         )
 
         result = NucleiProcess.nuclei_execute(nuclei_args, input_data)
