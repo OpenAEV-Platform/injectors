@@ -86,14 +86,14 @@ jobs:
           command: |
             TAGS="-t openbas/injector-nmap:${CIRCLE_TAG} -t openaev/injector-nmap:${CIRCLE_TAG}"
             $IS_LATEST && TAGS="$TAGS -t openbas/injector-nmap:latest"
-            docker build --progress=plain $TAGS .
+            docker build --progress=plain --build-context injector_common=../injector_common $TAGS .
       - run:
           working_directory: ~/openaev/nuclei
           name: Build Docker image openbas/injector-nuclei
           command: |
             TAGS="-t openbas/injector-nuclei:${CIRCLE_TAG} -t openaev/injector-nuclei:${CIRCLE_TAG}"
             $IS_LATEST && TAGS="$TAGS -t openbas/injector-nuclei:latest"
-            docker build --progress=plain $TAGS .
+            docker build --progress=plain --build-context injector_common=../injector_common $TAGS .
       - run:
           working_directory: ~/openaev/aws
           name: Build Docker image openbas/injector-aws
@@ -140,11 +140,11 @@ jobs:
       - run:
           working_directory: ~/openaev/nmap
           name: Build Docker image openaev/injector-nmap
-          command: docker build --progress=plain -t openbas/injector-nmap:rolling -t openaev/injector-nmap:rolling .
+          command: docker build --progress=plain --build-context injector_common=../injector_common -t openbas/injector-nmap:rolling -t openaev/injector-nmap:rolling .
       - run:
           working_directory: ~/openaev/nuclei
           name: Build Docker image openaev/injector-nuclei
-          command: docker build --progress=plain -t openbas/injector-nuclei:rolling -t openaev/injector-nuclei:rolling .
+          command: docker build --progress=plain --build-context injector_common=../injector_common -t openbas/injector-nuclei:rolling -t openaev/injector-nuclei:rolling .
       - run:
           working_directory: ~/openaev/aws
           name: Build Docker image openaev/injector-aws
@@ -184,11 +184,11 @@ jobs:
       - run:
           working_directory: ~/openaev/nmap
           name: Build Docker image openaev/injector-nmap
-          command: docker build --progress=plain -t openbas/injector-nmap:prerelease -t openaev/injector-nmap:prerelease .
+          command: docker build --progress=plain --build-context injector_common=../injector_common -t openbas/injector-nmap:prerelease -t openaev/injector-nmap:prerelease .
       - run:
           working_directory: ~/openaev/nuclei
           name: Build Docker image openaev/injector-nuclei
-          command: docker build --progress=plain -t openbas/injector-nuclei:prerelease -t openaev/injector-nuclei:prerelease .
+          command: docker build --progress=plain --build-context injector_common=../injector_common -t openbas/injector-nuclei:prerelease -t openaev/injector-nuclei:prerelease .
       - run:
           working_directory: ~/openaev/aws
           name: Build Docker image openaev/injector-aws
