@@ -65,7 +65,7 @@ jobs:
   build_1:
     working_directory: ~/openaev
     docker:
-      - image: cimg/base:stable-20.04
+      - image: cimg/base:current-24.04
     environment:
       LATEST_SEMANTIC_VERSION: $(git tag --sort=-v:refname | grep -E '^v?[0-9]+\.[0-9]+\.[0-9]+$' | head -n 1)
       IS_LATEST: $([ "$CIRCLE_TAG" = "$LATEST_SEMANTIC_VERSION" ] && echo "true" || echo "false")
@@ -124,7 +124,7 @@ jobs:
   build_rolling_1:
     working_directory: ~/openaev
     docker:
-      - image: cimg/base:stable-20.04
+      - image: cimg/base:current-24.04
     steps:
       - checkout
       - setup_remote_docker
@@ -167,7 +167,7 @@ jobs:
   build_prerelease_1:
     working_directory: ~/openaev
     docker:
-      - image: cimg/base:stable-20.04
+      - image: cimg/base:current-24.04
     steps:
       - checkout
       - setup_remote_docker
@@ -211,21 +211,21 @@ jobs:
 
   deploy_testing:
     docker:
-      - image: cimg/base:stable
+      - image: cimg/base:current-24.04
     steps:
       - checkout
       - kubernetes/install-kubectl
       - run: kubectl --server=https://api.staging.eu-west.filigran.io --token=$K8S_TOKEN -n customer-testing-oaev rollout restart deployment -l app=injector
   deploy_prerelease:
     docker:
-      - image: cimg/base:stable
+      - image: cimg/base:current-24.04
     steps:
       - checkout
       - kubernetes/install-kubectl
       - run: kubectl --server=https://api.staging.eu-west.filigran.io --token=$K8S_TOKEN_PRE_RELEASE -n customer-prerelease-oaev rollout restart deployment -l app=injector
   notify_rolling:
     docker:
-      - image: "cimg/base:stable"
+      - image: cimg/base:current-24.04
     steps:
       - run: sudo apt-get update -qq && sudo apt install curl gettext-base
       - slack/notify:
@@ -233,7 +233,7 @@ jobs:
           template: basic_success_1
   notify:
     docker:
-      - image: "cimg/base:stable"
+      - image: cimg/base:current-24.04
     steps:
       - run: sudo apt-get update -qq && sudo apt install curl gettext-base
       - slack/notify:
