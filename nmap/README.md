@@ -68,25 +68,28 @@ docker compose up -d
 
 The `nmap` and `jc` commands must be installed and available on the system you are running.
 
-#### Configuration
+The poetry package management system (version 2.1 or later) must also be available: https://python-poetry.org/
+Install the environment:
 
-Create a file `config.yml` based on the provided `config.yml.sample`.
-
-Replace the configuration variables with the appropriate configurations for
-you environment.
-
-Install the required python dependencies (preferably in a virtual environment):
-
+**Production**:
 ```shell
-pip3 install -r requirements.txt
+# production environment
+poetry install --extras prod
 ```
 
-Then, start the injector:
+**Development** (note that you should also clone the [pyoaev](OpenAEV-Platform/client-python) repository [according to
+these instructions](../README.md#simultaneous-development-on-pyoaev-and-a-collector))
+```shell
+# development environment
+poetry install --extras dev
+```
+
+Then, start the collector:
 
 ```shell
-cd src
-python3 openaev_nmap.py
+poetry run python -m nmap.openaev_nmap
 ```
+
 
 ## Behavior
 

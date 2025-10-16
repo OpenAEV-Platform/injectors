@@ -47,12 +47,12 @@ file (`config.yml`, manual).
 
 ### Base injector environment variables
 
-| Parameter                               | config.yml                                      | Docker environment variable                                | Default | Mandatory | Description                                                                                       |
-|-----------------------------------------|-------------------------------------------------|------------------------------------------------------------|---------|-----------|---------------------------------------------------------------------------------------------------|
-| Injector ID                             | id                                              | `INJECTOR_ID`                                              | /       | Yes       | A unique `UUIDv4` identifier for this injector instance.                                          |
-| Injector Name                           | name                                            | `INJECTOR_NAME`                                            |         | Yes       | Name of the injector.                                                                             |
-| Log Level                               | log_level                                       | `INJECTOR_LOG_LEVEL`                                       | info    | Yes       | Determines the verbosity of the logs. Options: `debug`, `info`, `warn`, or `error`.               |
-| External contracts maintenance schedule | external_contracts_maintenance_schedule_seconds | `INJECTOR_EXTERNAL_CONTRACTS_MAINTENANCE_SCHEDULE_SECONDS` | 86400   | No        | With every tick, trigger a maintenance of the external contracts (e.g. based on Nuclei templates) |
+| Parameter                               | config.yml                                                 | Docker environment variable                                | Default | Mandatory | Description                                                                                         |
+|-----------------------------------------|------------------------------------------------------------|------------------------------------------------------------|---------|-----------|-----------------------------------------------------------------------------------------------------|
+| Injector ID                             | `injector.id`                                              | `INJECTOR_ID`                                              | /       | Yes       | A unique `UUIDv4` identifier for this injector instance.                                            |
+| Injector Name                           | `injector.name`                                            | `INJECTOR_NAME`                                            |         | Yes       | Name of the injector.                                                                               |
+| Log Level                               | `injector.log_level`                                       | `INJECTOR_LOG_LEVEL`                                       | info    | Yes       | Determines the verbosity of the logs. Options: `debug`, `info`, `warn`, or `error`.                 |
+| External contracts maintenance schedule | `injector.external_contracts_maintenance_schedule_seconds` | `INJECTOR_EXTERNAL_CONTRACTS_MAINTENANCE_SCHEDULE_SECONDS` | 86400   | No        | With every tick, trigger a maintenance of the external contracts (e.g. based on Nuclei templates)   |
 
 ---
 
@@ -83,19 +83,26 @@ docker compose up -d
 * **Nuclei must be installed locally** and accessible via the command line (`nuclei` command).
 * You can install it from: [https://github.com/projectdiscovery/nuclei#installation](https://github.com/projectdiscovery/nuclei#installation)
 
-#### Configuration
+The poetry package management system (version 2.1 or later) must also be available: https://python-poetry.org/
+Install the environment:
 
-1. Copy `nuclei/config.yml.sample` to `nuclei/config.yml` and edit the relevant values.
-2. Install Python dependencies (ideally in a virtual environment):
-
-```bash
-pip3 install -r requirements.txt
+**Production**:
+```shell
+# production environment
+poetry install --extras prod
 ```
 
-3. Run the injector:
+**Development** (note that you should also clone the [pyoaev](OpenAEV-Platform/client-python) repository [according to
+these instructions](../README.md#simultaneous-development-on-pyoaev-and-a-collector))
+```shell
+# development environment
+poetry install --extras dev
+```
 
-```bash
-python3 -m nuclei.openaev_nuclei
+Then, start the collector:
+
+```shell
+poetry run python -m nuclei.openaev_nuclei
 ```
 
 ---
