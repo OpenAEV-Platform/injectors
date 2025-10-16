@@ -85,7 +85,32 @@ The injector supports all current AWS regions including:
 
 **Other Regions**: Middle East (Bahrain, UAE, Tel Aviv), Africa (Cape Town), South America (São Paulo), China (Beijing, Ningxia), AWS GovCloud (US-East, US-West)
 
-## Installation
+## Configuration variables
+
+There are a number of configuration options, which are set either in `docker-compose.yml` (for Docker) or
+in `config.yml` (for manual deployment).
+
+### OpenAEV environment variables
+
+Below are the parameters you'll need to set for OpenAEV:
+
+| Parameter     | config.yml | Docker environment variable | Mandatory | Description                                          |
+|---------------|------------|-----------------------------|-----------|------------------------------------------------------|
+| OpenAEV URL   | url        | `OPENAEV_URL`               | Yes       | The URL of the OpenAEV platform.                     |
+| OpenAEV Token | token      | `OPENAEV_TOKEN`             | Yes       | The default admin token set in the OpenAEV platform. |
+
+### Base injector environment variables
+
+Below are the parameters you'll need to set for running the injector properly:
+
+| Parameter        | config.yml | Docker environment variable | Default | Mandatory | Description                                                                            |
+|------------------|------------|-----------------------------|---------|-----------|----------------------------------------------------------------------------------------|
+| Injector ID      | id         | `INJECTOR_ID`               | /       | Yes       | A unique `UUIDv4` identifier for this injector instance.                               |
+| Collector Name   | name       | `INJECTOR_NAME`             |         | Yes       | Name of the injector.                                                                  |
+| Log Level        | log_level  | `INJECTOR_LOG_LEVEL`        | info    | Yes       | Determines the verbosity of the logs. Options are `debug`, `info`, `warn`, or `error`. |
+
+
+## Deployment
 
 ### Using Docker
 
@@ -102,54 +127,35 @@ docker-compose up -d
 
 ### Manual Installation
 
-1. Install Python dependencies:
-```bash
-cd aws/src
-pip install -r requirements.txt
+Create a file `config.yml` based on the provided `config.yml.sample`.
+
+Replace the configuration variables with the appropriate configurations for
+you environment.
+
+The poetry package management system (version 2.1 or later) must also be available: https://python-poetry.org/
+
+Install the environment:
+
+**Production**:
+```shell
+# production environment
+poetry install --extras prod
 ```
 
-2. Install AWS:
-```bash
-pip install aws
+**Development** (note that you should also clone the [pyoaev](OpenAEV-Platform/client-python) repository [according to
+these instructions](../README.md#simultaneous-development-on-pyoaev-and-an-injector))
+```shell
+# development environment
+poetry install --extras dev
 ```
 
-3. Configure the injector:
-```bash
-cp config.yml.sample config.yml
-# Edit config.yml with your OpenAEV connection details
+Then, start the collector:
+
+```shell
+poetry run python -m aws.openaev_aws
 ```
 
-4. Run the injector:
-```bash
-python openaev_aws.py
-```
-
-## Configuration
-
-### Environment Variables
-
-- `OPENAEV_URL`: URL of your OpenAEV instance
-- `OPENAEV_TOKEN`: Authentication token for OpenAEV API
-- `INJECTOR_ID`: Unique identifier for this injector instance
-- `INJECTOR_NAME`: Display name for the injector (default: "AWS")
-- `INJECTOR_LOG_LEVEL`: Logging level (info, warning, error) - debug logging has been removed for production use
-
-### Configuration File
-
-Create a `config.yml` file based on the provided sample:
-
-```yaml
-openaev:
-  url: 'http://localhost:3001'
-  token: 'your-openaev-token'
-
-injector:
-  id: 'unique-injector-id'
-  name: 'AWS'
-  log_level: 'info'
-```
-
-## Usage in OpenAEV
+## Behaviour
 
 1. **Deploy the Injector**: Start the AWS injector using Docker or manual installation
 2. **Verify Registration**: Check that the injector appears in OpenAEV under Integrations > Injectors
@@ -221,7 +227,7 @@ To add support for additional AWS modules:
 
 Run the injector with info logging to test new modules:
 
-```python
+```yaml
 # In config.yml
 injector:
   log_level: 'info'

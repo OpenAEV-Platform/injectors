@@ -2,7 +2,7 @@ import json
 import time
 from typing import Dict
 
-from contracts_aws import (
+from aws.contracts_aws import (
     CLOUDTRAIL_ENUM_CONTRACT,
     COGNITO_ENUM_CONTRACT,
     DYNAMODB_ENUM_CONTRACT,
@@ -32,7 +32,7 @@ from contracts_aws import (
     VPC_ENUM_CONTRACT,
     AWSContracts,
 )
-from helpers.pacu_executor import PacuExecutor
+from aws.helpers.pacu_executor import PacuExecutor
 from pyoaev.helpers import OpenAEVConfigHelper, OpenAEVInjectorHelper
 
 
@@ -67,7 +67,7 @@ class OpenAEVAWS:
             },
         )
 
-        self.helper = OpenAEVInjectorHelper(self.config, open("img/icon-aws.png", "rb"))
+        self.helper = OpenAEVInjectorHelper(self.config, open("aws/img/icon-aws.png", "rb"))
         self.pacu_executor = PacuExecutor(logger=self.helper.injector_logger)
 
     def aws_execution(self, start: float, data: Dict) -> Dict:
