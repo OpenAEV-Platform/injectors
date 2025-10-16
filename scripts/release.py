@@ -67,9 +67,9 @@ os.system(
 os.system(
     r"grep -rli '"
     + previous_version
-    + "' * | xargs -i@ sed -i -E 's/openaev\/(.*)\:"
+    + "' * | xargs -i@ sed -i -E 's/openaev\\/(.*)\\:"
     + previous_version.replace(".", "\\.")
-    + "/openaev\/\\1:"
+    + "/openaev\\/\\1:"
     + new_version.replace(".", "\\.")
     + "/g' @"
 )
