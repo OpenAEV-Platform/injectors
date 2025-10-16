@@ -98,7 +98,7 @@ jobs:
               find . -name pyproject.toml | xargs -I ___ sed "s|branch = 'release/current'|branch = '${CIRCLE_BRANCH}'|" -i ___;
             fi;
       - run:
-          working_directory: ~/openaev/injector-aws
+          working_directory: ~/openaev/aws
           name: Build Docker image openaev/injector-aws
           command: |
             if [ "${CIRCLE_BRANCH}" = "release/current" ]; then
