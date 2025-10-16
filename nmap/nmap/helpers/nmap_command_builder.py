@@ -1,6 +1,6 @@
 from typing import List
 
-from contracts.nmap_constants import (
+from nmap.contracts.nmap_constants import (
     FIN_SCAN_CONTRACT,
     TCP_CONNECT_SCAN_CONTRACT,
     TCP_SYN_SCAN_CONTRACT,

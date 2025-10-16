@@ -3,7 +3,7 @@ import time
 from typing import Dict
 
 import requests
-from contracts_http import (
+from http_query.contracts_http import (
     HTTP_FORM_POST_CONTRACT,
     HTTP_FORM_PUT_CONTRACT,
     HTTP_GET_CONTRACT,
@@ -40,7 +40,7 @@ class OpenAEVHttp:
             },
         )
         self.helper = OpenAEVInjectorHelper(
-            self.config, open("img/icon-http.png", "rb")
+            self.config, open("http_query/img/icon-http.png", "rb")
         )
 
     @staticmethod

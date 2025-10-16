@@ -2,14 +2,14 @@ import json
 import time
 from typing import Dict
 
-from contracts.nmap_contracts import NmapContracts
-from helpers.nmap_command_builder import NmapCommandBuilder
-from helpers.nmap_output_parser import NmapOutputParser
-from helpers.nmap_process import NmapProcess
 from pyoaev.helpers import OpenAEVConfigHelper, OpenAEVInjectorHelper
 
 from injector_common.constants import TARGET_PROPERTY_SELECTOR_KEY, TARGET_SELECTOR_KEY
 from injector_common.targets import TargetProperty, Targets
+from nmap.contracts.nmap_contracts import NmapContracts
+from nmap.helpers.nmap_command_builder import NmapCommandBuilder
+from nmap.helpers.nmap_output_parser import NmapOutputParser
+from nmap.helpers.nmap_process import NmapProcess
 
 
 class OpenAEVNmap:
@@ -38,7 +38,7 @@ class OpenAEVNmap:
             },
         )
         self.helper = OpenAEVInjectorHelper(
-            self.config, open("img/icon-nmap.png", "rb")
+            self.config, open("nmap/img/icon-nmap.png", "rb")
         )
 
     def nmap_execution(self, start: float, data: Dict) -> Dict:
