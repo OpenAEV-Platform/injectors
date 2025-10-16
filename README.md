@@ -42,9 +42,9 @@ prod = ["pyoaev"]
 dev = ["pyoaev"]
 ```
 
-### Simultaneous development on pyoaev and a collector
-The collectors repository is set to assume that in the event of a simultaneous development work on both `pyoaev`
-and collectors, the `pyoaev` repository is cloned in a directory at the same level as the collectors root directory,
+### Simultaneous development on pyoaev and an injector
+The injectors repository is set to assume that in the event of a simultaneous development work on both `pyoaev`
+and injectors, the `pyoaev` repository is cloned in a directory at the same level as the injectors root directory,
 and is named strictly `client-python`.
 
 Here's an example layout:

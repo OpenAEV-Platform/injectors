@@ -1,0 +1,30 @@
+[tool.poetry]
+name = "openaev-http-query-injector"
+version = "1.18.20"
+description = "An injector for executing arbitrary http requests"
+authors = ["Filigran <contact@filigran.io>"]
+license = "Apache-2.0"
+readme = "README.md"
+packages = [
+    { include = "http_query" }
+]
+
+
+[tool.poetry.dependencies]
+python = "^3.11"
+pyoaev = [
+    { markers = "extra == 'prod' and extra != 'dev'", version = "1.18.20", source = "pypi"  },
+    { markers = "extra == 'dev' and extra != 'prod'", path = "../../client-python", develop = true },
+]
+
+[tool.poetry.extras]
+prod = ["pyoaev"]
+dev = ["pyoaev"]
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.isort]
+profile = "black"
+known_local_folder = ["http_query"]

@@ -1,17 +1,31 @@
-FROM python:3.13-alpine
+FROM python:3.13-alpine AS builder
 
-# Copy the injector
-COPY src /opt/openaev-injector-http
+RUN apk update && apk upgrade
 
-# Install Python modules
-# hadolint ignore=DL3003
-RUN apk update && apk upgrade && \
-    apk --no-cache add git build-base libmagic libffi-dev libxslt libxslt-dev libxml2 libxml2-dev && \
-    cd /opt/openaev-injector-http && \
-    pip3 install --no-cache-dir -r requirements.txt && \
-    apk del git build-base
+# poetry version available on Ubuntu 24.04
+RUN pip3 install poetry==2.1.3
 
-# Expose and entrypoint
-COPY entrypoint.sh /
-RUN chmod +x /entrypoint.sh
-ENTRYPOINT ["/entrypoint.sh"]
+ARG installdir=/opt/injector
+ADD . ${installdir}
+WORKDIR ${installdir}
+RUN poetry build
+
+FROM python:3.13-alpine AS runner
+
+ARG installdir=/opt/injector
+WORKDIR ${installdir}
+COPY --from=builder ${installdir} ${installdir}
+RUN pip3 install --no-cache-dir "$(ls dist/*.whl)[prod]"
+
+# Declare the build argument
+ARG PYOAEV_GIT_BRANCH_OVERRIDE
+
+RUN if [[ ${PYOAEV_GIT_BRANCH_OVERRIDE} ]] ; then \
+        echo "Forcing specific version of client-python" && \
+        apk add --no-cache git && \
+        pip install pip3-autoremove && \
+        pip-autoremove pyoaev -y && \
+        pip install git+https://github.com/OpenAEV-Platform/client-python@${PYOAEV_GIT_BRANCH_OVERRIDE} ; \
+    fi
+
+CMD ["python3", "-m", "http_query.openaev_http"]

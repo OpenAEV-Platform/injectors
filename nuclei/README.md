@@ -93,7 +93,7 @@ poetry install --extras prod
 ```
 
 **Development** (note that you should also clone the [pyoaev](OpenAEV-Platform/client-python) repository [according to
-these instructions](../README.md#simultaneous-development-on-pyoaev-and-a-collector))
+these instructions](../README.md#simultaneous-development-on-pyoaev-and-an-injector))
 ```shell
 # development environment
 poetry install --extras dev
