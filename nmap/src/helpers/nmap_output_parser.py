@@ -19,10 +19,10 @@ class NmapOutputParser:
                             "port": int(port["@portid"]),
                             "service": port["service"]["@name"],
                         }
-                        if (
-                            data["injection"]["inject_content"]["target_selector"]
-                            == "assets"
-                        ):
+                        if data["injection"]["inject_content"]["target_selector"] in [
+                            "assets",
+                            "asset-groups",
+                        ]:
                             port_result["asset_id"] = asset_list[idx]
                             port_result["host"] = host["address"]["@addr"]
                         else:
