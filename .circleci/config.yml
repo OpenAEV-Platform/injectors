@@ -1,6 +1,6 @@
 version: 2.1
 orbs:
-  slack: circleci/slack@5.1.1
+  slack: circleci/slack@5.2.0
   kubernetes: circleci/kubernetes@1.3.1
 jobs:
   ensure_formatting:
@@ -39,24 +39,33 @@ jobs:
           event: fail
           template: basic_fail_1
   test:
-    working_directory: ~/openbas
+    working_directory: ~/openaev
     docker:
       - image: cimg/python:3.13
     steps:
       - checkout
       - setup_remote_docker
       - run:
-          working_directory: ~/openbas/nuclei
+          working_directory: ~/openaev/nuclei
           name: Install dependencies for nuclei injector
           command: pip install -r requirements.txt
       - run:
-          working_directory: ~/openbas/nuclei
+          working_directory: ~/openaev/nuclei
+          name: Overwrite pyoaev with correct version from CI
+          command: |
+            if [ "${CIRCLE_BRANCH}" = "main" ]; then
+              pip install --force-reinstall git+https://github.com/OpenAEV-Platform/client-python.git@main
+            else
+              pip install --force-reinstall git+https://github.com/OpenAEV-Platform/client-python.git@release/current
+            fi
+      - run:
+          working_directory: ~/openaev/nuclei
           name: Tests for nuclei injector
           command: python -m unittest
   build_1:
-    working_directory: ~/openbas
+    working_directory: ~/openaev
     docker:
-      - image: cimg/base:stable-20.04
+      - image: cimg/base:current-24.04
     environment:
       LATEST_SEMANTIC_VERSION: $(git tag --sort=-v:refname | grep -E '^v?[0-9]+\.[0-9]+\.[0-9]+$' | head -n 1)
       IS_LATEST: $([ "$CIRCLE_TAG" = "$LATEST_SEMANTIC_VERSION" ] && echo "true" || echo "false")
@@ -65,31 +74,31 @@ jobs:
       - setup_remote_docker
       - run: sudo apt-get update -qq && sudo apt install curl gettext-base
       - run:
-          working_directory: ~/openbas/http-query
+          working_directory: ~/openaev/http-query
           name: Build Docker image openbas/injector-http-query
           command: |
-            TAGS="-t openbas/injector-http-query:${CIRCLE_TAG}"
+            TAGS="-t openbas/injector-http-query:${CIRCLE_TAG} -t openaev/injector-http-query:${CIRCLE_TAG}"
             $IS_LATEST && TAGS="$TAGS -t openbas/injector-http-query:latest"
             docker build --progress=plain $TAGS .
       - run:
-          working_directory: ~/openbas/nmap
+          working_directory: ~/openaev/nmap
           name: Build Docker image openbas/injector-nmap
           command: |
-            TAGS="-t openbas/injector-nmap:${CIRCLE_TAG}"
+            TAGS="-t openbas/injector-nmap:${CIRCLE_TAG} -t openaev/injector-nmap:${CIRCLE_TAG}"
             $IS_LATEST && TAGS="$TAGS -t openbas/injector-nmap:latest"
-            docker build --progress=plain $TAGS .
+            docker build --progress=plain --build-context injector_common=../injector_common $TAGS .
       - run:
-          working_directory: ~/openbas/nuclei
+          working_directory: ~/openaev/nuclei
           name: Build Docker image openbas/injector-nuclei
           command: |
-            TAGS="-t openbas/injector-nuclei:${CIRCLE_TAG}"
+            TAGS="-t openbas/injector-nuclei:${CIRCLE_TAG} -t openaev/injector-nuclei:${CIRCLE_TAG}"
             $IS_LATEST && TAGS="$TAGS -t openbas/injector-nuclei:latest"
-            docker build --progress=plain $TAGS .
+            docker build --progress=plain --build-context injector_common=../injector_common $TAGS .
       - run:
-          working_directory: ~/openbas/aws
+          working_directory: ~/openaev/aws
           name: Build Docker image openbas/injector-aws
           command: |
-            TAGS="-t openbas/injector-aws:${CIRCLE_TAG}"
+            TAGS="-t openbas/injector-aws:${CIRCLE_TAG} -t openaev/injector-aws:${CIRCLE_TAG}"
             $IS_LATEST && TAGS="$TAGS -t openbas/injector-aws:latest"
             docker build --progress=plain $TAGS .
       - run:
@@ -98,111 +107,125 @@ jobs:
             echo "$DOCKERHUB_PASS" | docker login -u "$DOCKERHUB_USERNAME" --password-stdin
             $IS_LATEST && docker push openbas/injector-http-query:latest
             docker push openbas/injector-http-query:${CIRCLE_TAG}
+            docker push openaev/injector-http-query:${CIRCLE_TAG}
             $IS_LATEST && docker push openbas/injector-nmap:latest
             docker push openbas/injector-nmap:${CIRCLE_TAG}
+            docker push openaev/injector-nmap:${CIRCLE_TAG}
             $IS_LATEST && docker push openbas/injector-nuclei:latest
             docker push openbas/injector-nuclei:${CIRCLE_TAG}
+            docker push openaev/injector-nuclei:${CIRCLE_TAG}
             $IS_LATEST && docker push openbas/injector-aws:latest
             docker push openbas/injector-aws:${CIRCLE_TAG}
+            docker push openaev/injector-aws:${CIRCLE_TAG}
       - slack/notify:
           event: fail
           template: basic_fail_1
+
   build_rolling_1:
-    working_directory: ~/openbas
+    working_directory: ~/openaev
     docker:
-      - image: cimg/base:stable-20.04
+      - image: cimg/base:current-24.04
     steps:
       - checkout
       - setup_remote_docker
       - run: sudo apt-get update -qq && sudo apt install curl gettext-base
       - run:
-         working_directory: ~/openbas
-         name: Replace pyobas requirement of stable version with latest main branch code
-         command: find . -name requirements.txt -exec sed 's|^pyobas==.*$|pyobas @ git+https://github.com/OpenBAS-Platform/client-python@main|' -i {} \;
+          working_directory: ~/openaev
+          name: Replace pyoaev requirement of stable version with latest main branch code
+          command: find . -name requirements.txt -exec sed 's|^pyoaev==.*$|pyoaev @ git+https://github.com/OpenAEV-Platform/client-python@main|' -i {} \;
       - run:
-          working_directory: ~/openbas/http-query
-          name: Build Docker image openbas/injector-http-query
-          command: docker build --progress=plain -t openbas/injector-http-query:rolling .
+          working_directory: ~/openaev/http-query
+          name: Build Docker image openaev/injector-http-query
+          command: docker build --progress=plain -t openbas/injector-http-query:rolling -t openaev/injector-http-query:rolling .
       - run:
-          working_directory: ~/openbas/nmap
-          name: Build Docker image openbas/injector-nmap
-          command: docker build --progress=plain -t openbas/injector-nmap:rolling .
+          working_directory: ~/openaev/nmap
+          name: Build Docker image openaev/injector-nmap
+          command: docker build --progress=plain --build-context injector_common=../injector_common -t openbas/injector-nmap:rolling -t openaev/injector-nmap:rolling .
       - run:
-          working_directory: ~/openbas/nuclei
-          name: Build Docker image openbas/injector-nuclei
-          command: docker build --progress=plain -t openbas/injector-nuclei:rolling .
+          working_directory: ~/openaev/nuclei
+          name: Build Docker image openaev/injector-nuclei
+          command: docker build --progress=plain --build-context injector_common=../injector_common -t openbas/injector-nuclei:rolling -t openaev/injector-nuclei:rolling .
       - run:
-          working_directory: ~/openbas/aws
-          name: Build Docker image openbas/injector-aws
-          command: docker build --progress=plain -t openbas/injector-aws:rolling .
+          working_directory: ~/openaev/aws
+          name: Build Docker image openaev/injector-aws
+          command: docker build --progress=plain -t openbas/injector-aws:rolling -t openaev/injector-aws:rolling .
       - run:
           name: Publish Docker Image to Docker Hub
           command: |
             echo "$DOCKERHUB_PASS" | docker login -u "$DOCKERHUB_USERNAME" --password-stdin
             docker push openbas/injector-http-query:rolling
+            docker push openaev/injector-http-query:rolling 
             docker push openbas/injector-nmap:rolling
+            docker push openaev/injector-nmap:rolling
             docker push openbas/injector-nuclei:rolling
+            docker push openaev/injector-nuclei:rolling
             docker push openbas/injector-aws:rolling
+            docker push openaev/injector-aws:rolling
       - slack/notify:
           event: fail
           template: basic_fail_1
   build_prerelease_1:
-    working_directory: ~/openbas
+    working_directory: ~/openaev
     docker:
-      - image: cimg/base:stable-20.04
+      - image: cimg/base:current-24.04
     steps:
       - checkout
       - setup_remote_docker
       - run: sudo apt-get update -qq && sudo apt install curl gettext-base
       - run:
-          working_directory: ~/openbas
-          name: Replace pyobas requirement of stable version with latest release branch code
+          working_directory: ~/openaev
+          name: Replace pyoaev requirement of stable version with latest release branch code
           # We safely expand the CIRCLE_BRANCH variable because the CircleCI filters already enforce a strict release/x.x.x pattern using regex
-          command: find . -name requirements.txt -exec sed "s|^pyobas==.*$|pyobas @ git+https://github.com/OpenBAS-Platform/client-python@${CIRCLE_BRANCH}|" -i {} \;
+          command: find . -name requirements.txt -exec sed "s|^pyoaev==.*$|pyoaev @ git+https://github.com/OpenAEV-Platform/client-python@${CIRCLE_BRANCH}|" -i {} \;
       - run:
-          working_directory: ~/openbas/http-query
-          name: Build Docker image openbas/injector-http-query
-          command: docker build --progress=plain -t openbas/injector-http-query:prerelease .
+          working_directory: ~/openaev/http-query
+          name: Build Docker image openaev/injector-http-query
+          command: docker build --progress=plain -t openbas/injector-http-query:prerelease -t openaev/injector-http-query:prerelease .
       - run:
-          working_directory: ~/openbas/nmap
-          name: Build Docker image openbas/injector-nmap
-          command: docker build --progress=plain -t openbas/injector-nmap:prerelease .
+          working_directory: ~/openaev/nmap
+          name: Build Docker image openaev/injector-nmap
+          command: docker build --progress=plain --build-context injector_common=../injector_common -t openbas/injector-nmap:prerelease -t openaev/injector-nmap:prerelease .
       - run:
-          working_directory: ~/openbas/nuclei
-          name: Build Docker image openbas/injector-nuclei
-          command: docker build --progress=plain -t openbas/injector-nuclei:prerelease .
+          working_directory: ~/openaev/nuclei
+          name: Build Docker image openaev/injector-nuclei
+          command: docker build --progress=plain --build-context injector_common=../injector_common -t openbas/injector-nuclei:prerelease -t openaev/injector-nuclei:prerelease .
       - run:
-          working_directory: ~/openbas/aws
-          name: Build Docker image openbas/injector-aws
-          command: docker build --progress=plain -t openbas/injector-aws:prerelease .
+          working_directory: ~/openaev/aws
+          name: Build Docker image openaev/injector-aws
+          command: docker build --progress=plain -t openbas/injector-aws:prerelease -t openaev/injector-aws:prerelease .
       - run:
           name: Publish Docker Image to Docker Hub
           command: |
             echo "$DOCKERHUB_PASS" | docker login -u "$DOCKERHUB_USERNAME" --password-stdin
             docker push openbas/injector-http-query:prerelease
+            docker push openaev/injector-http-query:prerelease
             docker push openbas/injector-nmap:prerelease
+            docker push openaev/injector-nmap:prerelease
             docker push openbas/injector-nuclei:prerelease
+            docker push openaev/injector-nuclei:prerelease
             docker push openbas/injector-aws:prerelease
+            docker push openaev/injector-aws:prerelease
       - slack/notify:
           event: fail
           template: basic_fail_1
+
   deploy_testing:
     docker:
-      - image: cimg/base:stable
+      - image: cimg/base:current-24.04
     steps:
       - checkout
       - kubernetes/install-kubectl
-      - run: kubectl --server=https://api.staging.eu-west.filigran.io --token=$K8S_TOKEN -n customer-testing-obas rollout restart deployment -l app=injector
+      - run: kubectl --server=https://api.staging.eu-west.filigran.io --token=$K8S_TOKEN -n customer-testing-oaev rollout restart deployment -l app=injector
   deploy_prerelease:
     docker:
-      - image: cimg/base:stable
+      - image: cimg/base:current-24.04
     steps:
       - checkout
       - kubernetes/install-kubectl
-      - run: kubectl --server=https://api.staging.eu-west.filigran.io --token=$K8S_TOKEN_PRE_RELEASE -n customer-prerelease-obas rollout restart deployment -l app=injector
+      - run: kubectl --server=https://api.staging.eu-west.filigran.io --token=$K8S_TOKEN_PRE_RELEASE -n customer-prerelease-oaev rollout restart deployment -l app=injector
   notify_rolling:
     docker:
-      - image: "cimg/base:stable"
+      - image: cimg/base:current-24.04
     steps:
       - run: sudo apt-get update -qq && sudo apt install curl gettext-base
       - slack/notify:
@@ -210,7 +233,7 @@ jobs:
           template: basic_success_1
   notify:
     docker:
-      - image: "cimg/base:stable"
+      - image: cimg/base:current-24.04
     steps:
       - run: sudo apt-get update -qq && sudo apt install curl gettext-base
       - slack/notify:
@@ -218,7 +241,7 @@ jobs:
           template: basic_success_1
 workflows:
   version: 2
-  openbas:
+  openaev:
     jobs:
       - ensure_formatting
       - linter

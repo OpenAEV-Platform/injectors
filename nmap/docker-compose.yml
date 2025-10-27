@@ -1,10 +1,10 @@
 version: '3'
 services:
   injector-nmap:
-    image: openbas/injector-nmap:1.18.20
+    image: openaev/injector-nmap:1.18.20
     environment:
-      - OPENBAS_URL=http://localhost
-      - OPENBAS_TOKEN=ChangeMe
+      - OPENAEV_URL=http://localhost
+      - OPENAEV_TOKEN=ChangeMe
       - INJECTOR_ID=ChangeMe
       - "INJECTOR_NAME=Nmap"
       - INJECTOR_LOG_LEVEL=error

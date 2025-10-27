@@ -1,7 +1,7 @@
 from typing import List
 
-from pyobas.contracts import ContractBuilder
-from pyobas.contracts.contract_config import (
+from pyoaev.contracts import ContractBuilder
+from pyoaev.contracts.contract_config import (
     Contract,
     ContractAttachment,
     ContractCardinality,
@@ -17,7 +17,7 @@ from pyobas.contracts.contract_config import (
     prepare_contracts,
 )
 
-TYPE = "openbas_http"
+TYPE = "openaev_http"
 HTTP_RAW_POST_CONTRACT = "5948c96c-4064-4c0d-b079-51ec33f31b91"
 HTTP_RAW_PUT_CONTRACT = "bb503f7c-1f17-49e1-ac31-f4c2e99fd704"
 HTTP_FORM_POST_CONTRACT = "a4794081-ccb5-41ef-9855-304ad5fdf4a9"
@@ -60,14 +60,20 @@ class HttpContracts:
             label="Username",
             defaultValue="",
             mandatory=False,
-            linkedFields=[basic_auth_field],
+            mandatoryConditionFields=[basic_auth_field.key],
+            mandatoryConditionValues={basic_auth_field.key: True},
+            visibleConditionFields=[basic_auth_field.key],
+            visibleConditionValues={basic_auth_field.key: True},
         )
         basic_password = ContractText(
             key="basicPassword",
             label="Password",
             defaultValue="",
             mandatory=False,
-            linkedFields=[basic_auth_field],
+            mandatoryConditionFields=[basic_auth_field.key],
+            mandatoryConditionValues={basic_auth_field.key: True},
+            visibleConditionFields=[basic_auth_field.key],
+            visibleConditionValues={basic_auth_field.key: True},
         )
         auth_fields = [basic_auth_field, username_field, basic_password]
         # Post contract raw

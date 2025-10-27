@@ -1,13 +1,10 @@
-from dataclasses import dataclass
-from typing import Dict, List
-
-from pyobas.contracts import ContractBuilder
-from pyobas.contracts.contract_config import (
+from pyoaev.contracts import ContractBuilder
+from pyoaev.contracts.contract_config import (
     Contract,
     ContractAsset,
+    ContractAssetGroup,
     ContractCardinality,
     ContractConfig,
-    ContractElement,
     ContractExpectations,
     ContractOutputElement,
     ContractOutputType,
@@ -19,28 +16,20 @@ from pyobas.contracts.contract_config import (
     prepare_contracts,
 )
 
-from nuclei.nuclei_contracts.nuclei_constants import (
-    ASSETS_KEY,
-    CONTRACT_LABELS,
+from injector_common.constants import (
     TARGET_PROPERTY_SELECTOR_KEY,
     TARGET_SELECTOR_KEY,
     TARGETS_KEY,
-    TYPE,
 )
-
-
-@dataclass
-class TargetExtractionResult:
-    targets: List[str]
-    ip_to_asset_id_map: Dict[str, str]
+from injector_common.targets import TargetProperty, target_property_choices_dict
+from nuclei.nuclei_contracts.nuclei_constants import CONTRACT_LABELS, TYPE
 
 
 class NucleiContracts:
 
     @staticmethod
-    def build_contracts():
-        # -- CONFIG --
-        contract_config = ContractConfig(
+    def base_contract_config():
+        return ContractConfig(
             type=TYPE,
             label={
                 SupportedLanguage.en: "Nuclei Scan",
@@ -51,41 +40,57 @@ class NucleiContracts:
             expose=True,
         )
 
+    @staticmethod
+    def core_contract_fields():
         # -- FIELDS --
         target_selector = ContractSelect(
             key=TARGET_SELECTOR_KEY,
             label="Type of targets",
-            defaultValue=["assets"],
+            defaultValue=["asset-groups"],
             mandatory=True,
-            mandatoryGroups=["assets", "targets"],
-            choices={"assets": "Assets", "manual": "Manual"},
+            choices={
+                "assets": "Assets",
+                "manual": "Manual",
+                "asset-groups": "Asset groups",
+            },
         )
         targets_assets = ContractAsset(
             cardinality=ContractCardinality.Multiple,
-            key=ASSETS_KEY,
             label="Targeted assets",
             mandatory=False,
+            mandatoryConditionFields=[target_selector.key],
+            mandatoryConditionValues={target_selector.key: "assets"},
+            visibleConditionFields=[target_selector.key],
+            visibleConditionValues={target_selector.key: "assets"},
+        )
+        target_asset_groups = ContractAssetGroup(
+            cardinality=ContractCardinality.Multiple,
+            label="Targeted asset groups",
+            mandatory=False,
+            mandatoryConditionFields=[target_selector.key],
+            mandatoryConditionValues={target_selector.key: "asset-groups"},
+            visibleConditionFields=[target_selector.key],
+            visibleConditionValues={target_selector.key: "asset-groups"},
         )
         target_property_selector = ContractSelect(
             key=TARGET_PROPERTY_SELECTOR_KEY,
-            label="Targeted property",
-            defaultValue=["hostname"],
+            label="Targeted assets property",
+            defaultValue=[TargetProperty.AUTOMATIC.name.lower()],
             mandatory=False,
-            choices={
-                "hostname": "Hostname",
-                "seen_ip": "Seen IP",
-                "local_ip": "Local IP (first)",
-            },
+            choices=target_property_choices_dict,
+            mandatoryConditionFields=[target_selector.key],
+            mandatoryConditionValues={target_selector.key: ["assets", "asset-groups"]},
+            visibleConditionFields=[target_selector.key],
+            visibleConditionValues={target_selector.key: ["assets", "asset-groups"]},
         )
         targets_manual = ContractText(
             key=TARGETS_KEY,
             label="Manual targets (comma-separated)",
             mandatory=False,
-        )
-        template_manual = ContractText(
-            key="template",
-            label="Manual template path (-t)",
-            mandatory=False,
+            mandatoryConditionFields=[target_selector.key],
+            mandatoryConditionValues={target_selector.key: "manual"},
+            visibleConditionFields=[target_selector.key],
+            visibleConditionValues={target_selector.key: "manual"},
         )
         expectations = ContractExpectations(
             key="expectations",
@@ -103,7 +108,17 @@ class NucleiContracts:
             ],
         )
 
-        # -- OUTPUTS --
+        return [
+            target_selector,
+            targets_assets,
+            target_asset_groups,
+            target_property_selector,
+            targets_manual,
+            expectations,
+        ]
+
+    @staticmethod
+    def core_outputs():
         output_vulns = ContractOutputElement(
             type=ContractOutputType.CVE,
             field="cve",
@@ -118,68 +133,51 @@ class NucleiContracts:
             isFindingCompatible=True,
             labels=["nuclei"],
         )
+        return [output_vulns, output_others]
 
-        fields: List[ContractElement] = (
-            ContractBuilder()
-            .add_fields(
-                [
-                    target_selector,
-                    targets_assets,
-                    target_property_selector,
-                    targets_manual,
-                    template_manual,
-                    expectations,
-                ]
-            )
-            .build_fields()
-        )
-        nuclei_contract_outputs: List[ContractOutputElement] = (
-            ContractBuilder().add_outputs([output_vulns, output_others]).build_outputs()
-        )
-
-        def build_contract(contract_id, label_en, label_fr):
-            return Contract(
-                contract_id=contract_id,
-                config=contract_config,
-                label={
-                    SupportedLanguage.en: label_en,
-                    SupportedLanguage.fr: label_fr,
-                },
-                fields=fields,
-                outputs=nuclei_contract_outputs,
-                manual=False,
-            )
-
-        return prepare_contracts(
-            [
-                build_contract(cid, f"Nuclei - {en}", f"Nuclei - {fr}")
-                for cid, (en, fr) in CONTRACT_LABELS.items()
-            ]
+    @staticmethod
+    def build_contract(
+        contract_id,
+        external_id,
+        contract_config,
+        contract_fields,
+        contract_outputs,
+        label_en,
+        label_fr,
+    ):
+        return Contract(
+            contract_id=contract_id,
+            external_id=external_id,
+            config=contract_config,
+            label={
+                SupportedLanguage.en: label_en,
+                SupportedLanguage.fr: label_fr,
+            },
+            fields=ContractBuilder().add_fields(contract_fields).build_fields(),
+            outputs=ContractBuilder().add_outputs(contract_outputs).build_outputs(),
+            manual=False,
         )
 
     @staticmethod
-    def extract_targets(data: Dict) -> TargetExtractionResult:
-        targets = []
-        ip_to_asset_id_map = {}
-        content = data["injection"]["inject_content"]
-        if content[TARGET_SELECTOR_KEY] == "assets" and data.get(ASSETS_KEY):
-            selector = content[TARGET_PROPERTY_SELECTOR_KEY]
-            for asset in data[ASSETS_KEY]:
-                if selector == "seen_ip":
-                    ip_to_asset_id_map[asset["endpoint_seen_ip"]] = asset["asset_id"]
-                    targets.append(asset["endpoint_seen_ip"])
-                elif selector == "local_ip":
-                    if not asset["endpoint_ips"]:
-                        raise ValueError("No IP found for this endpoint")
-                    ip_to_asset_id_map[asset["endpoint_ips"][0]] = asset["asset_id"]
-                    targets.append(asset["endpoint_ips"][0])
-                else:
-                    ip_to_asset_id_map[asset["endpoint_hostname"]] = asset["asset_id"]
-                    targets.append(asset["endpoint_hostname"])
-        elif content[TARGET_SELECTOR_KEY] == "manual":
-            targets = [t.strip() for t in content[TARGETS_KEY].split(",") if t.strip()]
-        else:
-            raise ValueError("No targets provided for this injection")
-        return TargetExtractionResult(
-            targets=targets, ip_to_asset_id_map=ip_to_asset_id_map
+    def build_static_contracts():
+        return prepare_contracts(
+            [
+                NucleiContracts.build_contract(
+                    cid,
+                    None,
+                    NucleiContracts.base_contract_config(),
+                    NucleiContracts.core_contract_fields()
+                    + [
+                        ContractText(
+                            key="template",
+                            label="Manual template path (-t)",
+                            mandatory=False,
+                        )
+                    ],
+                    NucleiContracts.core_outputs(),
+                    f"Nuclei - {en}",
+                    f"Nuclei - {fr}",
+                )
+                for cid, (en, fr) in CONTRACT_LABELS.items()
+            ]
         )

@@ -1,13 +1,14 @@
 version: '3.8'
 services:
   injector-nuclei:
-    image: openbas/injector-nuclei:1.18.20
+    image: openaev/injector-nuclei:1.18.20
     environment:
-      - OPENBAS_URL=http://localhost
-      - OPENBAS_TOKEN=ChangeMe
+      - OPENAEV_URL=http://localhost
+      - OPENAEV_TOKEN=ChangeMe
       - INJECTOR_ID=ChangeMe
-      - "INJECTOR_NAME=Nuclei"
+      - INJECTOR_NAME=Nuclei
+      - INJECTOR_LOG_LEVEL=WARN
     restart: always
     depends_on:
-      openbas:
+      openaev:
         condition: service_healthy

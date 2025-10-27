@@ -1,13 +1,19 @@
 FROM python:3.13-alpine
 
+
+WORKDIR /opt/injector_common
+
+COPY --from=injector_common ./ ./
+
+WORKDIR /opt/openaev-injector-nmap
 # Copy the injector
-COPY src /opt/openbas-injector-nmap
+COPY ./ ./
 
 # Install Python modules
 # hadolint ignore=DL3003
 RUN apk update && apk upgrade && \
     apk --no-cache add nmap jc git build-base libmagic libffi-dev libxslt libxslt-dev libxml2 libxml2-dev && \
-    cd /opt/openbas-injector-nmap && \
+    cd /opt/openaev-injector-nmap && \
     pip3 install --no-cache-dir -r requirements.txt && \
     apk del git build-base
 

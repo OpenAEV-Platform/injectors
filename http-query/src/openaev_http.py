@@ -11,19 +11,19 @@ from contracts_http import (
     HTTP_RAW_PUT_CONTRACT,
     HttpContracts,
 )
-from pyobas.helpers import OpenBASConfigHelper, OpenBASInjectorHelper
+from pyoaev.helpers import OpenAEVConfigHelper, OpenAEVInjectorHelper
 
 
-class OpenBASHttp:
+class OpenAEVHttp:
     def __init__(self):
-        self.config = OpenBASConfigHelper(
+        self.config = OpenAEVConfigHelper(
             __file__,
             {
                 # API information
-                "openbas_url": {"env": "OPENBAS_URL", "file_path": ["openbas", "url"]},
-                "openbas_token": {
-                    "env": "OPENBAS_TOKEN",
-                    "file_path": ["openbas", "token"],
+                "openaev_url": {"env": "OPENAEV_URL", "file_path": ["openaev", "url"]},
+                "openaev_token": {
+                    "env": "OPENAEV_TOKEN",
+                    "file_path": ["openaev", "token"],
                 },
                 # Config information
                 "injector_id": {"env": "INJECTOR_ID", "file_path": ["injector", "id"]},
@@ -34,12 +34,12 @@ class OpenBASHttp:
                 "injector_type": {
                     "env": "INJECTOR_TYPE",
                     "file_path": ["injector", "type"],
-                    "default": "openbas_http_query",
+                    "default": "openaev_http_query",
                 },
                 "injector_contracts": {"data": HttpContracts.build_contract()},
             },
         )
-        self.helper = OpenBASInjectorHelper(
+        self.helper = OpenAEVInjectorHelper(
             self.config, open("img/icon-http.png", "rb")
         )
 
@@ -168,5 +168,5 @@ class OpenBASHttp:
 
 
 if __name__ == "__main__":
-    openBASHttp = OpenBASHttp()
-    openBASHttp.start()
+    openAEVHttp = OpenAEVHttp()
+    openAEVHttp.start()

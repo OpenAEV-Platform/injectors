@@ -1,10 +1,10 @@
 version: '3'
 services:
   injector-aws:
-    image: openbas/injector-aws:1.18.20
+    image: openaev/injector-aws:1.18.20
     environment:
-      - OPENBAS_URL=http://localhost
-      - OPENBAS_TOKEN=ChangeMe
+      - OPENAEV_URL=http://localhost
+      - OPENAEV_TOKEN=ChangeMe
       - INJECTOR_ID=ChangeMe
       - "INJECTOR_NAME=AWS"
       - INJECTOR_LOG_LEVEL=error

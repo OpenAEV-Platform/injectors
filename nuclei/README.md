@@ -1,11 +1,11 @@
-# OpenBAS Nuclei Injector
+# OpenAEV Nuclei Injector
 
 ## Table of Contents
 
-- [OpenBAS Nuclei Injector](#openbas-nuclei-injector)
+- [OpenAEV Nuclei Injector](#openaev-nuclei-injector)
   - [Prerequisites](#prerequisites)
   - [Configuration variables](#configuration-variables)
-    - [OpenBAS environment variables](#openbas-environment-variables)
+    - [OpenAEV environment variables](#openaev-environment-variables)
     - [Base injector environment variables](#base-injector-environment-variables)
   - [Deployment](#deployment)
     - [Docker Deployment](#docker-deployment)
@@ -28,29 +28,31 @@ Depending on your deployment method:
 
 In both cases, for the injector to operate correctly:
 
-- It **must be able to reach the OpenBAS platform** via the URL you provide (through `OPENBAS_URL` or `config.yml`).
-- It **must be able to reach the RabbitMQ broker** used by the OpenBAS platform.
+- It **must be able to reach the OpenAEV platform** via the URL you provide (through `OPENAEV_URL` or `config.yml`).
+- It **must be able to reach the RabbitMQ broker** used by the OpenAEV platform.
 
 ---
 
 ## Configuration variables
 
-Configuration is provided either through environment variables (Docker) or a config file (`config.yml`, manual).
+Configuration is provided either through environment variables (Docker) or a config
+file (`config.yml`, manual).
 
-### OpenBAS environment variables
+### OpenAEV environment variables
 
 | Parameter     | config.yml | Docker environment variable | Mandatory | Description                                          |
 |---------------|------------|-----------------------------|-----------|------------------------------------------------------|
-| OpenBAS URL   | url        | `OPENBAS_URL`               | Yes       | The URL of the OpenBAS platform.                     |
-| OpenBAS Token | token      | `OPENBAS_TOKEN`             | Yes       | The default admin token set in the OpenBAS platform. |
+| OpenAEV URL   | url        | `OPENAEV_URL`               | Yes       | The URL of the OpenAEV platform.                     |
+| OpenAEV Token | token      | `OPENAEV_TOKEN`             | Yes       | The default admin token set in the OpenAEV platform. |
 
 ### Base injector environment variables
 
-| Parameter      | config.yml | Docker environment variable | Default | Mandatory | Description                                                                            |
-|----------------|------------|-----------------------------|---------|-----------|----------------------------------------------------------------------------------------|
-| Injector ID    | id         | `INJECTOR_ID`               | /       | Yes       | A unique `UUIDv4` identifier for this injector instance.                               |
-| Injector Name  | name       | `INJECTOR_NAME`             |         | Yes       | Name of the injector.                                                                  |
-| Log Level      | log_level  | `INJECTOR_LOG_LEVEL`        | info    | Yes       | Determines the verbosity of the logs. Options: `debug`, `info`, `warn`, or `error`.   |
+| Parameter                               | config.yml                                      | Docker environment variable                                | Default | Mandatory | Description                                                                                       |
+|-----------------------------------------|-------------------------------------------------|------------------------------------------------------------|---------|-----------|---------------------------------------------------------------------------------------------------|
+| Injector ID                             | id                                              | `INJECTOR_ID`                                              | /       | Yes       | A unique `UUIDv4` identifier for this injector instance.                                          |
+| Injector Name                           | name                                            | `INJECTOR_NAME`                                            |         | Yes       | Name of the injector.                                                                             |
+| Log Level                               | log_level                                       | `INJECTOR_LOG_LEVEL`                                       | info    | Yes       | Determines the verbosity of the logs. Options: `debug`, `info`, `warn`, or `error`.               |
+| External contracts maintenance schedule | external_contracts_maintenance_schedule_seconds | `INJECTOR_EXTERNAL_CONTRACTS_MAINTENANCE_SCHEDULE_SECONDS` | 86400   | No        | With every tick, trigger a maintenance of the external contracts (e.g. based on Nuclei templates) |
 
 ---
 
@@ -61,10 +63,10 @@ Configuration is provided either through environment variables (Docker) or a con
 Build the Docker image using the provided `Dockerfile`.
 
 ```bash
-docker build . -t openbas/injector-nuclei:latest
+docker build --build-context injector_common=../injector_common .  -t openaev/injector-nuclei:latest
 ````
 
-Edit the `docker-compose.yml` file with your OpenBAS configuration, then start the container:
+Edit the `docker-compose.yml` file with your OpenAEV configuration, then start the container:
 
 ```bash
 docker compose up -d
@@ -83,25 +85,25 @@ docker compose up -d
 
 #### Configuration
 
-1. Copy `config.yml.sample` to `config.yml` and edit the relevant values.
+1. Copy `nuclei/config.yml.sample` to `nuclei/config.yml` and edit the relevant values.
 2. Install Python dependencies (ideally in a virtual environment):
 
 ```bash
-pip3 install -r src/requirements.txt
+pip3 install -r requirements.txt
 ```
 
 3. Run the injector:
 
 ```bash
-cd src
-python3 openbas_nuclei.py
+python3 -m nuclei.openaev_nuclei
 ```
 
 ---
 
 ## Behavior
 
-The Nuclei injector supports contract-based scans by dynamically constructing and executing Nuclei commands based on provided tags or templates.
+The Nuclei injector supports contract-based scans by dynamically constructing and executing Nuclei
+commands based on provided tags or templates.
 
 ### Supported Contracts
 
@@ -119,17 +121,26 @@ The CVE scan uses the `-tags cve` argument and enforces JSON output.
 
 The Template scan accepts a manual template via `-t <template>` or `template_path`.
 
+Additionally, contracts dedicated to scanning for a single, specific CVE may be provisioned in OpenAEV if
+two conditions are met:
+
+* A scan for the CVE is supported by a Nuclei template (part of the Nuclei distribution),
+* A vulnerability taxonomy entry exists in OpenAEV for that same CVE (under Settings > Taxonomies > Vulnerabilities).
+
+These CVE-specific contracts are set up out of the box to use the Nuclei template (with the `-t` argument)
+relevant to the CVE.
+
 ### Target Selection
 
 Targets are selected based on the `target_selector` field.
 
 #### If target type is **Assets**:
 
-| Selected Property | Uses Asset Field         |
-|-------------------|-------------------------|
-| Seen IP           | endpoint_seen_ip         |
+| Selected Property | Uses Asset Field           |
+|-------------------|----------------------------|
+| Seen IP           | endpoint_seen_ip           |
 | Local IP          | First IP from endpoint_ips |
-| Hostname          | endpoint_hostname       |
+| Hostname          | endpoint_hostname          |
 
 #### If target type is **Manual**:
 

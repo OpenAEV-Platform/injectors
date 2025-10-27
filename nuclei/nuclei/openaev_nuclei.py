@@ -1,25 +1,30 @@
 import json
+import os
 import subprocess
 import time
 from typing import Dict
 
-from pyobas.helpers import OpenBASConfigHelper, OpenBASInjectorHelper
+from pyoaev.helpers import OpenAEVConfigHelper, OpenAEVInjectorHelper
 
+from injector_common.constants import TARGET_PROPERTY_SELECTOR_KEY, TARGET_SELECTOR_KEY
+from injector_common.targets import TargetProperty, Targets
 from nuclei.helpers.nuclei_command_builder import NucleiCommandBuilder
 from nuclei.helpers.nuclei_output_parser import NucleiOutputParser
 from nuclei.helpers.nuclei_process import NucleiProcess
+from nuclei.nuclei_contracts.external_contracts import ExternalContractsScheduler
 from nuclei.nuclei_contracts.nuclei_contracts import NucleiContracts
 
 
-class OpenBASNuclei:
+class OpenAEVNuclei:
     def __init__(self):
-        self.config = OpenBASConfigHelper(
+        print(os.getenv("PATH"))
+        self.config = OpenAEVConfigHelper(
             __file__,
             {
-                "openbas_url": {"env": "OPENBAS_URL", "file_path": ["openbas", "url"]},
-                "openbas_token": {
-                    "env": "OPENBAS_TOKEN",
-                    "file_path": ["openbas", "token"],
+                "openaev_url": {"env": "OPENAEV_URL", "file_path": ["openaev", "url"]},
+                "openaev_token": {
+                    "env": "OPENAEV_TOKEN",
+                    "file_path": ["openaev", "token"],
                 },
                 "injector_id": {"env": "INJECTOR_ID", "file_path": ["injector", "id"]},
                 "injector_name": {
@@ -29,12 +34,28 @@ class OpenBASNuclei:
                 "injector_type": {
                     "env": "INJECTOR_TYPE",
                     "file_path": ["injector", "type"],
-                    "default": "openbas_nuclei",
+                    "default": "openaev_nuclei",
                 },
-                "injector_contracts": {"data": NucleiContracts.build_contracts()},
+                "injector_contracts": {
+                    "data": NucleiContracts.build_static_contracts()
+                },
+                "injector_external_contracts_maintenance_schedule_seconds": {
+                    "env": "INJECTOR_EXTERNAL_CONTRACTS_MAINTENANCE_SCHEDULE_SECONDS",
+                    "file_path": [
+                        "injector",
+                        "external_contracts_maintenance_schedule_seconds",
+                    ],
+                    "default": 86400,
+                    "is_number": True,
+                },
+                "injector_log_level": {
+                    "env": "INJECTOR_LOG_LEVEL",
+                    "file_path": ["injector", "log_level"],
+                    "default": "warn",
+                },
             },
         )
-        self.helper = OpenBASInjectorHelper(
+        self.helper = OpenAEVInjectorHelper(
             self.config, open("nuclei/img/nuclei.jpg", "rb")
         )
 
@@ -42,8 +63,6 @@ class OpenBASNuclei:
             raise RuntimeError(
                 "Nuclei is not installed or is not accessible from your PATH."
             )
-        self._update_templates()
-
         self.command_builder = NucleiCommandBuilder()
         self.parser = NucleiOutputParser()
 
@@ -53,24 +72,42 @@ class OpenBASNuclei:
             "contract_id"
         ]
         content = data["injection"]["inject_content"]
+        selector_key = content[TARGET_SELECTOR_KEY]
+        selector_property = content[TARGET_PROPERTY_SELECTOR_KEY]
 
-        target_results = NucleiContracts.extract_targets(data)
-        nuclei_args = self.command_builder.build_args(
-            contract_id, content, target_results.targets
+        target_results = Targets.extract_targets(
+            selector_key, selector_property, data, self.helper
         )
-        input_data = "\n".join(target_results.targets).encode("utf-8")
+        # Deduplicate targets
+        unique_targets = list(dict.fromkeys(target_results.targets))
+        # Handle empty targets as an error
+        if not unique_targets:
+            message = f"No target identified for the property {TargetProperty[selector_property.upper()].value}"
+            raise ValueError(message)
+        # Build Arguments to execute
+        nuclei_args = self.command_builder.build_args(
+            contract_id, content, unique_targets
+        )
+        input_data = "\n".join(unique_targets).encode("utf-8")
 
         self.helper.injector_logger.info(
             "Executing nuclei with: " + " ".join(nuclei_args)
         )
+
+        callback_data = {
+            "execution_message": Targets.build_execution_message(
+                selector_key=selector_key,
+                data=data,
+                command_args=nuclei_args,
+            ),
+            "execution_status": "INFO",
+            "execution_duration": int(time.time() - start),
+            "execution_action": "command_execution",
+        }
+
         self.helper.api.inject.execution_callback(
             inject_id=inject_id,
-            data={
-                "execution_message": " ".join(nuclei_args),
-                "execution_status": "INFO",
-                "execution_duration": int(time.time() - start),
-                "execution_action": "command_execution",
-            },
+            data=callback_data,
         )
 
         result = NucleiProcess.nuclei_execute(nuclei_args, input_data)
@@ -119,17 +156,17 @@ class OpenBASNuclei:
         except (FileNotFoundError, subprocess.CalledProcessError):
             return False
 
-    def _update_templates(self):
-        self.helper.injector_logger.info("Updating templates...")
-        try:
-            NucleiProcess.nuclei_update_templates()
-            self.helper.injector_logger.info("Templates updated successfully.")
-        except subprocess.CalledProcessError as e:
-            self.helper.injector_logger.error(f"Template update failed: {e}")
-
     def start(self):
         self.helper.listen(message_callback=self.process_message)
+        ExternalContractsScheduler(
+            self.helper.api,
+            self.config.get_conf("injector_id"),
+            self.config.get_conf(
+                "injector_external_contracts_maintenance_schedule_seconds"
+            ),
+            self.helper.injector_logger,
+        ).start()
 
 
 if __name__ == "__main__":
-    OpenBASNuclei().start()
+    OpenAEVNuclei().start()

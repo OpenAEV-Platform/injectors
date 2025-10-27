@@ -1,10 +1,10 @@
 version: '3'
 services:
   injector-http-query:
-    image: openbas/injector-http-query:1.18.20
+    image: openaev/injector-http-query:1.18.20
     environment:
-      - OPENBAS_URL=http://localhost
-      - OPENBAS_TOKEN=ChangeMe
+      - OPENAEV_URL=http://localhost
+      - OPENAEV_TOKEN=ChangeMe
       - INJECTOR_ID=ChangeMe
       - "INJECTOR_NAME=HTTP query"
       - INJECTOR_LOG_LEVEL=error
