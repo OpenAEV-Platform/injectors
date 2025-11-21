@@ -31,6 +31,7 @@ from nmap.contracts.nmap_constants import (
     TCP_SYN_SCAN_CONTRACT,
     TYPE,
 )
+from pyoaev.security_domain.types import SecurityDomains
 
 
 class NmapContracts:
@@ -160,6 +161,7 @@ class NmapContracts:
             fields=nmap_contract_fields,
             outputs=nmap_contract_outputs,
             manual=False,
+            domains=[SecurityDomains.NETWORK.value],
         )
         tcp_scan_contract = Contract(
             contract_id=TCP_CONNECT_SCAN_CONTRACT,
@@ -171,6 +173,7 @@ class NmapContracts:
             fields=nmap_contract_fields,
             outputs=nmap_contract_outputs,
             manual=False,
+            domains=[SecurityDomains.NETWORK.value],
         )
         fin_scan_contract = Contract(
             contract_id=FIN_SCAN_CONTRACT,
@@ -182,6 +185,7 @@ class NmapContracts:
             fields=nmap_contract_fields,
             outputs=nmap_contract_outputs,
             manual=False,
+            domains=[SecurityDomains.NETWORK.value],
         )
         return prepare_contracts(
             [syn_scan_contract, tcp_scan_contract, fin_scan_contract]
