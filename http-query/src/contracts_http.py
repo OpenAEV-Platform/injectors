@@ -1,5 +1,6 @@
 from typing import List
 
+from pyoaev.security_domain.types import SecurityDomains
 from pyoaev.contracts import ContractBuilder
 from pyoaev.contracts.contract_config import (
     Contract,
@@ -98,6 +99,7 @@ class HttpContracts:
             fields=raw_post_fields,
             outputs=outputs,
             manual=False,
+            domains=[SecurityDomains.WEB_APP.value],
         )
         raw_put_contract = Contract(
             contract_id=HTTP_RAW_PUT_CONTRACT,
@@ -109,6 +111,7 @@ class HttpContracts:
             fields=raw_post_fields,
             outputs=outputs,
             manual=False,
+            domains=[SecurityDomains.WEB_APP.value],
         )
         # Post contract form
         attachment_field = ContractAttachment(
@@ -141,6 +144,7 @@ class HttpContracts:
             fields=form_post_fields,
             outputs=outputs,
             manual=False,
+            domains=[SecurityDomains.WEB_APP.value],
         )
         form_put_contract = Contract(
             contract_id=HTTP_FORM_PUT_CONTRACT,
@@ -152,6 +156,7 @@ class HttpContracts:
             fields=form_post_fields,
             outputs=outputs,
             manual=False,
+            domains=[SecurityDomains.WEB_APP.value],
         )
         # Get contract
         get_fields: List[ContractElement] = (
@@ -171,6 +176,7 @@ class HttpContracts:
             fields=get_fields,
             outputs=outputs,
             manual=False,
+            domains=[SecurityDomains.WEB_APP.value],
         )
         return prepare_contracts(
             [

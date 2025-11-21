@@ -17,6 +17,7 @@ from pyoaev.utils import setup_logging_config
 
 from nuclei.helpers.nuclei_process import NucleiProcess
 from nuclei.nuclei_contracts.nuclei_contracts import NucleiContracts
+from pyoaev.security_domain.types import SecurityDomains
 
 
 class ExternalContractsScheduler:
@@ -149,6 +150,7 @@ class ExternalContractsManager:
             outputs,
             template["ID"],
             template["ID"],
+            [SecurityDomains.NETWORK.value],
         )
         contract.add_vulnerability(template["ID"])
         return contract
