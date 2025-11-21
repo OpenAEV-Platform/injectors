@@ -16,6 +16,7 @@ from pyoaev.contracts.contract_config import (
     SupportedLanguage,
     prepare_contracts,
 )
+from pyoaev.security_domain.types import SecurityDomains
 
 TYPE = "openaev_aws"
 
@@ -432,6 +433,7 @@ class AWSContracts:
                 fields=fields or base_fields,
                 outputs=(ContractBuilder().add_outputs(outputs).build_outputs()),
                 manual=False,
+                domains=[SecurityDomains.CLOUD.value],
             )
 
         # IAM Enumeration contracts
