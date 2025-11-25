@@ -1,6 +1,6 @@
 from typing import Dict
 
-from injector_common.injector_common.targets import TargetExtractionResult
+from injector_common.targets import TargetExtractionResult
 
 
 class NmapOutputParser:
