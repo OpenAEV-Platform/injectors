@@ -64,7 +64,11 @@ class Targets:
             )
 
         elif selector_key == "manual":
-            targets = list(dict.fromkeys([t.strip() for t in content[TARGETS_KEY].split(",") if t.strip()]))
+            targets = list(
+                dict.fromkeys(
+                    [t.strip() for t in content[TARGETS_KEY].split(",") if t.strip()]
+                )
+            )
 
         else:
             raise ValueError("No targets provided for this injection")

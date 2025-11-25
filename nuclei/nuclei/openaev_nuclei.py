@@ -85,9 +85,7 @@ class OpenAEVNuclei:
             message = f"No target identified for the property {TargetProperty[selector_property.upper()].value}"
             raise ValueError(message)
         # Build Arguments to execute
-        nuclei_args = self.command_builder.build_args(
-            contract_id, content, targets
-        )
+        nuclei_args = self.command_builder.build_args(contract_id, content, targets)
         input_data = "\n".join(targets).encode("utf-8")
 
         self.helper.injector_logger.info(
