@@ -4,7 +4,7 @@ from src.helpers.nmap_output_parser import NmapOutputParser
 parse = NmapOutputParser()
 
 
-class NucleiOutputParserTest(TestCase):
+class NmapOutputParserTest(TestCase):
     def setUp(self):
         self.data_assets = {
             "injection": {"inject_content": {"target_selector": "assets"}}
