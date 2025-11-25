@@ -53,7 +53,6 @@ class OpenAEVNmap:
         target_results = Targets.extract_targets(
             selector_key, selector_property, data, self.helper
         )
-        asset_list = list(target_results.ip_to_asset_id_map.values())
         # Deduplicate targets
         targets = target_results.targets
         # Handle empty targets as an error
@@ -90,7 +89,7 @@ class OpenAEVNmap:
         jc = NmapProcess.js_execute(["jc", "--xml", "-p"], nmap_result)
         result = json.loads(jc.stdout.decode("utf-8").strip())
 
-        return NmapOutputParser.parse(data, result, asset_list)
+        return NmapOutputParser.parse(data, result, target_results)
 
     def process_message(self, data: Dict) -> None:
         start = time.time()
