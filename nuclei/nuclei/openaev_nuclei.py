@@ -79,16 +79,16 @@ class OpenAEVNuclei:
             selector_key, selector_property, data, self.helper
         )
         # Deduplicate targets
-        unique_targets = list(dict.fromkeys(target_results.targets))
+        targets = target_results.targets
         # Handle empty targets as an error
-        if not unique_targets:
+        if not targets:
             message = f"No target identified for the property {TargetProperty[selector_property.upper()].value}"
             raise ValueError(message)
         # Build Arguments to execute
         nuclei_args = self.command_builder.build_args(
-            contract_id, content, unique_targets
+            contract_id, content, targets
         )
-        input_data = "\n".join(unique_targets).encode("utf-8")
+        input_data = "\n".join(targets).encode("utf-8")
 
         self.helper.injector_logger.info(
             "Executing nuclei with: " + " ".join(nuclei_args)

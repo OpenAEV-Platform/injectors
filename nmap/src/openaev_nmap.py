@@ -55,14 +55,14 @@ class OpenAEVNmap:
         )
         asset_list = list(target_results.ip_to_asset_id_map.values())
         # Deduplicate targets
-        unique_targets = list(dict.fromkeys(target_results.targets))
+        targets = target_results.targets
         # Handle empty targets as an error
-        if not unique_targets:
+        if not targets:
             message = f"No target identified for the property {TargetProperty[selector_property.upper()].value}"
             raise ValueError(message)
 
         # Build Arguments to execute
-        nmap_args = NmapCommandBuilder.build_args(contract_id, unique_targets)
+        nmap_args = NmapCommandBuilder.build_args(contract_id, targets)
 
         self.helper.injector_logger.info(
             "Executing nmap with command: " + " ".join(nmap_args)

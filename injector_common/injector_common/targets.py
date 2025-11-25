@@ -64,7 +64,8 @@ class Targets:
             )
 
         elif selector_key == "manual":
-            targets = [t.strip() for t in content[TARGETS_KEY].split(",") if t.strip()]
+            targets = list(dict.fromkeys([t.strip() for t in content[TARGETS_KEY].split(",") if t.strip()]))
+            ip_to_asset_id_map = {t: t for t in set(targets)}
 
         else:
             raise ValueError("No targets provided for this injection")
