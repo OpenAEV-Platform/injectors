@@ -27,7 +27,7 @@ class NmapOutputParser:
                             port_result["host"] = host["address"]["@addr"]
                         else:
                             port_result["asset_id"] = None
-                            port_result["host"] = host["address"]["@addr"]
+                            port_result["host"] = asset_list[idx]
                         ports_scans_results.append(port_result)
 
         return {
