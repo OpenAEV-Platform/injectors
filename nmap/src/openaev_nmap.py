@@ -128,7 +128,6 @@ class OpenAEVNmap:
     def start(self):
         self.helper.listen(message_callback=self.process_message)
 
-
 if __name__ == "__main__":
     openAEVNmap = OpenAEVNmap()
     openAEVNmap.start()
