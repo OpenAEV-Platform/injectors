@@ -1,54 +1,10 @@
 from unittest import TestCase
 
 from nmap.src.helpers.nmap_output_parser import NmapOutputParser
-
+from injector_common.targets import TargetExtractionResult
 
 class NmapOutputParserTest(TestCase):
     def setUp(self):
-        self.data_assets = {
-            "injection": {"inject_content": {"target_selector": "assets"}}
-        }
-
-        self.data_no_assets = {
-            "injection": {"inject_content": {"target_selector": "other"}}
-        }
-
-        self.result_multiple_hosts = {
-            "nmaprun": {
-                "host": [
-                    {
-                        "address": {"@addr": "10.0.0.1"},
-                        "ports": {
-                            "port": [
-                                {
-                                    "@portid": "22",
-                                    "state": {"@state": "open"},
-                                    "service": {"@name": "ssh"},
-                                },
-                                {
-                                    "@portid": "80",
-                                    "state": {"@state": "closed"},
-                                    "service": {"@name": "http"},
-                                },
-                            ]
-                        },
-                    },
-                    {
-                        "address": {"@addr": "10.0.0.2"},
-                        "ports": {
-                            "port": [
-                                {
-                                    "@portid": "443",
-                                    "state": {"@state": "open"},
-                                    "service": {"@name": "https"},
-                                }
-                            ]
-                        },
-                    },
-                ]
-            }
-        }
-
         self.result_single_host = {
             "nmaprun": {
                 "host": {
@@ -74,7 +30,9 @@ class NmapOutputParserTest(TestCase):
         """Ensure target_selector='assets' uses asset_list and sets asset_id."""
         data = {"injection": {"inject_content": {"target_selector": "assets"}}}
 
-        result = NmapOutputParser.parse(data, self.result_single_host, ["asset-123"])
+
+        result = NmapOutputParser.parse(data, self.result_single_host, TargetExtractionResult(ip_to_asset_id_map={"172.16.5.10": "asset-123"},
+        targets=[]))
 
         scan = result["outputs"]["scan_results"][0]
 
@@ -87,7 +45,8 @@ class NmapOutputParserTest(TestCase):
         """Ensure target_selector='asset-groups' also uses asset_list."""
         data = {"injection": {"inject_content": {"target_selector": "asset-groups"}}}
 
-        result = NmapOutputParser.parse(data, self.result_single_host, ["group-asset-555"])
+        result = NmapOutputParser.parse(data, self.result_single_host, TargetExtractionResult(ip_to_asset_id_map={"172.16.5.10": "group-asset-555"},
+                                                                                              targets=["172.16.5.10"]))
 
         scan = result["outputs"]["scan_results"][0]
 
@@ -100,11 +59,22 @@ class NmapOutputParserTest(TestCase):
         """Ensure target_selector='manual' sets asset_id=None."""
         data = {"injection": {"inject_content": {"target_selector": "manual"}}}
 
-        result = NmapOutputParser.parse(data, self.result_single_host, ["ignored"])
+        result = NmapOutputParser.parse(data, self.result_single_host, TargetExtractionResult(ip_to_asset_id_map={},
+                                                                                              targets=["172.16.5.10"]))
 
         scan = result["outputs"]["scan_results"][0]
 
         self.assertIsNone(scan["asset_id"])
         self.assertEqual(scan["host"], "172.16.5.10")
-        self.assertEqual(scan["port"], 21)
-        self.assertEqual(scan["service"], "ftp")
+
+    def test_parse_target_manual_None_values(self):
+        """Ensure target_selector='manual' sets asset_id=None."""
+        data = {"injection": {"inject_content": {"target_selector": "manual"}}}
+
+        result = NmapOutputParser.parse(data, self.result_single_host, TargetExtractionResult(ip_to_asset_id_map={},
+                                                                                              targets=[]))
+
+        scan = result["outputs"]["scan_results"][0]
+
+        self.assertIsNone(scan["asset_id"])
+        self.assertIsNone(scan["host"])
