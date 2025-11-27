@@ -1,7 +1,7 @@
 from unittest import TestCase
 
 from injector_common.targets import TargetExtractionResult
-from nmap.src.helpers.nmap_output_parser import NmapOutputParser
+from src.helpers.nmap_output_parser import NmapOutputParser
 
 
 class NmapOutputParserTest(TestCase):
