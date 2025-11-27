@@ -31,9 +31,13 @@ class NmapOutputParserTest(TestCase):
         """Ensure target_selector='assets' uses asset_list and sets asset_id."""
         data = {"injection": {"inject_content": {"target_selector": "assets"}}}
 
-
-        result = NmapOutputParser.parse(data, self.result_single_host, TargetExtractionResult(ip_to_asset_id_map={"172.16.5.10": "asset-123"},
-        targets=[]))
+        result = NmapOutputParser.parse(
+            data,
+            self.result_single_host,
+            TargetExtractionResult(
+                ip_to_asset_id_map={"172.16.5.10": "asset-123"}, targets=[]
+            ),
+        )
 
         scan = result["outputs"]["scan_results"][0]
 
@@ -46,8 +50,14 @@ class NmapOutputParserTest(TestCase):
         """Ensure target_selector='asset-groups' also uses asset_list."""
         data = {"injection": {"inject_content": {"target_selector": "asset-groups"}}}
 
-        result = NmapOutputParser.parse(data, self.result_single_host, TargetExtractionResult(ip_to_asset_id_map={"172.16.5.10": "group-asset-555"},
-                                                                                              targets=["172.16.5.10"]))
+        result = NmapOutputParser.parse(
+            data,
+            self.result_single_host,
+            TargetExtractionResult(
+                ip_to_asset_id_map={"172.16.5.10": "group-asset-555"},
+                targets=["172.16.5.10"],
+            ),
+        )
 
         scan = result["outputs"]["scan_results"][0]
 
@@ -60,8 +70,11 @@ class NmapOutputParserTest(TestCase):
         """Ensure target_selector='manual' sets asset_id=None."""
         data = {"injection": {"inject_content": {"target_selector": "manual"}}}
 
-        result = NmapOutputParser.parse(data, self.result_single_host, TargetExtractionResult(ip_to_asset_id_map={},
-                                                                                              targets=["172.16.5.10"]))
+        result = NmapOutputParser.parse(
+            data,
+            self.result_single_host,
+            TargetExtractionResult(ip_to_asset_id_map={}, targets=["172.16.5.10"]),
+        )
 
         scan = result["outputs"]["scan_results"][0]
 
@@ -72,8 +85,11 @@ class NmapOutputParserTest(TestCase):
         """Ensure target_selector='manual' sets asset_id=None."""
         data = {"injection": {"inject_content": {"target_selector": "manual"}}}
 
-        result = NmapOutputParser.parse(data, self.result_single_host, TargetExtractionResult(ip_to_asset_id_map={},
-                                                                                              targets=[]))
+        result = NmapOutputParser.parse(
+            data,
+            self.result_single_host,
+            TargetExtractionResult(ip_to_asset_id_map={}, targets=[]),
+        )
 
         scan = result["outputs"]["scan_results"][0]
 
