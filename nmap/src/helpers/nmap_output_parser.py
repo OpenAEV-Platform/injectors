@@ -4,6 +4,7 @@ from injector_common.targets import TargetExtractionResult
 
 
 class NmapOutputParser:
+    @staticmethod
     def parse(data: Dict, result: str, target_results: TargetExtractionResult) -> Dict:
         """Parse nmap results and extract open ports."""
         asset_list = list(target_results.ip_to_asset_id_map.values())

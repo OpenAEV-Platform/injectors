@@ -1,8 +1,6 @@
 from unittest import TestCase
 
-from src.helpers.nmap_output_parser import NmapOutputParser
-
-parse = NmapOutputParser()
+from nmap.src.helpers.nmap_output_parser import NmapOutputParser
 
 
 class NmapOutputParserTest(TestCase):
@@ -76,7 +74,7 @@ class NmapOutputParserTest(TestCase):
         """Ensure target_selector='assets' uses asset_list and sets asset_id."""
         data = {"injection": {"inject_content": {"target_selector": "assets"}}}
 
-        result = parse(data, self.result_single_host, ["asset-123"])
+        result = NmapOutputParser.parse(data, self.result_single_host, ["asset-123"])
 
         scan = result["outputs"]["scan_results"][0]
 
@@ -89,7 +87,7 @@ class NmapOutputParserTest(TestCase):
         """Ensure target_selector='asset-groups' also uses asset_list."""
         data = {"injection": {"inject_content": {"target_selector": "asset-groups"}}}
 
-        result = parse(data, self.result_single_host, ["group-asset-555"])
+        result = NmapOutputParser.parse(data, self.result_single_host, ["group-asset-555"])
 
         scan = result["outputs"]["scan_results"][0]
 
@@ -102,7 +100,7 @@ class NmapOutputParserTest(TestCase):
         """Ensure target_selector='manual' sets asset_id=None."""
         data = {"injection": {"inject_content": {"target_selector": "manual"}}}
 
-        result = parse(data, self.result_single_host, ["ignored"])
+        result = NmapOutputParser.parse(data, self.result_single_host, ["ignored"])
 
         scan = result["outputs"]["scan_results"][0]
 
