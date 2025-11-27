@@ -15,19 +15,19 @@ class HTTPHelpersTest(TestCase):
         result = HTTPHelpers.parse_headers(input_str)
         self.assertEqual(result, expected)
 
+    def test_parse_parts_with_string(self):
+        input_str = "msg=test&user=alice"
+        expected = [
+            {"key": "msg", "value": "test"},
+            {"key": "user", "value": "savacano"},
+        ]
+        result = HTTPHelpers.parse_parts(input_str)
+        self.assertEqual(result, expected)
 
-def test_parse_parts_with_string(self):
-    input_str = "msg=test&user=alice"
-    expected = [{"key": "msg", "value": "test"}, {"key": "user", "value": "savacano"}]
-    result = HTTPHelpers.parse_parts(input_str)
-    self.assertEqual(result, expected)
+    def test_parse_headers_empty_string(self):
+        result = HTTPHelpers.parse_headers("")
+        self.assertEqual(result, [])
 
-
-def test_parse_headers_empty_string(self):
-    result = HTTPHelpers.parse_headers("")
-    self.assertEqual(result, [])
-
-
-def test_parse_parts_empty_string(self):
-    result = HTTPHelpers.parse_parts("")
-    self.assertEqual(result, [])
+    def test_parse_parts_empty_string(self):
+        result = HTTPHelpers.parse_parts("")
+        self.assertEqual(result, [])
