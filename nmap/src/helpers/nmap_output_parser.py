@@ -1,9 +1,15 @@
 from typing import Dict
 
+from injector_common.targets import TargetExtractionResult
+
 
 class NmapOutputParser:
-    def parse(data: Dict, result: str, asset_list: []) -> Dict:
+    @staticmethod
+    def parse(data: Dict, result: str, target_results: TargetExtractionResult) -> Dict:
         """Parse nmap results and extract open ports."""
+        asset_list = list(target_results.ip_to_asset_id_map.values())
+        targets = target_results.targets or []
+
         run = result["nmaprun"]
         if not isinstance(run["host"], list):
             run["host"] = [run["host"]]
@@ -27,7 +33,10 @@ class NmapOutputParser:
                             port_result["host"] = host["address"]["@addr"]
                         else:
                             port_result["asset_id"] = None
-                            port_result["host"] = asset_list[idx]
+                            if idx < len(targets):
+                                port_result["host"] = targets[idx]
+                            else:
+                                port_result["host"] = None
                         ports_scans_results.append(port_result)
 
         return {
