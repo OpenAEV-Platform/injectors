@@ -19,7 +19,7 @@ class HTTPHelpersTest(TestCase):
         input_str = "msg=test&user=alice"
         expected = [
             {"key": "msg", "value": "test"},
-            {"key": "user", "value": "savacano"},
+            {"key": "user", "value": "alice"},
         ]
         result = HTTPHelpers.parse_parts(input_str)
         self.assertEqual(result, expected)
