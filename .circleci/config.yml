@@ -96,7 +96,7 @@ jobs:
       - run:
           working_directory: ~/openaev/http-query
           name: Install dependencies for http-query injector
-          command: pip install -r requirements.txt
+          command: pip install -r src/requirements.txt
       - run:
           working_directory: ~/openaev/http-query
           name: Overwrite pyoaev with correct version from CI
