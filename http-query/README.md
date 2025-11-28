@@ -84,3 +84,14 @@ python3 openaev_http.py
 ## Behavior
 
 This injector enables new inject contracts, allowing for API calls of the Get, Post, and Put types.
+
+### Passing headers with the request
+The contracts created in OpenAEV include an optional "Headers" parameter. While this field is technically a free-form
+text input, the contents passed to it are expected to be in a certain format: `key=value` and together separated with a comma  `,`.
+
+Note the pattern supports whitespace within the keys and values.
+
+Example:
+```plaintext
+content-type=application/json,x-custom-header=value for the header
+```

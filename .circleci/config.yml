@@ -86,6 +86,30 @@ jobs:
           working_directory: ~/openaev/nmap
           name: Tests for nmap injector
           command: python -m unittest
+  test-http-query:
+    working_directory: ~/openaev
+    docker:
+      - image: cimg/python:3.13
+    steps:
+      - checkout
+      - setup_remote_docker
+      - run:
+          working_directory: ~/openaev/http-query
+          name: Install dependencies for http-query injector
+          command: pip install -r src/requirements.txt
+      - run:
+          working_directory: ~/openaev/http-query
+          name: Overwrite pyoaev with correct version from CI
+          command: |
+            if [ "${CIRCLE_BRANCH}" = "main" ]; then
+              pip install --force-reinstall git+https://github.com/OpenAEV-Platform/client-python.git@main
+            else
+              pip install --force-reinstall git+https://github.com/OpenAEV-Platform/client-python.git@release/current
+            fi
+      - run:
+          working_directory: ~/openaev/http-query
+          name: Tests for http-query injector
+          command: python -m unittest
   build_1:
     working_directory: ~/openaev
     docker:
@@ -271,6 +295,7 @@ workflows:
       - linter
       - test-nmap
       - test-nuclei
+      - test-http-query
       - build_1:
           filters:
             tags:
@@ -283,6 +308,7 @@ workflows:
             - linter
             - test-nmap
             - test-nuclei
+            - test-http-query
           filters:
             branches:
               only:
@@ -293,6 +319,7 @@ workflows:
             - linter
             - test-nmap
             - test-nuclei
+            - test-http-query
           filters:
             branches:
               only:
