@@ -3,7 +3,7 @@ name="injector_common"
 version="1.0.0"
 
 dependencies = [
-    "pyoaev==2.0.4",
+    "pyoaev==2.0.5",
 ]
 [project.optional-dependencies]
 dev = [
