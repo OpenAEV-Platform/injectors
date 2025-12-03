@@ -13,11 +13,11 @@ from pyoaev.apis.inputs.search import (
 )
 from pyoaev.client import OpenAEV
 from pyoaev.contracts.contract_config import ContractText
+from pyoaev.security_domain.types import SecurityDomains
 from pyoaev.utils import setup_logging_config
 
 from nuclei.helpers.nuclei_process import NucleiProcess
 from nuclei.nuclei_contracts.nuclei_contracts import NucleiContracts
-from pyoaev.security_domain.types import SecurityDomains
 
 
 class ExternalContractsScheduler:

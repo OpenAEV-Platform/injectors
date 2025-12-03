@@ -18,6 +18,7 @@ from pyoaev.contracts.contract_config import (
     SupportedLanguage,
     prepare_contracts,
 )
+from pyoaev.security_domain.types import SecurityDomains
 
 from injector_common.constants import (
     TARGET_PROPERTY_SELECTOR_KEY,
@@ -31,7 +32,6 @@ from nmap.contracts.nmap_constants import (
     TCP_SYN_SCAN_CONTRACT,
     TYPE,
 )
-from pyoaev.security_domain.types import SecurityDomains
 
 
 class NmapContracts:

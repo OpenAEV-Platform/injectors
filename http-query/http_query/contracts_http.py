@@ -1,6 +1,5 @@
 from typing import List
 
-from pyoaev.security_domain.types import SecurityDomains
 from pyoaev.contracts import ContractBuilder
 from pyoaev.contracts.contract_config import (
     Contract,
@@ -17,6 +16,7 @@ from pyoaev.contracts.contract_config import (
     SupportedLanguage,
     prepare_contracts,
 )
+from pyoaev.security_domain.types import SecurityDomains
 
 TYPE = "openaev_http"
 HTTP_RAW_POST_CONTRACT = "5948c96c-4064-4c0d-b079-51ec33f31b91"
