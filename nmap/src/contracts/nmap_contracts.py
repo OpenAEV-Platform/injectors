@@ -24,6 +24,7 @@ from pyoaev.contracts.contract_config import (
     SupportedLanguage,
     prepare_contracts,
 )
+from pyoaev.security_domain.types import SecurityDomains
 
 from injector_common.constants import (
     TARGET_PROPERTY_SELECTOR_KEY,
@@ -31,7 +32,6 @@ from injector_common.constants import (
     TARGETS_KEY,
 )
 from injector_common.targets import TargetProperty, target_property_choices_dict
-from pyoaev.security_domain.types import SecurityDomains
 
 
 class NmapContracts:
