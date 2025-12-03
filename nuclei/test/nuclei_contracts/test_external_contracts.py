@@ -132,7 +132,9 @@ class ExternalContractsTest(unittest.TestCase):
                         + '_CVE-0001-0114", "domains": [{"domain_name": "Network", "domain_color": "#009933"}]}',
                         "is_atomic_testing": True,
                         "contract_platforms": [],
-                        "contract_domains": [{'domain_name': 'Network', 'domain_color': '#009933'}]
+                        "contract_domains": [
+                            {"domain_name": "Network", "domain_color": "#009933"}
+                        ],
                     }
                 ),
                 call(
@@ -169,7 +171,9 @@ class ExternalContractsTest(unittest.TestCase):
                         + '_CVE-0002-0760", "domains": [{"domain_name": "Network", "domain_color": "#009933"}]}',
                         "is_atomic_testing": True,
                         "contract_platforms": [],
-                        "contract_domains": [{'domain_name': 'Network', 'domain_color': '#009933'}]
+                        "contract_domains": [
+                            {"domain_name": "Network", "domain_color": "#009933"}
+                        ],
                     }
                 ),
                 call(
@@ -206,7 +210,9 @@ class ExternalContractsTest(unittest.TestCase):
                         + '_CVE-0003-0537", "domains": [{"domain_name": "Network", "domain_color": "#009933"}]}',
                         "is_atomic_testing": True,
                         "contract_platforms": [],
-                        "contract_domains": [{'domain_name': 'Network', 'domain_color': '#009933'}],
+                        "contract_domains": [
+                            {"domain_name": "Network", "domain_color": "#009933"}
+                        ],
                     }
                 ),
                 call(
@@ -243,7 +249,9 @@ class ExternalContractsTest(unittest.TestCase):
                         + '_CVE-0004-1131", "domains": [{"domain_name": "Network", "domain_color": "#009933"}]}',
                         "is_atomic_testing": True,
                         "contract_platforms": [],
-                        "contract_domains": [{'domain_name': 'Network', 'domain_color': '#009933'}],
+                        "contract_domains": [
+                            {"domain_name": "Network", "domain_color": "#009933"}
+                        ],
                     }
                 ),
                 call(
@@ -267,7 +275,9 @@ class ExternalContractsTest(unittest.TestCase):
                         + '_CVE-0005-0519", "domains": [{"domain_name": "Network", "domain_color": "#009933"}]}',
                         "is_atomic_testing": True,
                         "contract_platforms": [],
-                        "contract_domains": [{'domain_name': 'Network', 'domain_color': '#009933'}],
+                        "contract_domains": [
+                            {"domain_name": "Network", "domain_color": "#009933"}
+                        ],
                     }
                 ),
             ]
@@ -351,7 +361,9 @@ class ExternalContractsTest(unittest.TestCase):
                         + '_CVE-0004-1131", "domains": [{"domain_name": "Network", "domain_color": "#009933"}]}',
                         "is_atomic_testing": True,
                         "contract_platforms": [],
-                        "contract_domains": [{'domain_name': 'Network', 'domain_color': '#009933'}],
+                        "contract_domains": [
+                            {"domain_name": "Network", "domain_color": "#009933"}
+                        ],
                     },
                 ),
                 call(
@@ -371,7 +383,9 @@ class ExternalContractsTest(unittest.TestCase):
                         + '_CVE-0005-0519", "domains": [{"domain_name": "Network", "domain_color": "#009933"}]}',
                         "is_atomic_testing": True,
                         "contract_platforms": [],
-                        "contract_domains": [{'domain_name': 'Network', 'domain_color': '#009933'}]
+                        "contract_domains": [
+                            {"domain_name": "Network", "domain_color": "#009933"}
+                        ],
                     },
                 ),
             ]
@@ -401,7 +415,9 @@ class ExternalContractsTest(unittest.TestCase):
                         + '_CVE-0001-0114", "domains": [{"domain_name": "Network", "domain_color": "#009933"}]}',
                         "is_atomic_testing": True,
                         "contract_platforms": [],
-                        "contract_domains": [{'domain_name': 'Network', 'domain_color': '#009933'}],
+                        "contract_domains": [
+                            {"domain_name": "Network", "domain_color": "#009933"}
+                        ],
                     }
                 ),
                 call(
@@ -425,7 +441,9 @@ class ExternalContractsTest(unittest.TestCase):
                         + '_CVE-0002-0760", "domains": [{"domain_name": "Network", "domain_color": "#009933"}]}',
                         "is_atomic_testing": True,
                         "contract_platforms": [],
-                        "contract_domains": [{'domain_name': 'Network', 'domain_color': '#009933'}]
+                        "contract_domains": [
+                            {"domain_name": "Network", "domain_color": "#009933"}
+                        ],
                     }
                 ),
                 call(
@@ -449,7 +467,9 @@ class ExternalContractsTest(unittest.TestCase):
                         + '_CVE-0003-0537", "domains": [{"domain_name": "Network", "domain_color": "#009933"}]}',
                         "is_atomic_testing": True,
                         "contract_platforms": [],
-                        "contract_domains": [{'domain_name': 'Network', 'domain_color': '#009933'}]
+                        "contract_domains": [
+                            {"domain_name": "Network", "domain_color": "#009933"}
+                        ],
                     }
                 ),
             ]
