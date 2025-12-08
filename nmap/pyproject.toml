@@ -1,12 +1,12 @@
 [tool.poetry]
-name = "openaev-nuclei-injector"
+name = "openaev-nmap-injector"
 version = "2.0.5"
-description = "An injector for running vulnerability scans with Nuclei"
+description = "An injector for running port scans with nmap"
 authors = ["Filigran <contact@filigran.io>"]
 license = "Apache-2.0"
 readme = "README.md"
 packages = [
-    { include = "nuclei" }
+    { include = "nmap" }
 ]
 
 
@@ -28,4 +28,4 @@ build-backend = "poetry.core.masonry.api"
 
 [tool.isort]
 profile = "black"
-known_local_folder = ["nuclei"]
+known_local_folder = ["nmap"]

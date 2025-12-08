@@ -1,6 +1,6 @@
 from unittest import TestCase
 
-from src.helpers.helpers import HTTPHelpers
+from http_query.helpers.helpers import HTTPHelpers
 
 
 class HTTPHelpersTest(TestCase):

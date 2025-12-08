@@ -1,12 +1,12 @@
 [tool.poetry]
-name = "openaev-nuclei-injector"
+name = "openaev-aws-injector"
 version = "2.0.5"
-description = "An injector for running vulnerability scans with Nuclei"
+description = "An injector for impacting AWS"
 authors = ["Filigran <contact@filigran.io>"]
 license = "Apache-2.0"
 readme = "README.md"
 packages = [
-    { include = "nuclei" }
+    { include = "aws" }
 ]
 
 
@@ -16,7 +16,9 @@ pyoaev = [
     { markers = "extra == 'prod' and extra != 'dev'", version = "2.0.5", source = "pypi"  },
     { markers = "extra == 'dev' and extra != 'prod'", path = "../../client-python", develop = true },
 ]
-injector_common = { path = "../injector_common", develop = true }
+pacu = "^1.5.0"
+awscli = "^1.29.0"
+
 
 [tool.poetry.extras]
 prod = ["pyoaev"]
@@ -28,4 +30,4 @@ build-backend = "poetry.core.masonry.api"
 
 [tool.isort]
 profile = "black"
-known_local_folder = ["nuclei"]
+known_local_folder = ["aws"]

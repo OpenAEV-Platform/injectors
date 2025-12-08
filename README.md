@@ -10,6 +10,59 @@ The following repository is used to store the OpenAEV injectors for the platform
 
 This repository is used to host injectors that are supported by the core development team of OpenAEV. Nevertheless, the community is also developing a lot of injectors, third-parties modules directly linked to OpenAEV. You can find the list of all available injectors and plugins in the [OpenAEV ecosystem dedicated space](https://filigran.notion.site/OpenAEV-Ecosystem-30d8eb73d7d04611843e758ddef8941b).
 
+### Creating a new injector
+
+#### Project setup
+Assuming a new collector by the name of `new_injector`, create a skeleton directory with:
+```shell
+poetry new new_injector
+```
+
+#### `pyoaev` dependency
+We wish to retain the possibility to develop simultaneously on `pyoaev` and collectors. We rely on PEP 508 environment
+markers to alternatively install a local path `pyoaev` dependency or a released version from PyPI; specifically the `extra`
+marker.
+
+Navigate to the new directory and edit `pyproject.toml`.
+```shell
+vim new_injector/pyproject.toml
+```
+(or open the file in your favourite editor).
+
+Here's the expression for the pyoaev dependency, including the `extra` definition:
+```toml
+[tool.poetry.dependencies]
+pyoaev = [
+    { markers = "extra == 'prod' and extra != 'dev'", version = "<latest pyoaev release on PyPI>", source = "pypi"  },
+    { markers = "extra == 'dev' and extra != 'prod'", path = "../../client-python", develop = true },
+]
+
+[tool.poetry.extras]
+prod = ["pyoaev"]
+dev = ["pyoaev"]
+```
+
+### Simultaneous development on pyoaev and an injector
+The injectors repository is set to assume that in the event of a simultaneous development work on both `pyoaev`
+and injectors, the `pyoaev` repository is cloned in a directory at the same level as the injectors root directory,
+and is named strictly `client-python`.
+
+Here's an example layout:
+```
+.
+├── client-python       <= mandatory dir name
+│   ├── docs
+│   ├── pyoaev
+│   ├── scripts
+│   └── test
+└── injectors          <= this repo root dir
+    ├── aws
+    ├── http-query
+    ├── nmap
+    └── nuclei
+```
+
+
 ## Contributing
 
 If you want to help use improve or develop new injector, please check out the **[development documentation for new injectors](https://docs.openaev.io/latest/development/injectors)**. If you want to make your injectors available to the community, **please create a Pull Request on this repository**, then we will integrate it to the CI and in the [OpenAEV ecosystem](https://filigran.notion.site/OpenAEV-Ecosystem-30d8eb73d7d04611843e758ddef8941b).
