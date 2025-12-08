@@ -11,6 +11,7 @@ from http_query.contracts_http import (
     HTTP_RAW_PUT_CONTRACT,
     HttpContracts,
 )
+from helpers.helpers import HTTPHelpers
 from pyoaev.helpers import OpenAEVConfigHelper, OpenAEVInjectorHelper
 
 
@@ -43,24 +44,6 @@ class OpenAEVHttp:
             self.config, open("http_query/img/icon-http.png", "rb")
         )
 
-    @staticmethod
-    def _request_data_parts_body(request_data):
-        parts = request_data["injection"]["inject_content"]["parts"]
-        keys = list(map(lambda p: p["key"], parts))
-        values = list(map(lambda p: p["value"], parts))
-        return dict(zip(keys, values))
-
-    @staticmethod
-    def _response_parsing(response):
-        success = 200 <= response.status_code < 300
-        success_status = "SUCCESS" if success else "ERROR"
-        return {
-            "url": response.url,
-            "code": response.status_code,
-            "status": success_status,
-            "message": response.text,
-        }
-
     def attachments_to_files(self, request_data):
         documents = request_data["injection"].get("inject_documents", [])
         attachments = list(filter(lambda d: d["document_attached"] is True, documents))
@@ -73,7 +56,9 @@ class OpenAEVHttp:
 
     def http_execution(self, data: Dict):
         # Build headers
-        inject_headers = data["injection"]["inject_content"].get("headers", [])
+        inject_headers = HTTPHelpers.parse_headers(
+            data["injection"]["inject_content"].get("headers", [])
+        )
         headers = {}
         for header_definition in inject_headers:
             headers[header_definition["key"]] = header_definition["value"]
@@ -93,35 +78,35 @@ class OpenAEVHttp:
         # Get
         if inject_contract == HTTP_GET_CONTRACT:
             response = session.get(url=url, headers=headers)
-            return self._response_parsing(response)
+            return HTTPHelpers.response_parsing(response)
         # Post
         if inject_contract == HTTP_RAW_POST_CONTRACT:
             body = data["injection"]["inject_content"]["body"]
             response = session.post(
                 url=url, headers=headers, data=body, files=http_files
             )
-            return self._response_parsing(response)
+            return HTTPHelpers.response_parsing(response)
         # Put
         if inject_contract == HTTP_RAW_PUT_CONTRACT:
             body = data["injection"]["inject_content"]["body"]
             response = session.put(
                 url=url, headers=headers, data=body, files=http_files
             )
-            return self._response_parsing(response)
+            return HTTPHelpers.response_parsing(response)
         # Form Post
         if inject_contract == HTTP_FORM_POST_CONTRACT:
-            body = self._request_data_parts_body(data)
+            body = HTTPHelpers.request_data_parts_body(data)
             response = session.post(
                 url=url, headers=headers, data=body, files=http_files
             )
-            return self._response_parsing(response)
+            return HTTPHelpers.response_parsing(response)
         # Form Put
         if inject_contract == HTTP_FORM_PUT_CONTRACT:
-            body = self._request_data_parts_body(data)
+            body = HTTPHelpers.request_data_parts_body(data)
             response = session.put(
                 url=url, headers=headers, data=body, files=http_files
             )
-            return self._response_parsing(response)
+            return HTTPHelpers.response_parsing(response)
         # Nothing supported
         return {
             "code": 400,
