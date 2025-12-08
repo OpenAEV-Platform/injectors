@@ -3,7 +3,8 @@ import time
 from typing import Dict
 
 import requests
-from http_query.helpers.helpers import HTTPHelpers
+from pyoaev.helpers import OpenAEVConfigHelper, OpenAEVInjectorHelper
+
 from http_query.contracts_http import (
     HTTP_FORM_POST_CONTRACT,
     HTTP_FORM_PUT_CONTRACT,
@@ -12,7 +13,7 @@ from http_query.contracts_http import (
     HTTP_RAW_PUT_CONTRACT,
     HttpContracts,
 )
-from pyoaev.helpers import OpenAEVConfigHelper, OpenAEVInjectorHelper
+from http_query.helpers.helpers import HTTPHelpers
 
 
 class OpenAEVHttp:
