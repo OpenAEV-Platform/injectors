@@ -38,7 +38,7 @@ jobs:
       - slack/notify:
           event: fail
           template: basic_fail_1
-  test:
+  test-nuclei:
     working_directory: ~/openaev
     docker:
       - image: cimg/python:3.13
@@ -61,6 +61,54 @@ jobs:
       - run:
           working_directory: ~/openaev/nuclei
           name: Tests for nuclei injector
+          command: python -m unittest
+  test-nmap:
+    working_directory: ~/openaev
+    docker:
+      - image: cimg/python:3.13
+    steps:
+      - checkout
+      - setup_remote_docker
+      - run:
+          working_directory: ~/openaev/nmap
+          name: Install dependencies for nmap injector
+          command: pip install -r requirements.txt
+      - run:
+          working_directory: ~/openaev/nmap
+          name: Overwrite pyoaev with correct version from CI
+          command: |
+            if [ "${CIRCLE_BRANCH}" = "main" ]; then
+              pip install --force-reinstall git+https://github.com/OpenAEV-Platform/client-python.git@main
+            else
+              pip install --force-reinstall git+https://github.com/OpenAEV-Platform/client-python.git@release/current
+            fi
+      - run:
+          working_directory: ~/openaev/nmap
+          name: Tests for nmap injector
+          command: python -m unittest
+  test-http-query:
+    working_directory: ~/openaev
+    docker:
+      - image: cimg/python:3.13
+    steps:
+      - checkout
+      - setup_remote_docker
+      - run:
+          working_directory: ~/openaev/http-query
+          name: Install dependencies for http-query injector
+          command: pip install -r src/requirements.txt
+      - run:
+          working_directory: ~/openaev/http-query
+          name: Overwrite pyoaev with correct version from CI
+          command: |
+            if [ "${CIRCLE_BRANCH}" = "main" ]; then
+              pip install --force-reinstall git+https://github.com/OpenAEV-Platform/client-python.git@main
+            else
+              pip install --force-reinstall git+https://github.com/OpenAEV-Platform/client-python.git@release/current
+            fi
+      - run:
+          working_directory: ~/openaev/http-query
+          name: Tests for http-query injector
           command: python -m unittest
   build_1:
     working_directory: ~/openaev
@@ -245,7 +293,9 @@ workflows:
     jobs:
       - ensure_formatting
       - linter
-      - test
+      - test-nmap
+      - test-nuclei
+      - test-http-query
       - build_1:
           filters:
             tags:
@@ -256,7 +306,9 @@ workflows:
           requires:
             - ensure_formatting
             - linter
-            - test
+            - test-nmap
+            - test-nuclei
+            - test-http-query
           filters:
             branches:
               only:
@@ -265,7 +317,9 @@ workflows:
           requires:
             - ensure_formatting
             - linter
-            - test
+            - test-nmap
+            - test-nuclei
+            - test-http-query
           filters:
             branches:
               only:
