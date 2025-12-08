@@ -38,7 +38,7 @@ jobs:
       - slack/notify:
           event: fail
           template: basic_fail_1
-  test-nuclei:
+  test:
     working_directory: ~/openaev
     docker:
       - image: cimg/python:3.13
@@ -55,75 +55,43 @@ jobs:
               git clone -b release/current https://github.com/OpenAEV-Platform/client-python
             fi
       - run:
-          working_directory: ~/openaev/nuclei
+          working_directory: ~/openaev
           name: Install poetry
           command: pip install poetry==2.1.3 && poetry config installer.re-resolve false
       - run:
           working_directory: ~/openaev/nuclei
-          name: Install dependencies for nuclei injector
+          name: Run tests for Nuclei injector
           command: |
             poetry install --extras prod
-      - run:
-          working_directory: ~/openaev/nuclei
-          name: Overwrite pyoaev with correct version from CI
-          command: |
             if [ "${CIRCLE_BRANCH}" = "main" ]; then
               poetry run pip install --force-reinstall git+https://github.com/OpenAEV-Platform/client-python.git@main
             else
               poetry run pip install --force-reinstall git+https://github.com/OpenAEV-Platform/client-python.git@release/current
             fi
-      - run:
-          working_directory: ~/openaev/nuclei
-          name: Tests for nuclei injector
-          command: poetry run python -m unittest
-  test-nmap:
-    working_directory: ~/openaev
-    docker:
-      - image: cimg/python:3.13
-    steps:
-      - checkout
-      - setup_remote_docker
+            poetry run python -m unittest
       - run:
           working_directory: ~/openaev/nmap
-          name: Install dependencies for nmap injector
-          command: pip install -r requirements.txt
-      - run:
-          working_directory: ~/openaev/nmap
-          name: Overwrite pyoaev with correct version from CI
+          name: Run tests for nmap injector
           command: |
+            poetry install --extras prod
             if [ "${CIRCLE_BRANCH}" = "main" ]; then
-              pip install --force-reinstall git+https://github.com/OpenAEV-Platform/client-python.git@main
+              poetry run pip install --force-reinstall git+https://github.com/OpenAEV-Platform/client-python.git@main
             else
-              pip install --force-reinstall git+https://github.com/OpenAEV-Platform/client-python.git@release/current
+              poetry run pip install --force-reinstall git+https://github.com/OpenAEV-Platform/client-python.git@release/current
             fi
-      - run:
-          working_directory: ~/openaev/nmap
-          name: Tests for nmap injector
-          command: python -m unittest
-  test-http-query:
-    working_directory: ~/openaev
-    docker:
-      - image: cimg/python:3.13
-    steps:
-      - checkout
-      - setup_remote_docker
+            poetry run python -m unittest
+
       - run:
           working_directory: ~/openaev/http-query
-          name: Install dependencies for http-query injector
-          command: pip install -r src/requirements.txt
-      - run:
-          working_directory: ~/openaev/http-query
-          name: Overwrite pyoaev with correct version from CI
+          name: Run tests for HTTP Query injector
           command: |
+            poetry install --extras prod
             if [ "${CIRCLE_BRANCH}" = "main" ]; then
-              pip install --force-reinstall git+https://github.com/OpenAEV-Platform/client-python.git@main
+              poetry run pip install --force-reinstall git+https://github.com/OpenAEV-Platform/client-python.git@main
             else
-              pip install --force-reinstall git+https://github.com/OpenAEV-Platform/client-python.git@release/current
+              poetry run pip install --force-reinstall git+https://github.com/OpenAEV-Platform/client-python.git@release/current
             fi
-      - run:
-          working_directory: ~/openaev/http-query
-          name: Tests for http-query injector
-          command: python -m unittest
+            poetry run python -m unittest
   build_docker_images:
     working_directory: ~/openaev
     docker:
@@ -309,23 +277,12 @@ workflows:
     jobs:
       - ensure_formatting
       - linter
-      - test-nmap
-      - test-nuclei
-      - test-http-query
-      - build_1:
-          filters:
-            tags:
-              only: /[0-9]+(\.[0-9]+)+(\.[0-9]+)*/
+      - test
       - build_docker_images:
           requires:
             - ensure_formatting
             - linter
-            - test-nmap
-            - test-nuclei
-            - test-http-query
-          filters:
-            tags:
-              only: /[0-9]+(\.[0-9]+)+(\.[0-9]+)*/
+            - test
       - publish_images:
           requires:
             - build_docker_images
