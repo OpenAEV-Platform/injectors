@@ -1,7 +1,7 @@
 version: '3'
 services:
   injector-http-query:
-    image: openaev/injector-http-query:1.18.20
+    image: openaev/injector-http-query:2.0.4
     environment:
       - OPENAEV_URL=http://localhost
       - OPENAEV_TOKEN=ChangeMe
