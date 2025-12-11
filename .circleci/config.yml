@@ -113,7 +113,7 @@ jobs:
   build_1:
     working_directory: ~/openaev
     docker:
-      - image: cimg/base:stable-20.04
+      - image: cimg/base:current-24.04
     steps:
       - checkout
       - run:
@@ -124,7 +124,6 @@ jobs:
             export IS_LATEST=$([ "$CIRCLE_TAG" = "$LATEST_SEMANTIC_VERSION" ] && echo "true" || echo "false")
             echo "IS_LATEST=$IS_LATEST" >> $BASH_ENV         
       - setup_remote_docker
-      - run: sudo apt-get update -qq && sudo apt install curl gettext-base   
       - run:
           working_directory: ~/openaev/http-query
           name: Build Docker image openbas/injector-http-query
