@@ -1,2 +1,2 @@
-pyoaev==2.0.5
+pyoaev==2.0.6
 ../injector_common
