@@ -123,6 +123,9 @@ jobs:
             export LATEST_SEMANTIC_VERSION=$(git tag --sort=-v:refname | grep -E '^v?[0-9]+\.[0-9]+\.[0-9]+$' | head -n 1)
             export IS_LATEST=$([ "$CIRCLE_TAG" = "$LATEST_SEMANTIC_VERSION" ] && echo "true" || echo "false")
             echo "IS_LATEST=$IS_LATEST" >> $BASH_ENV         
+            echo $CIRCLE_TAG
+            echo $LATEST_SEMANTIC_VERSION
+            echo $IS_LATEST
       - setup_remote_docker
       - run:
           working_directory: ~/openaev/http-query
