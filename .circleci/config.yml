@@ -122,10 +122,7 @@ jobs:
           command: |
             export LATEST_SEMANTIC_VERSION=$(git tag --sort=-v:refname | grep -E '^v?[0-9]+\.[0-9]+\.[0-9]+$' | head -n 1)
             export IS_LATEST=$([ "$CIRCLE_TAG" = "$LATEST_SEMANTIC_VERSION" ] && echo "true" || echo "false")
-            echo "IS_LATEST=$IS_LATEST" >> $BASH_ENV         
-            echo $CIRCLE_TAG
-            echo $LATEST_SEMANTIC_VERSION
-            echo $IS_LATEST
+            echo "IS_LATEST=$IS_LATEST" >> $BASH_ENV
       - setup_remote_docker
       - run:
           working_directory: ~/openaev/http-query
@@ -159,16 +156,16 @@ jobs:
           name: Publish Docker Image to Docker Hub
           command: |
             echo "$DOCKERHUB_PASS" | docker login -u "$DOCKERHUB_USERNAME" --password-stdin
-            $IS_LATEST && docker push openbas/injector-http-query:latest
+            $IS_LATEST && docker push openaev/injector-http-query:latest
             docker push openbas/injector-http-query:${CIRCLE_TAG}
             docker push openaev/injector-http-query:${CIRCLE_TAG}
-            $IS_LATEST && docker push openbas/injector-nmap:latest
+            $IS_LATEST && docker push openaev/injector-nmap:latest
             docker push openbas/injector-nmap:${CIRCLE_TAG}
             docker push openaev/injector-nmap:${CIRCLE_TAG}
-            $IS_LATEST && docker push openbas/injector-nuclei:latest
+            $IS_LATEST && docker push openaev/injector-nuclei:latest
             docker push openbas/injector-nuclei:${CIRCLE_TAG}
             docker push openaev/injector-nuclei:${CIRCLE_TAG}
-            $IS_LATEST && docker push openbas/injector-aws:latest
+            $IS_LATEST && docker push openaev/injector-aws:latest
             docker push openbas/injector-aws:${CIRCLE_TAG}
             docker push openaev/injector-aws:${CIRCLE_TAG}
       - slack/notify:
