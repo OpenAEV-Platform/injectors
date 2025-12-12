@@ -126,31 +126,31 @@ jobs:
       - setup_remote_docker
       - run:
           working_directory: ~/openaev/http-query
-          name: Build Docker image openbas/injector-http-query
+          name: Build Docker image openaev/injector-http-query
           command: |
             TAGS="-t openbas/injector-http-query:${CIRCLE_TAG} -t openaev/injector-http-query:${CIRCLE_TAG}"
-            $IS_LATEST && TAGS="$TAGS -t openbas/injector-http-query:latest"
+            $IS_LATEST && TAGS="$TAGS -t openaev/injector-http-query:latest"
             docker build --progress=plain $TAGS .
       - run:
           working_directory: ~/openaev/nmap
-          name: Build Docker image openbas/injector-nmap
+          name: Build Docker image openaev/injector-nmap
           command: |
             TAGS="-t openbas/injector-nmap:${CIRCLE_TAG} -t openaev/injector-nmap:${CIRCLE_TAG}"
-            $IS_LATEST && TAGS="$TAGS -t openbas/injector-nmap:latest"
+            $IS_LATEST && TAGS="$TAGS -t openaev/injector-nmap:latest"
             docker build --progress=plain --build-context injector_common=../injector_common $TAGS .
       - run:
           working_directory: ~/openaev/nuclei
-          name: Build Docker image openbas/injector-nuclei
+          name: Build Docker image openaev/injector-nuclei
           command: |
             TAGS="-t openbas/injector-nuclei:${CIRCLE_TAG} -t openaev/injector-nuclei:${CIRCLE_TAG}"
-            $IS_LATEST && TAGS="$TAGS -t openbas/injector-nuclei:latest"
+            $IS_LATEST && TAGS="$TAGS -t openaev/injector-nuclei:latest"
             docker build --progress=plain --build-context injector_common=../injector_common $TAGS .
       - run:
           working_directory: ~/openaev/aws
-          name: Build Docker image openbas/injector-aws
+          name: Build Docker image openaev/injector-aws
           command: |
             TAGS="-t openbas/injector-aws:${CIRCLE_TAG} -t openaev/injector-aws:${CIRCLE_TAG}"
-            $IS_LATEST && TAGS="$TAGS -t openbas/injector-aws:latest"
+            $IS_LATEST && TAGS="$TAGS -t openaev/injector-aws:latest"
             docker build --progress=plain $TAGS .
       - run:
           name: Publish Docker Image to Docker Hub
