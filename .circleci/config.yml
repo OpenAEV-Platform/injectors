@@ -98,6 +98,13 @@ jobs:
       - image: cimg/base:current-24.04
     steps:
       - checkout
+      - run:
+          working_directory: ~/openaev
+          name: Set semantic version environment
+          command: |
+            export LATEST_SEMANTIC_VERSION=$(git tag --sort=-v:refname | grep -E '^v?[0-9]+\.[0-9]+\.[0-9]+$' | head -n 1)
+            export IS_LATEST=$([ "$CIRCLE_TAG" = "$LATEST_SEMANTIC_VERSION" ] && echo "true" || echo "false")
+            echo "IS_LATEST=$IS_LATEST" >> $BASH_ENV
       - setup_remote_docker
       - run:
           name: Install environment

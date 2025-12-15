@@ -513,15 +513,15 @@ typing-extensions = ">=4.6.0,<4.7.0 || >4.7.0"
 
 [[package]]
 name = "pyoaev"
-version = "2.0.6"
+version = "2.0.7"
 description = "Python API client for OpenAEV."
 optional = true
 python-versions = ">=3.11"
 groups = ["main"]
 markers = "extra == \"prod\" and extra != \"dev\""
 files = [
-    {file = "pyoaev-2.0.6-py3-none-any.whl", hash = "sha256:b8e939b47079a6814896d45203188f3a19b0b9a4578987e8962c67e67eca6a6c"},
-    {file = "pyoaev-2.0.6.tar.gz", hash = "sha256:25b811eabde4b3ad27dbc367e0b1c1baf4f0c08f80e5dddc3e9f8a7bbc84a11a"},
+    {file = "pyoaev-2.0.7-py3-none-any.whl", hash = "sha256:239f9e88416a0b257c5bcde9f8080d38b104e259c2ed80f0356ae2423b3138bc"},
+    {file = "pyoaev-2.0.7.tar.gz", hash = "sha256:c2798571911f2c1f249f55d0ab665ce500d03c490c21c7abd590474c07636007"},
 ]
 
 [package.dependencies]
@@ -548,7 +548,7 @@ doc = ["autoapi (>=2.0.1,<2.1.0)", "sphinx-autodoc-typehints (>=3.2.0,<3.3.0)", 
 
 [[package]]
 name = "pyoaev"
-version = "2.0.6"
+version = "2.0.7"
 description = "Python API client for OpenAEV."
 optional = true
 python-versions = ">=3.11"
@@ -1154,4 +1154,4 @@ prod = ["pyoaev", "pyoaev"]
 [metadata]
 lock-version = "2.1"
 python-versions = "^3.11"
-content-hash = "51a4805cdf906d273592979172dba3aecb294cc24f8953ccc9945e1172591301"
+content-hash = "3c74db6af9fc6264d0a4123d192cf0e215d3c5089353be14944d4a203d2a6cff"

@@ -4,7 +4,7 @@
 [![CircleCI](https://circleci.com/gh/OpenAEV-Platform/injectors.svg?style=shield)](https://circleci.com/gh/OpenAEV-Platform/injectors/tree/main)
 [![Slack Status](https://img.shields.io/badge/slack-3K%2B%20members-4A154B)](https://community.filigran.io)
 
-The following repository is used to store the OpenAEV injectors for the platform integration with other tools and applications. To know how to enable injectors on OpenAEV, please read the [dedicated documentation](https://docs.openaev.io/latest/deployment/injectors).
+The following repository is used to store the OpenAEV injectors for the platform integration with other tools and applications. To know how to enable injectors on OpenAEV, please read the [dedicated documentation](https://docs.openaev.io/latest/deployment/ecosystem/injectors).
 
 ## Injectors list and statuses
 
