@@ -13,6 +13,7 @@ from pyoaev.apis.inputs.search import (
 )
 from pyoaev.client import OpenAEV
 from pyoaev.contracts.contract_config import ContractText
+from pyoaev.security_domain.types import SecurityDomains
 from pyoaev.utils import setup_logging_config
 
 from nuclei.helpers.nuclei_process import NucleiProcess
@@ -149,6 +150,7 @@ class ExternalContractsManager:
             outputs,
             template["ID"],
             template["ID"],
+            [SecurityDomains.NETWORK.value],
         )
         contract.add_vulnerability(template["ID"])
         return contract

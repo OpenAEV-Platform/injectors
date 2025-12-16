@@ -144,6 +144,7 @@ class NucleiContracts:
         contract_outputs,
         label_en,
         label_fr,
+        domains,
     ):
         return Contract(
             contract_id=contract_id,
@@ -156,6 +157,7 @@ class NucleiContracts:
             fields=ContractBuilder().add_fields(contract_fields).build_fields(),
             outputs=ContractBuilder().add_outputs(contract_outputs).build_outputs(),
             manual=False,
+            domains=domains,
         )
 
     @staticmethod
@@ -177,7 +179,8 @@ class NucleiContracts:
                     NucleiContracts.core_outputs(),
                     f"Nuclei - {en}",
                     f"Nuclei - {fr}",
+                    domains,
                 )
-                for cid, (en, fr) in CONTRACT_LABELS.items()
+                for cid, (en, fr, domains) in CONTRACT_LABELS.items()
             ]
         )
