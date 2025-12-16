@@ -1,0 +1,14 @@
+version: '3.8'
+services:
+  injector-shodan:
+    image: openaev/injector-shodan:2.0.5
+    environment:
+      - OPENAEV_URL=http://localhost
+      - OPENAEV_TOKEN=ChangeMe
+      - INJECTOR_ID=ChangeMe
+      - INJECTOR_NAME=Shodan
+      - INJECTOR_LOG_LEVEL=error
+    restart: always
+    depends_on:
+      openaev:
+        condition: service_healthy
