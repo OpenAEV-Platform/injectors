@@ -1,0 +1,11 @@
+openaev:
+  url: 'http://localhost:3001'
+  token: 'ChangeMe'
+
+injector:
+  id: 'ChangeMe'
+  name: 'Shodan'
+  log_level: 'WARN'
+
+shodan:
+  api_key: 'ChangeMe'
