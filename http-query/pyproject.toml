@@ -16,6 +16,7 @@ pyoaev = [
     { markers = "extra == 'prod' and extra != 'dev'", version = "2.0.9", source = "pypi"  },
     { markers = "extra == 'dev' and extra != 'prod'", path = "../../client-python", develop = true },
 ]
+injector_common = { path = "../injector_common", develop = true }
 
 [tool.poetry.extras]
 prod = ["pyoaev"]

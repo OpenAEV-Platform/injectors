@@ -12,49 +12,13 @@ from nuclei.helpers.nuclei_command_builder import NucleiCommandBuilder
 from nuclei.helpers.nuclei_output_parser import NucleiOutputParser
 from nuclei.helpers.nuclei_process import NucleiProcess
 from nuclei.nuclei_contracts.external_contracts import ExternalContractsScheduler
-from nuclei.nuclei_contracts.nuclei_contracts import NucleiContracts
-
+from nuclei.configuration.config_loader import ConfigLoader
+from injector_common.dump_config import intercept_dump_argument
 
 class OpenAEVNuclei:
     def __init__(self):
-        print(os.getenv("PATH"))
-        self.config = OpenAEVConfigHelper(
-            __file__,
-            {
-                "openaev_url": {"env": "OPENAEV_URL", "file_path": ["openaev", "url"]},
-                "openaev_token": {
-                    "env": "OPENAEV_TOKEN",
-                    "file_path": ["openaev", "token"],
-                },
-                "injector_id": {"env": "INJECTOR_ID", "file_path": ["injector", "id"]},
-                "injector_name": {
-                    "env": "INJECTOR_NAME",
-                    "file_path": ["injector", "name"],
-                },
-                "injector_type": {
-                    "env": "INJECTOR_TYPE",
-                    "file_path": ["injector", "type"],
-                    "default": "openaev_nuclei",
-                },
-                "injector_contracts": {
-                    "data": NucleiContracts.build_static_contracts()
-                },
-                "injector_external_contracts_maintenance_schedule_seconds": {
-                    "env": "INJECTOR_EXTERNAL_CONTRACTS_MAINTENANCE_SCHEDULE_SECONDS",
-                    "file_path": [
-                        "injector",
-                        "external_contracts_maintenance_schedule_seconds",
-                    ],
-                    "default": 86400,
-                    "is_number": True,
-                },
-                "injector_log_level": {
-                    "env": "INJECTOR_LOG_LEVEL",
-                    "file_path": ["injector", "log_level"],
-                    "default": "warn",
-                },
-            },
-        )
+        self.config = OpenAEVConfigHelper.from_configuration_object(ConfigLoader().to_daemon_config())
+        intercept_dump_argument(self.config.get_config_obj())
         self.helper = OpenAEVInjectorHelper(
             self.config, open("nuclei/img/nuclei.jpg", "rb")
         )

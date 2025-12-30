@@ -13,36 +13,16 @@ from http_query.contracts_http import (
 )
 from http_query.helpers.helpers import HTTPHelpers
 from pyoaev.helpers import OpenAEVConfigHelper, OpenAEVInjectorHelper
-
+from http_query.configuration.config_loader import ConfigLoader
+from injector_common.dump_config import intercept_dump_argument
 
 class OpenAEVHttp:
     def __init__(self):
-        self.config = OpenAEVConfigHelper(
-            __file__,
-            {
-                # API information
-                "openaev_url": {"env": "OPENAEV_URL", "file_path": ["openaev", "url"]},
-                "openaev_token": {
-                    "env": "OPENAEV_TOKEN",
-                    "file_path": ["openaev", "token"],
-                },
-                # Config information
-                "injector_id": {"env": "INJECTOR_ID", "file_path": ["injector", "id"]},
-                "injector_name": {
-                    "env": "INJECTOR_NAME",
-                    "file_path": ["injector", "name"],
-                },
-                "injector_type": {
-                    "env": "INJECTOR_TYPE",
-                    "file_path": ["injector", "type"],
-                    "default": "openaev_http_query",
-                },
-                "injector_contracts": {"data": HttpContracts.build_contract()},
-            },
-        )
+        self.config = OpenAEVConfigHelper.from_configuration_object(ConfigLoader().to_daemon_config())
+        intercept_dump_argument(self.config.get_config_obj())
         self.helper = OpenAEVInjectorHelper(
-            self.config, open("http_query/img/icon-http.png", "rb")
-        )
+                self.config, open("http_query/img/icon-http.png", "rb")
+            )
 
     def attachments_to_files(self, request_data):
         documents = request_data["injection"].get("inject_documents", [])
