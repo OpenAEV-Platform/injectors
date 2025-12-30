@@ -1,9 +1,9 @@
-from aws.configuration.injector_config_override import \
-    InjectorConfigOverride
 from pydantic import Field
-from pyoaev.configuration import (ConfigLoaderOAEV, Configuration,
-                                  SettingsLoader)
+from pyoaev.configuration import ConfigLoaderOAEV, Configuration, SettingsLoader
+
+from aws.configuration.injector_config_override import InjectorConfigOverride
 from aws.contracts_aws import AWSContracts
+
 
 class ConfigLoader(SettingsLoader):
     openaev: ConfigLoaderOAEV = Field(default_factory=ConfigLoaderOAEV)

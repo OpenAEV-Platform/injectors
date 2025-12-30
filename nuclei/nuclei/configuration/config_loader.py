@@ -1,8 +1,7 @@
-from nuclei.configuration.injector_config_override import \
-    InjectorConfigOverride
 from pydantic import Field
-from pyoaev.configuration import (ConfigLoaderOAEV, Configuration,
-                                  SettingsLoader)
+from pyoaev.configuration import ConfigLoaderOAEV, Configuration, SettingsLoader
+
+from nuclei.configuration.injector_config_override import InjectorConfigOverride
 from nuclei.nuclei_contracts.nuclei_contracts import NucleiContracts
 
 
@@ -20,8 +19,12 @@ class ConfigLoader(SettingsLoader):
                 "injector_id": {"data": self.injector.id},
                 "injector_name": {"data": self.injector.name},
                 "injector_type": {"data": self.injector.type},
-                "injector_contracts": {"data": NucleiContracts.build_static_contracts()},
-                "injector_external_contracts_maintenance_schedule_seconds": {"data": self.injector.external_contracts_maintenance_schedule_seconds},
+                "injector_contracts": {
+                    "data": NucleiContracts.build_static_contracts()
+                },
+                "injector_external_contracts_maintenance_schedule_seconds": {
+                    "data": self.injector.external_contracts_maintenance_schedule_seconds
+                },
                 "injector_log_level": {"data": self.injector.log_level},
                 "injector_icon_filepath": {"data": self.injector.icon_filepath},
             },

@@ -4,6 +4,7 @@ from typing import Dict
 
 from pyoaev.helpers import OpenAEVConfigHelper, OpenAEVInjectorHelper
 
+from aws.configuration.config_loader import ConfigLoader
 from aws.contracts_aws import (
     CLOUDTRAIL_ENUM_CONTRACT,
     COGNITO_ENUM_CONTRACT,
@@ -35,12 +36,14 @@ from aws.contracts_aws import (
     AWSContracts,
 )
 from aws.helpers.pacu_executor import PacuExecutor
-from aws.configuration.config_loader import ConfigLoader
 from injector_common.dump_config import intercept_dump_argument
+
 
 class OpenAEVAWS:
     def __init__(self):
-        self.config = OpenAEVConfigHelper.from_configuration_object(ConfigLoader().to_daemon_config())
+        self.config = OpenAEVConfigHelper.from_configuration_object(
+            ConfigLoader().to_daemon_config()
+        )
         intercept_dump_argument(self.config.get_config_obj())
         self.helper = OpenAEVInjectorHelper(
             self.config, open("aws/img/icon-aws.png", "rb")

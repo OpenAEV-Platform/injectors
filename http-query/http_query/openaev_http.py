@@ -3,6 +3,7 @@ import time
 from typing import Dict
 
 import requests
+from http_query.configuration.config_loader import ConfigLoader
 from http_query.contracts_http import (
     HTTP_FORM_POST_CONTRACT,
     HTTP_FORM_PUT_CONTRACT,
@@ -13,16 +14,19 @@ from http_query.contracts_http import (
 )
 from http_query.helpers.helpers import HTTPHelpers
 from pyoaev.helpers import OpenAEVConfigHelper, OpenAEVInjectorHelper
-from http_query.configuration.config_loader import ConfigLoader
+
 from injector_common.dump_config import intercept_dump_argument
+
 
 class OpenAEVHttp:
     def __init__(self):
-        self.config = OpenAEVConfigHelper.from_configuration_object(ConfigLoader().to_daemon_config())
+        self.config = OpenAEVConfigHelper.from_configuration_object(
+            ConfigLoader().to_daemon_config()
+        )
         intercept_dump_argument(self.config.get_config_obj())
         self.helper = OpenAEVInjectorHelper(
-                self.config, open("http_query/img/icon-http.png", "rb")
-            )
+            self.config, open("http_query/img/icon-http.png", "rb")
+        )
 
     def attachments_to_files(self, request_data):
         documents = request_data["injection"].get("inject_documents", [])

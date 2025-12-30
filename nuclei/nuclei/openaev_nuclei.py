@@ -7,17 +7,20 @@ from typing import Dict
 from pyoaev.helpers import OpenAEVConfigHelper, OpenAEVInjectorHelper
 
 from injector_common.constants import TARGET_PROPERTY_SELECTOR_KEY, TARGET_SELECTOR_KEY
+from injector_common.dump_config import intercept_dump_argument
 from injector_common.targets import TargetProperty, Targets
+from nuclei.configuration.config_loader import ConfigLoader
 from nuclei.helpers.nuclei_command_builder import NucleiCommandBuilder
 from nuclei.helpers.nuclei_output_parser import NucleiOutputParser
 from nuclei.helpers.nuclei_process import NucleiProcess
 from nuclei.nuclei_contracts.external_contracts import ExternalContractsScheduler
-from nuclei.configuration.config_loader import ConfigLoader
-from injector_common.dump_config import intercept_dump_argument
+
 
 class OpenAEVNuclei:
     def __init__(self):
-        self.config = OpenAEVConfigHelper.from_configuration_object(ConfigLoader().to_daemon_config())
+        self.config = OpenAEVConfigHelper.from_configuration_object(
+            ConfigLoader().to_daemon_config()
+        )
         intercept_dump_argument(self.config.get_config_obj())
         self.helper = OpenAEVInjectorHelper(
             self.config, open("nuclei/img/nuclei.jpg", "rb")

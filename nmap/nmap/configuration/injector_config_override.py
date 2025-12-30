@@ -1,7 +1,9 @@
+from typing import List
+
 from pydantic import Field, SecretStr
 from pyoaev.configuration import ConfigLoaderCollector
 from pyoaev.contracts.contract_config import Contract
-from typing import List
+
 
 # To be change ConfigLoaderCollector
 class InjectorConfigOverride(ConfigLoaderCollector):
@@ -18,10 +20,9 @@ class InjectorConfigOverride(ConfigLoaderCollector):
     )
     type: str = Field(
         description="Type of the injector.",
-        default= "openaev_nmap",
+        default="openaev_nmap",
     )
     log_level: str = Field(
         description="Determines the verbosity of the logs. Options: debug, info, warn, or error.",
         default="info",
     )
-

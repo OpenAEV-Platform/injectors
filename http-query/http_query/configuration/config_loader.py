@@ -1,9 +1,8 @@
-from http_query.configuration.injector_config_override import \
-    InjectorConfigOverride
-from pydantic import Field
-from pyoaev.configuration import (ConfigLoaderOAEV, Configuration,
-                                  SettingsLoader)
+from http_query.configuration.injector_config_override import InjectorConfigOverride
 from http_query.contracts_http import HttpContracts
+from pydantic import Field
+from pyoaev.configuration import ConfigLoaderOAEV, Configuration, SettingsLoader
+
 
 class ConfigLoader(SettingsLoader):
     openaev: ConfigLoaderOAEV = Field(default_factory=ConfigLoaderOAEV)

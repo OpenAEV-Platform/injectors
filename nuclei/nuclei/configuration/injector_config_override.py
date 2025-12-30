@@ -1,7 +1,9 @@
+from typing import List
+
 from pydantic import Field, SecretStr
 from pyoaev.configuration import ConfigLoaderCollector
 from pyoaev.contracts.contract_config import Contract
-from typing import List
+
 
 # To be change ConfigLoaderCollector
 class InjectorConfigOverride(ConfigLoaderCollector):
@@ -18,14 +20,13 @@ class InjectorConfigOverride(ConfigLoaderCollector):
     )
     type: str = Field(
         description="Type of the injector.",
-        default= "openaev_nuclei",
+        default="openaev_nuclei",
     )
     external_contracts_maintenance_schedule_seconds: int = Field(
         description="With every tick, trigger a maintenance of the external contracts (e.g. based on Nuclei templates)",
-        default=86400
+        default=86400,
     )
     log_level: str = Field(
         description="Determines the verbosity of the logs. Options: debug, info, warn, or error.",
         default="info",
     )
-

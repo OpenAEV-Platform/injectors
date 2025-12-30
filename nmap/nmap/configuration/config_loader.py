@@ -1,8 +1,7 @@
-from nmap.configuration.injector_config_override import \
-    InjectorConfigOverride
 from pydantic import Field
-from pyoaev.configuration import (ConfigLoaderOAEV, Configuration,
-                                  SettingsLoader)
+from pyoaev.configuration import ConfigLoaderOAEV, Configuration, SettingsLoader
+
+from nmap.configuration.injector_config_override import InjectorConfigOverride
 from nmap.contracts.nmap_contracts import NmapContracts
 
 

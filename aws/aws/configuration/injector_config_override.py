@@ -2,6 +2,7 @@ from pydantic import Field, SecretStr
 from pyoaev.configuration import ConfigLoaderCollector
 from pyoaev.contracts.contract_config import Contract
 
+
 # To be change ConfigLoaderCollector
 class InjectorConfigOverride(ConfigLoaderCollector):
     id: str = Field(
@@ -17,10 +18,9 @@ class InjectorConfigOverride(ConfigLoaderCollector):
     )
     type: str = Field(
         description="Type of the injector.",
-        default= "openaev_aws",
+        default="openaev_aws",
     )
     log_level: str = Field(
         description="Determines the verbosity of the logs. Options: debug, info, warn, or error.",
         default="error",
     )
-
