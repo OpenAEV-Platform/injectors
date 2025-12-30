@@ -4,6 +4,7 @@ from typing import Dict
 
 from pyoaev.helpers import OpenAEVConfigHelper, OpenAEVInjectorHelper
 
+from aws.configuration.config_loader import ConfigLoader
 from aws.contracts_aws import (
     CLOUDTRAIL_ENUM_CONTRACT,
     COGNITO_ENUM_CONTRACT,
@@ -32,42 +33,17 @@ from aws.contracts_aws import (
     SNS_ENUM_CONTRACT,
     SSM_ENUM_PARAMETERS_CONTRACT,
     VPC_ENUM_CONTRACT,
-    AWSContracts,
 )
 from aws.helpers.pacu_executor import PacuExecutor
+from injector_common.dump_config import intercept_dump_argument
 
 
 class OpenAEVAWS:
     def __init__(self):
-        self.config = OpenAEVConfigHelper(
-            __file__,
-            {
-                # API information
-                "openaev_url": {"env": "OPENAEV_URL", "file_path": ["openaev", "url"]},
-                "openaev_token": {
-                    "env": "OPENAEV_TOKEN",
-                    "file_path": ["openaev", "token"],
-                },
-                # Config information
-                "injector_id": {"env": "INJECTOR_ID", "file_path": ["injector", "id"]},
-                "injector_name": {
-                    "env": "INJECTOR_NAME",
-                    "file_path": ["injector", "name"],
-                },
-                "injector_type": {
-                    "env": "INJECTOR_TYPE",
-                    "file_path": ["injector", "type"],
-                    "default": "openaev_aws",
-                },
-                "injector_log_level": {
-                    "env": "INJECTOR_LOG_LEVEL",
-                    "file_path": ["injector", "log_level"],
-                    "default": "error",
-                },
-                "injector_contracts": {"data": AWSContracts.build_contract()},
-            },
+        self.config = OpenAEVConfigHelper.from_configuration_object(
+            ConfigLoader().to_daemon_config()
         )
-
+        intercept_dump_argument(self.config.get_config_obj())
         self.helper = OpenAEVInjectorHelper(
             self.config, open("aws/img/icon-aws.png", "rb")
         )
