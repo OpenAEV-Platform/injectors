@@ -31,6 +31,6 @@ profile = "black"
 known_local_folder = ["nmap"]
 
 [tool.cmw]
-install-command = "poetry install --extras dev"
+install-command = "poetry install --extras prod"
 config-dump-command = "poetry run python -m nmap.openaev_nmap --dump-config-schema"
 icon-path = "nmap/img/icon-nmap.png"
