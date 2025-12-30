@@ -10,7 +10,6 @@ from http_query.contracts_http import (
     HTTP_GET_CONTRACT,
     HTTP_RAW_POST_CONTRACT,
     HTTP_RAW_PUT_CONTRACT,
-    HttpContracts,
 )
 from http_query.helpers.helpers import HTTPHelpers
 from pyoaev.helpers import OpenAEVConfigHelper, OpenAEVInjectorHelper

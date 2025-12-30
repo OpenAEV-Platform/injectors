@@ -8,7 +8,6 @@ from injector_common.constants import TARGET_PROPERTY_SELECTOR_KEY, TARGET_SELEC
 from injector_common.dump_config import intercept_dump_argument
 from injector_common.targets import TargetProperty, Targets
 from nmap.configuration.config_loader import ConfigLoader
-from nmap.contracts.nmap_contracts import NmapContracts
 from nmap.helpers.nmap_command_builder import NmapCommandBuilder
 from nmap.helpers.nmap_output_parser import NmapOutputParser
 from nmap.helpers.nmap_process import NmapProcess

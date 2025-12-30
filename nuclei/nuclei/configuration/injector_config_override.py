@@ -1,8 +1,5 @@
-from typing import List
-
-from pydantic import Field, SecretStr
+from pydantic import Field
 from pyoaev.configuration import ConfigLoaderCollector
-from pyoaev.contracts.contract_config import Contract
 
 
 # To be change ConfigLoaderCollector

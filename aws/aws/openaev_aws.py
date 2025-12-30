@@ -33,7 +33,6 @@ from aws.contracts_aws import (
     SNS_ENUM_CONTRACT,
     SSM_ENUM_PARAMETERS_CONTRACT,
     VPC_ENUM_CONTRACT,
-    AWSContracts,
 )
 from aws.helpers.pacu_executor import PacuExecutor
 from injector_common.dump_config import intercept_dump_argument
