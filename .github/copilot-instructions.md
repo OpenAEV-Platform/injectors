@@ -120,45 +120,61 @@ Docker builds use `--build-context injector_common=../injector_common` for nmap/
 
 ## Code Style & Conventions
 
-**isort:** Profile `black`, configured in pyproject.toml with `known_local_folder` per injector
-**black:** Default settings (88 char lines), must pass `black --check .`
-**flake8:** Max line 120, ignores E,W categories (focuses on F-syntax, B-bugbear). Config: `.flake8`
-**Testing:** Python `unittest`, run `python -m unittest` from injector root. Tests in `test/` dirs.
-**Versioning:** Current 2.0.10 (pyoaev). Versions in requirements.txt, docker-compose.yml, __version__ vars.
+**isort:** Profile `black` (pyproject.toml: `known_local_folder` per injector)
+**black:** 88 char lines, must pass `black --check .`
+**flake8:** Max line 120, ignores E,W. Config: `.flake8`
+**Testing:** `python -m unittest` from injector root. Tests in `test/` dirs.
+**Versioning:** Current 2.0.10 (pyoaev). Update in requirements.txt, docker-compose.yml, __version__.
 
 ## GitHub Workflows
 
-**PR Title Format (validate-pr-title.yml):** `[category] type(scope): description (#123)`
-- Types: feat|fix|chore|docs|style|refactor|perf|test|build|ci|revert
-- Example: `[nuclei] feat: add scanner` or `[nmap/contracts] fix(scan): correct command (#42)`
-
-**Release (release.yml):** Runs scripts/release.py to update versions across repo via grep/sed, creates tags, generates release notes with gren.
+**PR Title:** `[category] type(scope): description (#123)` - Types: feat|fix|chore|docs|style|refactor|perf|test|build|ci|revert
+**Release:** scripts/release.py updates versions via grep/sed, creates tags, generates notes with gren.
 
 ## Key Dependencies
 
-**All injectors:** pyoaev==2.0.10
-**nuclei Docker:** Nuclei 3.4.3 binary, Python 3.13-alpine
-**nmap Docker:** nmap + jc CLI tools, Python 3.13-alpine  
-**aws Docker:** Pacu (pip), AWS CLI (pip), Python 3.11-slim (NOT Alpine)
-**http-query Docker:** Python 3.13-alpine, no external tools
+**All:** pyoaev==2.0.10 | **nuclei:** Nuclei 3.4.3, Python 3.13-alpine | **nmap:** nmap+jc, Python 3.13-alpine | **aws:** Pacu+AWS CLI, Python 3.11-slim | **http-query:** Python 3.13-alpine
 
 ## Pre-Commit Checklist
 
-1. **Format code:** `isort --profile black .` then `black .`
-2. **Lint:** `flake8 --ignore=E,W .` must pass
-3. **Test:** Run `python -m unittest` for modified injectors
-4. **Docker (if deps changed):** Test build with correct --build-context for nmap/nuclei
-5. **Review diff:** No unintended changes, especially in other injectors
-6. **Check commits:** No build artifacts, venv, IDE files (.gitignore configured)
+1. Format: `isort --profile black .` then `black .`
+2. Lint: `flake8 --ignore=E,W .`
+3. Test: `python -m unittest` for modified injectors
+4. Docker (if deps changed): Test build with --build-context for nmap/nuclei
+5. Review: No unintended changes, especially in other injectors
 
 ## Configuration Pattern
 
-Each injector has `config.yml.sample`:
-- openaev.url - OpenAEV platform URL
-- openaev.token - Auth token
-- injector.id - UUID instance ID
-- injector.name - Display name
-- injector.log_level - info/warn/error/debug
+Each injector has `config.yml.sample`: openaev.url, openaev.token, injector.id, injector.name, injector.log_level
+
+## Code Review Guidelines
+
+When reviewing code, focus on:
+
+**Security Critical Issues:**
+- Check for hardcoded secrets, API keys, or credentials
+- Look for SQL injection and XSS vulnerabilities
+- Verify proper input validation and sanitization
+- Review authentication and authorization logic
+
+**Performance Red Flags:**
+- Identify N+1 database query problems
+- Spot inefficient loops and algorithmic issues
+- Check for memory leaks and resource cleanup
+- Review caching opportunities for expensive operations
+
+**Code Quality Essentials:**
+- Functions should be focused and appropriately sized
+- Use clear, descriptive naming conventions
+- Ensure proper error handling throughout
+
+**Review Style:**
+- Be specific and actionable in feedback
+- Explain the "why" behind recommendations
+- Acknowledge good patterns when you see them
+- Ask clarifying questions when code intent is unclear
+
+Always prioritize security vulnerabilities and performance issues that could impact users. Always suggest changes to improve readability - extract validation logic into reusable, testable functions rather than inline conditionals.
 
 ## Critical Notes
 
