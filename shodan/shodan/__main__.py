@@ -11,7 +11,7 @@ from shodan.injector.openaev_shodan import ShodanInjector
 from shodan.contracts.shodan_contracts import ShodanContracts
 # from shodan.injector.exception import InjectorConfigError
 
-LOG_PREFIX = "[MAIN]"
+LOG_PREFIX = "[SHODAN_MAIN]"
 
 def main() -> None:
     """Define the main function to run the injector."""
@@ -22,16 +22,15 @@ def main() -> None:
 
         # Injector Config
         config = ConfigLoader()
-        # config_dict = config.model_dump(mode="json")
 
-        # Prepare Helper
-        shodan_contracts = ShodanContracts().contracts
-        config_helper_adpater = config.to_config_injector_helper_adapter(contracts=shodan_contracts)
-        icon_bytes = Path("shodan/img/icon-shodan.png").read_bytes()
+        # Prepare config for Helper
+        shodan_contracts = ShodanContracts(config).contracts()
+        config_helper_adapter = config.to_config_injector_helper_adapter(contracts=shodan_contracts)
+        icon_bytes = Path("img/icon-shodan.png").read_bytes()
 
-        helper = OpenAEVInjectorHelper(config=config_helper_adpater, icon=icon_bytes)
+        helper = OpenAEVInjectorHelper(config=config_helper_adapter, icon=icon_bytes)
 
-        logger.info(  # type: ignore[has-type]
+        logger.info(
             f"{LOG_PREFIX} The initialization of the Shodan injector configuration was successful."
         )
 

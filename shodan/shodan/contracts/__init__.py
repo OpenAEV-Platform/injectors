@@ -1,12 +1,11 @@
-from shodan.contracts import (
-    CloudProviderAssetDiscovery,
-    CriticalPortsAndExposedAdminInterface,
-    CustomQuery,
-    CVEEnumeration,
-    CVESpecificWatchlist,
-    DomainDiscovery,
-    HostEnumeration,
-)
+from .cloud_provider_asset_discovery import CloudProviderAssetDiscovery
+from .critical_ports_and_exposed_admin_interface import CriticalPortsAndExposedAdminInterface
+from .custom_query import CustomQuery
+from .cve_enumeration import CVEEnumeration
+from .cve_specific_watchlist import CVESpecificWatchlist
+from .domain_discovery import DomainDiscovery
+from .host_enumeration import HostEnumeration
+from .shodan_contracts import InjectorKey, ShodanContractId
 
 __all__ = [
     "CloudProviderAssetDiscovery",
@@ -16,4 +15,6 @@ __all__ = [
     "CVESpecificWatchlist",
     "DomainDiscovery",
     "HostEnumeration",
+    "InjectorKey",
+    "ShodanContractId"
 ]
