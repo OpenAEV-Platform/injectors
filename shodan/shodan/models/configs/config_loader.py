@@ -30,7 +30,6 @@ class _BaseInjectorConfigHelperAdapter:
 class _BaseInjectorConfigUtils:
 
     def to_flatten(self, contracts=None) -> dict:
-
         flatten_config = {}
         for field_name in ["openaev", "injector"]:
             value = getattr(self, field_name, None)

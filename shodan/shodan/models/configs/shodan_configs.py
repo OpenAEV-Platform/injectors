@@ -9,8 +9,8 @@ class _ConfigLoaderShodan(_SettingsLoader):
 
     base_url: str = Field(
         default="https://api.shodan.io",
-        description="URL for the Shodan API.",
+        description="This is the base URL for the Shodan API.",
     )
     api_key: SecretStr = Field(
-        description="API Key for the Shodan API.",
+        description="This is the API key for the Shodan API.",
     )
