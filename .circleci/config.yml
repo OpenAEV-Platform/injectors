@@ -125,9 +125,9 @@ jobs:
           name: Build Docker image openaev/injector-aws
           command: |
             if [ "${CIRCLE_BRANCH}" = "release/current" ]; then
-              docker build --progress=plain -t openaev/injector-aws:${CIRCLE_SHA1} --build-arg PYOAEV_GIT_BRANCH_OVERRIDE="${CIRCLE_BRANCH}" .
+              docker build --progress=plain --build-context injector_common=../injector_common -t openaev/injector-aws:${CIRCLE_SHA1} --build-arg PYOAEV_GIT_BRANCH_OVERRIDE="${CIRCLE_BRANCH}" .
             else
-              docker build --progress=plain -t openaev/injector-aws:${CIRCLE_SHA1} .
+              docker build --progress=plain --build-context injector_common=../injector_common -t openaev/injector-aws:${CIRCLE_SHA1} .
             fi
             docker save -o ~/openaev/images/injector-aws openaev/injector-aws:${CIRCLE_SHA1}
       - run:
@@ -135,9 +135,9 @@ jobs:
           name: Build Docker image openaev/injector-http-query
           command: |
             if [ "${CIRCLE_BRANCH}" = "release/current" ]; then
-              docker build --progress=plain -t openaev/injector-http-query:${CIRCLE_SHA1} --build-arg PYOAEV_GIT_BRANCH_OVERRIDE="${CIRCLE_BRANCH}" .
+              docker build --progress=plain --build-context injector_common=../injector_common -t openaev/injector-http-query:${CIRCLE_SHA1} --build-arg PYOAEV_GIT_BRANCH_OVERRIDE="${CIRCLE_BRANCH}" .
             else
-              docker build --progress=plain -t openaev/injector-http-query:${CIRCLE_SHA1} .
+              docker build --progress=plain --build-context injector_common=../injector_common -t openaev/injector-http-query:${CIRCLE_SHA1} .
             fi
             docker save -o ~/openaev/images/injector-http-query openaev/injector-http-query:${CIRCLE_SHA1}
       - run:

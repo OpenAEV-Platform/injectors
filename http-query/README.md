@@ -51,7 +51,7 @@ Example:
 
 ```shell
 # Replace the IMAGE NAME with the appropriate value
-docker build . -t [IMAGE NAME]:latest
+docker build --build-context injector_common=../injector_common . -t [IMAGE NAME]:latest
 ```
 
 Make sure to replace the environment variables in `docker-compose.yml` with the appropriate configurations for your
