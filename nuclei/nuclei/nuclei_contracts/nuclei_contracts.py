@@ -124,9 +124,9 @@ class NucleiContracts:
             target_asset_groups,
             target_property_selector,
             targets_manual,
+            expectations,
             template_path,
             options,
-            expectations,
         ]
 
     @staticmethod
