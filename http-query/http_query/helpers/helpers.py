@@ -33,8 +33,9 @@ class HTTPHelpers:
     @staticmethod
     def response_parsing(response):
         return {
-                "url": response.url,
-                "code": response.status_code,
-                "status": "SUCCESS",
-                "message": response.text or f"No response body (HTTP {response.status_code})"
-            }
+            "url": response.url,
+            "code": response.status_code,
+            "status": "SUCCESS",
+            "message": response.text
+            or f"No response body (HTTP {response.status_code})",
+        }
