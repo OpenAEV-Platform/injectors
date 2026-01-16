@@ -132,14 +132,24 @@ class ExternalContractsManager:
 
     def _make_contract(self, contract_id: str, template):
         config = NucleiContracts.base_contract_config()
-        fields = NucleiContracts.core_contract_fields() + [
-            ContractText(
-                key="template",
-                label="Manual template path (-t)",
-                mandatory=False,
-                defaultValue=[template["file_path"]],
-            )
-        ]
+        fields = (
+            NucleiContracts.core_contract_fields()
+            + [
+                ContractText(
+                    key="template",
+                    label="Manual template path (-t)",
+                    mandatory=False,
+                    defaultValue=[template["file_path"]],
+                )
+            ]
+            + [
+                ContractText(
+                    key="options",
+                    label="Options",
+                    mandatory=False,
+                )
+            ]
+        )
         outputs = NucleiContracts.core_outputs()
         contract = NucleiContracts.build_contract(
             contract_id,
