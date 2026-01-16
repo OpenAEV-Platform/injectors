@@ -176,11 +176,13 @@ class NucleiContracts:
                             mandatory=False,
                         )
                     ]
-                    + [ContractText(
-                        key="options",
-                        label="Options",
-                        mandatory=False,
-                    )],
+                    + [
+                        ContractText(
+                            key="options",
+                            label="Options",
+                            mandatory=False,
+                        )
+                    ],
                     NucleiContracts.core_outputs(),
                     f"Nuclei - {en}",
                     f"Nuclei - {fr}",
