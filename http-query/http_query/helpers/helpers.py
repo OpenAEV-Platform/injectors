@@ -1,5 +1,3 @@
-import json
-
 class HTTPHelpers:
     @staticmethod
     def parse_headers(headers_str):
