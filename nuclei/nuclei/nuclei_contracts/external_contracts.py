@@ -140,7 +140,11 @@ class ExternalContractsManager:
                 mandatory=False,
                 defaultValue=[template["file_path"]],
             )
-        ]
+        ] + [ContractText(
+            key="options",
+            label="Options",
+            mandatory=False,
+        )]
         outputs = NucleiContracts.core_outputs()
         contract = NucleiContracts.build_contract(
             contract_id,

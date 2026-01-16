@@ -92,16 +92,6 @@ class NucleiContracts:
             visibleConditionFields=[target_selector.key],
             visibleConditionValues={target_selector.key: "manual"},
         )
-        template_path = ContractText(
-            key="template",
-            label="Manual template path (-t)",
-            mandatory=False,
-        )
-        options = ContractText(
-            key="options",
-            label="Options",
-            mandatory=False,
-        )
         expectations = ContractExpectations(
             key="expectations",
             label="Expectations",
@@ -125,8 +115,6 @@ class NucleiContracts:
             target_property_selector,
             targets_manual,
             expectations,
-            template_path,
-            options,
         ]
 
     @staticmethod
@@ -180,7 +168,19 @@ class NucleiContracts:
                     cid,
                     None,
                     NucleiContracts.base_contract_config(),
-                    NucleiContracts.core_contract_fields(),
+                    NucleiContracts.core_contract_fields()
+                    + [
+                        ContractText(
+                            key="template",
+                            label="Manual template path (-t)",
+                            mandatory=False,
+                        )
+                    ]
+                    + [ContractText(
+                        key="options",
+                        label="Options",
+                        mandatory=False,
+                    )],
                     NucleiContracts.core_outputs(),
                     f"Nuclei - {en}",
                     f"Nuclei - {fr}",
