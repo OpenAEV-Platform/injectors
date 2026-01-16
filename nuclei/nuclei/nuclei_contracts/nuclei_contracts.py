@@ -1,3 +1,12 @@
+from injector_common.constants import (
+    TARGET_PROPERTY_SELECTOR_KEY,
+    TARGET_SELECTOR_KEY,
+    TARGETS_KEY,
+)
+from injector_common.targets import (
+    TargetProperty,
+    target_property_choices_dict,
+)
 from pyoaev.contracts import ContractBuilder
 from pyoaev.contracts.contract_config import (
     Contract,
@@ -16,12 +25,6 @@ from pyoaev.contracts.contract_config import (
     prepare_contracts,
 )
 
-from injector_common.constants import (
-    TARGET_PROPERTY_SELECTOR_KEY,
-    TARGET_SELECTOR_KEY,
-    TARGETS_KEY,
-)
-from injector_common.targets import TargetProperty, target_property_choices_dict
 from nuclei.nuclei_contracts.nuclei_constants import CONTRACT_LABELS, TYPE
 
 
@@ -92,6 +95,16 @@ class NucleiContracts:
             visibleConditionFields=[target_selector.key],
             visibleConditionValues={target_selector.key: "manual"},
         )
+        template_path = ContractText(
+            key="template",
+            label="Manual template path (-t)",
+            mandatory=False,
+        )
+        options = ContractText(
+            key="options",
+            label="Options",
+            mandatory=False,
+        )
         expectations = ContractExpectations(
             key="expectations",
             label="Expectations",
@@ -114,6 +127,8 @@ class NucleiContracts:
             target_asset_groups,
             target_property_selector,
             targets_manual,
+            template_path,
+            options,
             expectations,
         ]
 
@@ -168,14 +183,7 @@ class NucleiContracts:
                     cid,
                     None,
                     NucleiContracts.base_contract_config(),
-                    NucleiContracts.core_contract_fields()
-                    + [
-                        ContractText(
-                            key="template",
-                            label="Manual template path (-t)",
-                            mandatory=False,
-                        )
-                    ],
+                    NucleiContracts.core_contract_fields(),
                     NucleiContracts.core_outputs(),
                     f"Nuclei - {en}",
                     f"Nuclei - {fr}",
