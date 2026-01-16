@@ -125,6 +125,7 @@ class OpenAEVHttp:
         # Execute inject
         try:
             execution_result = self.http_execution(data)
+            print(execution_result)
             execution_outputs = {"url": execution_result["url"]}
             callback_data = {
                 "execution_message": execution_result["message"],

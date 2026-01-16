@@ -1,3 +1,5 @@
+import json
+
 class HTTPHelpers:
     @staticmethod
     def parse_headers(headers_str):
@@ -32,11 +34,9 @@ class HTTPHelpers:
 
     @staticmethod
     def response_parsing(response):
-        success = 200 <= response.status_code < 300
-        success_status = "SUCCESS" if success else "ERROR"
         return {
-            "url": response.url,
-            "code": response.status_code,
-            "status": success_status,
-            "message": response.text,
-        }
+                "url": response.url,
+                "code": response.status_code,
+                "status": "SUCCESS",
+                "message": response.text or f"No response body (HTTP {response.status_code})"
+            }
