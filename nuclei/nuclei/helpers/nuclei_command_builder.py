@@ -46,6 +46,10 @@ class NucleiCommandBuilder:
             if "cve" in template.lower() and not json_output:
                 args += ["-j"]
 
+        options = content.get("options")
+        if options:
+            args += [options]
+
         for target in targets:
             args += ["-u", target]
 

@@ -175,6 +175,13 @@ class NucleiContracts:
                             label="Manual template path (-t)",
                             mandatory=False,
                         )
+                    ]
+                    + [
+                        ContractText(
+                            key="options",
+                            label="Options",
+                            mandatory=False,
+                        )
                     ],
                     NucleiContracts.core_outputs(),
                     f"Nuclei - {en}",
