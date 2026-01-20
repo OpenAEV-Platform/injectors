@@ -153,6 +153,10 @@ Targets are selected based on the `target_selector` field.
 
 Direct comma-separated values of IPs or hostnames are used.
 
+### Options
+
+You can add any options you want based on what is available for nuclei
+
 ### Example Execution
 
 A sample command executed by this injector might look like:
@@ -164,29 +168,17 @@ Or with a specific template:
 ```bash
 nuclei -u 10.0.0.5 -t cves/2021/CVE-2021-1234.yaml -j
 ```
+Or with options:
+```bash
+nuclei -u https://www.google.com -t dast/vulnerabilities/sqli/sqli-error-based.yaml -dast
+```
+
 ### Output Parsing
 - The injector captures and parses the JSON output of Nuclei, and returns:
 
 - Confirmed findings (if any) with severity and CVE IDs
 
 - Other lines as unstructured output
-
-
-### Target Selection
-
-The targets vary based on the provided input type:
-
-#### If target type is **Assets**:
-
-| Targeted Property   | Source Property        |
-|---------------------|------------------------|
-| Seen IP             | Seen IP address        |
-| Local IP (first)    | IP Addresses (first)   |
-| Hostname            | Hostname               |
-
-#### If target type is **Manual**:
-
-- Hostnames or IP addresses are provided directly as comma-separated values.
 
 ### Results
 
