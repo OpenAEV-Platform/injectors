@@ -2,6 +2,9 @@ FROM python:3.13-alpine AS builder
 
 RUN apk update && apk upgrade
 
+WORKDIR /opt/injector_common
+COPY --from=injector_common ./ ./
+
 # poetry version available on Ubuntu 24.04
 RUN pip3 install poetry==2.1.3
 
@@ -11,6 +14,9 @@ WORKDIR ${installdir}
 RUN poetry build
 
 FROM python:3.13-alpine AS runner
+
+WORKDIR /opt/injector_common
+COPY --from=injector_common ./ ./
 
 ARG installdir=/opt/injector
 WORKDIR ${installdir}

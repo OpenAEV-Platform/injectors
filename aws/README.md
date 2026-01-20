@@ -117,7 +117,7 @@ Below are the parameters you'll need to set for running the injector properly:
 1. Build the Docker image:
 ```bash
 cd aws
-docker build -t openaev/injector-aws:latest .
+docker build --build-context injector_common=../injector_common -t openaev/injector-aws:latest .
 ```
 
 2. Run with docker-compose:

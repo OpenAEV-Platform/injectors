@@ -29,3 +29,8 @@ build-backend = "poetry.core.masonry.api"
 [tool.isort]
 profile = "black"
 known_local_folder = ["nuclei"]
+
+[tool.cmw]
+install-command = "poetry install --extras prod"
+config-dump-command = "poetry run python -m nuclei.openaev_nuclei --dump-config-schema"
+icon-path = "nuclei/img/nuclei.jpg"

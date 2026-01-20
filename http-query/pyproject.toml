@@ -16,6 +16,7 @@ pyoaev = [
     { markers = "extra == 'prod' and extra != 'dev'", version = "2.0.13", source = "pypi"  },
     { markers = "extra == 'dev' and extra != 'prod'", path = "../../client-python", develop = true },
 ]
+injector_common = { path = "../injector_common", develop = true }
 
 [tool.poetry.extras]
 prod = ["pyoaev"]
@@ -28,3 +29,8 @@ build-backend = "poetry.core.masonry.api"
 [tool.isort]
 profile = "black"
 known_local_folder = ["http_query"]
+
+[tool.cmw]
+install-command = "poetry install --extras prod"
+config-dump-command = "poetry run python -m http_query.openaev_http --dump-config-schema"
+icon-path = "http_query/img/icon-http.png"

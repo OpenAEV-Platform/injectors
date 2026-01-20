@@ -18,7 +18,7 @@ pyoaev = [
 ]
 pacu = "^1.5.0"
 awscli = "^1.29.0"
-
+injector_common = { path = "../injector_common", develop = true }
 
 [tool.poetry.extras]
 prod = ["pyoaev"]
@@ -31,3 +31,8 @@ build-backend = "poetry.core.masonry.api"
 [tool.isort]
 profile = "black"
 known_local_folder = ["aws"]
+
+[tool.cmw]
+install-command = "poetry install --extras prod"
+config-dump-command = "poetry run python -m aws.openaev_aws --dump-config-schema"
+icon-path = "aws/img/icon-aws.png"
