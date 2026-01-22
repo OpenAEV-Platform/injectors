@@ -22,6 +22,7 @@ packages = [
 [tool.poetry.dependencies]
 python = "^3.11"
 pyoaev = [
+    { markers = "extra != 'dev'", source = "pypi" },
     { markers = "extra == 'dev'", develop = true },
 ]
 injector_common = { path = "../injector_common", develop = true }
