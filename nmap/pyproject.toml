@@ -1,7 +1,17 @@
-[tool.poetry]
+[project]
 name = "openaev-nmap-injector"
 version = "2.0.14"
 description = "An injector for running port scans with nmap"
+dependencies = [
+    "pyoaev (==2.0.14) ; extra != 'dev'",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pyoaev @ ../../client-python",
+]
+
+[tool.poetry]
 authors = ["Filigran <contact@filigran.io>"]
 license = "Apache-2.0"
 readme = "README.md"
@@ -9,18 +19,12 @@ packages = [
     { include = "nmap" }
 ]
 
-
 [tool.poetry.dependencies]
 python = "^3.11"
 pyoaev = [
-    { markers = "extra == 'prod' and extra != 'dev'", version = "2.0.14", source = "pypi"  },
-    { markers = "extra == 'dev' and extra != 'prod'", path = "../../client-python", develop = true },
+    { markers = "extra == 'dev'", develop = true },
 ]
 injector_common = { path = "../injector_common", develop = true }
-
-[tool.poetry.extras]
-prod = ["pyoaev"]
-dev = ["pyoaev"]
 
 [build-system]
 requires = ["poetry-core"]
@@ -31,6 +35,6 @@ profile = "black"
 known_local_folder = ["nmap"]
 
 [tool.cmw]
-install-command = "poetry install --extras prod"
+install-command = "poetry install --extras dev"
 config-dump-command = "poetry run python -m nmap.openaev_nmap --dump-config-schema"
 icon-path = "nmap/img/icon-nmap.png"
