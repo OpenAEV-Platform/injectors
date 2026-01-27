@@ -18,7 +18,7 @@ class ConfigLoader(SettingsLoader):
                 # Injector configuration (flattened)
                 "injector_id": {"data": self.injector.id},
                 "injector_name": {"data": self.injector.name},
-                "injector_type": {"data": self.injector.type},
+                "injector_type": {"data": "openaev_nuclei"},
                 "injector_contracts": {
                     "data": NucleiContracts.build_static_contracts()
                 },
