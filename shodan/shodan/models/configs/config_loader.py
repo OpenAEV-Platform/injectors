@@ -1,7 +1,8 @@
 """Base class for global config models."""
-from pathlib import Path
-from pydantic import Field, BaseModel
 
+from pathlib import Path
+
+from pydantic import BaseModel, Field
 from pydantic_settings import (
     BaseSettings,
     DotEnvSettingsSource,
@@ -11,11 +12,12 @@ from pydantic_settings import (
 )
 
 from shodan.models.configs import (
-    _SettingsLoader,
-    _BaseOpenAEVConfig,
     _BaseInjectorConfig,
+    _BaseOpenAEVConfig,
     _ConfigLoaderShodan,
+    _SettingsLoader,
 )
+
 
 class _BaseInjectorConfigHelperAdapter:
     def __init__(self, data: dict):
@@ -26,6 +28,7 @@ class _BaseInjectorConfigHelperAdapter:
         if isinstance(value, dict) and "data" in value:
             value = value["data"]
         return value
+
 
 class _BaseInjectorConfigUtils:
 
@@ -42,7 +45,9 @@ class _BaseInjectorConfigUtils:
                 flatten_config["injector_contracts"] = contracts
         return flatten_config
 
-    def to_config_injector_helper_adapter(self, contracts) -> _BaseInjectorConfigHelperAdapter:
+    def to_config_injector_helper_adapter(
+        self, contracts
+    ) -> _BaseInjectorConfigHelperAdapter:
         """Returns an OpenAEVInjectorHelper-compatible object"""
         flatten_dict = self.to_flatten(contracts)
         return _BaseInjectorConfigHelperAdapter(flatten_dict)
@@ -66,12 +71,12 @@ class ConfigLoader(_BaseInjectorConfigUtils, _SettingsLoader):
 
     @classmethod
     def settings_customise_sources(
-            cls,
-            settings_cls: type[BaseSettings],
-            init_settings: PydanticBaseSettingsSource,
-            env_settings: PydanticBaseSettingsSource,
-            dotenv_settings: PydanticBaseSettingsSource,
-            file_secret_settings: PydanticBaseSettingsSource,
+        cls,
+        settings_cls: type[BaseSettings],
+        init_settings: PydanticBaseSettingsSource,
+        env_settings: PydanticBaseSettingsSource,
+        dotenv_settings: PydanticBaseSettingsSource,
+        file_secret_settings: PydanticBaseSettingsSource,
     ) -> tuple[PydanticBaseSettingsSource]:
         """Pydantic settings customisation sources.
 

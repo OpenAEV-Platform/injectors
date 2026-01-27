@@ -1,5 +1,7 @@
 from .cloud_provider_asset_discovery import CloudProviderAssetDiscovery
-from .critical_ports_and_exposed_admin_interface import CriticalPortsAndExposedAdminInterface
+from .critical_ports_and_exposed_admin_interface import (
+    CriticalPortsAndExposedAdminInterface,
+)
 from .custom_query import CustomQuery
 from .cve_enumeration import CVEEnumeration
 from .cve_specific_watchlist import CVESpecificWatchlist
@@ -16,5 +18,5 @@ __all__ = [
     "DomainDiscovery",
     "HostEnumeration",
     "InjectorKey",
-    "ShodanContractId"
+    "ShodanContractId",
 ]

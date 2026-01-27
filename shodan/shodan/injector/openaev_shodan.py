@@ -1,5 +1,8 @@
 import time
 from datetime import datetime, timezone
+
+from pyoaev.helpers import OpenAEVInjectorHelper
+
 from shodan.contracts import (
     CloudProviderAssetDiscovery,
     CriticalPortsAndExposedAdminInterface,
@@ -11,11 +14,11 @@ from shodan.contracts import (
     InjectorKey,
     ShodanContractId,
 )
-from shodan.services import ShodanClientAPI, Utils
 from shodan.models import ConfigLoader
-from pyoaev.helpers import OpenAEVInjectorHelper
+from shodan.services import ShodanClientAPI, Utils
 
 LOG_PREFIX = "[SHODAN_INJECTOR]"
+
 
 class ShodanInjector:
     def __init__(self, config: ConfigLoader, helper: OpenAEVInjectorHelper):
@@ -27,8 +30,9 @@ class ShodanInjector:
         self.shodan_client_api = ShodanClientAPI(self.config, self.helper)
         self.utils = Utils()
 
-
-    def _prepare_output_message(self, contract_name:str, inject_content:dict, results, user_info:dict):
+    def _prepare_output_message(
+        self, contract_name: str, inject_content: dict, results, user_info: dict
+    ):
         self.helper.injector_logger.info(
             f"{LOG_PREFIX} - Start preparing the output message rendering.",
         )
@@ -45,7 +49,7 @@ class ShodanInjector:
         if contract_name not in output_trace_config:
             raise ValueError(
                 f"{LOG_PREFIX} - The contract name is unknown.",
-                {"contract_name": contract_name}
+                {"contract_name": contract_name},
             )
 
         contract_output_trace_config = output_trace_config.get(contract_name)
@@ -73,11 +77,12 @@ class ShodanInjector:
         )
         return rendering_output_message
 
-
     def _shodan_execution(self, data):
 
         # Contract information
-        contract_id = data["injection"]["inject_injector_contract"]["convertedContent"]["contract_id"]
+        contract_id = data["injection"]["inject_injector_contract"]["convertedContent"][
+            "contract_id"
+        ]
         contract_name = ShodanContractId(contract_id).name
 
         inject_content = data["injection"]["inject_content"]
@@ -88,12 +93,14 @@ class ShodanInjector:
             {
                 "contract_id": contract_id,
                 "contract_name": contract_name,
-                "type_of_target" : selector_key
+                "type_of_target": selector_key,
             },
         )
         if selector_key == "manual":
-            shodan_results, shodan_credit_user = self.shodan_client_api.process_shodan_search(
-                contract_id, inject_content
+            shodan_results, shodan_credit_user = (
+                self.shodan_client_api.process_shodan_search(
+                    contract_id, inject_content
+                )
             )
 
             output_json = ""
@@ -114,7 +121,6 @@ class ShodanInjector:
 
         else:
             return None, None
-
 
     def process_message(self, data: dict) -> None:
         # Initialization to get the current start utc iso format.
@@ -150,9 +156,7 @@ class ShodanInjector:
             )
             self.helper.injector_logger.info(
                 f"{LOG_PREFIX} - The injector has completed its execution.",
-                {
-                    "execution_duration": f"{execution_duration} s"
-                }
+                {"execution_duration": f"{execution_duration} s"},
             )
 
         except Exception as err:
@@ -171,5 +175,3 @@ class ShodanInjector:
 
     def start(self):
         self.helper.listen(message_callback=self.process_message)
-
-

@@ -4,14 +4,18 @@ import logging
 import os
 import sys
 from pathlib import Path
+
 from pydantic import ValidationError
 from pyoaev.helpers import OpenAEVInjectorHelper
-from shodan.models import ConfigLoader
-from shodan.injector.openaev_shodan import ShodanInjector
+
 from shodan.contracts.shodan_contracts import ShodanContracts
+from shodan.injector.openaev_shodan import ShodanInjector
+from shodan.models import ConfigLoader
+
 # from shodan.injector.exception import InjectorConfigError
 
 LOG_PREFIX = "[SHODAN_MAIN]"
+
 
 def main() -> None:
     """Define the main function to run the injector."""
@@ -25,7 +29,9 @@ def main() -> None:
 
         # Prepare config for Helper
         shodan_contracts = ShodanContracts(config).contracts()
-        config_helper_adapter = config.to_config_injector_helper_adapter(contracts=shodan_contracts)
+        config_helper_adapter = config.to_config_injector_helper_adapter(
+            contracts=shodan_contracts
+        )
         icon_bytes = Path("shodan/img/icon-shodan.png").read_bytes()
 
         helper = OpenAEVInjectorHelper(config=config_helper_adapter, icon=icon_bytes)

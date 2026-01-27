@@ -1,8 +1,8 @@
 """Base class for global config models."""
 
 from abc import ABC
-
 from typing import Literal
+
 from pydantic import (
     BaseModel,
     ConfigDict,
@@ -10,11 +10,16 @@ from pydantic import (
     HttpUrl,
 )
 
+
 class BaseConfigModel(BaseModel, ABC):
     """Base class for global config models
     To prevent attributes from being modified after initialization.
     """
-    model_config = ConfigDict(extra="allow", str_min_length=1, frozen=True, validate_default=True)
+
+    model_config = ConfigDict(
+        extra="allow", str_min_length=1, frozen=True, validate_default=True
+    )
+
 
 class _BaseOpenAEVConfig(BaseConfigModel, ABC):
     url: HttpUrl = Field(
@@ -23,6 +28,7 @@ class _BaseOpenAEVConfig(BaseConfigModel, ABC):
     token: str = Field(
         description="The API token to connect to OpenAEV.",
     )
+
 
 class _BaseInjectorConfig(BaseConfigModel, ABC):
     """Base class for connector configuration."""
@@ -37,7 +43,7 @@ class _BaseInjectorConfig(BaseConfigModel, ABC):
     )
     type: str = Field(
         default="openaev_shodan",
-        description="Identifies the functional type of the injector in OpenAEV"
+        description="Identifies the functional type of the injector in OpenAEV",
     )
     log_level: Literal["debug", "info", "warning", "error"] = Field(
         default="error",

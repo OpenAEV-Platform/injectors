@@ -1,14 +1,14 @@
 from dataclasses import dataclass
 from enum import Enum, StrEnum
-from shodan.models import ConfigLoader
+
 from pyoaev.contracts.contract_config import (
     Contract,
     ContractAsset,
     ContractAssetGroup,
     ContractCardinality,
-    ContractElement,
-    ContractConfig,
     ContractCheckbox,
+    ContractConfig,
+    ContractElement,
     ContractExpectations,
     ContractOutputElement,
     ContractOutputType,
@@ -28,24 +28,28 @@ from shodan.contracts import (
     DomainDiscovery,
     HostEnumeration,
 )
+from shodan.models import ConfigLoader
 
 TYPE = "openaev_shodan"
 
+
 class InjectorKey(StrEnum):
-    TARGETS_KEY="targets"
-    TARGET_SELECTOR_KEY="target_selector"
-    TARGET_PROPERTY_SELECTOR_KEY="target_property_selector"
-    AUTO_CREATE_ASSETS="auto_create_assets"
-    EXPECTATIONS_KEY="expectations"
+    TARGETS_KEY = "targets"
+    TARGET_SELECTOR_KEY = "target_selector"
+    TARGET_PROPERTY_SELECTOR_KEY = "target_property_selector"
+    AUTO_CREATE_ASSETS = "auto_create_assets"
+    EXPECTATIONS_KEY = "expectations"
+
 
 class ShodanContractId(StrEnum):
-    CLOUD_PROVIDER_ASSET_DISCOVERY="1887b988-1553-4e46-bac1-ceeee0483f3a"
-    CRITICAL_PORTS_AND_EXPOSED_ADMIN_INTERFACE="5349febd-ec73-408b-aa61-24a86a1ba0a7"
-    CUSTOM_QUERY="c7640b4c-8a12-458a-b761-6a1287501a58"
-    CVE_ENUMERATION="8cdccd58-78ed-4e17-be2e-7683ec611569"
-    CVE_SPECIFIC_WATCHLIST="462087b4-8012-4e21-9575-b9c854ef5811"
-    DOMAIN_DISCOVERY="faf73809-1128-4192-aa90-a08828f8ace5"
-    HOST_ENUMERATION="dc6b8b73-09dd-4388-b7cc-108bf16d26cd"
+    CLOUD_PROVIDER_ASSET_DISCOVERY = "1887b988-1553-4e46-bac1-ceeee0483f3a"
+    CRITICAL_PORTS_AND_EXPOSED_ADMIN_INTERFACE = "5349febd-ec73-408b-aa61-24a86a1ba0a7"
+    CUSTOM_QUERY = "c7640b4c-8a12-458a-b761-6a1287501a58"
+    CVE_ENUMERATION = "8cdccd58-78ed-4e17-be2e-7683ec611569"
+    CVE_SPECIFIC_WATCHLIST = "462087b4-8012-4e21-9575-b9c854ef5811"
+    DOMAIN_DISCOVERY = "faf73809-1128-4192-aa90-a08828f8ace5"
+    HOST_ENUMERATION = "dc6b8b73-09dd-4388-b7cc-108bf16d26cd"
+
 
 @dataclass
 class FieldDefinition:
@@ -53,6 +57,7 @@ class FieldDefinition:
     target: str | list[str]
     label: str
     mandatory: bool = False
+
 
 class TypeOfFields(Enum):
     ASSETS = FieldDefinition(
@@ -71,10 +76,12 @@ class TypeOfFields(Enum):
         label="Targeted assets property",
     )
 
+
 @dataclass
 class SelectorFieldDefinition:
     key: str
     label: str
+
 
 class TargetSelectorField(Enum):
     ASSETS = SelectorFieldDefinition(
@@ -98,6 +105,7 @@ class TargetSelectorField(Enum):
     def label(self) -> str:
         return self.value.label
 
+
 class TargetProperty(Enum):
     AUTOMATIC = "Automatic"
     HOSTNAME = "Hostname"
@@ -107,6 +115,7 @@ class TargetProperty(Enum):
     @staticmethod
     def default_value(value: str = "automatic"):
         return value.lower()
+
 
 class ShodanContracts:
     def __init__(self, config: ConfigLoader):
@@ -129,7 +138,7 @@ class ShodanContracts:
 
     # -- BUILDER CONTRACT FIELDS --
     @staticmethod
-    def _build_target_selector(selector_default_value:str) -> ContractSelect:
+    def _build_target_selector(selector_default_value: str) -> ContractSelect:
 
         prefix = "only_"
 
@@ -142,9 +151,7 @@ class ShodanContracts:
 
         if default_start_with_only:
             effective_default = selector_default_value.removeprefix(prefix)
-            choices = {
-                effective_default: choices[effective_default]
-            }
+            choices = {effective_default: choices[effective_default]}
 
         return ContractSelect(
             key=InjectorKey.TARGET_SELECTOR_KEY,
@@ -159,12 +166,10 @@ class ShodanContracts:
 
         builder_contract_fields_mapping = {
             "field_assets": lambda **kwargs: ContractAsset(
-                cardinality=ContractCardinality.Multiple,
-                **kwargs
+                cardinality=ContractCardinality.Multiple, **kwargs
             ),
             "field_asset_groups": lambda **kwargs: ContractAssetGroup(
-                cardinality=ContractCardinality.Multiple,
-                **kwargs
+                cardinality=ContractCardinality.Multiple, **kwargs
             ),
             "field_assets_property": lambda **kwargs: ContractSelect(
                 key=InjectorKey.TARGET_PROPERTY_SELECTOR_KEY,
@@ -184,9 +189,13 @@ class ShodanContracts:
             label=field_type_config.label,
             mandatory=field_type_config.mandatory,
             mandatoryConditionFields=[InjectorKey.TARGET_SELECTOR_KEY],
-            mandatoryConditionValues={InjectorKey.TARGET_SELECTOR_KEY: field_type_config.target},
+            mandatoryConditionValues={
+                InjectorKey.TARGET_SELECTOR_KEY: field_type_config.target
+            },
             visibleConditionFields=[InjectorKey.TARGET_SELECTOR_KEY],
-            visibleConditionValues={InjectorKey.TARGET_SELECTOR_KEY: field_type_config.target},
+            visibleConditionValues={
+                InjectorKey.TARGET_SELECTOR_KEY: field_type_config.target
+            },
         )
 
     @staticmethod
@@ -216,7 +225,7 @@ class ShodanContracts:
             ],
         )
 
-    def _base_fields(self, selector_default_value:str) -> list[ContractElement]:
+    def _base_fields(self, selector_default_value: str) -> list[ContractElement]:
 
         # Build Target Selector (Assets, Asset Groups, Manual)
         target_selector = self._build_target_selector(selector_default_value)
@@ -254,11 +263,18 @@ class ShodanContracts:
         return []
 
     def _build_contract(
-            self,
-            contract_id:str,
-            contract_cls: CloudProviderAssetDiscovery | CriticalPortsAndExposedAdminInterface | CustomQuery |
-                          CVEEnumeration | CVESpecificWatchlist | DomainDiscovery | HostEnumeration,
-            contract_selector_default: str,
+        self,
+        contract_id: str,
+        contract_cls: (
+            CloudProviderAssetDiscovery
+            | CriticalPortsAndExposedAdminInterface
+            | CustomQuery
+            | CVEEnumeration
+            | CVESpecificWatchlist
+            | DomainDiscovery
+            | HostEnumeration
+        ),
+        contract_selector_default: str,
     ) -> Contract:
         return contract_cls.contract(
             contract_id=contract_id,
@@ -278,11 +294,23 @@ class ShodanContracts:
         selector_default = TargetSelectorField.ASSET_GROUPS.key
 
         shodan_contract_definitions = [
-            (ShodanContractId.CLOUD_PROVIDER_ASSET_DISCOVERY, CloudProviderAssetDiscovery, selector_default),
-            (ShodanContractId.CRITICAL_PORTS_AND_EXPOSED_ADMIN_INTERFACE, CriticalPortsAndExposedAdminInterface, selector_default),
+            (
+                ShodanContractId.CLOUD_PROVIDER_ASSET_DISCOVERY,
+                CloudProviderAssetDiscovery,
+                selector_default,
+            ),
+            (
+                ShodanContractId.CRITICAL_PORTS_AND_EXPOSED_ADMIN_INTERFACE,
+                CriticalPortsAndExposedAdminInterface,
+                selector_default,
+            ),
             (ShodanContractId.CUSTOM_QUERY, CustomQuery, "only_manual"),
             (ShodanContractId.CVE_ENUMERATION, CVEEnumeration, selector_default),
-            (ShodanContractId.CVE_SPECIFIC_WATCHLIST, CVESpecificWatchlist, selector_default),
+            (
+                ShodanContractId.CVE_SPECIFIC_WATCHLIST,
+                CVESpecificWatchlist,
+                selector_default,
+            ),
             (ShodanContractId.DOMAIN_DISCOVERY, DomainDiscovery, selector_default),
             (ShodanContractId.HOST_ENUMERATION, HostEnumeration, selector_default),
         ]
