@@ -42,7 +42,7 @@ class DomainDiscovery:
                 "call_success": {
                     "icon": "SUCCESS",
                     "title": "Call Success",
-                    "count_at_path": "matches"
+                    "count_at_path": "matches",
                 },
                 "call_failed": {
                     "icon": "FAILED",
@@ -118,9 +118,9 @@ class DomainDiscovery:
 
     @staticmethod
     def contract_with_specific_fields(
-            base_fields: list[ContractElement],
-            source_selector_key:str,
-            target_selector_field:str,
+        base_fields: list[ContractElement],
+        source_selector_key: str,
+        target_selector_field: str,
     ) -> list[ContractElement]:
 
         mandatory_conditions = dict(
@@ -147,14 +147,14 @@ class DomainDiscovery:
         ]
 
         contract_fields = (
-            ContractBuilder()
-            .add_fields(base_fields + specific_fields)
-            .build_fields()
+            ContractBuilder().add_fields(base_fields + specific_fields).build_fields()
         )
         return contract_fields
 
     @staticmethod
-    def contract_with_specific_outputs(base_outputs: list[ContractOutputElement]) -> list[ContractOutputElement]:
+    def contract_with_specific_outputs(
+        base_outputs: list[ContractOutputElement],
+    ) -> list[ContractOutputElement]:
         specific_outputs = []
         contract_outputs = (
             ContractBuilder()
@@ -165,10 +165,10 @@ class DomainDiscovery:
 
     @staticmethod
     def contract(
-            contract_id: str,
-            contract_config: ContractConfig,
-            contract_with_specific_fields: list[ContractElement],
-            contract_with_specific_outputs: list[ContractOutputElement]
+        contract_id: str,
+        contract_config: ContractConfig,
+        contract_with_specific_fields: list[ContractElement],
+        contract_with_specific_outputs: list[ContractOutputElement],
     ) -> Contract:
         return Contract(
             contract_id=contract_id,

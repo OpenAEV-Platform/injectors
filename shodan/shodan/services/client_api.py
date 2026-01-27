@@ -1,24 +1,29 @@
-import requests
 import re
-from limiter import Limiter
-from tenacity import retry, stop_after_attempt, wait_exponential_jitter, RetryError
 from dataclasses import dataclass
 from enum import Enum
-from urllib.parse import urljoin, quote_plus
+from urllib.parse import quote_plus, urljoin
+
+import requests
+from limiter import Limiter
+from pyoaev.helpers import OpenAEVInjectorHelper
+from tenacity import RetryError, retry, stop_after_attempt, wait_exponential_jitter
+
 from shodan.contracts import ShodanContractId
 from shodan.models import ConfigLoader
-from pyoaev.helpers import OpenAEVInjectorHelper
 
 LOG_PREFIX = "[SHODAN_CLIENT_API]"
 
+
 class MissingRequiredFieldError(ValueError):
     pass
+
 
 @dataclass
 class ShodanRestAPIDefinition:
     http_method: str
     endpoint: str
     path_parameter: bool = False
+
 
 class ShodanRestAPI(Enum):
     SEARCH_SHODAN = ShodanRestAPIDefinition(
@@ -31,8 +36,7 @@ class ShodanRestAPI(Enum):
         endpoint="shodan/host/{target}",
     )
     API_PLAN_INFORMATION = ShodanRestAPIDefinition(
-        http_method="GET",
-        endpoint="api-info"
+        http_method="GET", endpoint="api-info"
     )
 
     @property
@@ -65,7 +69,6 @@ class ShodanClientAPI:
             bucket="shodan",
         )
 
-
     @staticmethod
     def _split_target(raw_input: str) -> list[str]:
         return [target for target in re.split(r"[,\s]+", raw_input or "") if target]
@@ -79,8 +82,8 @@ class ShodanClientAPI:
         return url.split("?key=")[0]
 
     @staticmethod
-    def _build_query(query_params: dict[str,tuple[str,str]]) -> str:
-        query=["query="]
+    def _build_query(query_params: dict[str, tuple[str, str]]) -> str:
+        query = ["query="]
         for key, (value, operator) in query_params.items():
             if operator == "and":
                 query.append(f"{key}:{value} ")
@@ -91,7 +94,12 @@ class ShodanClientAPI:
                 break
         return "".join(query).strip()
 
-    def _build_url(self, endpoint: str, query_params: str | None = None, is_custom_query:bool=False) -> str:
+    def _build_url(
+        self,
+        endpoint: str,
+        query_params: str | None = None,
+        is_custom_query: bool = False,
+    ) -> str:
         url = urljoin(self.base_url, endpoint)
         api_key = f"key={self.api_key.get_secret_value()}"
         if not query_params and "?query=" not in url:
@@ -99,7 +107,6 @@ class ShodanClientAPI:
         if is_custom_query and "?query=" in url:
             return f"{url}&{api_key}"
         return f"{url}?{query_params}&{api_key}"
-
 
     def _get_user_info(self):
         self.helper.injector_logger.info(
@@ -239,19 +246,19 @@ class ShodanClientAPI:
         )
 
     def _process_request(
-            self,
-            raw_input:str,
-            request_api: ShodanRestAPI | None,
-            filters_template:dict=None,
-            is_custom_query:bool=False,
-            http_method_custom_query:str|None=None
+        self,
+        raw_input: str,
+        request_api: ShodanRestAPI | None,
+        filters_template: dict = None,
+        is_custom_query: bool = False,
+        http_method_custom_query: str | None = None,
     ):
 
         if is_custom_query:
             targets = [raw_input]
-            http_method=http_method_custom_query
-            endpoint_template=raw_input
-            path_parameter=None
+            http_method = http_method_custom_query
+            endpoint_template = raw_input
+            path_parameter = None
         else:
             targets = self._split_target(raw_input)
             http_method = request_api.value.http_method
@@ -284,11 +291,13 @@ class ShodanClientAPI:
                     method=http_method,
                     url=target_url,
                 )
-                results.append({
-                    "target": target,
-                    "url": f"{http_method} {self._secure_url(target_url)}",
-                    "result": result,
-                })
+                results.append(
+                    {
+                        "target": target,
+                        "url": f"{http_method} {self._secure_url(target_url)}",
+                        "result": result,
+                    }
+                )
             except RetryError as retry_exc:
                 inner_exception = retry_exc.last_attempt.exception()
 
@@ -305,14 +314,15 @@ class ShodanClientAPI:
                     "error": response.text,
                 }
 
-                results.append({
-                    "target": target,
-                    "is_error": True,
-                    "request": request_filtered,
-                    "response": response_filtered,
-                })
-        return {"targets":targets, "data": results}
-
+                results.append(
+                    {
+                        "target": target,
+                        "is_error": True,
+                        "request": request_filtered,
+                        "response": response_filtered,
+                    }
+                )
+        return {"targets": targets, "data": results}
 
     def _request_data(self, method: str, url: str):
         @retry(
@@ -322,14 +332,16 @@ class ShodanClientAPI:
             ),
         )
         def _retry_wrapped():
-            response =  requests.request(method=method, url=url)
+            response = requests.request(method=method, url=url)
             response.raise_for_status()
             return response.json()
 
         with self.rate_limiter:
             return _retry_wrapped()
 
-    def process_shodan_search(self, contract_id: ShodanContractId, inject_content:dict):
+    def process_shodan_search(
+        self, contract_id: ShodanContractId, inject_content: dict
+    ):
         self.helper.injector_logger.info(
             f"{LOG_PREFIX} - Starting the Shodan search process...",
         )
@@ -347,7 +359,7 @@ class ShodanClientAPI:
         if not contract:
             raise ValueError(
                 f"{LOG_PREFIX} - The contract ID is invalid.",
-                {"contract_id": contract_id}
+                {"contract_id": contract_id},
             )
 
         results = contract(inject_content)
@@ -358,6 +370,3 @@ class ShodanClientAPI:
             f"{LOG_PREFIX} - Finalization of the Shodan search process....",
         )
         return results, shodan_credit_user
-
-
-

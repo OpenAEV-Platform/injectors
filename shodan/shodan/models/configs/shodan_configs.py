@@ -1,11 +1,13 @@
 """Configuration for Shodan injector."""
 
 from datetime import timedelta
+
 from pydantic import (
     Field,
-    SecretStr,
     PositiveInt,
+    SecretStr,
 )
+
 from shodan.models.configs import _SettingsLoader
 
 
@@ -22,12 +24,12 @@ class _ConfigLoaderShodan(_SettingsLoader):
     api_leaky_bucket_rate: PositiveInt = Field(
         default=10,
         description="Bucket refill rate (in tokens per second). Controls the rate at which API calls are allowed. "
-                    "For example, a rate of 10 means that 10 calls can be made per second, if the bucket is not empty.",
+        "For example, a rate of 10 means that 10 calls can be made per second, if the bucket is not empty.",
     )
     api_leaky_bucket_capacity: PositiveInt = Field(
         default=10,
         description="Maximum bucket capacity (in tokens). Defines the number of calls that can be made immediately in a "
-                    "burst. Once the bucket is empty, it refills at the rate defined by 'api_leaky_bucket_rate'.",
+        "burst. Once the bucket is empty, it refills at the rate defined by 'api_leaky_bucket_rate'.",
     )
     api_retry: PositiveInt = Field(
         default=5,
