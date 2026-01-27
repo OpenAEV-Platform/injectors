@@ -122,7 +122,9 @@ class ShodanClientAPI:
     def _get_cve_enumeration(self, inject_content):
         hostname = inject_content.get("hostname")
         if not hostname:
-            return None
+            raise MissingRequiredFieldError(
+                f"{LOG_PREFIX} - The 'Hostname' field is required and cannot be empty."
+            )
 
         filters = {
             "has_vuln": ("true", "and"),
@@ -139,7 +141,9 @@ class ShodanClientAPI:
     def _get_cve_specific_watchlist(self, inject_content):
         hostname = inject_content.get("hostname")
         if not hostname:
-            return None
+            raise MissingRequiredFieldError(
+                f"{LOG_PREFIX} - The 'Hostname' field is required and cannot be empty."
+            )
 
         filters = {
             "vuln": (inject_content.get("vulnerability"), "and"),
@@ -156,7 +160,9 @@ class ShodanClientAPI:
     def _get_cloud_provider_asset_discovery(self, inject_content):
         hostname = inject_content.get("hostname")
         if not hostname:
-            return None
+            raise MissingRequiredFieldError(
+                f"{LOG_PREFIX} - The 'Hostname' field is required and cannot be empty."
+            )
 
         cloud_provider = inject_content.get("cloud_provider")
         # Please note that the default values are by nature a list.
@@ -179,7 +185,7 @@ class ShodanClientAPI:
         hostname = inject_content.get("hostname")
         if not hostname:
             raise MissingRequiredFieldError(
-                f"{LOG_PREFIX} - The 'custom_request' field is required and cannot be empty."
+                f"{LOG_PREFIX} - The 'Hostname' field is required and cannot be empty."
             )
 
         port = inject_content.get("port")
@@ -200,15 +206,15 @@ class ShodanClientAPI:
 
     # CONTRACT - CUSTOM QUERY
     def _get_custom_query(self, inject_content):
-        custom_request = inject_content.get("custom_request")
+        custom_query = inject_content.get("custom_query")
         http_method = inject_content.get("http_method")
-        if not custom_request:
+        if not custom_query:
             raise MissingRequiredFieldError(
-                f"{LOG_PREFIX} - The 'Custom Request' field is required and cannot be empty."
+                f"{LOG_PREFIX} - The 'Custom Query' field is required and cannot be empty."
             )
 
         return self._process_request(
-            raw_input=custom_request,
+            raw_input=custom_query,
             request_api=None,
             filters_template=None,
             is_custom_query=True,
