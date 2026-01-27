@@ -12,6 +12,111 @@ from pyoaev.contracts.contract_config import (
 class CVEEnumeration:
 
     @staticmethod
+    def output_trace_config():
+        return {
+            "header": {
+                "title": "SHODAN - CVE ENUMERATION",
+                "subtitle": None,
+            },
+            "sections_config": {
+                "header": {
+                    "icon": "CONFIG",
+                    "title": "[CONFIG] Summary of all configurations used for the contract.",
+                },
+                "keys_list_to_string": [],
+                "keys_to_exclude": [],
+            },
+            "sections_info": {
+                "header": {
+                    "icon": "INFO",
+                    "title": "[INFO] The Shodan information for the remaining credits and the user's plan.",
+                },
+                "keys_list_to_string": [],
+                "keys_to_exclude": [],
+            },
+            "sections_external_api": {
+                "header": {
+                    "icon": "API",
+                    "title": "[SHODAN] Call API completed",
+                },
+                "call_success": {
+                    "icon": "SUCCESS",
+                    "title": "Call Success",
+                    "count_at_path": "matches"
+                },
+                "call_failed": {
+                    "icon": "FAILED",
+                    "title": "Call Failed",
+                },
+            },
+            "tables": [
+                {
+                    "header": {
+                        "icon": "SEARCH",
+                        "title": None,
+                    },
+                    "config": {
+                        "search_entity": None,
+                        "columns": [
+                            {
+                                "title": "Hostnames",
+                                "path": "matches.hostnames",
+                                "mode": "single",
+                            },
+                            {
+                                "title": "IP",
+                                "path": "matches.ip_str",
+                                "mode": "align_to_single",
+                            },
+                            {
+                                "title": "Port",
+                                "path": "matches.port",
+                                "mode": "align_to_single",
+                            },
+                            {
+                                "title": "Vulnerabilities (score)",
+                                "path": "matches.vulns.*",
+                                "use_key": True,
+                                "extra": "matches.vulns.*.cvss",
+                                "mode": "align_to_single",
+                            },
+                        ],
+                    },
+                }
+            ],
+            "options": {
+                # "split_output": False,
+                "show_header": {
+                    "is_active": True,
+                    "show_subtitle": True,
+                },
+                "show_sections": {
+                    "is_active": True,
+                    "sec_config": True,
+                    "sec_info": True,
+                    "sec_external_api": True,
+                },
+                "show_tables": {
+                    "is_active": True,
+                    "show_lines": True,
+                    "max_display_by_cell": 4,
+                    "show_index": {
+                        "is_active": False,
+                        "index_start": 1,
+                    },
+                },
+                "show_separator": {
+                    "is_active": True,
+                },
+                "show_json": {
+                    "is_active": False,
+                    "indent": 2,
+                    "sort_keys": False,
+                },
+            },
+        }
+
+    @staticmethod
     def contract_with_specific_fields(
             base_fields: list[ContractElement],
             source_selector_key:str,
@@ -32,7 +137,6 @@ class CVEEnumeration:
             ContractText(
                 key="hostname",
                 label="Hostname",
-                mandatory=True,
                 **(mandatory_conditions | visible_conditions),
             ),
             ContractText(

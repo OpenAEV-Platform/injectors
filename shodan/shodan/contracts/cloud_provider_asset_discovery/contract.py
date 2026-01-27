@@ -5,10 +5,126 @@ from pyoaev.contracts.contract_config import (
     ContractElement,
     ContractOutputElement,
     ContractText,
+    ContractTuple,
     SupportedLanguage,
 )
 
 class CloudProviderAssetDiscovery:
+
+    @staticmethod
+    def output_trace_config():
+        return {
+            "header": {
+                "title": "SHODAN - CLOUD PROVIDER ASSET DISCOVERY",
+                "subtitle": None,
+            },
+            "sections_config": {
+                "header": {
+                    "icon": "CONFIG",
+                    "title": "[CONFIG] Summary of all configurations used for the contract.",
+                },
+                "keys_list_to_string": ["cloud_provider"],
+                "keys_to_exclude": [],
+            },
+            "sections_info": {
+                "header": {
+                    "icon": "INFO",
+                    "title": "[INFO] The Shodan information for the remaining credits and the user's plan.",
+                },
+                "keys_list_to_string": [],
+                "keys_to_exclude": [],
+            },
+            "sections_external_api": {
+                "header": {
+                    "icon": "API",
+                    "title": "[SHODAN] Call API completed",
+                },
+                "call_success": {
+                    "icon": "SUCCESS",
+                    "title": "Call Success",
+                    "count_at_path": "matches"
+                },
+                "call_failed": {
+                    "icon": "FAILED",
+                    "title": "Call Failed",
+                },
+            },
+            "tables": [
+                {
+                    "header": {
+                        "icon": "SEARCH",
+                        "title": None,
+                    },
+                    "config": {
+                        "search_entity": None,
+                        "columns": [
+                            {
+                                "title": "Hostnames",
+                                "path": "matches.hostnames",
+                                "mode": "align_to_single",
+                            },
+                            {
+                                "title": "IP",
+                                "path": "matches.ip_str",
+                                "mode": "single",
+                            },
+                            {
+                                "title": "Port",
+                                "path": "matches.port",
+                                "mode": "align_to_single",
+                            },
+                            {
+                                "title": "Cloud Provider",
+                                "path": "matches.cloud.provider",
+                                "mode": "align_to_single",
+                            },
+                            {
+                                "title": "OS",
+                                "path": "matches.os",
+                                "mode": "align_to_single",
+                            },
+                            {
+                                "title": "Vulnerabilities (score)",
+                                "path": "matches.vulns.*",
+                                "use_key": True,
+                                "extra": "matches.vulns.*.cvss",
+                                "mode": "align_to_single",
+                            },
+                        ],
+                    },
+                }
+            ],
+            "options": {
+                # "split_output": False,
+                "show_header": {
+                    "is_active": True,
+                    "show_subtitle": True,
+                },
+                "show_sections": {
+                    "is_active": True,
+                    "sec_config": True,
+                    "sec_info": True,
+                    "sec_external_api": True,
+                },
+                "show_tables": {
+                    "is_active": True,
+                    "show_lines": True,
+                    "max_display_by_cell": 4,
+                    "show_index": {
+                        "is_active": False,
+                        "index_start": 1,
+                    },
+                },
+                "show_separator": {
+                    "is_active": False,
+                },
+                "show_json": {
+                    "is_active": False,
+                    "indent": 2,
+                    "sort_keys": False,
+                },
+            },
+        }
 
     @staticmethod
     def contract_with_specific_fields(
@@ -28,16 +144,15 @@ class CloudProviderAssetDiscovery:
         )
 
         specific_fields = [
-            ContractText(
+            ContractTuple(
                 key="cloud_provider",
                 label="Cloud Provider",
-                mandatory=True,
+                defaultValue=["Google","Microsoft","Amazon","Azure"],
                 **(mandatory_conditions | visible_conditions),
             ),
             ContractText(
                 key="hostname",
                 label="Hostname",
-                mandatory=True,
                 **(mandatory_conditions | visible_conditions),
             ),
             ContractText(

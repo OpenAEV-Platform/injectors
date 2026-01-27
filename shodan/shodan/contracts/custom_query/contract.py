@@ -5,11 +5,92 @@ from pyoaev.contracts.contract_config import (
     ContractElement,
     ContractOutputElement,
     ContractText,
+    ContractSelect,
     SupportedLanguage,
 )
 
 
 class CustomQuery:
+
+    @staticmethod
+    def output_trace_config():
+        return {
+            "header": {
+                "title": "SHODAN - CUSTOM QUERY",
+                "subtitle": None,
+            },
+            "sections_config": {
+                "header": {
+                    "icon": "CONFIG",
+                    "title": "[CONFIG] Summary of all configurations used for the contract.",
+                },
+                "keys_to_exclude": [],
+            },
+            "sections_info": {
+                "header": {
+                    "icon": "INFO",
+                    "title": "[INFO] The Shodan information for the remaining credits and the user's plan.",
+                },
+                "keys_to_exclude": [],
+            },
+            "sections_external_api": {
+                "header": {
+                    "icon": "API",
+                    "title": "[SHODAN] Call API completed",
+                },
+                "call_success": {
+                    "icon": "SUCCESS",
+                    "title": "Call Success",
+                    "count_at_path": "matches"
+                },
+                "call_failed": {
+                    "icon": "FAILED",
+                    "title": "Call Failed",
+                },
+            },
+            "tables": [
+                {
+                    "header": {
+                        "icon": "SEARCH",
+                        "title": None,
+                    },
+                    "config": {
+                        "search_entity": None,
+                        "columns": [],
+                    },
+                }
+            ],
+            "options": {
+                # "split_output": False,
+                "show_header": {
+                    "is_active": True,
+                    "show_subtitle": True,
+                },
+                "show_sections": {
+                    "is_active": True,
+                    "sec_config": True,
+                    "sec_info": True,
+                    "sec_external_api": True,
+                },
+                "show_tables": {
+                    "is_active": False,
+                    "show_lines": True,
+                    "max_display_by_cell": 4,
+                    "show_index": {
+                        "is_active": False,
+                        "index_start": 1,
+                    },
+                },
+                "show_separator": {
+                    "is_active": False,
+                },
+                "show_json": {
+                    "is_active": True,
+                    "indent": 2,
+                    "sort_keys": False,
+                },
+            },
+        }
 
     @staticmethod
     def contract_with_specific_fields(
@@ -29,16 +110,21 @@ class CustomQuery:
         )
 
         specific_fields = [
-            ContractText(
-                key="custom_request_overview",
-                label="Custom Request Overview",
-                readOnly=True,
-                **visible_conditions,
+            ContractSelect(
+                key="http_method",
+                label="HTTP Method",
+                defaultValue=["get"],
+                choices={
+                    "get":"GET",
+                    "post":"POST",
+                    "put":"PUT",
+                    "delete":"DELETE",
+                },
+                **(mandatory_conditions | visible_conditions),
             ),
             ContractText(
-                key="custom_request",
-                label="Custom Request",
-                mandatory=True,
+                key="custom_query",
+                label="Custom Query",
                 **(mandatory_conditions | visible_conditions),
             ),
         ]
