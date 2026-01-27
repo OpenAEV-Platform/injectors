@@ -10,7 +10,7 @@ Issues = "https://github.com/OpenAEV-Platform/injectors/issues"
 
 [project]
 name = "openaev-shodan-injector"
-version = "2.0.5"
+version = "2.0.14"
 description = "An injector for running with Shodan"
 readme = "README.md"
 authors = [{ name = "Filigran", email = "contact@filigran.io" }]
@@ -26,14 +26,14 @@ dependencies = [
     "pydantic~=2.11.7",
     "pydantic-settings~=2.11.0",
     "requests~=2.32.5",
-    "aiohttp~=3.13.2",
     "limiter==0.5.0",
     "tenacity~=9.1.2",
+    "rich~=14.2.0",
 ]
 
 [project.optional-dependencies]
 prod = [
-    "pyoaev ~=2.0.5"
+    "pyoaev ~=2.0.14"
 ]
 current = [
     "pyoaev @ git+https://github.com/OpenAEV-Platform/client-python.git@release/current"
