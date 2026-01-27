@@ -1,6 +1,6 @@
 import json
 from datetime import datetime
-from enum import Enum, StrEnum
+from enum import Enum
 from typing import Any
 
 from rich import box
