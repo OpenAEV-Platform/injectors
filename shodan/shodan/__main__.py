@@ -32,7 +32,8 @@ def main() -> None:
         config_helper_adapter = config.to_config_injector_helper_adapter(
             contracts=shodan_contracts
         )
-        icon_bytes = Path("shodan/img/icon-shodan.png").read_bytes()
+        icon_path = Path(__file__).parent / "img" / "icon-shodan.png"
+        icon_bytes = icon_path.read_bytes()
 
         helper = OpenAEVInjectorHelper(config=config_helper_adapter, icon=icon_bytes)
 
