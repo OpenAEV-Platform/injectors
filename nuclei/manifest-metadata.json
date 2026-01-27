@@ -1,9 +1,9 @@
 {
   "title": "Nuclei",
-  "slug": "nuclei_injector",
+  "slug": "openaev_nuclei",
   "description": "Allow to perform CVE scan based on Nuclei",
   "short_description": "Allow to perform CVE scan based on Nuclei",
-  "use_cases": ["Injector", "Technical"],
+  "use_cases": ["Technical"],
   "verified": true,
   "last_verified_date": "",
   "playbook_supported": false,

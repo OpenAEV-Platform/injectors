@@ -15,11 +15,3 @@ class InjectorConfigOverride(ConfigLoaderCollector):
         default="nmap/img/nmap.png",
         description="Path to the icon file",
     )
-    type: str = Field(
-        description="Type of the injector.",
-        default="openaev_nmap",
-    )
-    log_level: str = Field(
-        description="Determines the verbosity of the logs. Options: debug, info, warn, or error.",
-        default="info",
-    )

@@ -8,18 +8,10 @@ class InjectorConfigOverride(ConfigLoaderCollector):
         description="A unique UUIDv4 identifier for this injector instance.",
     )
     name: str = Field(
-        default="AWS",
+        default="HTTP query",
         description="Name of the injector.",
     )
     icon_filepath: str | None = Field(
         default="http-query/img/icon-http.png",
         description="Path to the icon file",
-    )
-    type: str = Field(
-        description="Type of the injector.",
-        default="openaev_http_query",
-    )
-    log_level: str = Field(
-        description="Determines the verbosity of the logs. Options: debug, info, warn, or error.",
-        default="info",
     )

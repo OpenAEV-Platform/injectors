@@ -18,7 +18,7 @@ class ConfigLoader(SettingsLoader):
                 # Injector configuration (flattened)
                 "injector_id": {"data": self.injector.id},
                 "injector_name": {"data": self.injector.name},
-                "injector_type": {"data": self.injector.type},
+                "injector_type": {"data": "openaev_nmap"},
                 "injector_contracts": {"data": NmapContracts.build_contract()},
                 "injector_log_level": {"data": self.injector.log_level},
                 "injector_icon_filepath": {"data": self.injector.icon_filepath},
