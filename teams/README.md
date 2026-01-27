@@ -41,7 +41,7 @@ Configuration values can be provided either:
 The following parameters are required to connect the injector to the OpenAEV platform:
 
 | Parameter     | `config.yml` | Docker Variable | Mandatory | Description                                         |
-| ------------- | ------------ | --------------- | --------- | --------------------------------------------------- |
+|---------------|--------------|-----------------|-----------|-----------------------------------------------------|
 | OpenAEV URL   | `url`        | `OPENAEV_URL`   | Yes       | Base URL of the OpenAEV platform.                   |
 | OpenAEV Token | `token`      | `OPENAEV_TOKEN` | Yes       | Admin API token configured in the OpenAEV platform. |
 
@@ -50,7 +50,7 @@ The following parameters are required to connect the injector to the OpenAEV pla
 The following parameters control the injector runtime behavior:
 
 | Parameter     | `config.yml` | Docker Variable      | Default | Mandatory | Description                                             |
-| ------------- | ------------ | -------------------- | ------- | --------- | ------------------------------------------------------- |
+|---------------|--------------|----------------------|---------|-----------|---------------------------------------------------------|
 | Injector ID   | `id`         | `INJECTOR_ID`        | —       | Yes       | Unique `UUIDv4` identifying this injector instance.     |
 | Injector Name | `name`       | `INJECTOR_NAME`      | —       | Yes       | Human-readable name of the injector.                    |
 | Log Level     | `log_level`  | `INJECTOR_LOG_LEVEL` | `info`  | Yes       | Logging verbosity: `debug`, `info`, `warn`, or `error`. |
@@ -64,11 +64,18 @@ Build the Docker image using the provided `Dockerfile`:
 ```shell
 docker build --build-context injector_common=../injector_common . -t openaev/injector-teams:latest
 ```
+```shell
+podman build --build-context injector_common=../injector_common . -t openaev/injector-teams:latest
+```
 
 Then configure the environment variables in `docker-compose.yml` and start the injector:
 
 ```shell
 docker compose up -d
+```
+
+```shell
+podman compose up -d
 ```
 
 ### Manual Deployment
@@ -91,8 +98,22 @@ poetry install --extras prod
 
 **Development environment**
 
-For development, you should also clone the `pyoaev` repository following the instructions provided in the OpenAEV
+For development, you should first clone the `pyoaev` repository following the instructions provided in the OpenAEV
 documentation.
+
+First, create a dedicated virtual environment to keep things isolated:
+
+```shell
+py -3.12 -m venv venv
+```
+
+Activate it depending on your OS:
+
+```shell
+.\venv\Scripts\activate
+```
+
+Then install development dependencies
 
 ```shell
 poetry install --extras dev

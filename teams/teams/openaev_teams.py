@@ -4,7 +4,9 @@ from typing import Dict
 from pyoaev.helpers import OpenAEVConfigHelper, OpenAEVInjectorHelper
 
 from injector_common.data_helpers import DataHelpers
+from injector_common.dump_config import intercept_dump_argument
 from teams.client.teams_client import ExecutionResult, TeamsClient
+from teams.configuration.config_loader import ConfigLoader
 from teams.contracts_teams import (
     CONTRACT_ID,
     TeamsContracts,
@@ -15,29 +17,10 @@ from teams.helpers.teams_helper import TeamsPayloadBuilder
 class OpenAEVTeamsInjector:
 
     def __init__(self):
-        self.config = OpenAEVConfigHelper(
-            __file__,
-            {
-                # API information
-                "openaev_url": {"env": "OPENAEV_URL", "file_path": ["openaev", "url"]},
-                "openaev_token": {
-                    "env": "OPENAEV_TOKEN",
-                    "file_path": ["openaev", "token"],
-                },
-                # Config information
-                "injector_id": {"env": "INJECTOR_ID", "file_path": ["injector", "id"]},
-                "injector_name": {
-                    "env": "INJECTOR_NAME",
-                    "file_path": ["injector", "name"],
-                },
-                "injector_type": {
-                    "env": "INJECTOR_TYPE",
-                    "file_path": ["injector", "type"],
-                    "default": "openaev_teams",
-                },
-                "injector_contracts": {"data": TeamsContracts.build()},
-            },
+        self.config = OpenAEVConfigHelper.from_configuration_object(
+            ConfigLoader().to_daemon_config()
         )
+        intercept_dump_argument(self.config.get_config_obj())
         with open("teams/img/icon-teams.png", "rb") as icon_file:
             icon_bytes = icon_file.read()
         self.helper = OpenAEVInjectorHelper(self.config, icon_bytes)
