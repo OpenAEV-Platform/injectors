@@ -17,7 +17,7 @@ class ConfigLoader(SettingsLoader):
                 # Injector configuration (flattened)
                 "injector_id": {"data": self.injector.id},
                 "injector_name": {"data": self.injector.name},
-                "injector_type": {"data": self.injector.type},
+                "injector_type": {"data": "openaev_http_query"},
                 "injector_contracts": {"data": HttpContracts.build_contract()},
                 "injector_log_level": {"data": self.injector.log_level},
                 "injector_icon_filepath": {"data": self.injector.icon_filepath},

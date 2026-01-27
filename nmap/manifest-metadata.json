@@ -1,9 +1,9 @@
 {
   "title": "Nmap: The network mapper",
-  "slug": "nmap_injector",
+  "slug": "openaev_nmap",
   "description": "Allow OAEV to perform nmap scans",
   "short_description": "Allow OAEV to perform nmap scans",
-  "use_cases": ["Injector", "Technical"],
+  "use_cases": ["Technical"],
   "verified": true,
   "last_verified_date": "",
   "playbook_supported": false,

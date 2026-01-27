@@ -1,9 +1,9 @@
 {
   "title": "HTTP query",
-  "slug": "http_query_injector",
+  "slug": "openaev_http_query",
   "description": "Allow OAEV to perform HTTP queries",
   "short_description": "Allow OAEV to perform HTTP queries",
-  "use_cases": ["Injector", "Technical"],
+  "use_cases": ["Technical"],
   "verified": true,
   "last_verified_date": "",
   "playbook_supported": false,
