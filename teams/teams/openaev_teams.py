@@ -1,10 +1,10 @@
 import time
 from typing import Dict
 
-from pyoaev.helpers import OpenAEVConfigHelper, OpenAEVInjectorHelper
-
 from injector_common.data_helpers import DataHelpers
 from injector_common.dump_config import intercept_dump_argument
+from pyoaev.helpers import OpenAEVConfigHelper, OpenAEVInjectorHelper
+
 from teams.client.teams_client import ExecutionResult, TeamsClient
 from teams.configuration.config_loader import ConfigLoader
 from teams.contracts_teams import (
