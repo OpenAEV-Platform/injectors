@@ -119,9 +119,9 @@ jobs:
               echo "Building injector: $injector"
             
               if [ "${CIRCLE_BRANCH}" = "release/current" ]; then
-                docker build --progress=plain --build-context injector_common=../injector_common -t openaev/injector-$injector:${CIRCLE_SHA1} --build-arg PYOAEV_GIT_BRANCH_OVERRIDE="${CIRCLE_BRANCH}" ./$injector
+                docker build --progress=plain --build-context injector_common=injector_common -t openaev/injector-$injector:${CIRCLE_SHA1} --build-arg PYOAEV_GIT_BRANCH_OVERRIDE="${CIRCLE_BRANCH}" ./$injector
               else
-                docker build --progress=plain --build-context injector_common=../injector_common -t openaev/injector-$injector:${CIRCLE_SHA1} ./$injector
+                docker build --progress=plain --build-context injector_common=injector_common -t openaev/injector-$injector:${CIRCLE_SHA1} ./$injector
               fi
             
               docker save -o ~/openaev/images/injector-$injector openaev/injector-$injector:${CIRCLE_SHA1}
