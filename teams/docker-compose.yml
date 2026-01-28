@@ -1,0 +1,13 @@
+services:
+  injector-teams:
+    image: openaev/injector-teams:2.0.11
+    environment:
+      - OPENAEV_URL=${OPENAEV_URL}
+      - OPENAEV_TOKEN=${OPENAEV_TOKEN}
+      - INJECTOR_ID=${INJECTOR_ID}
+      - INJECTOR_NAME=Teams
+      - INJECTOR_LOG_LEVEL=error
+    restart: always
+    depends_on:
+      openaev:
+        condition: service_healthy
