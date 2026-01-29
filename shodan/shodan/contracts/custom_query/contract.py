@@ -24,6 +24,7 @@ class CustomQuery:
                     "icon": "CONFIG",
                     "title": "[CONFIG] Summary of all configurations used for the contract.",
                 },
+                "keys_list_to_string": [],
                 "keys_to_exclude": [],
             },
             "sections_info": {
@@ -31,6 +32,7 @@ class CustomQuery:
                     "icon": "INFO",
                     "title": "[INFO] The Shodan information for the remaining credits and the user's plan.",
                 },
+                "keys_list_to_string": [],
                 "keys_to_exclude": [],
             },
             "sections_external_api": {

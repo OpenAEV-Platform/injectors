@@ -15,12 +15,13 @@ description = "An injector for running with Shodan"
 readme = "README.md"
 authors = [{ name = "Filigran", email = "contact@filigran.io" }]
 license = "Apache-2.0"
-requires-python = ">=3.11, <3.13"
+requires-python = ">=3.11, <3.14"
 classifiers = [
     "Development Status :: 5 - Production/Stable",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
 ]
 dependencies = [
     "pydantic~=2.11.7",

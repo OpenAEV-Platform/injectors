@@ -108,14 +108,15 @@ class ShodanClientAPI:
             return f"{url}&{api_key}"
         return f"{url}?{query_params}&{api_key}"
 
+    # SECTION INFO
     def _get_user_info(self):
         self.helper.injector_logger.info(
-            f"{LOG_PREFIX} - Preparation for user quota recovery....",
+            f"{LOG_PREFIX} - Preparation for user quota recovery...",
         )
-        target_url = self._build_url(ShodanRestAPI.API_PLAN_INFORMATION.endpoint)
-        return self._request_data(
-            method=ShodanRestAPI.API_PLAN_INFORMATION.http_method,
-            url=target_url,
+
+        return self._process_request(
+            raw_input="user_info",
+            request_api=ShodanRestAPI.API_PLAN_INFORMATION,
         )
 
     # CONTRACT - CVE ENUMERATION
@@ -369,10 +370,9 @@ class ShodanClientAPI:
             )
 
         results = contract(inject_content)
-
-        # Todo Include the user_info call in the _process_request
         shodan_credit_user = self._get_user_info()
+
         self.helper.injector_logger.info(
-            f"{LOG_PREFIX} - Finalization of the Shodan search process....",
+            f"{LOG_PREFIX} - Finalization of the Shodan search process.",
         )
         return results, shodan_credit_user

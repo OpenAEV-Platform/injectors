@@ -2,18 +2,20 @@
 
 ## Table of Contents
 
-- [OpenAEV SHODAN Injector](#openaev-nuclei-injector)
+- [OpenAEV SHODAN Injector](#openaev-shodan-injector)
     - [Prerequisites](#prerequisites)
     - [Configuration variables](#configuration-variables)
-        - [OpenAEV environment variables](#openaev-environment-variables)
+        - [Base OpenAEV environment variables](#base-openaev-environment-variables)
         - [Base injector environment variables](#base-injector-environment-variables)
         - [Base Shodan environment variables](#base-shodan-environment-variables)
     - [Deployment](#deployment)
         - [Docker Deployment](#docker-deployment)
         - [Manual Deployment](#manual-deployment)
     - [Behavior](#behavior)
-        - [Template Selection](#template-selection)
-        - [Target Selection](#target-selection)
+    - [Supported Contracts](#supported-contracts)
+        - [Fields available in manual mode by contract](#fields-available-in-manual-mode-by-contract)
+        - [Output Trace Message](#output-trace-message)
+        - [Auto-Create Assets](#auto-create-assets)
     - [Resources](#resources)
 
 ---
@@ -44,7 +46,9 @@ Depending on your deployment method:
 Configuration is provided either through environment variables (Docker) or a config
 file (`config.yml`, manual).
 
-### OpenAEV environment variables
+---
+
+### Base OpenAEV environment variables
 
 | Parameter     | config.yml | Docker environment variable | Mandatory | Description                                          |
 |---------------|------------|-----------------------------|-----------|------------------------------------------------------|
@@ -74,6 +78,8 @@ file (`config.yml`, manual).
 ---
 
 ## Deployment
+
+---
 
 ### Docker Deployment
 
@@ -157,10 +163,10 @@ Use Poetry for production or current releases, or to manage dependencies automat
 
 ```bash
 # Install prod dependencies (stable Pyoaev release)
-poetry install --with prod
+poetry install --extras prod
 
 # Install current release from Git / latest
-poetry install --with current
+poetry install --extras current
 
 # Tips For development/testing with local Pyoaev (client-python)
 poetry run pip install -r requirements.txt
@@ -186,12 +192,14 @@ ShodanInjector
 #### Commands Summary:
 The table below summarizes the installation and run commands for different workflows (pip or Poetry, prod/current/dev).
 
-| Installation    | Install Command                              | Run Command                             | Notes                                                      |
-|-----------------|----------------------------------------------|-----------------------------------------|------------------------------------------------------------|
-| Pip Dev/Test    | `pip install -r requirements.txt`            | `python -m shodan` / `ShodanInjector`   | Requires venv active, handles local editable client-python |
-| Poetry Prod     | `poetry install --with prod`                 | `poetry run ShodanInjector`             | Installs stable dependencies, venv managed automatically   |
-| Poetry Current  | `poetry install --with current`              | `poetry run ShodanInjector`             | Installs latest release from Git                           |
-| Poetry Dev/Test | `poetry run pip install -r requirements.txt` | `poetry run ShodanInjector`             | Handles local editable client-python + dev/test extras     |
+| Installation    | Install Command                              | Run Command                                                           | Notes                                                    |
+|-----------------|----------------------------------------------|-----------------------------------------------------------------------|----------------------------------------------------------|
+| Pip Prod        | `pip install .[prod]`                        | `python -m shodan` / `ShodanInjector` (Requires venv active)          | Installs stable dependencies, venv managed automatically |
+| Pip Current     | `pip install .[current]`                     | `python -m shodan` / `ShodanInjector` (Requires venv active)          | Installs latest release from Git                         |
+| Pip Dev/Test    | `pip install -r requirements.txt`            | `python -m shodan` / `ShodanInjector` (Requires venv active)          | Handles local editable client-python + dev/test extras   |
+| Poetry Prod     | `poetry install --extras prod`               | `poetry run ShodanInjector` / `ShodanInjector` (Requires venv active) | Installs stable dependencies, venv managed automatically |
+| Poetry Current  | `poetry install --extras current`            | `poetry run ShodanInjector` / `ShodanInjector` (Requires venv active) | Installs latest release from Git                         |
+| Poetry Dev/Test | `poetry run pip install -r requirements.txt` | `poetry run ShodanInjector` / `ShodanInjector` (Requires venv active) | Handles local editable client-python + dev/test extras   |
 
 ---
 
@@ -228,38 +236,38 @@ Direct values separated by commas or spaces between IP addresses or hostnames ar
 
 ### Fields available in manual mode by contract
 
-- Cloud Provider Asset Discovery
+- Cloud Provider Asset Discovery (Search Shodan Endpoint: `/shodan/host/search`)
   - Cloud Provider (default: `Google,Microsoft,Amazon,Azure`) - mandatory
   - Hostname - mandatory
   - Organization - Optional (default: `hostname value is used`)
 
-- Critical Ports And Exposed Admin Interface
+- Critical Ports And Exposed Admin Interface (Search Shodan Endpoint: `/shodan/host/search`)
   - Port (default: `20,21,22,23,25,53,80,110,111,135,139,143,443,445,993,995,1723,3306,3389,5900,8080`) - mandatory
   - Hostname - mandatory
   - Organization - Optional (default: `hostname value is used`)
 
-- Custom Query
+- Custom Query (Endpoint: `your custom endpoint`)
   - HTTP Method (choices: `GET, POST, PUT, DELETE`, default: `GET`) - mandatory 
   - Custom Query - mandatory
 
-- CVE Enumeration
+- CVE Enumeration (Search Shodan Endpoint: `/shodan/host/search`)
   - Hostname - mandatory
   - Organization - Optional (default: `hostname value is used`)
 
-- CVE Specific Watchlist
+- CVE Specific Watchlist (Search Shodan Endpoint: `/shodan/host/search`)
   - Vulnerability - mandatory
   - Hostname - mandatory
   - Organization - Optional (default: `hostname value is used`)
 
-- Domain Discovery
-    - Hostname - mandatory
-    - Organization - Optional (default: `hostname value is used`)
+- Domain Discovery (Search Shodan Endpoint: `/shodan/host/search`)
+  - Hostname - mandatory
+  - Organization - Optional (default: `hostname value is used`)
 
-- Host Enumeration
+- Host Enumeration (Host Information Endpoint: `/shodan/host/{ip}`)
   - Host - mandatory
 
 
-### Output Parsing
+### Output Trace Message
 The injector captures the fields filled in by the user and analyzes the JSON output of the Shodan response, 
 then returns several sections in the report if successful:
 
@@ -267,8 +275,8 @@ then returns several sections in the report if successful:
 - **Section Config** – Groups all the configuration information entered by the user for the current contract.
 - **Section Info** – Makes an additional final call to the Shodan API to determine the user's remaining quota and plan.
 - **Section External API** – Processes information from Shodan API responses based on the contract and fields filled in. This section also includes:
-  - Call Success – List of successful calls + As well as various other relevant information related to API calls
-  - Call Failed – List of failed calls + As well as various other relevant information related to API calls
+  - Call Success – List of successful calls + As well as various other relevant information related to API calls.
+  - Call Failed – List of failed calls + As well as various other relevant information related to API calls.
 - **Section Table** – Visually displays the details of each call, based on the configuration defined for the contract in the injector.
 - **OPTIONAL** - JSON return of the response directly (In the case of a "custom query", we return the JSON directly rather than the table section.)
 

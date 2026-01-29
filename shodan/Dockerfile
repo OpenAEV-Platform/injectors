@@ -1,13 +1,20 @@
 FROM python:3.13-alpine AS build
 
 WORKDIR /opt/openaev-injector-shodan
-COPY shodan /opt/openaev-injector-shodan
 
-# Build dependencies + pip install
+# Copy dependency files (pyproject.toml / poetry.lock / README.md)
+COPY pyproject.toml poetry.lock* README.md ./
+
+# Build dependencies
 RUN apk add --no-cache --virtual .build-dependencies \
-    build-base git libffi-dev libxml2-dev libxslt-dev && \
-    pip install --no-cache-dir -r shodan/requirements.txt && \
-    apk del .build-dependencies
+    build-base git libffi-dev libxml2-dev libxslt-dev \
+    && pip3 install --no-cache-dir poetry==2.2.1 \
+    && poetry config virtualenvs.create false \
+    && poetry install --only main --extras prod --no-interaction --no-ansi --no-root \
+    && apk del .build-dependencies
+
+# Copy the injector
+COPY shodan ./shodan
 
 FROM python:3.13-alpine AS runner
 
