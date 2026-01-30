@@ -22,25 +22,27 @@ def main() -> None:
     logger = logging.getLogger(__name__)
 
     try:
-        logger.info(f"{LOG_PREFIX} Starting Shodan Injector...")
-
-        # Injector Config
+        # Loading injector configuration
         config = ConfigLoader()
 
-        # Prepare config for Helper
+        # Build Shodan contracts and adapt config for the helper
         shodan_contracts = ShodanContracts(config).contracts()
         config_helper_adapter = config.to_config_injector_helper_adapter(
             contracts=shodan_contracts
         )
+
+        # Load the injector icon for the helper
         icon_path = Path(__file__).parent / "img" / "icon-shodan.png"
         icon_bytes = icon_path.read_bytes()
 
+        # Instantiate the OpenAEV injector helper
         helper = OpenAEVInjectorHelper(config=config_helper_adapter, icon=icon_bytes)
 
         logger.info(
-            f"{LOG_PREFIX} The initialization of the Shodan injector configuration was successful."
+            f"{LOG_PREFIX} - Shodan injector configuration initialized successfully."
         )
 
+        # Start the Shodan injector
         injector = ShodanInjector(config, helper)
         injector.start()
 

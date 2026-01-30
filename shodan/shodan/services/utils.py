@@ -309,7 +309,7 @@ class Utils:
         )
 
         if not (options_show_sections and options_show_sec_external_api):
-            return None
+            return None, None
 
         sec_external_api_icon = self._get_output_icon(
             self._get_trace_config(
@@ -507,7 +507,7 @@ class Utils:
                                 filtered = [
                                     str(v) for v in value if v not in (None, "")
                                 ]
-                                cell = ",".join(filtered) if filtered else "-"
+                                cell = ", ".join(filtered) if filtered else "-"
                             else:
                                 val = values[row_idx] if row_idx < len(values) else None
                                 cell = str(val) if val not in (None, "") else "-"
@@ -656,6 +656,8 @@ class Utils:
         )
 
         tables = self._get_trace_config(output_trace_config, "tables", default=[])
+
+        tables_rendering = []
         for table_config in tables:
             header_icon = self._get_output_icon(
                 self._get_trace_config(table_config, "header.icon", default="SEARCH")
@@ -666,7 +668,8 @@ class Utils:
             search_entity = self._get_trace_config(
                 table_config, "config.search_entity", default=None
             )
-            tables_final = []
+
+            table_rendering = []
             for data_table in data_tables:
                 result = data_table.get("result")
                 if header_title:
@@ -726,10 +729,10 @@ class Utils:
                 for row_with_limit in rows_with_limit_cell:
                     table.add_row(*row_with_limit)
 
-                tables_final.append(table)
+                table_rendering.append(table)
 
-            return tables_final
-        return []
+            tables_rendering.extend(table_rendering)
+        return tables_rendering
 
     def generate_output_message(
         self,
@@ -790,21 +793,22 @@ class Utils:
                 renderables.append(separator)
             renderables.append(output_sections_client_api)
 
-        # Output Tables
-        output_tables = self._make_tables(
-            output_trace_config=output_trace_config,
-            auto_create_assets=auto_create_assets,
-            data_tables=results_success_details,
-        )
-        for output_table in output_tables:
-            if output_table:
-                renderables.append(Text(""))
-                separator = self._make_separator(
-                    output_trace_config=output_trace_config
-                )
-                if separator:
-                    renderables.append(separator)
-                renderables.append(output_table)
+        if results_success_details:
+            # Output Tables
+            output_tables = self._make_tables(
+                output_trace_config=output_trace_config,
+                auto_create_assets=auto_create_assets,
+                data_tables=results_success_details,
+            )
+            for output_table in output_tables:
+                if output_table:
+                    renderables.append(Text(""))
+                    separator = self._make_separator(
+                        output_trace_config=output_trace_config
+                    )
+                    if separator:
+                        renderables.append(separator)
+                    renderables.append(output_table)
 
         # Output JSON
         output_json = self._make_json(

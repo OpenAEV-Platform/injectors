@@ -46,7 +46,6 @@ dev = [
     "mypy~=1.18.2",         # Type validator
     "pip_audit~=2.9.0",     # Security checker
     "pre-commit~=4.3.0",    # Git hooks
-    "flake8~=7.3.0",        # Linter
     "types-PyYAML~=6.0.12", # stubs for untyped module
 ]
 test = [

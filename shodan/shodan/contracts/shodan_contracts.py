@@ -282,7 +282,7 @@ class ShodanContracts:
 
     def contracts(self):
 
-        selector_default = TargetSelectorField.ASSET_GROUPS.key
+        selector_default = "only_manual"
 
         shodan_contract_definitions = [
             (
@@ -295,7 +295,7 @@ class ShodanContracts:
                 CriticalPortsAndExposedAdminInterface,
                 selector_default,
             ),
-            (ShodanContractId.CUSTOM_QUERY, CustomQuery, "only_manual"),
+            (ShodanContractId.CUSTOM_QUERY, CustomQuery, selector_default),
             (ShodanContractId.CVE_ENUMERATION, CVEEnumeration, selector_default),
             (
                 ShodanContractId.CVE_SPECIFIC_WATCHLIST,

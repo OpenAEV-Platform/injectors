@@ -47,10 +47,11 @@ class ShodanInjector:
             "HOST_ENUMERATION": HostEnumeration.output_trace_config(),
         }
         if contract_name not in output_trace_config:
-            raise ValueError(
+            self.helper.injector_logger.error(
                 f"{LOG_PREFIX} - The contract name is unknown.",
                 {"contract_name": contract_name},
             )
+            raise ValueError(f"{LOG_PREFIX} - The contract name is unknown.")
 
         contract_output_trace_config = output_trace_config.get(contract_name)
 
@@ -120,7 +121,13 @@ class ShodanInjector:
             return output_json, output_message
 
         else:
-            return None, None
+            self.helper.injector_logger.error(
+                f"{LOG_PREFIX} - Invalid selector key, expected keys 'manual', 'assets', or 'asset-groups",
+                {"selector_key": selector_key},
+            )
+            raise ValueError(
+                f"{LOG_PREFIX} - Invalid selector key, expected keys 'manual', 'assets', or 'asset-groups'."
+            )
 
     def process_message(self, data: dict) -> None:
         # Initialization to get the current start utc iso format.

@@ -1,4 +1,37 @@
-config.yml
-shodan/__pycache__
-__pycache__
+# Git
+.git
+.git*
+.gitignore
 
+# Python cache
+__pycache__/
+*.py[cod]
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# Build / packaging
+build/
+dist/
+*.egg-info/
+
+# Environment files
+.env
+config.yml
+
+# Logs
+logs/
+
+# Tests & coverage
+.pytest_cache/
+.coverage
+htmlcov/
+
+# IDE
+.idea/
+.vscode/
+
+# OS
+.DS_Store

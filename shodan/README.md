@@ -16,6 +16,7 @@
         - [Fields available in manual mode by contract](#fields-available-in-manual-mode-by-contract)
         - [Output Trace Message](#output-trace-message)
         - [Auto-Create Assets](#auto-create-assets)
+        - [Rate Limiting and Retry](#rate-limiting-and-retry)
     - [Resources](#resources)
 
 ---
@@ -207,13 +208,20 @@ The table below summarizes the installation and run commands for different workf
 
 For the Shodan injector, we have 7 contracts available.
 
+- Specific behavior for all contracts:
+    - For each contract that has the hostnames and organization fields
+        - For each hostname entered in the hostname field, a dedicated API call will be made with its associated wildcard.
+            - Example: `hostname:filigran.io,*.filigran.io` (wildcard)
+        - If left empty, the organization is automatically derived from each hostname. Otherwise, the specified organization is applied to all hostnames.
+    - Once all calls have been made, a final API call is made to retrieve user information, including the remaining quota.
+
 ### Supported Contracts
 
 - Cloud Provider Asset Discovery
 - Critical Ports And Exposed Admin Interface
 - Custom Query
 - CVE Enumeration
-- CVE Specific Watchlist (The only contract that requires a plan only available to academic users, Small Business API subscribers, and higher.)
+- CVE Specific Watchlist (The only contract that requires a plan Shodan only available to academic users, Small Business API subscribers, and higher.)
 - Domain Discovery
 - Host Enumeration
 
@@ -221,7 +229,7 @@ For the Shodan injector, we have 7 contracts available.
 
 Targets are selected based on the `target_selector` field.
 
-#### If target type is **Assets**:
+#### If target type is **Assets** / **Asset-Groups**: (Currently disabled)
 
 | Selected Property | Uses Asset Field           |
 |-------------------|----------------------------|
@@ -237,35 +245,73 @@ Direct values separated by commas or spaces between IP addresses or hostnames ar
 ### Fields available in manual mode by contract
 
 - Cloud Provider Asset Discovery (Search Shodan Endpoint: `/shodan/host/search`)
-  - Cloud Provider (default: `Google,Microsoft,Amazon,Azure`) - mandatory
-  - Hostname - mandatory
-  - Organization - Optional (default: `hostname value is used`)
+    - The `Cloud Provider` field must contain one or more cloud providers, separated by commas.
+    - The `Hostname` field must contain one or more hostnames, separated by commas.
+    - The `Organization` field must contain one or more organizations, separated by commas.
+
+    | Field          | Mandatory | Default / Notes                       |
+    |----------------|-----------|---------------------------------------|
+    | Cloud Provider | Yes       | `Google,Microsoft,Amazon,Azure`       |
+    | Hostname       | Yes       | /                                     |
+    | Organization   | No        | If empty, the hostname value is used. |
 
 - Critical Ports And Exposed Admin Interface (Search Shodan Endpoint: `/shodan/host/search`)
-  - Port (default: `20,21,22,23,25,53,80,110,111,135,139,143,443,445,993,995,1723,3306,3389,5900,8080`) - mandatory
-  - Hostname - mandatory
-  - Organization - Optional (default: `hostname value is used`)
+    - The `Port` field must contain one or more ports, separated by commas.
+    - The `Hostname` field must contain one or more hostnames, separated by commas.
+    - The `Organization` field must contain one or more organizations, separated by commas.
+    
+    | Field        | Mandatory   | Default / Notes                                                                     |
+    |--------------|-------------|-------------------------------------------------------------------------------------|
+    | Port         | Yes         | `20,21,22,23,25,53,80,110,111,135,139,143,443,445,993,995,1723,3306,3389,5900,8080` |
+    | Hostname     | Yes         | /                                                                                   |
+    | Organization | No          | If empty, the hostname value is used.                                               |
 
 - Custom Query (Endpoint: `your custom endpoint`)
-  - HTTP Method (choices: `GET, POST, PUT, DELETE`, default: `GET`) - mandatory 
-  - Custom Query - mandatory
+    -  See the Shodan documentation: https://developer.shodan.io/api
+
+    | Field        | Mandatory | Default / Notes                         |
+    |--------------|-----------|-----------------------------------------|
+    | HTTP Method  | Yes       | `GET` (choices: GET, POST, PUT, DELETE) |
+    | Custom Query | Yes       | /                                       |
 
 - CVE Enumeration (Search Shodan Endpoint: `/shodan/host/search`)
-  - Hostname - mandatory
-  - Organization - Optional (default: `hostname value is used`)
+    - The `Hostname` field must contain one or more hostnames, separated by commas.
+    - The `Organization` field must contain one or more organizations, separated by commas.
+  
+    | Field        | Mandatory | Default / Notes                       |
+    |--------------|-----------|---------------------------------------|
+    | Hostname     | Yes       | /                                     |
+    | Organization | No        | If empty, the hostname value is used. |
 
 - CVE Specific Watchlist (Search Shodan Endpoint: `/shodan/host/search`)
-  - Vulnerability - mandatory
-  - Hostname - mandatory
-  - Organization - Optional (default: `hostname value is used`)
+    - Warning : The only contract that requires a plan Shodan only available to academic users, Small Business API subscribers, and higher.
+    - The `Vulnerability` field must contain one or more specific CVEs.
+    - The `Hostname` field must contain one or more hostnames, separated by commas.
+    - The `Organization` field must contain one or more organizations, separated by commas.
+
+    | Field         | Mandatory | Default / Notes                       |
+    |---------------|-----------|---------------------------------------|
+    | Vulnerability | Yes       | /                                     |                           
+    | Hostname      | Yes       | /                                     |                           
+    | Organization  | No        | If empty, the hostname value is used. |                        
 
 - Domain Discovery (Search Shodan Endpoint: `/shodan/host/search`)
-  - Hostname - mandatory
-  - Organization - Optional (default: `hostname value is used`)
+    - The `Hostname` field must contain one or more hostnames, separated by commas.
+    - The `Organization` field must contain one or more organizations, separated by commas.
+
+    | Field        | Mandatory | Default / Notes                       |
+    |--------------|-----------|---------------------------------------|
+    | Hostname     | Yes       | /                                     | 
+    | Organization | No        | If empty, the hostname value is used. |
 
 - Host Enumeration (Host Information Endpoint: `/shodan/host/{ip}`)
-  - Host - mandatory
+    - The `Host` field must contain one or more valid IPv4 addresses.
+     
+    | Field   | Mandatory | Default / Notes |
+    |---------|-----------|-----------------|
+    | Host    | Yes       | /               | 
 
+---
 
 ### Output Trace Message
 The injector captures the fields filled in by the user and analyzes the JSON output of the Shodan response, 
@@ -278,10 +324,13 @@ then returns several sections in the report if successful:
   - Call Success – List of successful calls + As well as various other relevant information related to API calls.
   - Call Failed – List of failed calls + As well as various other relevant information related to API calls.
 - **Section Table** – Visually displays the details of each call, based on the configuration defined for the contract in the injector.
-- **OPTIONAL** - JSON return of the response directly (In the case of a "custom query", we return the JSON directly rather than the table section.)
+- **Section JSON** – JSON return of the response directly (In the case of a "custom query", we return the JSON directly rather than the table section.)
 
 ### Auto-Create Assets
 - Feature currently under development
+
+### Rate Limiting and Retry
+- WIP
 
 ---
 

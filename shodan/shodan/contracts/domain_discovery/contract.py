@@ -99,14 +99,14 @@ class DomainDiscovery:
                 "show_tables": {
                     "is_active": True,
                     "show_lines": True,
-                    "max_display_by_cell": 4,
+                    "max_display_by_cell": 10,
                     "show_index": {
                         "is_active": False,
                         "index_start": 1,
                     },
                 },
                 "show_separator": {
-                    "is_active": True,
+                    "is_active": False,
                 },
                 "show_json": {
                     "is_active": False,

@@ -364,10 +364,11 @@ class ShodanClientAPI:
 
         contract = contract_handler.get(contract_id)
         if not contract:
-            raise ValueError(
+            self.helper.injector_logger.error(
                 f"{LOG_PREFIX} - The contract ID is invalid.",
                 {"contract_id": contract_id},
             )
+            raise ValueError(f"{LOG_PREFIX} - The contract ID is invalid.")
 
         results = contract(inject_content)
         shodan_credit_user = self._get_user_info()
