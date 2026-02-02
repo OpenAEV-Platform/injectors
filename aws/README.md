@@ -139,7 +139,7 @@ Install the environment:
 **Production**:
 ```shell
 # production environment
-poetry install --extras prod
+poetry install 
 ```
 
 **Development** (note that you should also clone the [pyoaev](OpenAEV-Platform/client-python) repository [according to

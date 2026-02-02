@@ -21,7 +21,7 @@ COPY --from=injector_common ./ ./
 ARG installdir=/opt/injector
 WORKDIR ${installdir}
 COPY --from=builder ${installdir} ${installdir}
-RUN pip3 install --no-cache-dir "$(ls dist/*.whl)[prod]"
+RUN pip3 install --no-cache-dir "$(ls dist/*.whl)"
 
 # Declare the build argument
 ARG PYOAEV_GIT_BRANCH_OVERRIDE

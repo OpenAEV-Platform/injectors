@@ -57,12 +57,12 @@ jobs:
       - run:
           working_directory: ~/openaev
           name: Install poetry
-          command: pip install poetry==2.1.3 && poetry config installer.re-resolve false
+          command: pip install poetry==2.3.2 && poetry config installer.re-resolve false
       - run:
           working_directory: ~/openaev/nuclei
           name: Run tests for Nuclei injector
           command: |
-            poetry install --extras prod
+            poetry install
             if [ "${CIRCLE_BRANCH}" = "main" ]; then
               poetry run pip install --force-reinstall git+https://github.com/OpenAEV-Platform/client-python.git@main
             else
@@ -73,7 +73,7 @@ jobs:
           working_directory: ~/openaev/nmap
           name: Run tests for nmap injector
           command: |
-            poetry install --extras prod
+            poetry install
             if [ "${CIRCLE_BRANCH}" = "main" ]; then
               poetry run pip install --force-reinstall git+https://github.com/OpenAEV-Platform/client-python.git@main
             else
@@ -85,7 +85,7 @@ jobs:
           working_directory: ~/openaev/http-query
           name: Run tests for HTTP Query injector
           command: |
-            poetry install --extras prod
+            poetry install
             if [ "${CIRCLE_BRANCH}" = "main" ]; then
               poetry run pip install --force-reinstall git+https://github.com/OpenAEV-Platform/client-python.git@main
             else
