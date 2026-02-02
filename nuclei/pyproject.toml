@@ -4,6 +4,7 @@ version = "2.0.14"
 description = "An injector for running vulnerability scans with Nuclei"
 dependencies = [
     "pyoaev (==2.0.14) ; extra != 'dev'",
+    "injector_common @ ../injector_common",
 ]
 
 [project.optional-dependencies]
@@ -25,7 +26,7 @@ pyoaev = [
     { markers = "extra != 'dev'", source = "pypi" },
     { markers = "extra == 'dev'", develop = true },
 ]
-injector_common = { path = "../injector_common", develop = true }
+injector_common = { develop = true }
 
 [build-system]
 requires = ["poetry-core"]
