@@ -1,0 +1,18 @@
+{
+  "title": "Nmap: The network mapper",
+  "slug": "openaev_nmap",
+  "description": "Allow OAEV to perform nmap scans",
+  "short_description": "Allow OAEV to perform nmap scans",
+  "use_cases": ["Technical"],
+  "verified": true,
+  "last_verified_date": "",
+  "playbook_supported": false,
+  "max_confidence_level": 80,
+  "support_version": "",
+  "subscription_link": "https://nmap.org/](https://nmap.org/",
+  "source_code": "",
+  "manager_supported": true,
+  "container_version": "rolling",
+  "container_image": "openaev/injector-nmap",
+  "container_type": "INJECTOR"
+}

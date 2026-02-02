@@ -1,0 +1,18 @@
+{
+  "title": "Nuclei",
+  "slug": "openaev_nuclei",
+  "description": "Allow to perform CVE scan based on Nuclei",
+  "short_description": "Allow to perform CVE scan based on Nuclei",
+  "use_cases": ["Technical"],
+  "verified": true,
+  "last_verified_date": "",
+  "playbook_supported": false,
+  "max_confidence_level": 80,
+  "support_version": "",
+  "subscription_link": "https://projectdiscovery.io/nuclei](https://projectdiscovery.io/nuclei",
+  "source_code": "",
+  "manager_supported": true,
+  "container_version": "rolling",
+  "container_image": "openaev/injector-nuclei",
+  "container_type": "INJECTOR"
+}

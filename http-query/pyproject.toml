@@ -1,12 +1,12 @@
 [tool.poetry]
-name = "openaev-nuclei-injector"
+name = "openaev-http-query-injector"
 version = "2.0.14"
-description = "An injector for running vulnerability scans with Nuclei"
+description = "An injector for executing arbitrary http requests"
 authors = ["Filigran <contact@filigran.io>"]
 license = "Apache-2.0"
 readme = "README.md"
 packages = [
-    { include = "nuclei" }
+    { include = "http_query" }
 ]
 
 
@@ -28,9 +28,9 @@ build-backend = "poetry.core.masonry.api"
 
 [tool.isort]
 profile = "black"
-known_local_folder = ["nuclei"]
+known_local_folder = ["http_query"]
 
 [tool.cmw]
 install-command = "poetry install --extras prod"
-config-dump-command = "poetry run python -m nuclei.openaev_nuclei --dump-config-schema"
-icon-path = "nuclei/img/nuclei.jpg"
+config-dump-command = "poetry run python -m http_query.openaev_http --dump-config-schema"
+icon-path = "http_query/img/icon-http.png"

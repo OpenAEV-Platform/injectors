@@ -1,11 +1,5 @@
 from typing import List
 
-from contracts.nmap_constants import (
-    FIN_SCAN_CONTRACT,
-    TCP_CONNECT_SCAN_CONTRACT,
-    TCP_SYN_SCAN_CONTRACT,
-    TYPE,
-)
 from pyoaev.contracts import ContractBuilder
 from pyoaev.contracts.contract_config import (
     Contract,
@@ -24,6 +18,7 @@ from pyoaev.contracts.contract_config import (
     SupportedLanguage,
     prepare_contracts,
 )
+from pyoaev.security_domain.types import SecurityDomains
 
 from injector_common.constants import (
     TARGET_PROPERTY_SELECTOR_KEY,
@@ -31,6 +26,12 @@ from injector_common.constants import (
     TARGETS_KEY,
 )
 from injector_common.targets import TargetProperty, target_property_choices_dict
+from nmap.contracts.nmap_constants import (
+    FIN_SCAN_CONTRACT,
+    TCP_CONNECT_SCAN_CONTRACT,
+    TCP_SYN_SCAN_CONTRACT,
+    TYPE,
+)
 
 
 class NmapContracts:
@@ -160,6 +161,7 @@ class NmapContracts:
             fields=nmap_contract_fields,
             outputs=nmap_contract_outputs,
             manual=False,
+            domains=[SecurityDomains.NETWORK.value],
         )
         tcp_scan_contract = Contract(
             contract_id=TCP_CONNECT_SCAN_CONTRACT,
@@ -171,6 +173,7 @@ class NmapContracts:
             fields=nmap_contract_fields,
             outputs=nmap_contract_outputs,
             manual=False,
+            domains=[SecurityDomains.NETWORK.value],
         )
         fin_scan_contract = Contract(
             contract_id=FIN_SCAN_CONTRACT,
@@ -182,6 +185,7 @@ class NmapContracts:
             fields=nmap_contract_fields,
             outputs=nmap_contract_outputs,
             manual=False,
+            domains=[SecurityDomains.NETWORK.value],
         )
         return prepare_contracts(
             [syn_scan_contract, tcp_scan_contract, fin_scan_contract]

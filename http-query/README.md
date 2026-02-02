@@ -51,7 +51,7 @@ Example:
 
 ```shell
 # Replace the IMAGE NAME with the appropriate value
-docker build . -t [IMAGE NAME]:latest
+docker build --build-context injector_common=../injector_common . -t [IMAGE NAME]:latest
 ```
 
 Make sure to replace the environment variables in `docker-compose.yml` with the appropriate configurations for your
@@ -69,17 +69,29 @@ Create a file `config.yml` based on the provided `config.yml.sample`.
 Replace the configuration variables with the appropriate configurations for
 you environment.
 
-Install the required python dependencies (preferably in a virtual environment):
+The poetry package management system (version 2.1 or later) must also be available: https://python-poetry.org/
 
+Install the environment:
+
+**Production**:
 ```shell
-pip3 install -r requirements.txt
+# production environment
+poetry install --extras prod
 ```
 
-Then, start the injector:
+**Development** (note that you should also clone the [pyoaev](OpenAEV-Platform/client-python) repository [according to
+these instructions](../README.md#simultaneous-development-on-pyoaev-and-an-injector))
+```shell
+# development environment
+poetry install --extras dev
+```
+
+Then, start the collector:
 
 ```shell
-python3 openaev_http.py
+poetry run python -m http_query.openaev_http
 ```
+
 
 ## Behavior
 

@@ -1,6 +1,6 @@
 version: 2.1
 orbs:
-  slack: circleci/slack@5.2.0
+  slack: circleci/slack@5.2.3
   kubernetes: circleci/kubernetes@1.3.1
 jobs:
   ensure_formatting:
@@ -38,79 +38,61 @@ jobs:
       - slack/notify:
           event: fail
           template: basic_fail_1
-  test-nuclei:
+  test:
     working_directory: ~/openaev
     docker:
       - image: cimg/python:3.13
     steps:
       - checkout
       - setup_remote_docker
-      - run:
-          working_directory: ~/openaev/nuclei
-          name: Install dependencies for nuclei injector
-          command: pip install -r requirements.txt
-      - run:
-          working_directory: ~/openaev/nuclei
-          name: Overwrite pyoaev with correct version from CI
+      - run: # this is only to satisfy poetry; not used
+          working_directory: ~/
+          name: Clone pyoaev
           command: |
             if [ "${CIRCLE_BRANCH}" = "main" ]; then
-              pip install --force-reinstall git+https://github.com/OpenAEV-Platform/client-python.git@main
+              git clone -b main https://github.com/OpenAEV-Platform/client-python
             else
-              pip install --force-reinstall git+https://github.com/OpenAEV-Platform/client-python.git@release/current
+              git clone -b release/current https://github.com/OpenAEV-Platform/client-python
             fi
+      - run:
+          working_directory: ~/openaev
+          name: Install poetry
+          command: pip install poetry==2.1.3 && poetry config installer.re-resolve false
       - run:
           working_directory: ~/openaev/nuclei
-          name: Tests for nuclei injector
-          command: python -m unittest
-  test-nmap:
-    working_directory: ~/openaev
-    docker:
-      - image: cimg/python:3.13
-    steps:
-      - checkout
-      - setup_remote_docker
-      - run:
-          working_directory: ~/openaev/nmap
-          name: Install dependencies for nmap injector
-          command: pip install -r requirements.txt
-      - run:
-          working_directory: ~/openaev/nmap
-          name: Overwrite pyoaev with correct version from CI
+          name: Run tests for Nuclei injector
           command: |
+            poetry install --extras prod
             if [ "${CIRCLE_BRANCH}" = "main" ]; then
-              pip install --force-reinstall git+https://github.com/OpenAEV-Platform/client-python.git@main
+              poetry run pip install --force-reinstall git+https://github.com/OpenAEV-Platform/client-python.git@main
             else
-              pip install --force-reinstall git+https://github.com/OpenAEV-Platform/client-python.git@release/current
+              poetry run pip install --force-reinstall git+https://github.com/OpenAEV-Platform/client-python.git@release/current
             fi
+            poetry run python -m unittest
       - run:
           working_directory: ~/openaev/nmap
-          name: Tests for nmap injector
-          command: python -m unittest
-  test-http-query:
-    working_directory: ~/openaev
-    docker:
-      - image: cimg/python:3.13
-    steps:
-      - checkout
-      - setup_remote_docker
-      - run:
-          working_directory: ~/openaev/http-query
-          name: Install dependencies for http-query injector
-          command: pip install -r src/requirements.txt
-      - run:
-          working_directory: ~/openaev/http-query
-          name: Overwrite pyoaev with correct version from CI
+          name: Run tests for nmap injector
           command: |
+            poetry install --extras prod
             if [ "${CIRCLE_BRANCH}" = "main" ]; then
-              pip install --force-reinstall git+https://github.com/OpenAEV-Platform/client-python.git@main
+              poetry run pip install --force-reinstall git+https://github.com/OpenAEV-Platform/client-python.git@main
             else
-              pip install --force-reinstall git+https://github.com/OpenAEV-Platform/client-python.git@release/current
+              poetry run pip install --force-reinstall git+https://github.com/OpenAEV-Platform/client-python.git@release/current
             fi
+            poetry run python -m unittest
+
       - run:
           working_directory: ~/openaev/http-query
-          name: Tests for http-query injector
-          command: python -m unittest
-  build_1:
+          name: Run tests for HTTP Query injector
+          command: |
+            poetry install --extras prod
+            if [ "${CIRCLE_BRANCH}" = "main" ]; then
+              poetry run pip install --force-reinstall git+https://github.com/OpenAEV-Platform/client-python.git@main
+            else
+              poetry run pip install --force-reinstall git+https://github.com/OpenAEV-Platform/client-python.git@release/current
+            fi
+            poetry run python -m unittest
+  build_docker_images:
     working_directory: ~/openaev
     docker:
       - image: cimg/base:current-24.04
@@ -125,141 +107,147 @@ jobs:
             echo "IS_LATEST=$IS_LATEST" >> $BASH_ENV
       - setup_remote_docker
       - run:
-          working_directory: ~/openaev/http-query
-          name: Build Docker image openaev/injector-http-query
+          name: Install environment
           command: |
-            TAGS="-t openbas/injector-http-query:${CIRCLE_TAG} -t openaev/injector-http-query:${CIRCLE_TAG}"
-            $IS_LATEST && TAGS="$TAGS -t openaev/injector-http-query:latest"
-            docker build --progress=plain $TAGS .
-      - run:
-          working_directory: ~/openaev/nmap
-          name: Build Docker image openaev/injector-nmap
-          command: |
-            TAGS="-t openbas/injector-nmap:${CIRCLE_TAG} -t openaev/injector-nmap:${CIRCLE_TAG}"
-            $IS_LATEST && TAGS="$TAGS -t openaev/injector-nmap:latest"
-            docker build --progress=plain --build-context injector_common=../injector_common $TAGS .
-      - run:
-          working_directory: ~/openaev/nuclei
-          name: Build Docker image openaev/injector-nuclei
-          command: |
-            TAGS="-t openbas/injector-nuclei:${CIRCLE_TAG} -t openaev/injector-nuclei:${CIRCLE_TAG}"
-            $IS_LATEST && TAGS="$TAGS -t openaev/injector-nuclei:latest"
-            docker build --progress=plain --build-context injector_common=../injector_common $TAGS .
-      - run:
-          working_directory: ~/openaev/aws
-          name: Build Docker image openaev/injector-aws
-          command: |
-            TAGS="-t openbas/injector-aws:${CIRCLE_TAG} -t openaev/injector-aws:${CIRCLE_TAG}"
-            $IS_LATEST && TAGS="$TAGS -t openaev/injector-aws:latest"
-            docker build --progress=plain $TAGS .
-      - run:
-          name: Publish Docker Image to Docker Hub
-          command: |
-            echo "$DOCKERHUB_PASS" | docker login -u "$DOCKERHUB_USERNAME" --password-stdin
-            $IS_LATEST && docker push openaev/injector-http-query:latest
-            docker push openbas/injector-http-query:${CIRCLE_TAG}
-            docker push openaev/injector-http-query:${CIRCLE_TAG}
-            $IS_LATEST && docker push openaev/injector-nmap:latest
-            docker push openbas/injector-nmap:${CIRCLE_TAG}
-            docker push openaev/injector-nmap:${CIRCLE_TAG}
-            $IS_LATEST && docker push openaev/injector-nuclei:latest
-            docker push openbas/injector-nuclei:${CIRCLE_TAG}
-            docker push openaev/injector-nuclei:${CIRCLE_TAG}
-            $IS_LATEST && docker push openaev/injector-aws:latest
-            docker push openbas/injector-aws:${CIRCLE_TAG}
-            docker push openaev/injector-aws:${CIRCLE_TAG}
-      - slack/notify:
-          event: fail
-          template: basic_fail_1
-
-  build_rolling_1:
-    working_directory: ~/openaev
-    docker:
-      - image: cimg/base:current-24.04
-    steps:
-      - checkout
-      - setup_remote_docker
-      - run: sudo apt-get update -qq && sudo apt install curl gettext-base
-      - run:
-          working_directory: ~/openaev
-          name: Replace pyoaev requirement of stable version with latest main branch code
-          command: find . -name requirements.txt -exec sed 's|^pyoaev==.*$|pyoaev @ git+https://github.com/OpenAEV-Platform/client-python@main|' -i {} \;
-      - run:
-          working_directory: ~/openaev/http-query
-          name: Build Docker image openaev/injector-http-query
-          command: docker build --progress=plain -t openbas/injector-http-query:rolling -t openaev/injector-http-query:rolling .
-      - run:
-          working_directory: ~/openaev/nmap
-          name: Build Docker image openaev/injector-nmap
-          command: docker build --progress=plain --build-context injector_common=../injector_common -t openbas/injector-nmap:rolling -t openaev/injector-nmap:rolling .
-      - run:
-          working_directory: ~/openaev/nuclei
-          name: Build Docker image openaev/injector-nuclei
-          command: docker build --progress=plain --build-context injector_common=../injector_common -t openbas/injector-nuclei:rolling -t openaev/injector-nuclei:rolling .
-      - run:
-          working_directory: ~/openaev/aws
-          name: Build Docker image openaev/injector-aws
-          command: docker build --progress=plain -t openbas/injector-aws:rolling -t openaev/injector-aws:rolling .
-      - run:
-          name: Publish Docker Image to Docker Hub
-          command: |
-            echo "$DOCKERHUB_PASS" | docker login -u "$DOCKERHUB_USERNAME" --password-stdin
-            docker push openbas/injector-http-query:rolling
-            docker push openaev/injector-http-query:rolling 
-            docker push openbas/injector-nmap:rolling
-            docker push openaev/injector-nmap:rolling
-            docker push openbas/injector-nuclei:rolling
-            docker push openaev/injector-nuclei:rolling
-            docker push openbas/injector-aws:rolling
-            docker push openaev/injector-aws:rolling
-      - slack/notify:
-          event: fail
-          template: basic_fail_1
-  build_prerelease_1:
-    working_directory: ~/openaev
-    docker:
-      - image: cimg/base:current-24.04
-    steps:
-      - checkout
-      - setup_remote_docker
-      - run: sudo apt-get update -qq && sudo apt install curl gettext-base
+            sudo apt-get update -qq
+            sudo apt install curl gettext-base
+            mkdir -p ~/openaev/images
       - run:
           working_directory: ~/openaev
           name: Replace pyoaev requirement of stable version with latest release branch code
           # We safely expand the CIRCLE_BRANCH variable because the CircleCI filters already enforce a strict release/x.x.x pattern using regex
-          command: find . -name requirements.txt -exec sed "s|^pyoaev==.*$|pyoaev @ git+https://github.com/OpenAEV-Platform/client-python@${CIRCLE_BRANCH}|" -i {} \;
-      - run:
-          working_directory: ~/openaev/http-query
-          name: Build Docker image openaev/injector-http-query
-          command: docker build --progress=plain -t openbas/injector-http-query:prerelease -t openaev/injector-http-query:prerelease .
-      - run:
-          working_directory: ~/openaev/nmap
-          name: Build Docker image openaev/injector-nmap
-          command: docker build --progress=plain --build-context injector_common=../injector_common -t openbas/injector-nmap:prerelease -t openaev/injector-nmap:prerelease .
-      - run:
-          working_directory: ~/openaev/nuclei
-          name: Build Docker image openaev/injector-nuclei
-          command: docker build --progress=plain --build-context injector_common=../injector_common -t openbas/injector-nuclei:prerelease -t openaev/injector-nuclei:prerelease .
+          command: |
+            if [ "${CIRCLE_BRANCH}" = "main" ]; then
+              find . -name pyproject.toml | xargs -I ___ sed "s|branch = 'release/current'|branch = '${CIRCLE_BRANCH}'|" -i ___;
+            fi;
       - run:
           working_directory: ~/openaev/aws
           name: Build Docker image openaev/injector-aws
-          command: docker build --progress=plain -t openbas/injector-aws:prerelease -t openaev/injector-aws:prerelease .
-      - run:
-          name: Publish Docker Image to Docker Hub
           command: |
-            echo "$DOCKERHUB_PASS" | docker login -u "$DOCKERHUB_USERNAME" --password-stdin
-            docker push openbas/injector-http-query:prerelease
-            docker push openaev/injector-http-query:prerelease
-            docker push openbas/injector-nmap:prerelease
-            docker push openaev/injector-nmap:prerelease
-            docker push openbas/injector-nuclei:prerelease
-            docker push openaev/injector-nuclei:prerelease
-            docker push openbas/injector-aws:prerelease
-            docker push openaev/injector-aws:prerelease
+            if [ "${CIRCLE_BRANCH}" = "release/current" ]; then
+              docker build --progress=plain --build-context injector_common=../injector_common -t openaev/injector-aws:${CIRCLE_SHA1} --build-arg PYOAEV_GIT_BRANCH_OVERRIDE="${CIRCLE_BRANCH}" .
+            else
+              docker build --progress=plain --build-context injector_common=../injector_common -t openaev/injector-aws:${CIRCLE_SHA1} .
+            fi
+            docker save -o ~/openaev/images/injector-aws openaev/injector-aws:${CIRCLE_SHA1}
+      - run:
+          working_directory: ~/openaev/http-query
+          name: Build Docker image openaev/injector-http-query
+          command: |
+            if [ "${CIRCLE_BRANCH}" = "release/current" ]; then
+              docker build --progress=plain --build-context injector_common=../injector_common -t openaev/injector-http-query:${CIRCLE_SHA1} --build-arg PYOAEV_GIT_BRANCH_OVERRIDE="${CIRCLE_BRANCH}" .
+            else
+              docker build --progress=plain --build-context injector_common=../injector_common -t openaev/injector-http-query:${CIRCLE_SHA1} .
+            fi
+            docker save -o ~/openaev/images/injector-http-query openaev/injector-http-query:${CIRCLE_SHA1}
+      - run:
+          working_directory: ~/openaev/nmap
+          name: Build Docker image openaev/injector-nmap
+          command: |
+            if [ "${CIRCLE_BRANCH}" = "release/current" ]; then
+              docker build --progress=plain --build-context injector_common=../injector_common -t openaev/injector-nmap:${CIRCLE_SHA1} --build-arg PYOAEV_GIT_BRANCH_OVERRIDE="${CIRCLE_BRANCH}" .
+            else
+              docker build --progress=plain --build-context injector_common=../injector_common -t openaev/injector-nmap:${CIRCLE_SHA1} .
+            fi
+            docker save -o ~/openaev/images/injector-nmap openaev/injector-nmap:${CIRCLE_SHA1}
+      - run:
+          working_directory: ~/openaev/nuclei
+          name: Build Docker image openaev/injector-nuclei
+          command: |
+            if [ "${CIRCLE_BRANCH}" = "release/current" ]; then
+              docker build --progress=plain --build-context injector_common=../injector_common -t openaev/injector-nuclei:${CIRCLE_SHA1} --build-arg PYOAEV_GIT_BRANCH_OVERRIDE="${CIRCLE_BRANCH}" .
+            else
+              docker build --progress=plain --build-context injector_common=../injector_common -t openaev/injector-nuclei:${CIRCLE_SHA1} .
+            fi
+            docker save -o ~/openaev/images/injector-nuclei openaev/injector-nuclei:${CIRCLE_SHA1}
+      - persist_to_workspace:
+          root: ~/openaev
+          paths:
+            - images
       - slack/notify:
           event: fail
           template: basic_fail_1
+  publish_images:
+    working_directory: ~/openaev
+    docker:
+      - image: cimg/base:current-24.04
+    steps:
+      - checkout
+      - run:
+          working_directory: ~/openaev
+          name: Set semantic version environment
+          command: |
+            export LATEST_SEMANTIC_VERSION=$(git tag --sort=-v:refname | grep -E '^v?[0-9]+\.[0-9]+\.[0-9]+$' | head -n 1)
+            export IS_LATEST=$([ "$CIRCLE_TAG" = "$LATEST_SEMANTIC_VERSION" ] && echo "true" || echo "false")
+            echo "IS_LATEST=$IS_LATEST" >> $BASH_ENV
+      - attach_workspace:
+          at: .
+      - setup_remote_docker
+      - run:
+          working_directory: ~/openaev/images
+          name: Restore saved images and publish
+          command: |
+            if [ "${CIRCLE_TAG}" != "" ]
+            then
+              export IMAGETAG=${CIRCLE_TAG}
+            elif [ "${CIRCLE_BRANCH}" = "main" ]
+            then
+              export IMAGETAG="rolling"
+            elif [ "${CIRCLE_BRANCH}" = "release/current" ]
+            then
+              export IMAGETAG="prerelease"
+            else
+              echo "No tag supplied or branch is neither 'main' nor 'release/current' (was: '${CIRCLE_BRANCH}')"
+              exit 1
+            fi
+            echo "Image tag: ${IMAGETAG}"
 
+            docker image load < injector-aws
+            docker tag openaev/injector-aws:${CIRCLE_SHA1} openaev/injector-aws:${IMAGETAG}
+            docker tag openaev/injector-aws:${CIRCLE_SHA1} openbas/injector-aws:${IMAGETAG}
+            docker image load < injector-http-query
+            docker tag openaev/injector-http-query:${CIRCLE_SHA1} openaev/injector-http-query:${IMAGETAG}
+            docker tag openaev/injector-http-query:${CIRCLE_SHA1} openbas/injector-http-query:${IMAGETAG}
+            docker image load < injector-nmap
+            docker tag openaev/injector-nmap:${CIRCLE_SHA1} openaev/injector-nmap:${IMAGETAG}
+            docker tag openaev/injector-nmap:${CIRCLE_SHA1} openbas/injector-nmap:${IMAGETAG}
+            docker image load < injector-nuclei
+            docker tag openaev/injector-nuclei:${CIRCLE_SHA1} openaev/injector-nuclei:${IMAGETAG}
+            docker tag openaev/injector-nuclei:${CIRCLE_SHA1} openbas/injector-nuclei:${IMAGETAG}
+
+            echo "$DOCKERHUB_PASS" | docker login -u "$DOCKERHUB_USERNAME" --password-stdin
+            # docker push openaev/injector-aws:${IMAGETAG}
+            docker push openbas/injector-aws:${IMAGETAG}
+            # docker push openaev/injector-http-query:${IMAGETAG}
+            docker push openbas/injector-http-query:${IMAGETAG}
+            # docker push openaev/injector-nmap:${IMAGETAG}
+            docker push openbas/injector-nmap:${IMAGETAG}
+            # docker push openaev/injector-nuclei:${IMAGETAG}
+            docker push openbas/injector-nuclei:${IMAGETAG}
+
+            if [ "${IS_LATEST}" == "true" ]
+            then
+              docker tag openaev/injector-aws:${IMAGETAG} openaev/injector-aws:latest
+              docker tag openaev/injector-aws:${IMAGETAG} openbas/injector-aws:latest
+              docker tag openaev/injector-http-query:${IMAGETAG} openaev/injector-http-query:latest
+              docker tag openaev/injector-http-query:${IMAGETAG} openbas/injector-http-query:latest
+              docker tag openaev/injector-nmap:${IMAGETAG} openaev/injector-nmap:latest
+              docker tag openaev/injector-nmap:${IMAGETAG} openbas/injector-nmap:latest
+              docker tag openaev/injector-nuclei:${IMAGETAG} openaev/injector-nuclei:latest
+              docker tag openaev/injector-nuclei:${IMAGETAG} openbas/injector-nuclei:latest
+
+              docker push openaev/injector-aws:latest
+              docker push openbas/injector-aws:latest
+              docker push openaev/injector-http-query:latest
+              docker push openbas/injector-http-query:latest
+              docker push openaev/injector-nmap:latest
+              docker push openbas/injector-nmap:latest
+              docker push openaev/injector-nuclei:latest
+              docker push openbas/injector-nuclei:latest
+            fi
+      - slack/notify:
+          event: fail
+          template: basic_fail_1
   deploy_testing:
     docker:
       - image: cimg/base:current-24.04
@@ -296,50 +284,41 @@ workflows:
     jobs:
       - ensure_formatting
       - linter
-      - test-nmap
-      - test-nuclei
-      - test-http-query
-      - build_1:
+      - test
+      - build_docker_images:
+          requires:
+            - ensure_formatting
+            - linter
+            - test
+      - publish_images:
+          requires:
+            - build_docker_images
           filters:
             tags:
               only: /[0-9]+(\.[0-9]+)+(\.[0-9]+)*/
             branches:
-              ignore: /.*/
-      - build_rolling_1:
-          requires:
-            - ensure_formatting
-            - linter
-            - test-nmap
-            - test-nuclei
-            - test-http-query
-          filters:
-            branches:
               only:
                 - main
-      - build_prerelease_1:
-          requires:
-            - ensure_formatting
-            - linter
-            - test-nmap
-            - test-nuclei
-            - test-http-query
-          filters:
-            branches:
-              only:
                 - release/current
       - deploy_testing:
           requires:
-            - build_rolling_1
+            - publish_images
+          filters:
+            branches:
+              only: main
       - deploy_prerelease:
           requires:
-            - build_prerelease_1
+            - publish_images
+          filters:
+            branches:
+              only: release/current
       - notify_rolling:
           requires:
             - deploy_testing
             - deploy_prerelease
       - notify:
           requires:
-            - build_1
+            - publish_images
           filters:
             tags:
               only: /[0-9]+(\.[0-9]+)+(\.[0-9]+)*/

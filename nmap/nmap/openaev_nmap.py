@@ -2,43 +2,25 @@ import json
 import time
 from typing import Dict
 
-from contracts.nmap_contracts import NmapContracts
-from helpers.nmap_command_builder import NmapCommandBuilder
-from helpers.nmap_output_parser import NmapOutputParser
-from helpers.nmap_process import NmapProcess
 from pyoaev.helpers import OpenAEVConfigHelper, OpenAEVInjectorHelper
 
 from injector_common.constants import TARGET_PROPERTY_SELECTOR_KEY, TARGET_SELECTOR_KEY
+from injector_common.dump_config import intercept_dump_argument
 from injector_common.targets import TargetProperty, Targets
+from nmap.configuration.config_loader import ConfigLoader
+from nmap.helpers.nmap_command_builder import NmapCommandBuilder
+from nmap.helpers.nmap_output_parser import NmapOutputParser
+from nmap.helpers.nmap_process import NmapProcess
 
 
 class OpenAEVNmap:
     def __init__(self):
-        self.config = OpenAEVConfigHelper(
-            __file__,
-            {
-                # API information
-                "openaev_url": {"env": "OPENAEV_URL", "file_path": ["openaev", "url"]},
-                "openaev_token": {
-                    "env": "OPENAEV_TOKEN",
-                    "file_path": ["openaev", "token"],
-                },
-                # Config information
-                "injector_id": {"env": "INJECTOR_ID", "file_path": ["injector", "id"]},
-                "injector_name": {
-                    "env": "INJECTOR_NAME",
-                    "file_path": ["injector", "name"],
-                },
-                "injector_type": {
-                    "env": "INJECTOR_TYPE",
-                    "file_path": ["injector", "type"],
-                    "default": "openaev_nmap",
-                },
-                "injector_contracts": {"data": NmapContracts.build_contract()},
-            },
+        self.config = OpenAEVConfigHelper.from_configuration_object(
+            ConfigLoader().to_daemon_config()
         )
+        intercept_dump_argument(self.config.get_config_obj())
         self.helper = OpenAEVInjectorHelper(
-            self.config, open("img/icon-nmap.png", "rb")
+            self.config, open("nmap/img/icon-nmap.png", "rb")
         )
 
     def nmap_execution(self, start: float, data: Dict) -> Dict:
