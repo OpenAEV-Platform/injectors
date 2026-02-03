@@ -1,7 +1,7 @@
 version: '3.8'
 services:
   injector-nuclei:
-    image: openaev/injector-nuclei:2.1.1
+    image: openaev/injector-nuclei:2.1.2
     environment:
       - OPENAEV_URL=http://localhost
       - OPENAEV_TOKEN=ChangeMe
