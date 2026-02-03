@@ -10,8 +10,8 @@ from shodan.contracts import (
     CVEEnumeration,
     CVESpecificWatchlist,
     DomainDiscovery,
-    IPEnumeration,
     InjectorKey,
+    IPEnumeration,
     ShodanContractId,
 )
 from shodan.models import ConfigLoader
