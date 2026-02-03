@@ -282,14 +282,26 @@ workflows:
   version: 2
   openaev:
     jobs:
-      - ensure_formatting
-      - linter
-      - test
+      - ensure_formatting:
+          filters:
+            tags:
+              only: /[0-9]+(\.[0-9]+)+(\.[0-9]+)*/
+      - linter:
+          filters:
+            tags:
+              only: /[0-9]+(\.[0-9]+)+(\.[0-9]+)*/
+      - test:
+          filters:
+            tags:
+              only: /[0-9]+(\.[0-9]+)+(\.[0-9]+)*/
       - build_docker_images:
           requires:
             - ensure_formatting
             - linter
             - test
+          filters:
+            tags:
+              only: /[0-9]+(\.[0-9]+)+(\.[0-9]+)*/
       - publish_images:
           requires:
             - build_docker_images
