@@ -22,18 +22,12 @@ class MissingRequiredFieldError(ValueError):
 class ShodanRestAPIDefinition:
     http_method: str
     endpoint: str
-    path_parameter: bool = False
 
 
 class ShodanRestAPI(Enum):
     SEARCH_SHODAN = ShodanRestAPIDefinition(
         http_method="GET",
         endpoint="shodan/host/search",
-    )
-    HOST_INFORMATION = ShodanRestAPIDefinition(
-        http_method="GET",
-        path_parameter=True,
-        endpoint="shodan/host/{target}",
     )
     API_PLAN_INFORMATION = ShodanRestAPIDefinition(
         http_method="GET", endpoint="api-info"
@@ -240,16 +234,22 @@ class ShodanClientAPI:
             filters_template=filters,
         )
 
-    # CONTRACT - HOST ENUMERATION
-    def _get_host_enumeration(self, inject_content):
-        host = inject_content.get("host")
-        if not host:
+    # CONTRACT - IP ENUMERATION
+    def _get_ip_enumeration(self, inject_content):
+        ip = inject_content.get("ip")
+        if not ip:
             raise MissingRequiredFieldError(
-                f"{LOG_PREFIX} - The 'host' field is required and cannot be empty."
+                f"{LOG_PREFIX} - The 'ip' field is required and cannot be empty."
             )
+
+        filters = {
+            "ip": ("{target}", "end"),
+        }
+
         return self._process_request(
-            raw_input=host,
-            request_api=ShodanRestAPI.HOST_INFORMATION,
+            raw_input=ip,
+            request_api=ShodanRestAPI.SEARCH_SHODAN,
+            filters_template=filters,
         )
 
     def _process_request(
@@ -265,20 +265,16 @@ class ShodanClientAPI:
             targets = [raw_input]
             http_method = http_method_custom_query
             endpoint_template = raw_input
-            path_parameter = None
         else:
             targets = self._split_target(raw_input)
             http_method = request_api.value.http_method
             endpoint_template = request_api.value.endpoint
-            path_parameter = request_api.value.path_parameter
 
         results = []
         for target in targets:
             new_endpoint = endpoint_template
             query_params = None
             encoded_for_shodan = None
-            if path_parameter:
-                new_endpoint = endpoint_template.format(target=target)
 
             if filters_template:
                 filters = {}
@@ -359,7 +355,7 @@ class ShodanClientAPI:
             ShodanContractId.CRITICAL_PORTS_AND_EXPOSED_ADMIN_INTERFACE: self._get_critical_ports_and_exposed_admin_interface,
             ShodanContractId.CUSTOM_QUERY: self._get_custom_query,
             ShodanContractId.DOMAIN_DISCOVERY: self._get_domain_discovery,
-            ShodanContractId.HOST_ENUMERATION: self._get_host_enumeration,
+            ShodanContractId.IP_ENUMERATION: self._get_ip_enumeration,
         }
 
         contract = contract_handler.get(contract_id)

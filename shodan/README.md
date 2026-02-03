@@ -223,7 +223,7 @@ For the Shodan injector, we have 7 contracts available.
 - CVE Enumeration
 - CVE Specific Watchlist (The only contract that requires a plan Shodan only available to academic users, Small Business API subscribers, and higher.)
 - Domain Discovery
-- Host Enumeration
+- IP Enumeration
 
 ### Target Selection
 
@@ -304,12 +304,12 @@ Direct values separated by commas or spaces between IP addresses or hostnames ar
     | Hostname     | Yes       | /                                     | 
     | Organization | No        | If empty, the hostname value is used. |
 
-- Host Enumeration (Host Information Endpoint: `/shodan/host/{ip}`)
-    - The `Host` field must contain one or more valid IPv4 addresses.
+- IP Enumeration (Search Shodan Endpoint: `/shodan/host/search`)
+    - The `IP` field must contain one or more valid IPv4 addresses.
      
-    | Field   | Mandatory | Default / Notes |
-    |---------|-----------|-----------------|
-    | Host    | Yes       | /               | 
+    | Field | Mandatory | Default / Notes |
+    |-------|-----------|-----------------|
+    | IP    | Yes       | /               | 
 
 ---
 
@@ -330,7 +330,51 @@ then returns several sections in the report if successful:
 - Feature currently under development
 
 ### Rate Limiting and Retry
-- WIP
+
+#### Overview
+
+The Shodan API does not publicly document strict rate-limiting rules or request thresholds.
+However, to ensure stable and reliable interactions with the API, a rate-limiting and retry mechanism is implemented.
+
+These mechanisms aim to:
+- Smooth the flow of outgoing requests,
+- Reduce the risk of HTTP 429 Too Many Requests responses,
+- Handle transient failures,
+- Improve the clarity of error reporting in output traces message.
+
+#### Rate limiting 
+
+A rate-limiting mechanism is applied to control the frequency of API calls.
+Requests are deliberately paced to avoid sending bursts of traffic that could exceed Shodan’s internal limits or trigger protective measures.
+
+This approach helps:
+- Prevent temporary blocking or throttling,
+- Ensure consistent behavior across multiple API calls,
+- Maintain predictable execution when processing multiple hostnames or IPs.
+
+There are two environment variables for controlling the flow:
+- `SHODAN_API_LEAKY_BUCKET_RATE` - Controls the rate at which API requests are allowed to be executed.
+- `SHODAN_API_LEAKY_BUCKET_CAPACITY` - Defines the maximum burst size allowed before requests are delayed.
+
+#### Retry strategy
+
+A retry mechanism is applied to handle failed API requests.
+Requests are retried after a short delay to mitigate transient failures and improve execution stability.
+
+This approach helps:
+- Automatically retry failed requests up to a limited number of attempts.
+- Introduce delays between retries to avoid repeated immediate failures.
+
+There are two environment variables for controlling the flow:
+- `SHODAN_API_RETRY` - Defines the maximum number of retry attempts for a failed request.
+- `SHODAN_API_BACKOFF` - Specifies the maximum delay (in seconds) applied between retry attempts, using an exponential backoff strategy.
+
+#### Execution trace and feedback
+
+Each API call is tracked individually.
+The success or failure of each request is reported in the external API section of the output trace message.
+
+Once all API calls related to the host name or IP address have been made, a final API call is executed to retrieve user information, including the remaining API quota.
 
 ---
 

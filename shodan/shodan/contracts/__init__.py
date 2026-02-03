@@ -6,7 +6,7 @@ from .custom_query import CustomQuery
 from .cve_enumeration import CVEEnumeration
 from .cve_specific_watchlist import CVESpecificWatchlist
 from .domain_discovery import DomainDiscovery
-from .host_enumeration import HostEnumeration
+from .ip_enumeration import IPEnumeration
 from .shodan_contracts import InjectorKey, ShodanContractId
 
 __all__ = [
@@ -16,7 +16,7 @@ __all__ = [
     "CVEEnumeration",
     "CVESpecificWatchlist",
     "DomainDiscovery",
-    "HostEnumeration",
+    "IPEnumeration",
     "InjectorKey",
     "ShodanContractId",
 ]

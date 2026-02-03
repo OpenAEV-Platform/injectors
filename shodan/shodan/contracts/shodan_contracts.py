@@ -24,7 +24,7 @@ from shodan.contracts import (
     CVEEnumeration,
     CVESpecificWatchlist,
     DomainDiscovery,
-    HostEnumeration,
+    IPEnumeration,
 )
 from shodan.models import ConfigLoader
 
@@ -46,7 +46,7 @@ class ShodanContractId(StrEnum):
     CVE_ENUMERATION = "8cdccd58-78ed-4e17-be2e-7683ec611569"
     CVE_SPECIFIC_WATCHLIST = "462087b4-8012-4e21-9575-b9c854ef5811"
     DOMAIN_DISCOVERY = "faf73809-1128-4192-aa90-a08828f8ace5"
-    HOST_ENUMERATION = "dc6b8b73-09dd-4388-b7cc-108bf16d26cd"
+    IP_ENUMERATION = "dc6b8b73-09dd-4388-b7cc-108bf16d26cd"
 
 
 @dataclass
@@ -263,7 +263,7 @@ class ShodanContracts:
             | CVEEnumeration
             | CVESpecificWatchlist
             | DomainDiscovery
-            | HostEnumeration
+            | IPEnumeration
         ),
         contract_selector_default: str,
     ) -> Contract:
@@ -303,7 +303,7 @@ class ShodanContracts:
                 selector_default,
             ),
             (ShodanContractId.DOMAIN_DISCOVERY, DomainDiscovery, selector_default),
-            (ShodanContractId.HOST_ENUMERATION, HostEnumeration, selector_default),
+            (ShodanContractId.IP_ENUMERATION, IPEnumeration, selector_default),
         ]
 
         contracts = [

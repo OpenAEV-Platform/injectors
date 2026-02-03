@@ -9,13 +9,13 @@ from pyoaev.contracts.contract_config import (
 )
 
 
-class HostEnumeration:
+class IPEnumeration:
 
     @staticmethod
     def output_trace_config():
         return {
             "header": {
-                "title": "SHODAN - HOST ENUMERATION",
+                "title": "SHODAN - IP ENUMERATION",
                 "subtitle": None,
             },
             "sections_config": {
@@ -42,7 +42,7 @@ class HostEnumeration:
                 "call_success": {
                     "icon": "SUCCESS",
                     "title": "Call Success",
-                    "count_at_path": "data",
+                    "count_at_path": "matches",
                 },
                 "call_failed": {
                     "icon": "FAILED",
@@ -60,19 +60,19 @@ class HostEnumeration:
                         "columns": [
                             {
                                 "title": "Port",
-                                "path": "data.port",
+                                "path": "matches.port",
                                 "mode": "single",
                             },
                             {
                                 "title": "Hostnames",
-                                "path": "hostnames",
-                                "mode": "repeat",
+                                "path": "matches.hostnames",
+                                "mode": "align_to_single",
                             },
                             {
                                 "title": "Vulnerabilities (score)",
-                                "path": "data.vulns.*",
+                                "path": "matches.vulns.*",
                                 "use_key": True,
-                                "extra": "data.vulns.*.cvss",
+                                "extra": "matches.vulns.*.cvss",
                                 "mode": "align_to_single",
                             },
                         ],
@@ -130,8 +130,8 @@ class HostEnumeration:
 
         specific_fields = [
             ContractText(
-                key="host",
-                label="Host",
+                key="ip",
+                label="IP",
                 **(mandatory_conditions | visible_conditions),
             ),
         ]
@@ -164,8 +164,8 @@ class HostEnumeration:
             contract_id=contract_id,
             config=contract_config,
             label={
-                SupportedLanguage.en: "Shodan - Host Enumeration",
-                SupportedLanguage.fr: "Shodan - Énumération des hôtes",
+                SupportedLanguage.en: "Shodan - IP Enumeration",
+                SupportedLanguage.fr: "Shodan - Énumération des IP",
             },
             fields=contract_with_specific_fields,
             outputs=contract_with_specific_outputs,

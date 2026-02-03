@@ -10,7 +10,7 @@ from shodan.contracts import (
     CVEEnumeration,
     CVESpecificWatchlist,
     DomainDiscovery,
-    HostEnumeration,
+    IPEnumeration,
     InjectorKey,
     ShodanContractId,
 )
@@ -44,7 +44,7 @@ class ShodanInjector:
             "CVE_ENUMERATION": CVEEnumeration.output_trace_config(),
             "CVE_SPECIFIC_WATCHLIST": CVESpecificWatchlist.output_trace_config(),
             "DOMAIN_DISCOVERY": DomainDiscovery.output_trace_config(),
-            "HOST_ENUMERATION": HostEnumeration.output_trace_config(),
+            "IP_ENUMERATION": IPEnumeration.output_trace_config(),
         }
         if contract_name not in output_trace_config:
             self.helper.injector_logger.error(

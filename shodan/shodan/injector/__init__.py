@@ -5,7 +5,7 @@ from shodan.contracts import (
     CVEEnumeration,
     CVESpecificWatchlist,
     DomainDiscovery,
-    HostEnumeration,
+    IPEnumeration,
 )
 
 __all__ = [
@@ -15,5 +15,5 @@ __all__ = [
     "CVEEnumeration",
     "CVESpecificWatchlist",
     "DomainDiscovery",
-    "HostEnumeration",
+    "IPEnumeration",
 ]

@@ -611,11 +611,11 @@ class Utils:
                         shown = items[:max_display_by_cell]
                         hidden = len(items) - max_display_by_cell
 
-                        main_row.append(",".join(shown))
+                        main_row.append(", ".join(shown))
                         hidden_row.append(f"...(+{hidden} hidden)")
                         has_hidden = True
                     else:
-                        main_row.append(",".join(items))
+                        main_row.append(", ".join(items))
                         hidden_row.append("")
                 else:
                     main_row.append(cell)
