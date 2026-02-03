@@ -722,6 +722,16 @@ class Utils:
                     column_extras,
                 )
 
+                if not final_rows:
+                    tables_rendering.append(
+                        Panel(
+                            renderable="No data found",
+                            title=f"Result for {result.get(search_entity) or data_table.get("data_target")}",
+                            title_align="left",
+                        )
+                    )
+                    continue
+
                 rows_with_limit_cell = self._rows_with_limit_cells(
                     final_rows, max_display_by_cell
                 )
