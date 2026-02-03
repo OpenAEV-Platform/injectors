@@ -270,7 +270,7 @@ class ShodanClientAPI:
             http_method = request_api.value.http_method
             endpoint_template = request_api.value.endpoint
 
-        result=None
+        result = None
         results = []
         for target in targets:
             new_endpoint = endpoint_template
@@ -326,7 +326,11 @@ class ShodanClientAPI:
                         "response": response_filtered,
                     }
                 )
-        return result if targets == ["user_info"] else {"targets": targets, "data": results}
+        return (
+            result
+            if targets == ["user_info"]
+            else {"targets": targets, "data": results}
+        )
 
     def _request_data(self, method: str, url: str):
         @retry(
