@@ -1,0 +1,15 @@
+services:
+  injector-netexec:
+    image: openaev/openaev-netexec:${INJECTOR_VERSION}
+    environment:
+      - OPENAEV_URL=${OPENAEV_URL}
+      - OPENAEV_TOKEN=${OPENAEV_TOKEN}
+      - INJECTOR_ID=${INJECTOR_ID}
+      - INJECTOR_NAME=NetExec
+      - INJECTOR_LOG_LEVEL=debug
+    restart: always
+    networks:
+      - openaev-dev_default
+networks:
+  openaev-dev_default:
+    external: true
