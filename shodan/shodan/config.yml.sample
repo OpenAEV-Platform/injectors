@@ -1,0 +1,16 @@
+openaev:
+  url: 'ChangeMe'
+  token: 'ChangeMe'
+
+#injector:
+#  id: 'shodan--a87488ad-2c72-4592-b429-69259d7bcef1'
+#  name: 'Shodan'
+#  log_level: 'error'
+
+shodan:
+  api_key: 'ChangeMe'
+#  base_url: 'https://api.shodan.io'
+#  api_leaky_bucket_rate: 10
+#  api_leaky_bucket_capacity: 10
+#  api_retry: 5
+#  api_backoff: 'PT30S'
