@@ -1,7 +1,7 @@
 version: '3'
 services:
   injector-aws:
-    image: openaev/injector-aws:2.1.5
+    image: openaev/injector-aws:2.1.6
     environment:
       - OPENAEV_URL=http://localhost
       - OPENAEV_TOKEN=ChangeMe
