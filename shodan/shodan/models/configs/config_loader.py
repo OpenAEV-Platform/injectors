@@ -1,6 +1,6 @@
 """Base class for global config models."""
 
-from pydantic import BaseModel, Field
+from pydantic import Field
 from pyoaev.configuration import ConfigLoaderOAEV, Configuration, SettingsLoader
 
 from shodan.contracts.shodan_contracts import ShodanContracts

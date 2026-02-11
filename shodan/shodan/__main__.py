@@ -3,13 +3,11 @@
 import logging
 import os
 import sys
-from pathlib import Path
 
 from pydantic import ValidationError
 from pyoaev.helpers import OpenAEVConfigHelper, OpenAEVInjectorHelper
 
 from injector_common.dump_config import intercept_dump_argument
-from shodan.contracts.shodan_contracts import ShodanContracts
 from shodan.injector.openaev_shodan import ShodanInjector
 from shodan.models import ConfigLoader
 
