@@ -59,14 +59,14 @@ jobs:
       - run:
           working_directory: ~/openaev
           name: Install poetry
-          command: pip install poetry==2.1.3 && poetry config installer.re-resolve false
+          command: pip install poetry==2.3.2 && poetry config installer.re-resolve false
       - run:
           name: Run injector tests
           working_directory: ~/openaev
           command: |
             INJECTORS="nuclei nmap http-query"
             
-            if [ "${CIRCLE_BRANCH}" = "main" ]; then
+            if [ "${CIRCLE_BRANCH:-main}" = "main" ]; then
               PYOAEV_REF="main"
             else
               PYOAEV_REF="release/current"
@@ -77,7 +77,7 @@ jobs:
             
               cd ~/openaev/$injector
             
-              poetry install --extras prod
+              poetry install
               poetry run pip install --force-reinstall git+https://github.com/OpenAEV-Platform/client-python.git@${PYOAEV_REF}
               poetry run python -m unittest
             done
@@ -113,7 +113,7 @@ jobs:
           name: Build injector Docker images
           working_directory: ~/openaev
           command: |
-            INJECTORS="aws http-query nmap nuclei teams"
+            INJECTORS="aws http-query nmap nuclei shodan teams"
             
             for injector in $INJECTORS; do
               echo "Building injector: $injector"
@@ -133,7 +133,6 @@ jobs:
       - slack/notify:
           event: fail
           template: basic_fail_1
-
   publish_images:
     working_directory: ~/openaev
     docker:
@@ -169,7 +168,7 @@ jobs:
             fi
             echo "Image tag: ${IMAGETAG}"
             
-            INJECTORS="aws http-query nmap nuclei teams"
+            INJECTORS="aws http-query nmap nuclei shodan teams"
 
             for injector in $INJECTORS; do
               docker image load < injector-$injector
@@ -195,7 +194,6 @@ jobs:
       - slack/notify:
           event: fail
           template: basic_fail_1
-
   deploy_testing:
     docker:
       - image: cimg/base:current-24.04
