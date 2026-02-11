@@ -101,19 +101,7 @@ poetry install --extras prod
 For development, you should first clone the `pyoaev` repository following the instructions provided in the OpenAEV
 documentation.
 
-First, create a dedicated virtual environment to keep things isolated:
-
-```shell
-py -3.12 -m venv venv
-```
-
-Activate it depending on your OS:
-
-```shell
-.\venv\Scripts\activate
-```
-
-Then install development dependencies
+Install development dependencies
 
 ```shell
 poetry install --extras dev
