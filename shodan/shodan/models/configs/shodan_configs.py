@@ -3,11 +3,10 @@
 from datetime import timedelta
 
 from pydantic import Field, PositiveInt, SecretStr
+from pydantic_settings import BaseSettings
 
-from shodan.models.configs import _SettingsLoader
 
-
-class _ConfigLoaderShodan(_SettingsLoader):
+class _ConfigLoaderShodan(BaseSettings):
     """Shodan API configuration settings."""
 
     base_url: str = Field(

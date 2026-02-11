@@ -1,7 +1,5 @@
 """Base class for global config models."""
 
-from pathlib import Path
-
 from pydantic import BaseModel, Field
 from pydantic_settings import (
     BaseSettings,
@@ -10,13 +8,10 @@ from pydantic_settings import (
     PydanticBaseSettingsSource,
     YamlConfigSettingsSource,
 )
+from pyoaev.configuration import ConfigLoaderOAEV, Configuration, SettingsLoader
 
-from shodan.models.configs import (
-    _BaseInjectorConfig,
-    _BaseOpenAEVConfig,
-    _ConfigLoaderShodan,
-    _SettingsLoader,
-)
+from shodan.models.configs import _ConfigLoaderShodan
+from shodan.models.configs.injector_config_override import InjectorConfigOverride
 
 
 class _BaseInjectorConfigHelperAdapter:
@@ -53,15 +48,14 @@ class _BaseInjectorConfigUtils:
         return _BaseInjectorConfigHelperAdapter(flatten_dict)
 
 
-class ConfigLoader(_BaseInjectorConfigUtils, _SettingsLoader):
+class ConfigLoader(SettingsLoader):
     """Configuration loader for the injector."""
 
-    openaev: _BaseOpenAEVConfig = Field(
-        default_factory=_BaseOpenAEVConfig,
-        description="Base OpenAEV configurations.",
+    openaev: ConfigLoaderOAEV = Field(
+        default_factory=ConfigLoaderOAEV, description="Base OpenAEV configurations."
     )
-    injector: _BaseInjectorConfig = Field(
-        default_factory=_BaseInjectorConfig,
+    injector: InjectorConfigOverride = Field(
+        default_factory=InjectorConfigOverride,
         description="Base Injector configurations.",
     )
     shodan: _ConfigLoaderShodan = Field(
@@ -69,57 +63,8 @@ class ConfigLoader(_BaseInjectorConfigUtils, _SettingsLoader):
         description="Shodan configurations.",
     )
 
-    @classmethod
-    def settings_customise_sources(
-        cls,
-        settings_cls: type[BaseSettings],
-        init_settings: PydanticBaseSettingsSource,
-        env_settings: PydanticBaseSettingsSource,
-        dotenv_settings: PydanticBaseSettingsSource,
-        file_secret_settings: PydanticBaseSettingsSource,
-    ) -> tuple[PydanticBaseSettingsSource]:
-        """Pydantic settings customisation sources.
-
-        Defines the priority order for loading configuration settings:
-        1. .env file (if exists)
-        2. config.yml file (if exists)
-        3. Environment variables (fallback)
-
-        Args:
-            settings_cls: The settings class being configured.
-            init_settings: Initialization settings source.
-            env_settings: Environment variables settings source.
-            dotenv_settings: .env file settings source.
-            file_secret_settings: File secrets settings source.
-
-        Returns:
-            Tuple containing the selected settings source.
-
-        """
-        env_path = Path(__file__).parents[2] / ".env"
-        yaml_path = Path(__file__).parents[2] / "config.yml"
-
-        if env_path.exists():
-            return (
-                DotEnvSettingsSource(
-                    settings_cls,
-                    env_file=env_path,
-                    env_ignore_empty=True,
-                    env_file_encoding="utf-8",
-                ),
-            )
-        elif yaml_path.exists():
-            return (
-                YamlConfigSettingsSource(
-                    settings_cls,
-                    yaml_file=yaml_path,
-                    yaml_file_encoding="utf-8",
-                ),
-            )
-        else:
-            return (
-                EnvSettingsSource(
-                    settings_cls,
-                    env_ignore_empty=True,
-                ),
-            )
+    def to_daemon_config(self) -> Configuration:
+        return Configuration(
+            config_hints={},
+            config_base_model=self,
+        )

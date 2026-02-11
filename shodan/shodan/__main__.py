@@ -25,7 +25,7 @@ def main() -> None:
     try:
         # Loading injector configuration
         config = ConfigLoader()
-        intercept_dump_argument(config)
+        intercept_dump_argument(config.to_daemon_config())
 
         # Build Shodan contracts and adapt config for the helper
         shodan_contracts = ShodanContracts(config).contracts()
