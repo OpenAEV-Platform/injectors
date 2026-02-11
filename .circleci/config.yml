@@ -44,6 +44,9 @@ jobs:
     working_directory: ~/openaev
     docker:
       - image: cimg/python:3.13
+    parameters:
+      injector_name:
+        type: string
     steps:
       - checkout
       - setup_remote_docker
@@ -62,29 +65,26 @@ jobs:
           command: pip install poetry==2.3.2 && poetry config installer.re-resolve false
       - run:
           name: Run injector tests
-          working_directory: ~/openaev
+          working_directory: ~/openaev/<< parameters.injector_name >>
           command: |
-            INJECTORS="nuclei nmap http-query"
-            
             if [ "${CIRCLE_BRANCH:-main}" = "main" ]; then
               PYOAEV_REF="main"
             else
               PYOAEV_REF="release/current"
             fi
-            
-            for injector in $INJECTORS; do
-              echo "Running tests for injector: $injector"
-            
-              cd ~/openaev/$injector
-            
-              poetry install
-              poetry run pip install --force-reinstall git+https://github.com/OpenAEV-Platform/client-python.git@${PYOAEV_REF}
-              poetry run python -m unittest
-            done
+
+            echo "Running tests for injector: << parameters.injector_name >>"
+            poetry install
+            poetry run pip install --force-reinstall git+https://github.com/OpenAEV-Platform/client-python.git@${PYOAEV_REF}
+            poetry run python -m unittest
+
   build_docker_images:
     working_directory: ~/openaev
     docker:
       - image: cimg/base:current-24.04
+    parameters:
+      injector_name:
+        type: string
     steps:
       - checkout
       - run:
@@ -111,21 +111,17 @@ jobs:
             fi;
       - run:
           name: Build injector Docker images
-          working_directory: ~/openaev
+          working_directory: ~/openaev/<< parameters.injector_name >>
           command: |
-            INJECTORS="aws http-query nmap nuclei shodan teams"
-            
-            for injector in $INJECTORS; do
-              echo "Building injector: $injector"
-            
-              if [ "${CIRCLE_BRANCH}" = "release/current" ]; then
-                docker build --progress=plain --build-context injector_common=injector_common -t openaev/injector-$injector:${CIRCLE_SHA1} --build-arg PYOAEV_GIT_BRANCH_OVERRIDE="${CIRCLE_BRANCH}" ./$injector
-              else
-                docker build --progress=plain --build-context injector_common=injector_common -t openaev/injector-$injector:${CIRCLE_SHA1} ./$injector
-              fi
-            
-              docker save -o ~/openaev/images/injector-$injector openaev/injector-$injector:${CIRCLE_SHA1}
-            done
+            echo "Building injector: << parameters.injector_name >>"
+          
+            if [ "${CIRCLE_BRANCH}" = "release/current" ]; then
+              docker build --progress=plain --build-context injector_common=../injector_common -t openaev/injector-<< parameters.injector_name >>:${CIRCLE_SHA1} --build-arg PYOAEV_GIT_BRANCH_OVERRIDE="${CIRCLE_BRANCH}" .
+            else
+              docker build --progress=plain --build-context injector_common=../injector_common -t openaev/injector-<< parameters.injector_name >>:${CIRCLE_SHA1} .
+            fi
+          
+            docker save -o ~/openaev/images/injector-<< parameters.injector_name >> openaev/injector-<< parameters.injector_name >>:${CIRCLE_SHA1}
       - persist_to_workspace:
           root: ~/openaev
           paths:
@@ -137,6 +133,9 @@ jobs:
     working_directory: ~/openaev
     docker:
       - image: cimg/base:current-24.04
+    parameters:
+      injector_name:
+        type: string
     steps:
       - checkout
       - run:
@@ -167,29 +166,22 @@ jobs:
               exit 1
             fi
             echo "Image tag: ${IMAGETAG}"
-            
-            INJECTORS="aws http-query nmap nuclei shodan teams"
 
-            for injector in $INJECTORS; do
-              docker image load < injector-$injector
-              docker tag openaev/injector-$injector:${CIRCLE_SHA1} openaev/injector-$injector:${IMAGETAG}
-              docker tag openaev/injector-$injector:${CIRCLE_SHA1} openbas/injector-$injector:${IMAGETAG}
-            done
-
+            docker image load < injector-<< parameters.injector_name >>
+            docker tag openaev/injector-<< parameters.injector_name >>:${CIRCLE_SHA1} openaev/injector-<< parameters.injector_name >>:${IMAGETAG}
+            docker tag openaev/injector-<< parameters.injector_name >>:${CIRCLE_SHA1} openbas/injector-<< parameters.injector_name >>:${IMAGETAG}
+  
             echo "$DOCKERHUB_PASS" | docker login -u "$DOCKERHUB_USERNAME" --password-stdin
-            for injector in $INJECTORS; do
-              docker push openaev/injector-$injector:${IMAGETAG}
-              docker push openbas/injector-$injector:${IMAGETAG}
-            done
+
+            docker push openaev/injector-<< parameters.injector_name >>:${IMAGETAG}
+            docker push openbas/injector-<< parameters.injector_name >>:${IMAGETAG}
 
             if [ "${IS_LATEST}" == "true" ]
             then
-              for injector in $INJECTORS; do
-                docker tag openaev/injector-$injector:${IMAGETAG} openaev/injector-$injector:latest
-                docker tag openaev/injector-$injector:${IMAGETAG} openbas/injector-$injector:latest
-                docker push openaev/injector-$injector:latest
-                docker push openbas/injector-$injector:latest
-              done
+              docker tag openaev/injector-<< parameters.injector_name >>:${IMAGETAG} openaev/injector-<< parameters.injector_name >>:latest
+              docker tag openaev/injector-<< parameters.injector_name >>:${IMAGETAG} openbas/injector-<< parameters.injector_name >>:latest
+              docker push openaev/injector-<< parameters.injector_name >>:latest
+              docker push openbas/injector-<< parameters.injector_name >>:latest
             fi
       - slack/notify:
           event: fail
@@ -237,10 +229,16 @@ workflows:
             tags:
               only: /[0-9]+(\.[0-9]+)+(\.[0-9]+)*/
       - test:
+          matrix:
+            parameters:
+              injector_name: ["nuclei" "nmap" "http-query"]
           filters:
             tags:
               only: /[0-9]+(\.[0-9]+)+(\.[0-9]+)*/
       - build_docker_images:
+          matrix:
+            parameters:
+              injector_name: [ "aws" "http-query" "nmap" "nuclei" "shodan" "teams" ]
           requires:
             - ensure_formatting
             - linter
@@ -249,6 +247,9 @@ workflows:
             tags:
               only: /[0-9]+(\.[0-9]+)+(\.[0-9]+)*/
       - publish_images:
+          matrix:
+            parameters:
+              injector_name: [ "aws" "http-query" "nmap" "nuclei" "shodan" "teams" ]
           requires:
             - build_docker_images
           filters:
