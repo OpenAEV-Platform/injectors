@@ -231,14 +231,14 @@ workflows:
       - test:
           matrix:
             parameters:
-              injector_name: ["nuclei" "nmap" "http-query"]
+              injector_name: ["nuclei", "nmap", "http-query"]
           filters:
             tags:
               only: /[0-9]+(\.[0-9]+)+(\.[0-9]+)*/
       - build_docker_images:
           matrix:
             parameters:
-              injector_name: [ "aws" "http-query" "nmap" "nuclei" "shodan" "teams" ]
+              injector_name: [ "aws", "http-query", "nmap", "nuclei", "shodan", "teams" ]
           requires:
             - ensure_formatting
             - linter
@@ -249,7 +249,7 @@ workflows:
       - publish_images:
           matrix:
             parameters:
-              injector_name: [ "aws" "http-query" "nmap" "nuclei" "shodan" "teams" ]
+              injector_name: [ "aws", "http-query", "nmap", "nuclei", "shodan", "teams" ]
           requires:
             - build_docker_images
           filters:
