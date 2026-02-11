@@ -324,7 +324,7 @@ files = []
 develop = true
 
 [package.dependencies]
-pyoaev = "2.0.14"
+pyoaev = "2.1.6"
 
 [package.extras]
 dev = ["black (>=25.11.0,<25.12.0)", "wheel (>=0.45.1,<0.46.0)"]
@@ -669,14 +669,14 @@ yaml = ["pyyaml (>=6.0.1)"]
 
 [[package]]
 name = "pyoaev"
-version = "2.0.14"
+version = "2.1.6"
 description = "Python API client for OpenAEV."
 optional = false
 python-versions = ">=3.11"
 groups = ["main"]
 files = [
-    {file = "pyoaev-2.0.14-py3-none-any.whl", hash = "sha256:8a03dd1b2ce1d30c0d71249a8974ee27b61ebd72613b0a94f4b81a9d170009b0"},
-    {file = "pyoaev-2.0.14.tar.gz", hash = "sha256:a93b75db0248f824d625b06fdaa1d66898902076e9b69a84abce5b933a8dcdbd"},
+    {file = "pyoaev-2.1.6-py3-none-any.whl", hash = "sha256:8a03dd1b2ce1d30c0d71249a8974ee27b61ebd72613b0a94f4b81a9d170009b0"},
+    {file = "pyoaev-2.1.6.tar.gz", hash = "sha256:a93b75db0248f824d625b06fdaa1d66898902076e9b69a84abce5b933a8dcdbd"},
 ]
 
 [package.dependencies]
@@ -703,7 +703,7 @@ doc = ["autoapi (>=2.0.1,<2.1.0)", "sphinx-autodoc-typehints (>=3.2.0,<3.3.0)", 
 
 [[package]]
 name = "pyoaev"
-version = "2.0.14"
+version = "2.1.6"
 description = "Python API client for OpenAEV."
 optional = false
 python-versions = ">=3.11"
