@@ -3,42 +3,9 @@
 from pydantic import BaseModel, Field
 from pyoaev.configuration import ConfigLoaderOAEV, Configuration, SettingsLoader
 
+from shodan.contracts.shodan_contracts import ShodanContracts
 from shodan.models.configs import _ConfigLoaderShodan
 from shodan.models.configs.injector_config_override import InjectorConfigOverride
-
-
-class _BaseInjectorConfigHelperAdapter:
-    def __init__(self, data: dict):
-        self.data = data
-
-    def get_conf(self, key, default=None):
-        value = self.data.get(key, default)
-        if isinstance(value, dict) and "data" in value:
-            value = value["data"]
-        return value
-
-
-class _BaseInjectorConfigUtils:
-
-    def to_flatten(self, contracts=None) -> dict:
-        flatten_config = {}
-        for field_name in ["openaev", "injector"]:
-            value = getattr(self, field_name, None)
-            if isinstance(value, BaseModel):
-                for subfield, subvalue in value.__dict__.items():
-                    flatten_config[f"{field_name}_{subfield}"] = str(subvalue)
-            elif value is not None:
-                flatten_config[field_name] = str(value)
-            if contracts:
-                flatten_config["injector_contracts"] = contracts
-        return flatten_config
-
-    def to_config_injector_helper_adapter(
-        self, contracts
-    ) -> _BaseInjectorConfigHelperAdapter:
-        """Returns an OpenAEVInjectorHelper-compatible object"""
-        flatten_dict = self.to_flatten(contracts)
-        return _BaseInjectorConfigHelperAdapter(flatten_dict)
 
 
 class ConfigLoader(SettingsLoader):
@@ -58,6 +25,17 @@ class ConfigLoader(SettingsLoader):
 
     def to_daemon_config(self) -> Configuration:
         return Configuration(
-            config_hints={},
+            config_hints={
+                # OpenAEV configuration (flattened)
+                "openaev_url": {"data": str(self.openaev.url)},
+                "openaev_token": {"data": self.openaev.token},
+                # Injector configuration (flattened)
+                "injector_id": {"data": self.injector.id},
+                "injector_name": {"data": self.injector.name},
+                "injector_type": {"data": "openaev_shodan"},
+                "injector_contracts": {"data": ShodanContracts().contracts()},
+                "injector_log_level": {"data": self.injector.log_level},
+                "injector_icon_filepath": {"data": self.injector.icon_filepath},
+            },
             config_base_model=self,
         )

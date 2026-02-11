@@ -6,7 +6,7 @@ import sys
 from pathlib import Path
 
 from pydantic import ValidationError
-from pyoaev.helpers import OpenAEVInjectorHelper
+from pyoaev.helpers import OpenAEVConfigHelper, OpenAEVInjectorHelper
 
 from injector_common.dump_config import intercept_dump_argument
 from shodan.contracts.shodan_contracts import ShodanContracts
@@ -27,18 +27,13 @@ def main() -> None:
         config = ConfigLoader()
         intercept_dump_argument(config.to_daemon_config())
 
-        # Build Shodan contracts and adapt config for the helper
-        shodan_contracts = ShodanContracts(config).contracts()
-        config_helper_adapter = config.to_config_injector_helper_adapter(
-            contracts=shodan_contracts
-        )
-
-        # Load the injector icon for the helper
-        icon_path = Path(__file__).parent / "img" / "icon-shodan.png"
-        icon_bytes = icon_path.read_bytes()
-
         # Instantiate the OpenAEV injector helper
-        helper = OpenAEVInjectorHelper(config=config_helper_adapter, icon=icon_bytes)
+        helper = OpenAEVInjectorHelper(
+            config=OpenAEVConfigHelper.from_configuration_object(
+                config.to_daemon_config()
+            ),
+            icon=open("shodan/img/icon-shodan.png", "rb"),
+        )
 
         logger.info(
             f"{LOG_PREFIX} - Shodan injector configuration initialized successfully."

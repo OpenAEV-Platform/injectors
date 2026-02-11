@@ -26,7 +26,6 @@ from shodan.contracts import (
     DomainDiscovery,
     IPEnumeration,
 )
-from shodan.models import ConfigLoader
 
 TYPE = "openaev_shodan"
 
@@ -116,11 +115,6 @@ class TargetProperty(Enum):
 
 
 class ShodanContracts:
-    def __init__(self, config: ConfigLoader):
-        # Load configuration file
-        self.config = config
-
-    # -- CONFIG --
     @staticmethod
     def _base_contract_config():
         return ContractConfig(
@@ -311,4 +305,4 @@ class ShodanContracts:
             for contract_id, contract_cls, contract_selector_default in shodan_contract_definitions
         ]
 
-        return {"data": prepare_contracts(contracts)}
+        return prepare_contracts(contracts)
