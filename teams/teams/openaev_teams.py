@@ -7,9 +7,7 @@ from injector_common.data_helpers import DataHelpers
 from injector_common.dump_config import intercept_dump_argument
 from teams.client.teams_client import ExecutionResult, TeamsClient
 from teams.configuration.config_loader import ConfigLoader
-from teams.contracts_teams import (
-    CONTRACT_ID,
-)
+from teams.contracts_teams import CONTRACT_ID
 from teams.helpers.teams_helper import TeamsPayloadBuilder
 
 

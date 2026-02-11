@@ -93,7 +93,7 @@ podman compose up -d
 **Production environment**
 
 ```shell
-poetry install --extras prod
+poetry install
 ```
 
 **Development environment**

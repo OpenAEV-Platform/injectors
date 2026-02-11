@@ -8,6 +8,7 @@ from pathlib import Path
 from pydantic import ValidationError
 from pyoaev.helpers import OpenAEVInjectorHelper
 
+from injector_common.dump_config import intercept_dump_argument
 from shodan.contracts.shodan_contracts import ShodanContracts
 from shodan.injector.openaev_shodan import ShodanInjector
 from shodan.models import ConfigLoader
@@ -24,6 +25,7 @@ def main() -> None:
     try:
         # Loading injector configuration
         config = ConfigLoader()
+        intercept_dump_argument(config)
 
         # Build Shodan contracts and adapt config for the helper
         shodan_contracts = ShodanContracts(config).contracts()

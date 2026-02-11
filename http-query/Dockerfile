@@ -6,7 +6,7 @@ WORKDIR /opt/injector_common
 COPY --from=injector_common ./ ./
 
 # poetry version available on Ubuntu 24.04
-RUN pip3 install poetry==2.1.3 && poetry config installer.re-resolve false
+RUN pip3 install poetry==2.3.2 && poetry config installer.re-resolve false
 
 ARG installdir=/opt/injector
 ADD . ${installdir}

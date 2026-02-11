@@ -1,27 +1,27 @@
-[tool.poetry]
+[project]
 name = "openaev-teams-injector"
 version = "2.1.6"
 description = "An injector for Microsoft Teams"
-authors = ["Filigran <contact@filigran.io>"]
-license = "Apache-2.0"
 readme = "README.md"
+authors = [{ name = "Filigran", email = "contact@filigran.io" }]
+license = "Apache-2.0"
+requires-python = ">=3.11,<4.0"
+dependencies = [
+    "pyoaev==2.1.6; extra != 'dev'",
+    "injector_common @ ../injector_common",
+    "requests~=2.32.3",
+]
+
+[tools.poetry]
 packages = [
     { include = "teams" }
 ]
 
-
 [tool.poetry.dependencies]
-python = "^3.11"
-requests = "2.32.3"
 pyoaev = [
-    { markers = "extra == 'prod' and extra != 'dev'", version = "2.1.6", source = "pypi"  },
-    { markers = "extra == 'dev' and extra != 'prod'", path = "../../client-python", develop = true },
+    { markers = "extra == 'dev'", develop = true },
 ]
-injector_common = { path = "../injector_common", develop = true }
-
-[tool.poetry.extras]
-prod = ["pyoaev"]
-dev = ["pyoaev"]
+injector_common = { develop = true }
 
 [build-system]
 requires = ["poetry-core"]
@@ -36,3 +36,8 @@ dev = [
     "black (>=25.12.0,<26.0.0)",
     "isort (>=7.0.0,<8.0.0)"
 ]
+
+[tool.cmw]
+install-command = "poetry install"
+config-dump-command = "poetry run python -m teams.openaev_teams --dump-config-schema"
+icon-path = "teams/img/icon-teams.png"
