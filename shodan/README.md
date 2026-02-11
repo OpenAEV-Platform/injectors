@@ -87,7 +87,7 @@ file (`config.yml`, manual).
 Build the Docker image using the provided `Dockerfile`:
 
 ```bash
-docker build -t openaev/injector-shodan:latest .
+docker build --build-context injector_common=../injector_common . -t openaev/injector-shodan:latest
 ```
 
 Edit the `docker-compose.yml` file with your OpenAEV configuration, then start the container:

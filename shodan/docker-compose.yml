@@ -1,20 +1,16 @@
-version: '3.8'
 services:
   injector-shodan:
-    image: openaev/injector-shodan:2.0.14
+    image: openaev/injector-shodan:latest
     environment:
-      - OPENAEV_URL=http://localhost
-      - OPENAEV_TOKEN=ChangeMe
-#      - INJECTOR_ID=shodan--a87488ad-2c72-4592-b429-69259d7bcef1
-#      - INJECTOR_NAME=Shodan
-#      - INJECTOR_LOG_LEVEL=error
-      - SHODAN_API_KEY=ChangeMe
-#      - SHODAN_BASE_URL=https://api.shodan.io
-#      - SHODAN_API_LEAKY_BUCKET_RATE=10
-#      - SHODAN_API_LEAKY_BUCKET_CAPACITY=10
-#      - SHODAN_API_RETRY=5
-#      - SHODAN_API_BACKOFF=PT30S
+      - OPENAEV_URL=${OPENAEV_URL}
+      - OPENAEV_TOKEN=${OPENAEV_TOKEN}
+      - INJECTOR_ID=${INJECTOR_ID}
+      - INJECTOR_NAME=${INJECTOR_NAME}
+      - INJECTOR_LOG_LEVEL=${INJECTOR_LOG_LEVEL}
+      - SHODAN_API_KEY=${SHODAN_API_KEY}
+      - SHODAN_BASE_URL=${SHODAN_BASE_URL}
+      - SHODAN_API_LEAKY_BUCKET_RATE=${SHODAN_API_LEAKY_BUCKET_RATE}
+      - SHODAN_API_LEAKY_BUCKET_CAPACITY=${SHODAN_API_LEAKY_BUCKET_CAPACITY}
+      - SHODAN_API_RETRY=${SHODAN_API_RETRY}
+      - SHODAN_API_BACKOFF=${SHODAN_API_BACKOFF}
     restart: always
-    depends_on:
-      openaev:
-        condition: service_healthy

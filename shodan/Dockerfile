@@ -1,29 +1,37 @@
-FROM python:3.13-alpine AS build
+FROM python:3.13-alpine AS builder
 
-WORKDIR /opt/openaev-injector-shodan
+RUN apk update && apk upgrade
 
-# Copy dependency files (pyproject.toml / poetry.lock / README.md)
-COPY pyproject.toml poetry.lock* README.md ./
+WORKDIR /opt/injector_common
+COPY --from=injector_common ./ ./
 
-# Build dependencies
-RUN apk add --no-cache --virtual .build-dependencies \
-    build-base git libffi-dev libxml2-dev libxslt-dev \
-    && pip3 install --no-cache-dir poetry==2.2.1 \
-    && poetry config virtualenvs.create false \
-    && poetry install --only main --extras prod --no-interaction --no-ansi --no-root \
-    && apk del .build-dependencies
+# poetry version available on Ubuntu 24.04
+RUN pip3 install poetry==2.3.2 && poetry config installer.re-resolve false
 
-# Copy the injector
-COPY shodan ./shodan
+ARG installdir=/opt/injector
+ADD . ${installdir}
+WORKDIR ${installdir}
+RUN poetry build
 
 FROM python:3.13-alpine AS runner
 
-WORKDIR /opt/openaev-injector-shodan
+WORKDIR /opt/injector_common
+COPY --from=injector_common ./ ./
 
-# Runtime libraries
-RUN apk add --no-cache libmagic libffi libxml2 libxslt
+ARG installdir=/opt/injector
+WORKDIR ${installdir}
+COPY --from=builder ${installdir} ${installdir}
+RUN pip3 install --no-cache-dir "$(ls dist/*.whl)"
 
-COPY --from=build /opt/openaev-injector-shodan/shodan ./shodan
-COPY --from=build /usr/local/lib/python3.13/site-packages /usr/local/lib/python3.13/site-packages
+# Declare the build argument
+ARG PYOAEV_GIT_BRANCH_OVERRIDE
+
+RUN if [[ ${PYOAEV_GIT_BRANCH_OVERRIDE} ]] ; then \
+        echo "Forcing specific version of client-python" && \
+        apk add --no-cache git && \
+        pip install pip3-autoremove && \
+        pip-autoremove pyoaev -y && \
+        pip install git+https://github.com/OpenAEV-Platform/client-python@${PYOAEV_GIT_BRANCH_OVERRIDE} ; \
+    fi
 
 CMD ["python3", "-m", "shodan"]

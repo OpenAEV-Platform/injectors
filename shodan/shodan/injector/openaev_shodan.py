@@ -2,6 +2,7 @@ import time
 from datetime import datetime, timezone
 
 from pyoaev.helpers import OpenAEVInjectorHelper
+from injector_common.dump_config import intercept_dump_argument
 
 from shodan.contracts import (
     CloudProviderAssetDiscovery,
@@ -26,6 +27,8 @@ class ShodanInjector:
 
         # Load configuration file and connection helper
         self.config = config
+        intercept_dump_argument(self.config)
+
         self.helper = helper
         self.shodan_client_api = ShodanClientAPI(self.config, self.helper)
         self.utils = Utils()

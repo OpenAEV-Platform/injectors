@@ -2,8 +2,14 @@
 name = "openaev-nmap-injector"
 version = "2.1.6"
 description = "An injector for running port scans with nmap"
+license = "Apache-2.0"
+readme = "README.md"
+authors = [
+    { name = "Filigran", email = "contact@filigran.io" },
+]
+requires-python = ">=3.11,<4.0"
 dependencies = [
-    "pyoaev (==2.1.6) ; extra != 'dev'",
+    "pyoaev==2.1.6 ; extra != 'dev'",
     "injector_common @ ../injector_common",
 ]
 
@@ -13,17 +19,12 @@ dev = [
 ]
 
 [tool.poetry]
-authors = ["Filigran <contact@filigran.io>"]
-license = "Apache-2.0"
-readme = "README.md"
 packages = [
     { include = "nmap" }
 ]
 
 [tool.poetry.dependencies]
-python = "^3.11"
 pyoaev = [
-    { markers = "extra != 'dev'", source = "pypi" },
     { markers = "extra == 'dev'", develop = true },
 ]
 injector_common = { develop = true }
