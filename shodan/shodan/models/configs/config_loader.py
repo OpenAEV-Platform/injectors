@@ -1,13 +1,6 @@
 """Base class for global config models."""
 
 from pydantic import BaseModel, Field
-from pydantic_settings import (
-    BaseSettings,
-    DotEnvSettingsSource,
-    EnvSettingsSource,
-    PydanticBaseSettingsSource,
-    YamlConfigSettingsSource,
-)
 from pyoaev.configuration import ConfigLoaderOAEV, Configuration, SettingsLoader
 
 from shodan.models.configs import _ConfigLoaderShodan
