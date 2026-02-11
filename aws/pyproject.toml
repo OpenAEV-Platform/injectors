@@ -1,9 +1,9 @@
 [project]
 name = "openaev-aws-injector"
-version = "2.0.14"
+version = "2.1.6"
 description = "An injector for impacting AWS"
 dependencies = [
-    "pyoaev (==2.0.14) ; extra != 'dev'",
+    "pyoaev (==2.1.6) ; extra != 'dev'",
     "injector_common @ ../injector_common",
 ]
 

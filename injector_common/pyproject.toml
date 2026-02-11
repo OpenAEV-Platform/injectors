@@ -2,6 +2,15 @@
 name="injector_common"
 version="1.0.0"
 
+dependencies = [
+    "pyoaev==2.1.6",
+]
+[project.optional-dependencies]
+dev = [
+    "black (>=25.11.0,<25.12.0)",
+    "wheel (>=0.45.1,<0.46.0)"
+]
+
 [build-system]
 requires = ["setuptools", "wheel"]
 build-backend = "setuptools.build_meta"

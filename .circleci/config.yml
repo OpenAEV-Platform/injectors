@@ -216,13 +216,13 @@ jobs:
             docker tag openaev/injector-nuclei:${CIRCLE_SHA1} openbas/injector-nuclei:${IMAGETAG}
 
             echo "$DOCKERHUB_PASS" | docker login -u "$DOCKERHUB_USERNAME" --password-stdin
-            # docker push openaev/injector-aws:${IMAGETAG}
+            docker push openaev/injector-aws:${IMAGETAG}
             docker push openbas/injector-aws:${IMAGETAG}
-            # docker push openaev/injector-http-query:${IMAGETAG}
+            docker push openaev/injector-http-query:${IMAGETAG}
             docker push openbas/injector-http-query:${IMAGETAG}
-            # docker push openaev/injector-nmap:${IMAGETAG}
+            docker push openaev/injector-nmap:${IMAGETAG}
             docker push openbas/injector-nmap:${IMAGETAG}
-            # docker push openaev/injector-nuclei:${IMAGETAG}
+            docker push openaev/injector-nuclei:${IMAGETAG}
             docker push openbas/injector-nuclei:${IMAGETAG}
 
             if [ "${IS_LATEST}" == "true" ]
@@ -282,14 +282,26 @@ workflows:
   version: 2
   openaev:
     jobs:
-      - ensure_formatting
-      - linter
-      - test
+      - ensure_formatting:
+          filters:
+            tags:
+              only: /[0-9]+(\.[0-9]+)+(\.[0-9]+)*/
+      - linter:
+          filters:
+            tags:
+              only: /[0-9]+(\.[0-9]+)+(\.[0-9]+)*/
+      - test:
+          filters:
+            tags:
+              only: /[0-9]+(\.[0-9]+)+(\.[0-9]+)*/
       - build_docker_images:
           requires:
             - ensure_formatting
             - linter
             - test
+          filters:
+            tags:
+              only: /[0-9]+(\.[0-9]+)+(\.[0-9]+)*/
       - publish_images:
           requires:
             - build_docker_images
