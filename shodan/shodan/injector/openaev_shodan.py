@@ -2,8 +2,8 @@ import time
 from datetime import datetime, timezone
 
 from pyoaev.helpers import OpenAEVInjectorHelper
-from injector_common.dump_config import intercept_dump_argument
 
+from injector_common.dump_config import intercept_dump_argument
 from shodan.contracts import (
     CloudProviderAssetDiscovery,
     CriticalPortsAndExposedAdminInterface,

@@ -3,12 +3,7 @@
 from abc import ABC
 from typing import Literal
 
-from pydantic import (
-    BaseModel,
-    ConfigDict,
-    Field,
-    HttpUrl,
-)
+from pydantic import BaseModel, ConfigDict, Field, HttpUrl
 
 
 class BaseConfigModel(BaseModel, ABC):

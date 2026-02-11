@@ -2,11 +2,7 @@
 
 from datetime import timedelta
 
-from pydantic import (
-    Field,
-    PositiveInt,
-    SecretStr,
-)
+from pydantic import Field, PositiveInt, SecretStr
 
 from shodan.models.configs import _SettingsLoader
 
