@@ -18,88 +18,88 @@ from shodan.services.client_api import ShodanClientAPI
     "port, hostname, organization, expected_targets, expected_query_fragments_per_target, search_responses, user_info_response",
     [
         (
-                "443",
-                "filigran.io",
-                "filigran.io",
-                ["filigran.io"],
+            "443",
+            "filigran.io",
+            "filigran.io",
+            ["filigran.io"],
+            [
                 [
-                    [
-                        "port:443",
-                        "hostname:filigran.io,*.filigran.io",
-                        "org:filigran.io",
-                    ]
-                ],
-                [
-                    {
-                        "data": [
-                            {
-                                "hostnames": ["automation.filigran.io"],
-                                "ip_str": "51.38.220.153",
-                                "port": 443,
-                                "vulns": {
-                                    "CVE-2023-44487": {"cvss": 7.5},
-                                    "CVE-2025-23419": {"cvss": 4.3},
-                                },
-                            }
-                        ],
-                        "total": 1,
-                    }
-                ],
-                {"scan_credits": 1000, "query_credits": 1000, "plan": "basic"},
+                    "port:443",
+                    "hostname:filigran.io,*.filigran.io",
+                    "org:filigran.io",
+                ]
+            ],
+            [
+                {
+                    "data": [
+                        {
+                            "hostnames": ["automation.filigran.io"],
+                            "ip_str": "51.38.220.153",
+                            "port": 443,
+                            "vulns": {
+                                "CVE-2023-44487": {"cvss": 7.5},
+                                "CVE-2025-23419": {"cvss": 4.3},
+                            },
+                        }
+                    ],
+                    "total": 1,
+                }
+            ],
+            {"scan_credits": 1000, "query_credits": 1000, "plan": "basic"},
         ),
         (
-                "22,443,8080",
-                "filigran.io,google.com",
-                "",
-                ["filigran.io", "google.com"],
+            "22,443,8080",
+            "filigran.io,google.com",
+            "",
+            ["filigran.io", "google.com"],
+            [
                 [
-                    [
-                        "port:22,443,8080",
-                        "hostname:filigran.io,*.filigran.io",
-                        "org:filigran.io",
-                    ],
-                    [
-                        "port:22,443,8080",
-                        "hostname:google.com,*.google.com",
-                        "org:google.com",
-                    ],
+                    "port:22,443,8080",
+                    "hostname:filigran.io,*.filigran.io",
+                    "org:filigran.io",
                 ],
                 [
-                    {
-                        "data": [
-                            {
-                                "hostnames": ["worker.filigran.io"],
-                                "ip_str": "57.129.99.196",
-                                "port": 22,
-                                "vulns": {},
-                            },
-                            {
-                                "hostnames": ["automation.filigran.io"],
-                                "ip_str": "51.38.220.153",
-                                "port": 443,
-                                "vulns": {
-                                    "CVE-2023-44487": {"cvss": 7.5},
-                                    "CVE-2025-23419": {"cvss": 4.3},
-                                },
-                            },
-                        ],
-                        "total": 2,
-                    },
-                    {
-                        "data": [
-                            {
-                                "hostnames": ["www.google.com"],
-                                "ip_str": "142.250.80.46",
-                                "port": 443,
-                                "vulns": {
-                                    "CVE-2019-8936": {"cvss": 6.1},
-                                },
-                            }
-                        ],
-                        "total": 1,
-                    },
+                    "port:22,443,8080",
+                    "hostname:google.com,*.google.com",
+                    "org:google.com",
                 ],
-                {"scan_credits": 1000, "query_credits": 1000, "plan": "basic"},
+            ],
+            [
+                {
+                    "data": [
+                        {
+                            "hostnames": ["worker.filigran.io"],
+                            "ip_str": "57.129.99.196",
+                            "port": 22,
+                            "vulns": {},
+                        },
+                        {
+                            "hostnames": ["automation.filigran.io"],
+                            "ip_str": "51.38.220.153",
+                            "port": 443,
+                            "vulns": {
+                                "CVE-2023-44487": {"cvss": 7.5},
+                                "CVE-2025-23419": {"cvss": 4.3},
+                            },
+                        },
+                    ],
+                    "total": 2,
+                },
+                {
+                    "data": [
+                        {
+                            "hostnames": ["www.google.com"],
+                            "ip_str": "142.250.80.46",
+                            "port": 443,
+                            "vulns": {
+                                "CVE-2019-8936": {"cvss": 6.1},
+                            },
+                        }
+                    ],
+                    "total": 1,
+                },
+            ],
+            {"scan_credits": 1000, "query_credits": 1000, "plan": "basic"},
         ),
     ],
     ids=[
@@ -108,14 +108,14 @@ from shodan.services.client_api import ShodanClientAPI
     ],
 )
 def test_critical_ports_with_valid_port_and_hostname_and_organization(
-        shodan_client_api,
-        port,
-        hostname,
-        organization,
-        expected_targets,
-        expected_query_fragments_per_target,
-        search_responses,
-        user_info_response,
+    shodan_client_api,
+    port,
+    hostname,
+    organization,
+    expected_targets,
+    expected_query_fragments_per_target,
+    search_responses,
+    user_info_response,
 ):
     """Scenario Outline: Execute Critical Ports with valid port, hostname and organization."""
     # Given: A Critical Ports inject_content with valid port, hostname and organization
@@ -149,9 +149,9 @@ def test_critical_ports_with_valid_port_and_hostname_and_organization(
 
 
 def _given_critical_ports_inject_content(
-        port:str,
-        hostname: str,
-        organization: str,
+    port: str,
+    hostname: str,
+    organization: str,
 ) -> dict:
     """Create inject_content as received from the real injection payload.
 
@@ -181,10 +181,10 @@ def _given_critical_ports_inject_content(
 
 
 def _when_execute_critical_ports(
-        client: ShodanClientAPI,
-        inject_content: dict,
-        mock_search_responses: list[dict],
-        mock_user_info: dict,
+    client: ShodanClientAPI,
+    inject_content: dict,
+    mock_search_responses: list[dict],
+    mock_user_info: dict,
 ) -> tuple:
     """Execute the Critical Ports contract through process_shodan_search.
 
@@ -236,7 +236,7 @@ def _then_results_contain_expected_targets(results: dict, targets: list[str]) ->
 
 
 def _then_results_data_contains_search_responses(
-        results: dict, expected_responses: list[dict]
+    results: dict, expected_responses: list[dict]
 ) -> None:
     """Verify that each entry in results data contains its expected search response.
 
@@ -253,8 +253,8 @@ def _then_results_data_contains_search_responses(
 
 
 def _then_results_data_url_contains_expected_query(
-        results: dict,
-        expected_fragments_per_target: list[list[str]],
+    results: dict,
+    expected_fragments_per_target: list[list[str]],
 ) -> None:
     """Verify that each entry's URL contains the expected query fragments.
 
@@ -264,7 +264,7 @@ def _then_results_data_url_contains_expected_query(
 
     """
     for entry, expected_fragments in zip(
-            results["data"], expected_fragments_per_target
+        results["data"], expected_fragments_per_target
     ):
         url = entry["url"]
 

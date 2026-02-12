@@ -143,7 +143,7 @@ def test_cve_specific_watchlist_with_valid_vulnerability_and_hostname_and_organi
 
 
 def _given_cve_specific_watchlist_inject_content(
-    vulnerability:str,
+    vulnerability: str,
     hostname: str,
     organization: str,
 ) -> dict:

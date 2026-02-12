@@ -12,6 +12,7 @@ from shodan.services.client_api import ShodanClientAPI
 # Scenarios
 # --------
 
+
 # Scenario Outline: Organization defaults to hostname when not provided
 @pytest.mark.parametrize(
     "hostname, expected_query_fragments_per_target",
@@ -43,12 +44,12 @@ from shodan.services.client_api import ShodanClientAPI
     ids=[
         "single_hostname_organization_not_provided",
         "multi_hostname_organization_not_provided",
-    ]
+    ],
 )
 def test_organization_resolution_organization_not_provided(
-        shodan_client_api: ShodanClientAPI,
-        hostname: str,
-        expected_query_fragments_per_target: list[list[str]],
+    shodan_client_api: ShodanClientAPI,
+    hostname: str,
+    expected_query_fragments_per_target: list[list[str]],
 ):
     """Scenario Outline: Organization defaults to hostname when not provided"""
     # Given I have a valid inject_content with hostname "<hostname>" and no organization
@@ -67,8 +68,9 @@ def test_organization_resolution_organization_not_provided(
     )
 
     # Then each result URL contains the expected organization derived from its hostname
-    _then_results_data_url_contains_expected_query(results, expected_query_fragments_per_target)
-
+    _then_results_data_url_contains_expected_query(
+        results, expected_query_fragments_per_target
+    )
 
 
 # Scenario Outline: Organization is explicitly provided
@@ -76,33 +78,41 @@ def test_organization_resolution_organization_not_provided(
     "hostname, organization, expected_query_fragments_per_target",
     [
         # Organization explicitly provided -> same for all hostnames
-        ("filigran.io", "filigran.io", [
+        (
+            "filigran.io",
+            "filigran.io",
             [
-                "hostname:filigran.io,*.filigran.io",
-                "org:filigran.io",
+                [
+                    "hostname:filigran.io,*.filigran.io",
+                    "org:filigran.io",
+                ],
             ],
-        ],),
-        ("filigran.io,google.com", "filigran.io", [
+        ),
+        (
+            "filigran.io,google.com",
+            "filigran.io",
             [
-                "hostname:filigran.io,*.filigran.io",
-                "org:filigran.io",
+                [
+                    "hostname:filigran.io,*.filigran.io",
+                    "org:filigran.io",
+                ],
+                [
+                    "hostname:google.com,*.google.com",
+                    "org:filigran.io",
+                ],
             ],
-            [
-                "hostname:google.com,*.google.com",
-                "org:filigran.io",
-            ],
-        ],),
+        ),
     ],
     ids=[
         "single_hostname_organization_provided",
         "multi_hostname_organization_provided",
-    ]
+    ],
 )
 def test_organization_resolution_organization_provided(
-        shodan_client_api,
-        hostname,
-        organization,
-        expected_query_fragments_per_target,
+    shodan_client_api,
+    hostname,
+    organization,
+    expected_query_fragments_per_target,
 ):
     """Scenario Outline: Organization is explicitly provided"""
     # Given I have a valid inject_content with hostname "<hostname>" and organization "<organization>"
@@ -121,7 +131,9 @@ def test_organization_resolution_organization_provided(
     )
 
     # Then the provided organization "<organization>" is applied to all hostnames
-    _then_results_data_url_contains_expected_query(results, expected_query_fragments_per_target)
+    _then_results_data_url_contains_expected_query(
+        results, expected_query_fragments_per_target
+    )
 
 
 # --------
@@ -130,8 +142,8 @@ def test_organization_resolution_organization_provided(
 
 
 def _given_contract_inject_content(
-        hostname: str,
-        organization: str | None,
+    hostname: str,
+    organization: str | None,
 ) -> dict:
     """Create inject_content as received from the real injection payload.
 
@@ -159,11 +171,11 @@ def _given_contract_inject_content(
 
 
 def _when_execute_process_shodan_search(
-        client: ShodanClientAPI,
-        contract_id: ShodanContractId,
-        inject_content: dict,
-        mock_search_responses: list[dict],
-        mock_user_info: dict,
+    client: ShodanClientAPI,
+    contract_id: ShodanContractId,
+    inject_content: dict,
+    mock_search_responses: list[dict],
+    mock_user_info: dict,
 ) -> tuple:
     """Execute the Critical Ports contract through process_shodan_search.
 
@@ -204,8 +216,8 @@ def _when_execute_process_shodan_search(
 
 
 def _then_results_data_url_contains_expected_query(
-        results: dict,
-        expected_fragments_per_target: list[list[str]],
+    results: dict,
+    expected_fragments_per_target: list[list[str]],
 ) -> None:
     """Verify that each entry's URL contains the expected query fragments.
 
@@ -215,7 +227,7 @@ def _then_results_data_url_contains_expected_query(
     """
 
     for entry, expected_fragments in zip(
-            results["data"], expected_fragments_per_target
+        results["data"], expected_fragments_per_target
     ):
         url = entry["url"]
 

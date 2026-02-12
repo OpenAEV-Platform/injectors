@@ -4,56 +4,83 @@ from unittest.mock import patch
 from shodan.contracts import ShodanContractId
 from shodan.services.client_api import ShodanClientAPI
 
+
 @pytest.mark.parametrize(
     "contract_id, expected_targets, inject_content, expected_query_fragments_per_target, empty_search_responses, user_info_response",
     [
         (
-                ShodanContractId.IP_ENUMERATION,
-                ["1.2.3.4"],
-                {"ip": "1.2.3.4"},
-                [["ip:1.2.3.4"]],
-                [{"matches": [], "total": 0}, {"matches": [], "total": 0}],
-                {"plan": "basic", "scan_credits": 1000, "query_credits": 1000},
+            ShodanContractId.IP_ENUMERATION,
+            ["1.2.3.4"],
+            {"ip": "1.2.3.4"},
+            [["ip:1.2.3.4"]],
+            [{"matches": [], "total": 0}, {"matches": [], "total": 0}],
+            {"plan": "basic", "scan_credits": 1000, "query_credits": 1000},
         ),
         (
-                ShodanContractId.CVE_ENUMERATION,
-                ["filigran.io"],
-                {"hostname": "filigran.io", "organization": "filigran.io"},
-                [["has_vuln:true", "hostname:filigran.io,*.filigran.io", "org:filigran.io"]],
-                [{"matches": [], "total": 0}],
-                {"plan": "basic", "scan_credits": 1000, "query_credits": 1000},
+            ShodanContractId.CVE_ENUMERATION,
+            ["filigran.io"],
+            {"hostname": "filigran.io", "organization": "filigran.io"},
+            [
+                [
+                    "has_vuln:true",
+                    "hostname:filigran.io,*.filigran.io",
+                    "org:filigran.io",
+                ]
+            ],
+            [{"matches": [], "total": 0}],
+            {"plan": "basic", "scan_credits": 1000, "query_credits": 1000},
         ),
         (
-                ShodanContractId.CVE_SPECIFIC_WATCHLIST,
-                ["filigran.io"],
-                {"vulnerability": "CVE-2023-44487", "hostname": "filigran.io", "organization": "filigran.io"},
-                [["vuln:CVE-2023-44487", "hostname:filigran.io,*.filigran.io", "org:filigran.io"]],
-                [{"matches": [], "total": 0}],
-                {"plan": "basic", "scan_credits": 1000, "query_credits": 1000},
+            ShodanContractId.CVE_SPECIFIC_WATCHLIST,
+            ["filigran.io"],
+            {
+                "vulnerability": "CVE-2023-44487",
+                "hostname": "filigran.io",
+                "organization": "filigran.io",
+            },
+            [
+                [
+                    "vuln:CVE-2023-44487",
+                    "hostname:filigran.io,*.filigran.io",
+                    "org:filigran.io",
+                ]
+            ],
+            [{"matches": [], "total": 0}],
+            {"plan": "basic", "scan_credits": 1000, "query_credits": 1000},
         ),
         (
-                ShodanContractId.DOMAIN_DISCOVERY,
-                ["filigran.io"],
-                {"hostname": "filigran.io", "organization": "filigran.io"},
-                [["hostname:filigran.io,*.filigran.io", "org:filigran.io"]],
-                [{"matches": [], "total": 0}],
-                {"plan": "basic", "scan_credits": 1000, "query_credits": 1000},
+            ShodanContractId.DOMAIN_DISCOVERY,
+            ["filigran.io"],
+            {"hostname": "filigran.io", "organization": "filigran.io"},
+            [["hostname:filigran.io,*.filigran.io", "org:filigran.io"]],
+            [{"matches": [], "total": 0}],
+            {"plan": "basic", "scan_credits": 1000, "query_credits": 1000},
         ),
         (
-                ShodanContractId.CLOUD_PROVIDER_ASSET_DISCOVERY,
-                ["filigran.io"],
-                {"cloud_provider": "Google", "hostname": "filigran.io", "organization": "filigran.io"},
-                [["cloud.provider:Google", "hostname:filigran.io,*.filigran.io", "org:filigran.io"]],
-                [{"matches": [], "total": 0}],
-                {"plan": "basic", "scan_credits": 1000, "query_credits": 1000},
+            ShodanContractId.CLOUD_PROVIDER_ASSET_DISCOVERY,
+            ["filigran.io"],
+            {
+                "cloud_provider": "Google",
+                "hostname": "filigran.io",
+                "organization": "filigran.io",
+            },
+            [
+                [
+                    "cloud.provider:Google",
+                    "hostname:filigran.io,*.filigran.io",
+                    "org:filigran.io",
+                ]
+            ],
+            [{"matches": [], "total": 0}],
+            {"plan": "basic", "scan_credits": 1000, "query_credits": 1000},
         ),
         (
-                ShodanContractId.CRITICAL_PORTS_AND_EXPOSED_ADMIN_INTERFACE,
-                ["filigran.io"],
-                {"port": "443", "hostname": "filigran.io", "organization": "filigran.io"},
-                [["port:443", "hostname:filigran.io,*.filigran.io", "org:filigran.io"]],
-                [{"matches": [], "total": 0}],
-                {"plan": "basic", "scan_credits": 1000, "query_credits": 1000},
+            ShodanContractId.CRITICAL_PORTS_AND_EXPOSED_ADMIN_INTERFACE,
+            ["filigran.io"],
+            {"port": "443", "hostname": "filigran.io", "organization": "filigran.io"},
+            [["port:443", "hostname:filigran.io,*.filigran.io", "org:filigran.io"]],
+            [{"matches": [], "total": 0}],
+            {"plan": "basic", "scan_credits": 1000, "query_credits": 1000},
         ),
     ],
     ids=[
@@ -63,16 +90,16 @@ from shodan.services.client_api import ShodanClientAPI
         "empty_search_response_for_domain_discovery",
         "empty_search_response_for_cloud_provider_asset_discovery",
         "empty_search_response_for_critical_ports_and_exposed_admin_interface",
-    ]
+    ],
 )
 def test_contracts_handle_empty_shodan_results(
-        shodan_client_api,
-        contract_id,
-        inject_content,
-        expected_targets,
-        expected_query_fragments_per_target,
-        empty_search_responses,
-        user_info_response,
+    shodan_client_api,
+    contract_id,
+    inject_content,
+    expected_targets,
+    expected_query_fragments_per_target,
+    empty_search_responses,
+    user_info_response,
 ):
     """Scenario Outline: Execute contract when Shodan returns no matches"""
     # Given I have a valid <contract_name> inject_content with target "<target>"
@@ -103,11 +130,11 @@ def test_contracts_handle_empty_shodan_results(
 
 
 def _when_execute_contract(
-        client: ShodanClientAPI,
-        contract_id: ShodanContractId,
-        inject_content: dict,
-        mock_empty_search_responses:  list[dict],
-        mock_user_info: dict,
+    client: ShodanClientAPI,
+    contract_id: ShodanContractId,
+    inject_content: dict,
+    mock_empty_search_responses: list[dict],
+    mock_user_info: dict,
 ) -> tuple:
     """Execute the domain discovery contract through process_shodan_search.
 
@@ -142,7 +169,6 @@ def _when_execute_contract(
         )
 
 
-
 # --------
 # Then Methods
 # --------
@@ -158,6 +184,7 @@ def _then_results_contain_expected_targets(results: dict, targets: list[str]) ->
     """
     assert results["targets"] == targets  # noqa: S101
 
+
 def _then_results_are_empty(results, expected_targets):
     """Verify that each target result is empty."""
     assert results["targets"] == expected_targets
@@ -168,9 +195,10 @@ def _then_results_are_empty(results, expected_targets):
         assert entry["result"]["matches"] == []
         assert "test-api-key" not in entry["url"]
 
+
 def _then_results_data_url_contains_expected_query(
-        results: dict,
-        expected_fragments_per_target: list[list[str]],
+    results: dict,
+    expected_fragments_per_target: list[list[str]],
 ) -> None:
     """Verify that each entry's URL contains the expected query fragments.
 
@@ -182,13 +210,13 @@ def _then_results_data_url_contains_expected_query(
     assert len(results["data"]) == len(expected_fragments_per_target)  # noqa: S101
 
     for entry, expected_fragments in zip(
-            results["data"], expected_fragments_per_target
+        results["data"], expected_fragments_per_target
     ):
         url = entry["url"]
 
         for fragment in expected_fragments:
             assert (
-                    fragment in url
+                fragment in url
             ), f"Expected '{fragment}' in URL '{url}'"  # noqa: S101
 
         # Verify the API key is NOT exposed in the secured URL

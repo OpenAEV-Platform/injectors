@@ -18,100 +18,92 @@ from shodan.services.client_api import ShodanClientAPI
     "cloud_provider, hostname, organization, expected_targets, expected_query_fragments_per_target, search_responses, user_info_response",
     [
         (
-                "Amazon",
-                "filigran.io",
-                "filigran.io",
-                ["filigran.io"],
+            "Amazon",
+            "filigran.io",
+            "filigran.io",
+            ["filigran.io"],
+            [
                 [
-                    [
-                        "cloud.provider:Amazon",
-                        "hostname:filigran.io,*.filigran.io",
-                        "org:filigran.io",
-                    ]
-                ],
-                [
-                    {
-                        "data": [
-                            {
-                                "hostnames": ["automation.filigran.io"],
-                                "ip_str": "51.38.220.153",
-                                "port": 443,
-                                "cloud": {
-                                    "provider": "Google"
-                                },
-                                "vulns": {
-                                    "CVE-2023-44487": {"cvss": 7.5},
-                                    "CVE-2025-23419": {"cvss": 4.3},
-                                },
-                            }
-                        ],
-                        "total": 1,
-                    }
-                ],
-                {"scan_credits": 1000, "query_credits": 1000, "plan": "basic"},
+                    "cloud.provider:Amazon",
+                    "hostname:filigran.io,*.filigran.io",
+                    "org:filigran.io",
+                ]
+            ],
+            [
+                {
+                    "data": [
+                        {
+                            "hostnames": ["automation.filigran.io"],
+                            "ip_str": "51.38.220.153",
+                            "port": 443,
+                            "cloud": {"provider": "Google"},
+                            "vulns": {
+                                "CVE-2023-44487": {"cvss": 7.5},
+                                "CVE-2025-23419": {"cvss": 4.3},
+                            },
+                        }
+                    ],
+                    "total": 1,
+                }
+            ],
+            {"scan_credits": 1000, "query_credits": 1000, "plan": "basic"},
         ),
         (
-                "Google,Amazon",
-                "filigran.io,google.com",
-                "",
-                ["filigran.io", "google.com"],
+            "Google,Amazon",
+            "filigran.io,google.com",
+            "",
+            ["filigran.io", "google.com"],
+            [
                 [
-                    [
-                        "cloud.provider:Google,Amazon",
-                        "hostname:filigran.io,*.filigran.io",
-                        "org:filigran.io",
-                    ],
-                    [
-                        "cloud.provider:Google,Amazon",
-                        "hostname:google.com,*.google.com",
-                        "org:google.com",
-                    ],
+                    "cloud.provider:Google,Amazon",
+                    "hostname:filigran.io,*.filigran.io",
+                    "org:filigran.io",
                 ],
                 [
-                    {
-                        "data": [
-                            {
-                                "hostnames": ["worker.filigran.io"],
-                                "ip_str": "57.129.99.196",
-                                "port": 22,
-                                "cloud": {
-                                    "provider": "Amazon"
-                                },
-                                "vulns": {},
-                            },
-                            {
-                                "hostnames": ["automation.filigran.io"],
-                                "ip_str": "51.38.220.153",
-                                "port": 443,
-                                "cloud": {
-                                    "provider": "Amazon"
-                                },
-                                "vulns": {
-                                    "CVE-2023-44487": {"cvss": 7.5},
-                                    "CVE-2025-23419": {"cvss": 4.3},
-                                },
-                            },
-                        ],
-                        "total": 2,
-                    },
-                    {
-                        "data": [
-                            {
-                                "hostnames": ["www.google.com"],
-                                "ip_str": "142.250.80.46",
-                                "port": 443,
-                                "cloud": {
-                                    "provider": "Google"
-                                },
-                                "vulns": {
-                                    "CVE-2019-8936": {"cvss": 6.1},
-                                },
-                            }
-                        ],
-                        "total": 1,
-                    },
+                    "cloud.provider:Google,Amazon",
+                    "hostname:google.com,*.google.com",
+                    "org:google.com",
                 ],
-                {"scan_credits": 1000, "query_credits": 1000, "plan": "basic"},
+            ],
+            [
+                {
+                    "data": [
+                        {
+                            "hostnames": ["worker.filigran.io"],
+                            "ip_str": "57.129.99.196",
+                            "port": 22,
+                            "cloud": {"provider": "Amazon"},
+                            "vulns": {},
+                        },
+                        {
+                            "hostnames": ["automation.filigran.io"],
+                            "ip_str": "51.38.220.153",
+                            "port": 443,
+                            "cloud": {"provider": "Amazon"},
+                            "vulns": {
+                                "CVE-2023-44487": {"cvss": 7.5},
+                                "CVE-2025-23419": {"cvss": 4.3},
+                            },
+                        },
+                    ],
+                    "total": 2,
+                },
+                {
+                    "data": [
+                        {
+                            "hostnames": ["www.google.com"],
+                            "ip_str": "142.250.80.46",
+                            "port": 443,
+                            "cloud": {"provider": "Google"},
+                            "vulns": {
+                                "CVE-2019-8936": {"cvss": 6.1},
+                            },
+                        }
+                    ],
+                    "total": 1,
+                },
+            ],
+            {"scan_credits": 1000, "query_credits": 1000, "plan": "basic"},
         ),
     ],
     ids=[
@@ -120,14 +112,14 @@ from shodan.services.client_api import ShodanClientAPI
     ],
 )
 def test_cloud_provider_asset_discovery_with_valid_cloud_provider_and_hostname_and_organization(
-        shodan_client_api,
-        cloud_provider,
-        hostname,
-        organization,
-        expected_targets,
-        expected_query_fragments_per_target,
-        search_responses,
-        user_info_response,
+    shodan_client_api,
+    cloud_provider,
+    hostname,
+    organization,
+    expected_targets,
+    expected_query_fragments_per_target,
+    search_responses,
+    user_info_response,
 ):
     """Scenario Outline: Execute Cloud Provider Asset Discovery with valid cloud_provider, hostname and organization."""
     # Given: A Cloud Provider Asset Discovery inject_content with valid cloud_provider, hostname and organization
@@ -161,9 +153,9 @@ def test_cloud_provider_asset_discovery_with_valid_cloud_provider_and_hostname_a
 
 
 def _given_cloud_provider_asset_discovery_inject_content(
-        cloud_provider:str,
-        hostname: str,
-        organization: str,
+    cloud_provider: str,
+    hostname: str,
+    organization: str,
 ) -> dict:
     """Create inject_content as received from the real injection payload.
 
@@ -193,10 +185,10 @@ def _given_cloud_provider_asset_discovery_inject_content(
 
 
 def _when_execute_cloud_provider_asset_discovery(
-        client: ShodanClientAPI,
-        inject_content: dict,
-        mock_search_responses: list[dict],
-        mock_user_info: dict,
+    client: ShodanClientAPI,
+    inject_content: dict,
+    mock_search_responses: list[dict],
+    mock_user_info: dict,
 ) -> tuple:
     """Execute the Cloud Provider Asset Discovery contract through process_shodan_search.
 
@@ -248,7 +240,7 @@ def _then_results_contain_expected_targets(results: dict, targets: list[str]) ->
 
 
 def _then_results_data_contains_search_responses(
-        results: dict, expected_responses: list[dict]
+    results: dict, expected_responses: list[dict]
 ) -> None:
     """Verify that each entry in results data contains its expected search response.
 
@@ -265,8 +257,8 @@ def _then_results_data_contains_search_responses(
 
 
 def _then_results_data_url_contains_expected_query(
-        results: dict,
-        expected_fragments_per_target: list[list[str]],
+    results: dict,
+    expected_fragments_per_target: list[list[str]],
 ) -> None:
     """Verify that each entry's URL contains the expected query fragments.
 
@@ -276,7 +268,7 @@ def _then_results_data_url_contains_expected_query(
 
     """
     for entry, expected_fragments in zip(
-            results["data"], expected_fragments_per_target
+        results["data"], expected_fragments_per_target
     ):
         url = entry["url"]
 
