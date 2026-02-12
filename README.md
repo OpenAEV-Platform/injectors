@@ -31,15 +31,18 @@ vim new_injector/pyproject.toml
 
 Here's the expression for the pyoaev dependency, including the `extra` definition:
 ```toml
+dependencies = [
+    "pyoaev (==2.1.6); extra != 'dev'",
+]
+[project.optional-dependencies]
+dev = [
+    "pyoaev @ ../../client-python",
+]
 [tool.poetry.dependencies]
 pyoaev = [
-    { markers = "extra == 'prod' and extra != 'dev'", version = "<latest pyoaev release on PyPI>", source = "pypi"  },
-    { markers = "extra == 'dev' and extra != 'prod'", path = "../../client-python", develop = true },
+    { markers = "extra != 'dev'", source = "PyPI" },
+    { markers = "extra == 'dev'", develop = true },
 ]
-
-[tool.poetry.extras]
-prod = ["pyoaev"]
-dev = ["pyoaev"]
 ```
 
 ### Simultaneous development on pyoaev and an injector
