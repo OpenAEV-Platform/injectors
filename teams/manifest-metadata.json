@@ -1,0 +1,18 @@
+{
+  "title": "Microsoft Teams",
+  "slug": "openaev_teams",
+  "description": "Send messages through Microsoft Teams webhooks",
+  "short_description": "Send messages through Microsoft Teams webhooks",
+  "use_cases": ["Technical"],
+  "verified": true,
+  "last_verified_date": "",
+  "playbook_supported": false,
+  "max_confidence_level": 80,
+  "support_version": "",
+  "subscription_link": "https://teams.cloud.microsoft/",
+  "source_code": "",
+  "manager_supported": true,
+  "container_version": "rolling",
+  "container_image": "openaev/injector-teams",
+  "container_type": "INJECTOR"
+}

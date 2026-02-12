@@ -9,7 +9,7 @@
   "playbook_supported": false,
   "max_confidence_level": 80,
   "support_version": "",
-  "subscription_link": "https://projectdiscovery.io/nuclei](https://projectdiscovery.io/nuclei",
+  "subscription_link": "https://projectdiscovery.io/nuclei",
   "source_code": "",
   "manager_supported": true,
   "container_version": "rolling",

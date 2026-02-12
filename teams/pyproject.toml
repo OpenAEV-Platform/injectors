@@ -1,27 +1,27 @@
 [project]
-name = "openaev-nuclei-injector"
+name = "openaev-teams-injector"
 version = "2.1.6"
-description = "An injector for running vulnerability scans with Nuclei"
-license = "Apache-2.0"
+description = "An injector for Microsoft Teams"
 readme = "README.md"
-authors = [
-    { name = "Filigran", email = "contact@filigran.io" },
-]
+authors = [{ name = "Filigran", email = "contact@filigran.io" }]
+license = "Apache-2.0"
 requires-python = ">=3.11,<4.0"
-
 dependencies = [
-    "pyoaev (==2.1.6) ; extra != 'dev'",
+    "pyoaev (==2.1.6); extra != 'dev'",
     "injector_common @ ../injector_common",
+    "requests~=2.32.3",
 ]
 
 [project.optional-dependencies]
 dev = [
     "pyoaev @ ../../client-python",
+    "black (>=25.12.0,<26.0.0)",
+    "isort (>=7.0.0,<8.0.0)"
 ]
 
 [tool.poetry]
 packages = [
-    { include = "nuclei" }
+    { include = "teams" }
 ]
 
 [tool.poetry.dependencies]
@@ -37,9 +37,9 @@ build-backend = "poetry.core.masonry.api"
 
 [tool.isort]
 profile = "black"
-known_local_folder = ["nuclei"]
+known_local_folder = ["teams"]
 
 [tool.cmw]
 install-command = "poetry install"
-config-dump-command = "poetry run python -m nuclei.openaev_nuclei --dump-config-schema"
-icon-path = "nuclei/img/nuclei.jpg"
+config-dump-command = "poetry run python -m teams.openaev_teams --dump-config-schema"
+icon-path = "teams/img/icon-teams.png"

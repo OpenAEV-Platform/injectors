@@ -34,10 +34,4 @@ RUN if [[ ${PYOAEV_GIT_BRANCH_OVERRIDE} ]] ; then \
         pip install git+https://github.com/OpenAEV-Platform/client-python@${PYOAEV_GIT_BRANCH_OVERRIDE} ; \
     fi
 
-# get nuclei from above
-ENV NUCLEI_VERSION=3.4.3
-ENV NUCLEI_URL=https://github.com/projectdiscovery/nuclei/releases/download/v${NUCLEI_VERSION}/nuclei_${NUCLEI_VERSION}_linux_amd64.zip
-ADD ${NUCLEI_URL} /tmp
-RUN unzip /tmp/nuclei_${NUCLEI_VERSION}_linux_amd64.zip -d /usr/local/bin/
-
-CMD ["python3", "-m", "nuclei.openaev_nuclei"]
+CMD ["python3", "-m", "teams.openaev_teams"]

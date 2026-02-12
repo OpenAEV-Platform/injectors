@@ -1,29 +1,14 @@
-[build-system]
-requires = ["setuptools", "wheel"]
-build-backend = "setuptools.build_meta"
-
-[project.urls]
-Homepage = "https://filigran.io/"
-Repository = "https://github.com/OpenAEV-Platform/injectors/tree/main/shodan"
-Documentation = "https://github.com/OpenAEV-Platform/injectors/tree/main/shodan/README.md"
-Issues = "https://github.com/OpenAEV-Platform/injectors/issues"
-
 [project]
 name = "openaev-shodan-injector"
-version = "2.0.14"
+version = "2.1.6"
 description = "An injector for running with Shodan"
 readme = "README.md"
 authors = [{ name = "Filigran", email = "contact@filigran.io" }]
 license = "Apache-2.0"
-requires-python = ">=3.11, <3.14"
-classifiers = [
-    "Development Status :: 5 - Production/Stable",
-    "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.11",
-    "Programming Language :: Python :: 3.12",
-    "Programming Language :: Python :: 3.13",
-]
+requires-python = ">=3.11,<4.0"
 dependencies = [
+    "pyoaev (==2.1.6); extra != 'dev'",
+    "injector_common @ ../injector_common",
     "pydantic~=2.11.7",
     "pydantic-settings~=2.11.0",
     "requests~=2.32.5",
@@ -32,14 +17,18 @@ dependencies = [
     "rich~=14.2.0",
 ]
 
+[project.urls]
+Homepage = "https://filigran.io/"
+Repository = "https://github.com/OpenAEV-Platform/injectors/tree/main/shodan"
+Documentation = "https://github.com/OpenAEV-Platform/injectors/tree/main/shodan/README.md"
+Issues = "https://github.com/OpenAEV-Platform/injectors/issues"
+
+[project.scripts]
+ShodanInjector = "shodan.__main__:main"
+
 [project.optional-dependencies]
-prod = [
-    "pyoaev ~=2.0.14"
-]
-current = [
-    "pyoaev @ git+https://github.com/OpenAEV-Platform/client-python.git@release/current"
-]
 dev = [
+    "pyoaev @ ../../client-python",
     "black~=25.1",          # Code formatter
     "isort~=7.0.0",         # Import sorter
     "ruff~=0.14.2",         # linter
@@ -47,20 +36,24 @@ dev = [
     "pip_audit~=2.9.0",     # Security checker
     "pre-commit~=4.3.0",    # Git hooks
     "types-PyYAML~=6.0.12", # stubs for untyped module
-]
-test = [
     "pytest~=8.4.1",
     "polyfactory~=2.22.2",
 ]
 
 [tool.poetry]
-packages = [{ include = "shodan" }]
+packages = [
+    { include = "shodan" }
+]
 
-[project.scripts]
-ShodanInjector = "shodan.__main__:main"
+[tool.poetry.dependencies]
+pyoaev = [
+    { markers = "extra != 'dev'", source = "PyPI" },
+    { markers = "extra == 'dev'", develop = true },
+]
 
-[tool.setuptools.packages.find]
-where = ["."]
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
 
 [tool.isort]
 profile = "black"
@@ -142,3 +135,8 @@ exclude = [
     '^.venv',
 ]
 plugins = ["pydantic.mypy"]
+
+[tool.cmw]
+install-command = "poetry install"
+config-dump-command = "poetry run python -m shodan --dump-config-schema"
+icon-path = "shodan/img/icon-shodan.png"

@@ -1,5 +1,0 @@
-# Local dependency (client-python)
--e ../../client-python
-
-# Local project with extras (dev + test)
--e .[dev,test]

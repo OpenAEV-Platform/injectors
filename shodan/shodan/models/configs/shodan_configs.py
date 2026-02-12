@@ -2,16 +2,11 @@
 
 from datetime import timedelta
 
-from pydantic import (
-    Field,
-    PositiveInt,
-    SecretStr,
-)
-
-from shodan.models.configs import _SettingsLoader
+from pydantic import Field, PositiveInt, SecretStr
+from pydantic_settings import BaseSettings
 
 
-class _ConfigLoaderShodan(_SettingsLoader):
+class _ConfigLoaderShodan(BaseSettings):
     """Shodan API configuration settings."""
 
     base_url: str = Field(
