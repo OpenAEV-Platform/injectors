@@ -1,11 +1,10 @@
-version: '3'
 services:
   injector-aws:
     image: openaev/injector-aws:latest
     environment:
-      - OPENAEV_URL=http://localhost
-      - OPENAEV_TOKEN=ChangeMe
-      - INJECTOR_ID=ChangeMe
-      - INJECTOR_NAME=AWS
-      - INJECTOR_LOG_LEVEL=error
+      - OPENAEV_URL=${OPENAEV_URL}
+      - OPENAEV_TOKEN=${OPENAEV_TOKEN}
+      - INJECTOR_ID=${INJECTOR_ID}
+      - INJECTOR_NAME=${INJECTOR_NAME}
+      - INJECTOR_LOG_LEVEL=${INJECTOR_LOG_LEVEL}
     restart: always

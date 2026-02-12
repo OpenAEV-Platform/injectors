@@ -6,12 +6,14 @@ WORKDIR /opt/injector_common
 COPY --from=injector_common ./ ./
 
 # poetry version available on Ubuntu 24.04
-RUN pip3 install poetry==2.3.2 && poetry config installer.re-resolve false
+RUN pip3 install poetry==2.3.2 \
+    && poetry config installer.re-resolve false \
+    && poetry config virtualenvs.create false
 
 ARG installdir=/opt/injector
 ADD . ${installdir}
 WORKDIR ${installdir}
-RUN poetry build
+RUN poetry install
 
 FROM python:3.13-alpine AS runner
 
@@ -23,7 +25,7 @@ COPY --from=injector_common ./ ./
 ARG installdir=/opt/injector
 WORKDIR ${installdir}
 COPY --from=builder ${installdir} ${installdir}
-RUN pip3 install --no-cache-dir "$(ls dist/*.whl)"
+COPY --from=builder /usr/local/lib/python3.13/site-packages /usr/local/lib/python3.13/site-packages
 
 # Declare the build argument
 ARG PYOAEV_GIT_BRANCH_OVERRIDE

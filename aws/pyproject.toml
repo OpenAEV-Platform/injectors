@@ -12,8 +12,8 @@ requires-python = ">=3.11,<4.0"
 dependencies = [
     "pyoaev (==2.1.6); extra != 'dev'",
     "injector_common @ ../injector_common",
-    "pacu>=1.5.0,<1.6.0",
-    "awscli>=1.29.0,<1.30.0",
+    "pacu~=1.5.0",
+    "awscli~=1.29.0",
 ]
 
 [project.optional-dependencies]
