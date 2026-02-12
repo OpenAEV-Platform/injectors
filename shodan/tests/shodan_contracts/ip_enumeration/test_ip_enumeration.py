@@ -7,7 +7,6 @@ import pytest
 from shodan.contracts import InjectorKey, ShodanContractId
 from shodan.services.client_api import ShodanClientAPI
 
-
 # --------
 # Scenarios
 # --------

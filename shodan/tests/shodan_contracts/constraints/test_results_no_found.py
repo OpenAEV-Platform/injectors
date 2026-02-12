@@ -1,5 +1,6 @@
-import pytest
 from unittest.mock import patch
+
+import pytest
 
 from shodan.contracts import ShodanContractId
 from shodan.services.client_api import ShodanClientAPI
