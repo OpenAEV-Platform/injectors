@@ -1,9 +1,12 @@
 FROM python:3.13-alpine AS builder
 
-RUN apk update && apk upgrade
+RUN apk update && apk upgrade && apk add git
 
 WORKDIR /opt/injector_common
 COPY --from=injector_common ./ ./
+
+WORKDIR /
+RUN git clone https://github.com/OpenAEV-Platform/client-python
 
 # poetry version available on Ubuntu 24.04
 RUN pip3 install poetry==2.3.2 \
