@@ -41,6 +41,6 @@ profile = "black"
 known_local_folder = ["aws"]
 
 [tool.cmw]
-install-command = "poetry install --extras dev"
+install-command = "poetry install"
 config-dump-command = "poetry run python -m aws.openaev_aws --dump-config-schema"
 icon-path = "aws/img/icon-aws.png"

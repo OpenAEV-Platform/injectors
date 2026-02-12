@@ -39,6 +39,6 @@ profile = "black"
 known_local_folder = ["nuclei"]
 
 [tool.cmw]
-install-command = "poetry install --extras dev"
+install-command = "poetry install"
 config-dump-command = "poetry run python -m nuclei.openaev_nuclei --dump-config-schema"
 icon-path = "nuclei/img/nuclei.jpg"
