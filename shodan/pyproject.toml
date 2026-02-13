@@ -1,6 +1,6 @@
 [project]
 name = "openaev-shodan-injector"
-version = "2.1.6"
+version = "2.1.7"
 description = "An injector for running with Shodan"
 readme = "README.md"
 authors = [{ name = "Filigran", email = "contact@filigran.io" }]

@@ -1,6 +1,6 @@
 [project]
 name = "openaev-aws-injector"
-version = "2.1.6"
+version = "2.1.7"
 description = "An injector for impacting AWS"
 license = "Apache-2.0"
 readme = "README.md"
