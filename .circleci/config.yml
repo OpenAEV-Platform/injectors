@@ -7,7 +7,7 @@ orbs:
 jobs:
   ensure_formatting:
     docker:
-      - image: cimg/python:3.13
+      - image: cimg/python:3.14
     working_directory: ~/repo
     steps:
       - checkout
@@ -43,7 +43,7 @@ jobs:
   test:
     working_directory: ~/openaev
     docker:
-      - image: cimg/python:3.13
+      - image: cimg/python:3.14
     parameters:
       injector_name:
         type: string
