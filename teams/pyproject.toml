@@ -1,6 +1,6 @@
 [project]
 name = "openaev-teams-injector"
-version = "2.1.7"
+version = "2.1.8"
 description = "An injector for Microsoft Teams"
 readme = "README.md"
 authors = [{ name = "Filigran", email = "contact@filigran.io" }]

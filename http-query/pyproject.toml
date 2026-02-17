@@ -1,6 +1,6 @@
 [project]
 name = "openaev-http-query-injector"
-version = "2.1.7"
+version = "2.1.8"
 description = "An injector for executing arbitrary http requests"
 license = "Apache-2.0"
 readme = "README.md"

@@ -1,6 +1,6 @@
 [project]
 name = "openaev-nuclei-injector"
-version = "2.1.7"
+version = "2.1.8"
 description = "An injector for running vulnerability scans with Nuclei"
 license = "Apache-2.0"
 readme = "README.md"

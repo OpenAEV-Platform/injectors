@@ -1,6 +1,6 @@
 [project]
 name = "openaev-nmap-injector"
-version = "2.1.7"
+version = "2.1.8"
 description = "An injector for running port scans with nmap"
 license = "Apache-2.0"
 readme = "README.md"
