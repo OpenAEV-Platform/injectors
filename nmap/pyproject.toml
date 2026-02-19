@@ -9,7 +9,7 @@ authors = [
 ]
 requires-python = ">=3.11,<4.0"
 dependencies = [
-    "pyoaev (==2.1.6); extra != 'dev'",
+    "pyoaev (==2.1.8); extra != 'dev'",
     "injector_common @ ../injector_common",
 ]
 
