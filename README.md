@@ -32,7 +32,7 @@ vim new_injector/pyproject.toml
 Here's the expression for the pyoaev dependency, including the `extra` definition:
 ```toml
 dependencies = [
-    "pyoaev (==2.1.6); extra != 'dev'",
+    "pyoaev (==2.1.8); extra != 'dev'",
 ]
 [project.optional-dependencies]
 dev = [
