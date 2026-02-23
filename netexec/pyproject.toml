@@ -1,26 +1,34 @@
-[tool.poetry]
+[project]
 name = "openaev-netexec-injector"
-version = "2.1.3"
-description = "An injector for NetExec"
-authors = ["Filigran <contact@filigran.io>"]
+version = "2.1.7"
+description = "An injector for network execution and credential testing with NetExec"
 license = "Apache-2.0"
 readme = "README.md"
+authors = [
+    { name = "Filigran", email = "contact@filigran.io" },
+]
+requires-python = ">=3.11,<4.0"
+dependencies = [
+    "pyoaev (==2.1.6); extra != 'dev'",
+    "injector_common @ ../injector_common",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pyoaev @ ../../client-python",
+]
+
+[tool.poetry]
 packages = [
     { include = "netexec" }
 ]
 
-
 [tool.poetry.dependencies]
-python = "^3.11"
 pyoaev = [
-    { markers = "extra == 'prod' and extra != 'dev'", version = "2.1.3", source = "pypi"  },
-    { markers = "extra == 'dev' and extra != 'prod'", path = "../../client-python", develop = true },
+    { markers = "extra != 'dev'", source = "PyPI" },
+    { markers = "extra == 'dev'", develop = true },
 ]
-injector_common = { path = "../injector_common", develop = true }
-
-[tool.poetry.extras]
-prod = ["pyoaev"]
-dev = ["pyoaev"]
+injector_common = { develop = true }
 
 [build-system]
 requires = ["poetry-core"]
@@ -33,8 +41,7 @@ netexec = ["img/*.png"]
 profile = "black"
 known_local_folder = ["netexec"]
 
-[dependency-groups]
-dev = [
-    "black (>=25.12.0,<26.0.0)",
-    "isort (>=7.0.0,<8.0.0)"
-]
+[tool.cmw]
+install-command = "poetry install"
+config-dump-command = "poetry run python -m netexec.openaev_netexec --dump-config-schema"
+icon-path = "netexec/img/icon-netexec.png"
