@@ -138,3 +138,9 @@ cython_debug/
 # ignoring the poetry.lock files for now
 # as we don't have a good release scheme for keeping them up to date at the moment
 poetry.lock
+
+# Claude Code
+.claude/
+
+# Local context docs
+NETEXEC_INJECTOR_CONTEXT.md

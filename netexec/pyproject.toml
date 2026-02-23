@@ -1,0 +1,40 @@
+[tool.poetry]
+name = "openaev-netexec-injector"
+version = "2.1.3"
+description = "An injector for NetExec"
+authors = ["Filigran <contact@filigran.io>"]
+license = "Apache-2.0"
+readme = "README.md"
+packages = [
+    { include = "netexec" }
+]
+
+
+[tool.poetry.dependencies]
+python = "^3.11"
+pyoaev = [
+    { markers = "extra == 'prod' and extra != 'dev'", version = "2.1.3", source = "pypi"  },
+    { markers = "extra == 'dev' and extra != 'prod'", path = "../../client-python", develop = true },
+]
+injector_common = { path = "../injector_common", develop = true }
+
+[tool.poetry.extras]
+prod = ["pyoaev"]
+dev = ["pyoaev"]
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.setuptools.package-data]
+netexec = ["img/*.png"]
+
+[tool.isort]
+profile = "black"
+known_local_folder = ["netexec"]
+
+[dependency-groups]
+dev = [
+    "black (>=25.12.0,<26.0.0)",
+    "isort (>=7.0.0,<8.0.0)"
+]
