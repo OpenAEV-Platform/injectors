@@ -1,0 +1,15 @@
+services:
+  injector-netexec:
+    image: openaev/openaev-netexec:v14
+    environment:
+      - OPENAEV_URL=http://openaev:8080
+      - OPENAEV_TOKEN=8215614c-7139-422e-b825-b20fd2a13a43
+      - INJECTOR_ID=8215614c-7139-422e-b123-b20fd2a13a43
+      - INJECTOR_NAME=NetExec
+      - INJECTOR_LOG_LEVEL=debug
+    restart: always
+    networks:
+      - xtm_default
+networks:
+  xtm_default:
+    external: true

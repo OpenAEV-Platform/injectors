@@ -1,0 +1,19 @@
+# Virtualenv
+bin/
+include/
+lib/
+lib64
+pyvenv.cfg
+
+# Generated files
+collected_outputs.json
+hash_spider_default.sqlite3
+nul
+*.whl
+
+# Local tools (keep locally, exclude from git)
+.claude/
+collect_outputs.py
+validate_commands.sh
+FRONTEND_CHANGES.md
+update_contrats_spec.md
