@@ -1,6 +1,6 @@
 [project]
 name = "openaev-nuclei-injector"
-version = "2.1.8"
+version = "2.2.0"
 description = "An injector for running vulnerability scans with Nuclei"
 license = "Apache-2.0"
 readme = "README.md"
@@ -10,7 +10,7 @@ authors = [
 requires-python = ">=3.11,<4.0"
 
 dependencies = [
-    "pyoaev (==2.1.8) ; extra != 'dev'",
+    "pyoaev (==2.2.0) ; extra != 'dev'",
     "injector_common @ ../injector_common",
 ]
 

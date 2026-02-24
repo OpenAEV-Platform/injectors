@@ -1,13 +1,13 @@
 [project]
 name = "openaev-teams-injector"
-version = "2.1.8"
+version = "2.2.0"
 description = "An injector for Microsoft Teams"
 readme = "README.md"
 authors = [{ name = "Filigran", email = "contact@filigran.io" }]
 license = "Apache-2.0"
 requires-python = ">=3.11,<4.0"
 dependencies = [
-    "pyoaev (==2.1.8); extra != 'dev'",
+    "pyoaev (==2.2.0); extra != 'dev'",
     "injector_common @ ../injector_common",
     "requests~=2.32.3",
 ]
