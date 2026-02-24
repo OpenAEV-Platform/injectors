@@ -5,6 +5,12 @@ from unittest.mock import patch
 import pytest
 
 from shodan.contracts import InjectorKey, ShodanContractId
+from shodan.models.normalize_input_data import (
+    AssetsType,
+    CloudProviderAssetDiscovery,
+    NormalizeInputData,
+    TargetsType,
+)
 from shodan.services.client_api import ShodanClientAPI
 
 # --------
@@ -121,8 +127,9 @@ def test_cloud_provider_asset_discovery_with_valid_cloud_provider_and_hostname_a
     user_info_response,
 ):
     """Scenario Outline: Execute Cloud Provider Asset Discovery with valid cloud_provider, hostname and organization."""
-    # Given: A Cloud Provider Asset Discovery inject_content with valid cloud_provider, hostname and organization
-    inject_content = _given_cloud_provider_asset_discovery_inject_content(
+    # Given: A Cloud Provider Asset Discovery inject_content with valid cloud_provider, hostname
+    # and organization wrapped in NormalizeInputData
+    normalize_input_data = _given_cloud_provider_asset_discovery_normalize_input_data(
         cloud_provider=cloud_provider,
         hostname=hostname,
         organization=organization,
@@ -131,7 +138,7 @@ def test_cloud_provider_asset_discovery_with_valid_cloud_provider_and_hostname_a
     # When: I execute the Cloud Provider Asset Discovery contract via process_shodan_search
     results, credit_user = _when_execute_cloud_provider_asset_discovery(
         shodan_client_api,
-        inject_content,
+        normalize_input_data=normalize_input_data,
         mock_search_responses=search_responses,
         mock_user_info=user_info_response,
     )
@@ -151,31 +158,57 @@ def test_cloud_provider_asset_discovery_with_valid_cloud_provider_and_hostname_a
 # --------
 
 
-def _given_cloud_provider_asset_discovery_inject_content(
-    cloud_provider: str,
+def _given_cloud_provider_asset_discovery_normalize_input_data(
+    cloud_provider: str | list[str],
     hostname: str,
     organization: str,
-) -> dict:
+) -> NormalizeInputData:
     """Create inject_content as received from the real injection payload.
 
-    Mirrors the structure from _shodan_execution in openaev_shodan.py:
-    data["injection"]["inject_content"]
+    Mirrors the structure produced by the real injection pipeline,
+    but wrapped inside NormalizeInputData as expected by process_shodan_search.
+
+    In manual mode:
+        - Targets are resolved from inject_content.hostname.
+        - TargetsType fields are not used for hostname resolution.
 
     Args:
         cloud_provider: The Cloud Provider to search for.
         hostname: The hostname to search for.
-        organization: The organization to filter by.
+        organization: The organization filter. Can be empty.
+            If empty, use the hostname as the organization filter.
 
     Returns:
-        Dictionary matching the real inject_content structure.
+        A fully constructed NormalizeInputData instance ready to be
+        passed to process_shodan_search in tests.
 
     """
-    return {
-        InjectorKey.TARGET_SELECTOR_KEY: "manual",
-        "cloud_provider": cloud_provider,
-        "hostname": hostname,
-        "organization": organization,
-    }
+    inject_content = CloudProviderAssetDiscovery(
+        contract="cloud_provider_asset_discovery",
+        expectations=[],
+        target_selector="manual",
+        target_property_selector="automatic",
+        auto_create_assets=False,
+        cloud_provider=cloud_provider,
+        hostname=hostname,
+        organization=organization,
+    )
+
+    targets = TargetsType(
+        selector_key="manual",
+        asset_ids=[],
+        hostnames=[],
+        ips=[],
+        seen_ips=[],
+        assets=[],
+    )
+
+    return NormalizeInputData(
+        contract_name="cloud_provider_asset_discovery",
+        contract_id="test_contract_id",
+        inject_content=inject_content,
+        targets=targets,
+    )
 
 
 # --------
@@ -185,7 +218,7 @@ def _given_cloud_provider_asset_discovery_inject_content(
 
 def _when_execute_cloud_provider_asset_discovery(
     client: ShodanClientAPI,
-    inject_content: dict,
+    normalize_input_data: NormalizeInputData,
     mock_search_responses: list[dict],
     mock_user_info: dict,
 ) -> tuple:
@@ -197,7 +230,7 @@ def _when_execute_cloud_provider_asset_discovery(
 
     Args:
         client: The ShodanClientAPI instance.
-        inject_content: The inject content with hostname and organization.
+        normalize_input_data: The NormalizeInputData object passed to process_shodan_search.
         mock_search_responses: List of mocked search API responses, one per target.
         mock_user_info: The mocked user info API response.
 
@@ -216,10 +249,7 @@ def _when_execute_cloud_provider_asset_discovery(
         return response
 
     with patch.object(client, "_request_data", side_effect=mock_request_data):
-        return client.process_shodan_search(
-            contract_id=ShodanContractId.CLOUD_PROVIDER_ASSET_DISCOVERY,
-            inject_content=inject_content,
-        )
+        return client.process_shodan_search(normalize_input_data=normalize_input_data)
 
 
 # --------

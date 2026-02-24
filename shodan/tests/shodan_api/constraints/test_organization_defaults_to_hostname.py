@@ -5,6 +5,8 @@ from unittest.mock import patch
 import pytest
 
 from shodan.contracts import InjectorKey, ShodanContractId
+from shodan.injector.openaev_shodan import ShodanInjector
+from shodan.models import NormalizeInputData
 from shodan.services.client_api import ShodanClientAPI
 
 # --------
@@ -47,21 +49,39 @@ from shodan.services.client_api import ShodanClientAPI
 )
 def test_organization_resolution_organization_not_provided(
     shodan_client_api: ShodanClientAPI,
+    shodan_injector: ShodanInjector,
     hostname: str,
     expected_query_fragments_per_target: list[list[str]],
 ):
     """Scenario Outline: Organization defaults to hostname when not provided"""
     # Given I have a valid inject_content with hostname "<hostname>" and no organization
-    inject_content = _given_contract_inject_content(
-        hostname=hostname,
-        organization=None,
+    inject_content = {
+        "expectations": [],
+        "target_selector": "manual",
+        "target_property_selector": "automatic",
+        "auto_create_assets": False,
+        "hostname": hostname,
+        "organization": None,
+    }
+    normalize_input_data = shodan_injector._normalize_input_data(
+        data={
+            "injection": {
+                "inject_injector_contract": {
+                    "convertedContent": {
+                        "contract_id": "faf73809-1128-4192-aa90-a08828f8ace5"
+                    }
+                }
+            }
+        },
+        inject_content=inject_content,
+        selector_key="manual",
     )
+
     # When: When I execute process_shodan_search
-    hostnames = [h.strip() for h in hostname.split(",")]
+    hostnames = normalize_input_data.inject_content.hostname
     results, credit_user = _when_execute_process_shodan_search(
         shodan_client_api,
-        ShodanContractId.DOMAIN_DISCOVERY,
-        inject_content,
+        normalize_input_data=normalize_input_data,
         mock_search_responses=[{"matches": [], "total": 0} for _ in hostnames],
         mock_user_info={"plan": "basic", "scan_credits": 1000, "query_credits": 1000},
     )
@@ -108,23 +128,41 @@ def test_organization_resolution_organization_not_provided(
     ],
 )
 def test_organization_resolution_organization_provided(
-    shodan_client_api,
+    shodan_client_api: ShodanClientAPI,
+    shodan_injector: ShodanInjector,
     hostname,
     organization,
     expected_query_fragments_per_target,
 ):
     """Scenario Outline: Organization is explicitly provided"""
-    # Given I have a valid inject_content with hostname "<hostname>" and organization "<organization>"
-    inject_content = _given_contract_inject_content(
-        hostname=hostname,
-        organization=organization,
+    # Given I have a valid inject_content with hostname "<hostname>"
+    # and organization "<organization>"  wrapped in NormalizeInputData
+    inject_content = {
+        "expectations": [],
+        "target_selector": "manual",
+        "target_property_selector": "automatic",
+        "auto_create_assets": False,
+        "hostname": hostname,
+        "organization": organization,
+    }
+    normalize_input_data = shodan_injector._normalize_input_data(
+        data={
+            "injection": {
+                "inject_injector_contract": {
+                    "convertedContent": {
+                        "contract_id": "faf73809-1128-4192-aa90-a08828f8ace5"
+                    }
+                }
+            }
+        },
+        inject_content=inject_content,
+        selector_key="manual",
     )
     # When: When I execute process_shodan_search
-    hostnames = [h.strip() for h in hostname.split(",")]
+    hostnames = normalize_input_data.inject_content.hostname
     results, credit_user = _when_execute_process_shodan_search(
         shodan_client_api,
-        ShodanContractId.DOMAIN_DISCOVERY,
-        inject_content,
+        normalize_input_data=normalize_input_data,
         mock_search_responses=[{"matches": [], "total": 0} for _ in hostnames],
         mock_user_info={"plan": "basic", "scan_credits": 1000, "query_credits": 1000},
     )
@@ -136,43 +174,13 @@ def test_organization_resolution_organization_provided(
 
 
 # --------
-# Given Methods
-# --------
-
-
-def _given_contract_inject_content(
-    hostname: str,
-    organization: str | None,
-) -> dict:
-    """Create inject_content as received from the real injection payload.
-
-    Mirrors the structure from _shodan_execution in openaev_shodan.py:
-    data["injection"]["inject_content"]
-
-    Args:
-        hostname: The hostname to search for.
-        organization: The organization to filter by.
-
-    Returns:
-        Dictionary matching the real inject_content structure.
-
-    """
-    return {
-        InjectorKey.TARGET_SELECTOR_KEY: "manual",
-        "hostname": hostname,
-        "organization": organization,
-    }
-
-
-# --------
 # When Methods
 # --------
 
 
 def _when_execute_process_shodan_search(
     client: ShodanClientAPI,
-    contract_id: ShodanContractId,
-    inject_content: dict,
+    normalize_input_data: NormalizeInputData,
     mock_search_responses: list[dict],
     mock_user_info: dict,
 ) -> tuple:
@@ -204,8 +212,7 @@ def _when_execute_process_shodan_search(
 
     with patch.object(client, "_request_data", side_effect=mock_request_data):
         return client.process_shodan_search(
-            contract_id=contract_id,
-            inject_content=inject_content,
+            normalize_input_data=normalize_input_data,
         )
 
 

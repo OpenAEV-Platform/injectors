@@ -1,8 +1,10 @@
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 import pytest
 
 from shodan.contracts import ShodanContractId
+from shodan.injector.openaev_shodan import ShodanInjector
+from shodan.models import NormalizeInputData
 from shodan.services.client_api import ShodanClientAPI
 
 
@@ -95,22 +97,38 @@ from shodan.services.client_api import ShodanClientAPI
 )
 def test_contracts_handle_empty_shodan_results(
     shodan_client_api,
+    shodan_injector,
     contract_id,
-    inject_content,
     expected_targets,
+    inject_content,
     expected_query_fragments_per_target,
     empty_search_responses,
     user_info_response,
 ):
     """Scenario Outline: Execute contract when Shodan returns no matches"""
-    # Given I have a valid <contract_name> inject_content with target "<target>"
-    inject_content = inject_content
+    # Given I have a valid <contract_id> inject_content with target "<target>"
+    common_fields = {
+        "expectations": [],
+        "target_selector": "manual",
+        "target_property_selector": "automatic",
+        "auto_create_assets": False,
+    }
+    normalize_input_data = shodan_injector._normalize_input_data(
+        data={
+            "injection": {
+                "inject_injector_contract": {
+                    "convertedContent": {"contract_id": contract_id}
+                }
+            }
+        },
+        inject_content={**common_fields, **inject_content},
+        selector_key="manual",
+    )
 
     # When I execute process_shodan_search with the <contract_name> contract
     results, credit_user = _when_execute_contract(
         shodan_client_api,
-        contract_id,
-        inject_content,
+        normalize_input_data=normalize_input_data,
         mock_empty_search_responses=empty_search_responses,
         mock_user_info=user_info_response,
     )
@@ -132,8 +150,7 @@ def test_contracts_handle_empty_shodan_results(
 
 def _when_execute_contract(
     client: ShodanClientAPI,
-    contract_id: ShodanContractId,
-    inject_content: dict,
+    normalize_input_data: NormalizeInputData,
     mock_empty_search_responses: list[dict],
     mock_user_info: dict,
 ) -> tuple:
@@ -145,7 +162,7 @@ def _when_execute_contract(
 
     Args:
         client: The ShodanClientAPI instance.
-        inject_content: The inject content with hostname and organization.
+        normalize_input_data: The NormalizeInputData object passed to process_shodan_search.
         mock_empty_search_responses: List of mocked search API empty responses, one per target.
         mock_user_info: The mocked user info API response.
 
@@ -165,8 +182,7 @@ def _when_execute_contract(
 
     with patch.object(client, "_request_data", side_effect=mock_request_data):
         return client.process_shodan_search(
-            contract_id=contract_id,
-            inject_content=inject_content,
+            normalize_input_data=normalize_input_data,
         )
 
 

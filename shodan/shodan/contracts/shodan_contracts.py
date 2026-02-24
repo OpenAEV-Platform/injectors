@@ -267,7 +267,7 @@ class ShodanContracts:
             contract_with_specific_fields=contract_cls.contract_with_specific_fields(
                 base_fields=self._base_fields(contract_selector_default),
                 source_selector_key=InjectorKey.TARGET_SELECTOR_KEY,
-                target_selector_field=TargetSelectorField.MANUAL.key,
+                target_selector_field=TargetSelectorField,
             ),
             contract_with_specific_outputs=contract_cls.contract_with_specific_outputs(
                 self._base_outputs()
@@ -276,7 +276,7 @@ class ShodanContracts:
 
     def contracts(self):
 
-        selector_default = "only_manual"
+        selector_default = TargetSelectorField.ASSET_GROUPS.key
 
         shodan_contract_definitions = [
             (
@@ -289,7 +289,7 @@ class ShodanContracts:
                 CriticalPortsAndExposedAdminInterface,
                 selector_default,
             ),
-            (ShodanContractId.CUSTOM_QUERY, CustomQuery, selector_default),
+            (ShodanContractId.CUSTOM_QUERY, CustomQuery, "only_manual"),
             (ShodanContractId.CVE_ENUMERATION, CVEEnumeration, selector_default),
             (
                 ShodanContractId.CVE_SPECIFIC_WATCHLIST,

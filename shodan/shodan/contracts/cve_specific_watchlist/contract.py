@@ -1,3 +1,5 @@
+from typing import TYPE_CHECKING
+
 from pyoaev.contracts import ContractBuilder
 from pyoaev.contracts.contract_config import (
     Contract,
@@ -7,6 +9,9 @@ from pyoaev.contracts.contract_config import (
     ContractText,
     SupportedLanguage,
 )
+
+if TYPE_CHECKING:
+    from shodan.contracts.shodan_contracts import TargetSelectorField
 
 
 class CVESpecificWatchlist:
@@ -23,8 +28,15 @@ class CVESpecificWatchlist:
                     "icon": "CONFIG",
                     "title": "[CONFIG] Summary of all configurations used for the contract.",
                 },
-                "keys_list_to_string": [],
-                "keys_to_exclude": [],
+                "keys_list_to_string": ["vulnerability", "hostnames"],
+                "keys_to_exclude": [
+                    "expectations",
+                    "selector_key",
+                    "asset_ids",
+                    "ips",
+                    "seen_ips",
+                    "assets",
+                ],
             },
             "sections_info": {
                 "header": {
@@ -65,12 +77,12 @@ class CVESpecificWatchlist:
                             },
                             {
                                 "title": "Hostnames",
-                                "path": "hostnames",
+                                "path": "data.hostnames",
                                 "mode": "align_to_single",
                             },
                             {
                                 "title": "IP",
-                                "path": "ip_str",
+                                "path": "data.ip_str",
                                 "mode": "align_to_single",
                             },
                             {
@@ -116,38 +128,68 @@ class CVESpecificWatchlist:
             },
         }
 
-    @staticmethod
+    @classmethod
+    def _build_conditions(
+        cls,
+        source_selector: str,
+        target_selector: list[str],
+        mandatory: bool = True,
+        visible: bool = True,
+    ):
+        conditions = {}
+        if mandatory:
+            conditions |= dict(
+                mandatoryConditionFields=[source_selector],
+                mandatoryConditionValues={source_selector: target_selector},
+            )
+        if visible:
+            conditions |= dict(
+                visibleConditionFields=[source_selector],
+                visibleConditionValues={source_selector: target_selector},
+            )
+        return conditions
+
+    @classmethod
     def contract_with_specific_fields(
+        cls,
         base_fields: list[ContractElement],
         source_selector_key: str,
-        target_selector_field: str,
+        target_selector_field: type["TargetSelectorField"],
     ) -> list[ContractElement]:
 
-        mandatory_conditions = dict(
-            mandatoryConditionFields=[source_selector_key],
-            mandatoryConditionValues={source_selector_key: target_selector_field},
-        )
-
-        visible_conditions = dict(
-            visibleConditionFields=[source_selector_key],
-            visibleConditionValues={source_selector_key: target_selector_field},
-        )
+        manual_target_selector = [target_selector_field.MANUAL.key]
+        all_targets_selector = [
+            target_selector_field.MANUAL.key,
+            target_selector_field.ASSETS.key,
+            target_selector_field.ASSET_GROUPS.key,
+        ]
 
         specific_fields = [
             ContractText(
                 key="vulnerability",
                 label="Vulnerability",
-                **(mandatory_conditions | visible_conditions),
+                mandatory=True,
+                **cls._build_conditions(
+                    source_selector=source_selector_key,
+                    target_selector=all_targets_selector,
+                ),
             ),
             ContractText(
                 key="hostname",
                 label="Hostname",
-                **(mandatory_conditions | visible_conditions),
+                **cls._build_conditions(
+                    source_selector=source_selector_key,
+                    target_selector=manual_target_selector,
+                ),
             ),
             ContractText(
                 key="organization",
                 label="Organization",
-                **visible_conditions,
+                **cls._build_conditions(
+                    source_selector=source_selector_key,
+                    target_selector=manual_target_selector,
+                    mandatory=False,
+                ),
             ),
         ]
 

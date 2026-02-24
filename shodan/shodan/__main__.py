@@ -3,11 +3,12 @@
 import logging
 import os
 import sys
+from pathlib import Path
 
+from injector_common.dump_config import intercept_dump_argument
 from pydantic import ValidationError
 from pyoaev.helpers import OpenAEVConfigHelper, OpenAEVInjectorHelper
 
-from injector_common.dump_config import intercept_dump_argument
 from shodan.injector.openaev_shodan import ShodanInjector
 from shodan.models import ConfigLoader
 
@@ -25,12 +26,17 @@ def main() -> None:
         config = ConfigLoader()
         intercept_dump_argument(config.to_daemon_config())
 
+        # Load the injector icon for the helper
+        icon_bytes = (
+            Path(__file__).parents[1] / config.injector.icon_filepath
+        ).read_bytes()
+
         # Instantiate the OpenAEV injector helper
         helper = OpenAEVInjectorHelper(
             config=OpenAEVConfigHelper.from_configuration_object(
                 config.to_daemon_config()
             ),
-            icon=open("shodan/img/icon-shodan.png", "rb"),
+            icon=icon_bytes,
         )
 
         logger.info(

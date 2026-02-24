@@ -1,6 +1,7 @@
 import time
 from datetime import datetime, timezone
 
+from injector_common.pagination import Pagination
 from pyoaev.helpers import OpenAEVInjectorHelper
 
 from shodan.contracts import (
@@ -14,7 +15,7 @@ from shodan.contracts import (
     IPEnumeration,
     ShodanContractId,
 )
-from shodan.models import ConfigLoader
+from shodan.models import ConfigLoader, ContractType, NormalizeInputData
 from shodan.services import ShodanClientAPI, Utils
 
 LOG_PREFIX = "[SHODAN_INJECTOR]"
@@ -31,11 +32,16 @@ class ShodanInjector:
         self.utils = Utils()
 
     def _prepare_output_message(
-        self, contract_name: str, inject_content: dict, results, user_info: dict
+        self, normalize_input_data: NormalizeInputData, results, user_info: dict
     ):
         self.helper.injector_logger.info(
             f"{LOG_PREFIX} - Start preparing the output message rendering.",
         )
+
+        contract_name = normalize_input_data.contract_name
+        targets = normalize_input_data.targets.model_dump()
+        inject_content = normalize_input_data.inject_content.model_dump()
+
         #  Retrieving the contract-specific output trace configuration.
         output_trace_config = {
             "CLOUD_PROVIDER_ASSET_DISCOVERY": CloudProviderAssetDiscovery.output_trace_config(),
@@ -68,7 +74,7 @@ class ShodanInjector:
 
         rendering_output_message = self.utils.generate_output_message(
             output_trace_config=contract_output_trace_config,
-            data_sections_config=[inject_content],
+            data_sections_config=[inject_content, targets],
             data_sections_info=[data_sections_info],
             data_sections_external_api=results_data,
             auto_create_assets=inject_content.get("auto_create_assets", None),
@@ -78,49 +84,186 @@ class ShodanInjector:
         )
         return rendering_output_message
 
-    def _shodan_execution(self, data):
+    def _resolve_assets(self, data: dict, selector_key: str) -> list[dict]:
+
+        if selector_key == "assets":
+            return data.get("assets", [])
+
+        if selector_key == "asset-groups":
+            asset_groups = data.get("assetGroups", [])
+            asset_group_ids = [
+                asset_group.get("asset_group_id") for asset_group in asset_groups
+            ]
+
+            return Pagination.fetch_all_targets(
+                helper=self.helper,
+                asset_group_ids=asset_group_ids,
+            )
+
+        return []
+
+    def _deduplicate(self, key: str, values: list[str]):
+
+        if not values:
+            return values
+
+        deduplicate_values = []
+        removed_values = []
+        for value in values:
+            if value in deduplicate_values:
+                removed_values.append(value)
+            else:
+                deduplicate_values.append(value)
+
+        if removed_values:
+            self.helper.injector_logger.debug(
+                f"{LOG_PREFIX} - Deduplication was performed on list {key}.",
+                {"key": key, "removed_values": removed_values},
+            )
+
+        return deduplicate_values
+
+    def _build_targets_from_assets(
+        self, selector_property: str, targets: dict, assets: list[dict]
+    ):
+
+        match selector_property:
+            case "automatic":
+                targets["asset_ids"] = [asset.get("asset_id") for asset in assets]
+
+                targets["hostnames"] = [
+                    asset.get("endpoint_hostname")
+                    for asset in assets
+                    if asset and asset.get("endpoint_hostname")
+                ]
+
+                targets["ips"] = [
+                    endpoint_ip
+                    for asset in assets
+                    for endpoint_ip in (asset.get("endpoint_ips") or [])
+                ]
+
+                targets["seen_ips"] = [
+                    asset.get("endpoint_seen_ip")
+                    for asset in assets
+                    if asset and asset.get("endpoint_seen_ip")
+                ]
+
+                for asset in assets:
+                    targets["assets"].append(
+                        {
+                            "asset_id": asset.get("asset_id"),
+                            "endpoint_hostname": asset.get("endpoint_hostname") or None,
+                            "endpoint_ips": asset.get("endpoint_ips") or [],
+                            "endpoint_seen_ip": asset.get("endpoint_seen_ip"),
+                        }
+                    )
+
+            # Only the hostname is used
+            case "hostname":
+                for asset in assets:
+                    asset_id = asset.get("asset_id")
+                    endpoint_hostname = asset.get("endpoint_hostname")
+                    if endpoint_hostname:
+                        targets["asset_ids"].append(asset_id)
+                        targets["hostnames"].append(endpoint_hostname)
+                    else:
+                        self.helper.injector_logger.debug(
+                            f"{LOG_PREFIX} - The asset ID was ignored because you chose to map to hostname, "
+                            f"but the asset does not have a hostname value.",
+                            {
+                                "selector_property": selector_property,
+                                "asset_id": asset_id,
+                            },
+                        )
+
+                    targets["assets"].append(
+                        {
+                            "asset_id": asset_id,
+                            "endpoint_hostname": endpoint_hostname,
+                            "endpoint_ips": [],
+                            "endpoint_seen_ip": None,
+                        }
+                    )
+
+            # Only the local_ip (first) is used (only first IP used)
+            case "local_ip":
+                for asset in assets:
+                    asset_id = asset.get("asset_id")
+                    endpoint_ips = asset.get("endpoint_ips")
+                    if endpoint_ips:
+                        targets["asset_ids"].append(asset_id)
+                        targets["ips"].append(endpoint_ips[0])
+                        targets["assets"].append(
+                            {
+                                "asset_id": asset_id,
+                                "endpoint_hostname": None,
+                                "endpoint_ips": endpoint_ips,
+                                "endpoint_seen_ip": None,
+                            }
+                        )
+                    else:
+                        self.helper.injector_logger.debug(
+                            f"{LOG_PREFIX} - The asset ID was ignored because you chose to map to local_ip (first), "
+                            f"but the asset does not have a ip value.",
+                            {
+                                "selector_property": selector_property,
+                                "asset_id": asset_id,
+                            },
+                        )
+
+            # Only the seen_ip is used
+            case "seen_ip":
+                for asset in assets:
+                    asset_id = asset.get("asset_id")
+                    endpoint_seen_ip = asset.get("endpoint_seen_ip")
+                    if endpoint_seen_ip:
+                        targets["asset_ids"].append(asset_id)
+                        targets["seen_ips"].append(endpoint_seen_ip)
+                        targets["assets"].append(
+                            {
+                                "asset_id": asset_id,
+                                "endpoint_hostname": None,
+                                "endpoint_ips": [],
+                                "endpoint_seen_ip": endpoint_seen_ip,
+                            }
+                        )
+                    else:
+                        self.helper.injector_logger.debug(
+                            f"{LOG_PREFIX} - The asset ID was ignored because you chose to map to seen_ip, "
+                            f"but the asset does not have a seen_ip value.",
+                            {
+                                "selector_property": selector_property,
+                                "asset_id": asset_id,
+                            },
+                        )
+        return targets
+
+    def _normalize_input_data(
+        self,
+        data: dict,
+        inject_content: dict,
+        selector_key: str,
+        selector_property: str = None,
+    ):
 
         # Contract information
         contract_id = data["injection"]["inject_injector_contract"]["convertedContent"][
             "contract_id"
         ]
-        contract_name = ShodanContractId(contract_id).name
-
-        inject_content = data["injection"]["inject_content"]
-        selector_key = inject_content[InjectorKey.TARGET_SELECTOR_KEY]
+        contract = ContractType(ShodanContractId(contract_id).name.lower())
+        inject_content["contract"] = contract.value
 
         self.helper.injector_logger.info(
-            f"{LOG_PREFIX} - Starting the execution of Shodan...",
+            f"{LOG_PREFIX} - Starting the normalization and validation of input data...",
             {
                 "contract_id": contract_id,
-                "contract_name": contract_name,
+                "contract_name": contract.name,
                 "type_of_target": selector_key,
             },
         )
-        if selector_key == "manual":
-            shodan_results, shodan_credit_user = (
-                self.shodan_client_api.process_shodan_search(
-                    contract_id, inject_content
-                )
-            )
 
-            output_json = ""
-            output_message = self._prepare_output_message(
-                contract_name, inject_content, shodan_results, shodan_credit_user
-            )
-            return output_json, output_message
-
-        elif selector_key == "assets":
-            output_json = ""
-            output_message = "Assets - Currently not supported"
-            return output_json, output_message
-
-        elif selector_key == "asset-groups":
-            output_json = ""
-            output_message = "Asset-groups - Currently not supported"
-            return output_json, output_message
-
-        else:
+        if selector_key not in ["manual", "assets", "asset-groups"]:
             self.helper.injector_logger.error(
                 f"{LOG_PREFIX} - Invalid selector key, expected keys 'manual', 'assets', or 'asset-groups",
                 {"selector_key": selector_key},
@@ -128,6 +271,84 @@ class ShodanInjector:
             raise ValueError(
                 f"{LOG_PREFIX} - Invalid selector key, expected keys 'manual', 'assets', or 'asset-groups'."
             )
+
+        initial_targets = {
+            "selector_key": selector_key,
+            "asset_ids": [],
+            "hostnames": [],
+            "ips": [],
+            "seen_ips": [],
+            "assets": [],
+        }
+
+        if selector_key == "manual":
+            normalize_input_data = NormalizeInputData.model_validate(
+                {
+                    "contract_name": contract.name,
+                    "contract_id": contract_id,
+                    "inject_content": inject_content,
+                    "targets": initial_targets,
+                }
+            )
+            self.helper.injector_logger.info(
+                f"{LOG_PREFIX} - Finalization the normalization and validation of input data.",
+            )
+            return normalize_input_data
+
+        # Resolve Assets (assets / asset-groups)
+        assets = self._resolve_assets(data, selector_key)
+
+        # Build targets from assets based on the selector_property
+        targets = self._build_targets_from_assets(
+            selector_property, initial_targets, assets
+        )
+
+        # Deduplication of hostnames, ips, and seen_ips
+        for key in ("hostnames", "ips", "seen_ips"):
+            targets[key] = self._deduplicate(key=key, values=targets[key])
+
+        normalize_input_data = NormalizeInputData.model_validate(
+            {
+                "contract_name": contract.name,
+                "contract_id": contract_id,
+                "inject_content": inject_content,
+                "targets": targets,
+            }
+        )
+
+        self.helper.injector_logger.info(
+            f"{LOG_PREFIX} - Finalization the normalization and validation of input data.",
+        )
+        return normalize_input_data
+
+    def _shodan_execution(self, data: dict):
+
+        inject_content = data["injection"]["inject_content"]
+        selector_key = inject_content[InjectorKey.TARGET_SELECTOR_KEY]
+        selector_property = inject_content[InjectorKey.TARGET_PROPERTY_SELECTOR_KEY]
+
+        # Normalization and Validation of input data (Manual / Assets / Asset-Groups)
+        normalize_input_data = self._normalize_input_data(
+            data, inject_content, selector_key, selector_property
+        )
+
+        # Preparation and creation of HTTP requests based on contracts
+        shodan_results, shodan_credit_user = (
+            self.shodan_client_api.process_shodan_search(normalize_input_data)
+        )
+
+        # Preparation and creation of auto_create_assets
+        output_json = ""
+        # if normalize_input_data.inject_content.auto_create_assets:
+        #     output_json = self._prepare_output_json(
+        #         normalize_input_data
+        #     )
+
+        # Preparation and creation of output_message
+        output_message = self._prepare_output_message(
+            normalize_input_data, shodan_results, shodan_credit_user
+        )
+        return output_json, output_message
 
     def process_message(self, data: dict) -> None:
         # Initialization to get the current start utc iso format.

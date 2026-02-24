@@ -79,7 +79,7 @@ class Utils:
                             parts.extend(f"{k}:{v}" for k, v in item.items())
                         else:
                             parts.append(str(item))
-                    value = ",".join(parts)
+                    value = ", ".join(parts)
 
                 self._add_value_to_tree(tree, key, value)
 

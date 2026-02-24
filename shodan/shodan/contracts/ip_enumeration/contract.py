@@ -1,3 +1,5 @@
+from typing import TYPE_CHECKING
+
 from pyoaev.contracts import ContractBuilder
 from pyoaev.contracts.contract_config import (
     Contract,
@@ -7,6 +9,9 @@ from pyoaev.contracts.contract_config import (
     ContractText,
     SupportedLanguage,
 )
+
+if TYPE_CHECKING:
+    from shodan.contracts.shodan_contracts import TargetSelectorField
 
 
 class IPEnumeration:
@@ -23,8 +28,14 @@ class IPEnumeration:
                     "icon": "CONFIG",
                     "title": "[CONFIG] Summary of all configurations used for the contract.",
                 },
-                "keys_list_to_string": [],
-                "keys_to_exclude": [],
+                "keys_list_to_string": ["ips", "seen_ips"],
+                "keys_to_exclude": [
+                    "expectations",
+                    "asset_ids",
+                    "hostnames",
+                    "assets",
+                    "selector_key",
+                ],
             },
             "sections_info": {
                 "header": {
@@ -111,28 +122,43 @@ class IPEnumeration:
             },
         }
 
-    @staticmethod
+    @classmethod
+    def _build_conditions(
+        cls,
+        source_selector: str,
+        target_selector: list[str],
+        mandatory: bool = True,
+        visible: bool = True,
+    ):
+        conditions = {}
+        if mandatory:
+            conditions |= dict(
+                mandatoryConditionFields=[source_selector],
+                mandatoryConditionValues={source_selector: target_selector},
+            )
+        if visible:
+            conditions |= dict(
+                visibleConditionFields=[source_selector],
+                visibleConditionValues={source_selector: target_selector},
+            )
+        return conditions
+
+    @classmethod
     def contract_with_specific_fields(
+        cls,
         base_fields: list[ContractElement],
         source_selector_key: str,
-        target_selector_field: str,
+        target_selector_field: type["TargetSelectorField"],
     ) -> list[ContractElement]:
-
-        mandatory_conditions = dict(
-            mandatoryConditionFields=[source_selector_key],
-            mandatoryConditionValues={source_selector_key: target_selector_field},
-        )
-
-        visible_conditions = dict(
-            visibleConditionFields=[source_selector_key],
-            visibleConditionValues={source_selector_key: target_selector_field},
-        )
 
         specific_fields = [
             ContractText(
                 key="ip",
                 label="IP",
-                **(mandatory_conditions | visible_conditions),
+                **cls._build_conditions(
+                    source_selector=source_selector_key,
+                    target_selector=[target_selector_field.MANUAL.key],
+                ),
             ),
         ]
 
