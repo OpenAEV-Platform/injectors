@@ -4,9 +4,7 @@ from unittest.mock import patch
 
 import pytest
 
-from shodan.contracts import InjectorKey, ShodanContractId
 from shodan.models.normalize_input_data import (
-    AssetsType,
     CVESpecificWatchlist,
     NormalizeInputData,
     TargetsType,

@@ -1,9 +1,8 @@
-from unittest.mock import Mock, patch
+from unittest.mock import patch
 
 import pytest
 
 from shodan.contracts import ShodanContractId
-from shodan.injector.openaev_shodan import ShodanInjector
 from shodan.models import NormalizeInputData
 from shodan.services.client_api import ShodanClientAPI
 
