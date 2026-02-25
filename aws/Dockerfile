@@ -24,6 +24,8 @@ RUN poetry install
 
 FROM python:3.13-alpine AS runner
 
+ENV PIP_VERSION=25.0.1
+
 WORKDIR /opt/injector_common
 COPY --from=injector_common ./ ./
 
