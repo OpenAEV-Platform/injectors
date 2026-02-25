@@ -1,5 +1,7 @@
 FROM python:3.13-alpine AS builder
 
+ENV PIP_VERSION=25.0.1
+
 RUN apk update && apk upgrade && apk add git
 
 WORKDIR /opt/injector_common
@@ -7,6 +9,8 @@ COPY --from=injector_common ./ ./
 
 WORKDIR /
 RUN git clone https://github.com/OpenAEV-Platform/client-python
+
+RUN pip3 install --upgrade pip==${PIP_VERSION}
 
 # poetry version available on Ubuntu 24.04
 RUN pip3 install poetry==2.3.2 \
@@ -34,6 +38,7 @@ ARG PYOAEV_GIT_BRANCH_OVERRIDE
 RUN if [[ ${PYOAEV_GIT_BRANCH_OVERRIDE} ]] ; then \
         echo "Forcing specific version of client-python" && \
         apk add --no-cache git && \
+        pip install --upgrade pip==${PIP_VERSION} && \
         pip install pip3-autoremove && \
         pip-autoremove pyoaev -y && \
         pip install git+https://github.com/OpenAEV-Platform/client-python@${PYOAEV_GIT_BRANCH_OVERRIDE} ; \
