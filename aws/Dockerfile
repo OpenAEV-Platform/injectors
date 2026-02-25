@@ -41,9 +41,7 @@ RUN if [[ ${PYOAEV_GIT_BRANCH_OVERRIDE} ]] ; then \
         echo "Forcing specific version of client-python" && \
         apk add --no-cache git && \
         pip install --upgrade pip==${PIP_VERSION} && \
-        pip install pip3-autoremove && \
-        pip-autoremove pyoaev -y && \
-        pip install git+https://github.com/OpenAEV-Platform/client-python@${PYOAEV_GIT_BRANCH_OVERRIDE} ; \
+        pip install --force-reinstall git+https://github.com/OpenAEV-Platform/client-python@${PYOAEV_GIT_BRANCH_OVERRIDE} ; \
     fi
 
 # Verify AWS CLI is installed
