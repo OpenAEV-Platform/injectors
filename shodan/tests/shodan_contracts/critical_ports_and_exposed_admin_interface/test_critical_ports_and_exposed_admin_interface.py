@@ -4,7 +4,11 @@ from unittest.mock import patch
 
 import pytest
 
-from shodan.contracts import InjectorKey, ShodanContractId
+from shodan.models.normalize_input_data import (
+    CriticalPortsAndExposedAdminInterface,
+    NormalizeInputData,
+    TargetsType,
+)
 from shodan.services.client_api import ShodanClientAPI
 
 # --------
@@ -117,8 +121,8 @@ def test_critical_ports_with_valid_port_and_hostname_and_organization(
     user_info_response,
 ):
     """Scenario Outline: Execute Critical Ports with valid port, hostname and organization."""
-    # Given: A Critical Ports inject_content with valid port, hostname and organization
-    inject_content = _given_critical_ports_inject_content(
+    # Given: A Critical Ports inject_content with valid port, hostname and organization wrapped in NormalizeInputData
+    normalize_input_data = _given_critical_ports_normalize_input_data(
         port=port,
         hostname=hostname,
         organization=organization,
@@ -127,7 +131,7 @@ def test_critical_ports_with_valid_port_and_hostname_and_organization(
     # When: I execute the Critical Ports contract via process_shodan_search
     results, credit_user = _when_execute_critical_ports(
         shodan_client_api,
-        inject_content,
+        normalize_input_data=normalize_input_data,
         mock_search_responses=search_responses,
         mock_user_info=user_info_response,
     )
@@ -147,31 +151,57 @@ def test_critical_ports_with_valid_port_and_hostname_and_organization(
 # --------
 
 
-def _given_critical_ports_inject_content(
-    port: str,
+def _given_critical_ports_normalize_input_data(
+    port: str | list[str],
     hostname: str,
     organization: str,
 ) -> dict:
-    """Create inject_content as received from the real injection payload.
+    """Create NormalizeInputData for the Critical Ports contract.
 
-    Mirrors the structure from _shodan_execution in openaev_shodan.py:
-    data["injection"]["inject_content"]
+    Mirrors the structure produced by the real injection pipeline,
+    but wrapped inside NormalizeInputData as expected by process_shodan_search.
+
+    In manual mode:
+        - Targets are resolved from inject_content.hostname.
+        - TargetsType fields are not used for hostname resolution.
 
     Args:
         port: The port to search for.
         hostname: The hostname to search for.
-        organization: The organization to filter by.
+        organization: The organization filter. Can be empty.
+            If empty, use the hostname as the organization filter.
 
     Returns:
-        Dictionary matching the real inject_content structure.
+        A fully constructed NormalizeInputData instance ready to be
+        passed to process_shodan_search in tests.
 
     """
-    return {
-        InjectorKey.TARGET_SELECTOR_KEY: "manual",
-        "port": port,
-        "hostname": hostname,
-        "organization": organization,
-    }
+    inject_content = CriticalPortsAndExposedAdminInterface(
+        contract="critical_ports_and_exposed_admin_interface",
+        expectations=[],
+        target_selector="manual",
+        target_property_selector="automatic",
+        auto_create_assets=False,
+        port=port,
+        hostname=hostname,
+        organization=organization,
+    )
+
+    targets = TargetsType(
+        selector_key="manual",
+        asset_ids=[],
+        hostnames=[],
+        ips=[],
+        seen_ips=[],
+        assets=[],
+    )
+
+    return NormalizeInputData(
+        contract_name="critical_ports_and_exposed_admin_interface",
+        contract_id="test_contract_id",
+        inject_content=inject_content,
+        targets=targets,
+    )
 
 
 # --------
@@ -181,7 +211,7 @@ def _given_critical_ports_inject_content(
 
 def _when_execute_critical_ports(
     client: ShodanClientAPI,
-    inject_content: dict,
+    normalize_input_data: NormalizeInputData,
     mock_search_responses: list[dict],
     mock_user_info: dict,
 ) -> tuple:
@@ -193,7 +223,7 @@ def _when_execute_critical_ports(
 
     Args:
         client: The ShodanClientAPI instance.
-        inject_content: The inject content with hostname and organization.
+        normalize_input_data: The NormalizeInputData object passed to process_shodan_search.
         mock_search_responses: List of mocked search API responses, one per target.
         mock_user_info: The mocked user info API response.
 
@@ -212,10 +242,7 @@ def _when_execute_critical_ports(
         return response
 
     with patch.object(client, "_request_data", side_effect=mock_request_data):
-        return client.process_shodan_search(
-            contract_id=ShodanContractId.CRITICAL_PORTS_AND_EXPOSED_ADMIN_INTERFACE,
-            inject_content=inject_content,
-        )
+        return client.process_shodan_search(normalize_input_data=normalize_input_data)
 
 
 # --------

@@ -4,6 +4,7 @@ from unittest.mock import Mock, patch
 
 from pytest import fixture
 
+from shodan.injector.openaev_shodan import ShodanInjector
 from shodan.services.client_api import ShodanClientAPI
 
 
@@ -53,3 +54,19 @@ def shodan_client_api() -> ShodanClientAPI:
     mock_helper = Mock()
 
     return ShodanClientAPI(config=mock_config, helper=mock_helper)
+
+
+@fixture
+def shodan_injector() -> ShodanInjector:
+    """Provide a ShodanInjector with mocked config and helper."""
+    mock_config = Mock()
+    mock_config.shodan.base_url = "https://api.shodan.io"
+    mock_config.shodan.api_key.get_secret_value.return_value = "test-api-key"
+    mock_config.shodan.api_retry = 1
+    mock_config.shodan.api_backoff.total_seconds.return_value = 1
+    mock_config.shodan.api_leaky_bucket_rate = 10
+    mock_config.shodan.api_leaky_bucket_capacity = 10
+
+    mock_helper = Mock()
+
+    return ShodanInjector(config=mock_config, helper=mock_helper)
