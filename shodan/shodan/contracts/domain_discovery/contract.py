@@ -73,24 +73,20 @@ class DomainDiscovery:
                             {
                                 "title": "Hostnames",
                                 "path": "matches.hostnames",
-                                "mode": "single",
                             },
                             {
                                 "title": "IP",
                                 "path": "matches.ip_str",
-                                "mode": "align_to_single",
                             },
                             {
                                 "title": "Port",
                                 "path": "matches.port",
-                                "mode": "align_to_single",
                             },
                             {
                                 "title": "Vulnerabilities (score)",
                                 "path": "matches.vulns.*",
                                 "use_key": True,
                                 "extra": "matches.vulns.*.cvss",
-                                "mode": "align_to_single",
                             },
                         ],
                     },
