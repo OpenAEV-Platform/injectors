@@ -54,7 +54,6 @@ class CVESpecificWatchlist(ContractFieldsCommon):
 
 class CustomQuery(InjectContent):
     contract: Literal["custom_query"]
-    http_method: str
     custom_query: str
 
 
