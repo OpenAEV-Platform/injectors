@@ -1,5 +1,7 @@
+import json
 import time
 from datetime import datetime, timezone
+from urllib.parse import urlparse
 
 from pyoaev.helpers import OpenAEVInjectorHelper
 
@@ -15,7 +17,13 @@ from shodan.contracts import (
     IPEnumeration,
     ShodanContractId,
 )
-from shodan.models import ConfigLoader, ContractType, NormalizeInputData
+from shodan.models import (
+    Asset,
+    AssetExtendedAttributes,
+    ConfigLoader,
+    ContractType,
+    NormalizeInputData,
+)
 from shodan.services import ShodanClientAPI, Utils
 
 LOG_PREFIX = "[SHODAN_INJECTOR]"
@@ -35,7 +43,7 @@ class ShodanInjector:
         self, normalize_input_data: NormalizeInputData, results, user_info: dict
     ):
         self.helper.injector_logger.info(
-            f"{LOG_PREFIX} - Start preparing the output message rendering.",
+            f"{LOG_PREFIX} - Initiating message output preparation rendering.",
         )
 
         contract_name = normalize_input_data.contract_name
@@ -80,9 +88,105 @@ class ShodanInjector:
             auto_create_assets=inject_content.get("auto_create_assets", None),
         )
         self.helper.injector_logger.info(
-            f"{LOG_PREFIX} - Finalization of the preparation of the output message rendering.",
+            f"{LOG_PREFIX} - Message output preparation rendering completed successfully.",
         )
         return rendering_output_message
+
+    def _aggregate_assets(self, found_assets_list: list[dict]):
+        merged = {}
+
+        for asset_dict in found_assets_list:
+            extended_attributes = asset_dict.get("extended_attributes", {})
+
+            hostname = asset_dict.get("name")
+            platform = extended_attributes.get("platform")
+            arch = extended_attributes.get("arch")
+
+            key = (hostname, platform, arch)
+            ips = set(extended_attributes.get("ip_addresses", []))
+
+            if key not in merged:
+                merged[key] = asset_dict
+                merged[key]["extended_attributes"]["ip_addresses"] = ips
+            else:
+                merged[key]["extended_attributes"]["ip_addresses"].update(ips)
+
+        for asset in merged.values():
+            asset_extended_attributes = asset.get("extended_attributes", {})
+            asset_hostname = asset_extended_attributes.get("hostname", "")
+            asset_ip_addresses = asset_extended_attributes.get("ip_addresses", set())
+
+            asset["extended_attributes"]["ip_addresses"] = list(asset_ip_addresses)
+
+            self.helper.injector_logger.debug(
+                f"{LOG_PREFIX} - Asset generated.",
+                {"hostname": asset_hostname, "ip_addresses": list(asset_ip_addresses)},
+            )
+
+        return list(merged.values())
+
+    def _prepare_output_structured(self, shodan_results: dict):
+
+        self.helper.injector_logger.info(
+            f"{LOG_PREFIX} - Initiating structured output preparation and asset generation.",
+        )
+
+        results = shodan_results.get("data", [])
+        found_assets_list = []
+
+        for item in results:
+            result = item.get("result", {})
+
+            raw_api_url = item.get("url")
+            url = raw_api_url.split(maxsplit=1)[1] if raw_api_url else ""
+            parsed_url = urlparse(url)
+            parsed_url_query = parsed_url.query
+            origin_url = (
+                f"https://www.shodan.io/search?{parsed_url_query}"
+                if parsed_url_query and "key=" not in parsed_url_query
+                else ""
+            )
+
+            if "matches" in result:
+                elements = result.get("matches", [])
+            elif "data" in result:
+                elements = result.get("data", [])  # For CVE_SPECIFIC_WATCHLIST CONTRACT
+            else:
+                elements = []
+
+            for element in elements:
+
+                ip_str = element.get("ip_str")
+                hostnames = element.get("hostnames", [])
+                os = element.get("os", "Unknown")
+
+                if not ip_str or not hostnames:
+                    continue
+
+                for hostname in hostnames:
+
+                    asset_extended_attributes = AssetExtendedAttributes(
+                        ip_addresses=[ip_str],
+                        platform=os,
+                        hostname=hostname,
+                    )
+
+                    asset = Asset(
+                        name=hostname,
+                        description=f"Asset automatically created by Shodan Injector. (Source: {origin_url})",
+                        tags=["source:shodan.io"],
+                        extended_attributes=asset_extended_attributes,
+                    )
+
+                    found_assets_list.append(asset.model_dump())
+
+        aggregate_assets = self._aggregate_assets(found_assets_list)
+
+        self.helper.injector_logger.info(
+            f"{LOG_PREFIX} - Structured output preparation and asset generation completed successfully.",
+            {"total_assets_generated": len(aggregate_assets)},
+        )
+        return {"found_assets": aggregate_assets}
 
     def _resolve_assets(self, data: dict, selector_key: str) -> list[dict]:
 
@@ -338,17 +442,15 @@ class ShodanInjector:
         )
 
         # Preparation and creation of auto_create_assets
-        output_json = ""
-        # if normalize_input_data.inject_content.auto_create_assets:
-        #     output_json = self._prepare_output_json(
-        #         normalize_input_data
-        #     )
+        output_structured = ""
+        if normalize_input_data.inject_content.auto_create_assets:
+            output_structured = self._prepare_output_structured(shodan_results)
 
         # Preparation and creation of output_message
         output_message = self._prepare_output_message(
             normalize_input_data, shodan_results, shodan_credit_user
         )
-        return output_json, output_message
+        return output_structured, output_message
 
     def process_message(self, data: dict) -> None:
         # Initialization to get the current start utc iso format.
@@ -370,11 +472,11 @@ class ShodanInjector:
 
         # Execute inject
         try:
-            output_json, output_message = self._shodan_execution(data)
+            output_structured, output_message = self._shodan_execution(data)
             execution_duration = int(time.time() - start)
             callback_data = {
                 "execution_message": output_message,
-                # "execution_output_structured": json.dumps(result["outputs"]),
+                "execution_output_structured": json.dumps(output_structured),
                 "execution_status": "SUCCESS",
                 "execution_duration": execution_duration,
                 "execution_action": "complete",
@@ -384,7 +486,7 @@ class ShodanInjector:
             )
             self.helper.injector_logger.info(
                 f"{LOG_PREFIX} - The injector has completed its execution.",
-                {"execution_duration": f"{execution_duration} s"},
+                {"execution_duration": f"{execution_duration}s"},
             )
 
         except Exception as err:

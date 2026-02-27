@@ -327,7 +327,11 @@ then returns several sections in the report if successful:
 - **Section JSON** – JSON return of the response directly (In the case of a "custom query", we return the JSON directly rather than the table section.)
 
 ### Auto-Create Assets
-- Feature currently under development
+This feature automatically creates structured Asset objects (when auto_create_assets is enabled in the UI) from
+Shodan API responses by extracting hostnames, IP addresses, and platform information.
+It supports multiple Shodan response formats depending on the contract type and normalizes the data into a unified
+structure. Assets are then grouped (hostname, platform, and architecture) to prevent duplicates while merging associated
+IP addresses.
 
 ### Rate Limiting and Retry
 
