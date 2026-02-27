@@ -131,21 +131,6 @@ class CustomQuery:
         manual_target_selector = [target_selector_field.MANUAL.key]
 
         specific_fields = [
-            ContractSelect(
-                key="http_method",
-                label="HTTP Method",
-                defaultValue=["get"],
-                choices={
-                    "get": "GET",
-                    "post": "POST",
-                    "put": "PUT",
-                    "delete": "DELETE",
-                },
-                **cls._build_conditions(
-                    source_selector=source_selector_key,
-                    target_selector=manual_target_selector,
-                ),
-            ),
             ContractText(
                 key="custom_query",
                 label="Custom Query",

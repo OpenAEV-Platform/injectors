@@ -266,12 +266,13 @@ Direct values separated by commas or spaces between IP addresses or hostnames ar
     | Hostname     | Yes         | /                                                                                   |
     | Organization | No          | If empty, the hostname value is used.                                               |
 
-- Custom Query (Endpoint: `your custom endpoint`)
-    -  See the Shodan documentation: https://developer.shodan.io/api
+- Custom Query (Search Shodan Endpoint: `/shodan/host/search` + your custom query)
+    - You can find all available filters here: https://beta.shodan.io/search/filters
+    -  Note that spaces and commas are important. You must use the same formatting as in the Shodan search bar.
+      - `Spaces = AND` / `Commas = OR`
 
     | Field        | Mandatory | Default / Notes                         |
     |--------------|-----------|-----------------------------------------|
-    | HTTP Method  | Yes       | `GET` (choices: GET, POST, PUT, DELETE) |
     | Custom Query | Yes       | /                                       |
 
 - CVE Enumeration (Search Shodan Endpoint: `/shodan/host/search`)
