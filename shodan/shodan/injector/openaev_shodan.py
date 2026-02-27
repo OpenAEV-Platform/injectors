@@ -2,9 +2,9 @@ import time
 from datetime import datetime, timezone
 from urllib.parse import urlparse
 
-from injector_common.pagination import Pagination
 from pyoaev.helpers import OpenAEVInjectorHelper
 
+from injector_common.pagination import Pagination
 from shodan.contracts import (
     CloudProviderAssetDiscovery,
     CriticalPortsAndExposedAdminInterface,
