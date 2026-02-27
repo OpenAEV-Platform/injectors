@@ -1,3 +1,4 @@
+import json
 import time
 from datetime import datetime, timezone
 from urllib.parse import urlparse
@@ -129,7 +130,7 @@ class ShodanInjector:
             raw_api_url = item.get("url")
             url = raw_api_url.split(maxsplit=1)[1] if raw_api_url else ""
             parsed_url = urlparse(url)
-            external_reference = (
+            origin_url = (
                 f"https://www.shodan.io/search?{parsed_url.query}"
                 if parsed_url.query
                 else ""
@@ -161,8 +162,8 @@ class ShodanInjector:
 
                     asset = Asset(
                         name=hostname,
-                        description="Asset automatically created by Shodan Injector.",
-                        external_reference=external_reference,
+                        description=f"Asset automatically created by Shodan Injector."
+                        f"Origin url: {origin_url}",
                         tags=["source:shodan.io"],
                         extended_attributes=asset_extended_attributes,
                     )
@@ -460,7 +461,7 @@ class ShodanInjector:
             execution_duration = int(time.time() - start)
             callback_data = {
                 "execution_message": output_message,
-                "execution_output_structured": output_structured,
+                "execution_output_structured": json.dumps(output_structured),
                 "execution_status": "SUCCESS",
                 "execution_duration": execution_duration,
                 "execution_action": "complete",
