@@ -6,7 +6,6 @@ from pyoaev.contracts.contract_config import (
     ContractConfig,
     ContractElement,
     ContractOutputElement,
-    ContractSelect,
     ContractText,
     SupportedLanguage,
 )
