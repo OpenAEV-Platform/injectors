@@ -99,7 +99,7 @@ class ShodanInjector:
         for asset_dict in found_assets_list:
             extended_attributes = asset_dict.get("extended_attributes", {})
 
-            hostname = asset_dict["name"]
+            hostname = asset_dict.get("name")
             platform = extended_attributes.get("platform")
             arch = extended_attributes.get("arch")
 
