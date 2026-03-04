@@ -133,7 +133,6 @@ class ShodanClientAPI:
         request_api: ShodanRestAPI | None,
         filters_template: dict[str, FilterDefinition] | None = None,
         is_custom_query: bool = False,
-        http_method_custom_query: str | None = None,
     ) -> Union[dict[str, Any], Any]:
         """Sends a request to Shodan for the given targets and filters, handling retries and errors.
         This method constructs the query URL, applies optional filters, encodes it, and calls "_request_data".
@@ -143,26 +142,22 @@ class ShodanClientAPI:
             request_api (ShodanRestAPI | None): The API endpoint definition to use.
             filters_template (dict[str, FilterDefinition] | None): Optional filters to apply to the query.
             is_custom_query (bool): Whether this is a custom query bypassing standard contract endpoints.
-            http_method_custom_query (str | None): HTTP method to use for a custom query.
 
         Returns:
              Union[dict[str, Any], Any]: Either a structured dictionary with targets and results, or the raw API
                 response for special queries.
         """
 
-        targets = [raw_input] if is_custom_query else raw_input
-        http_method = (
-            http_method_custom_query
-            if is_custom_query
-            else request_api.value.http_method
-        )
-        endpoint_template = raw_input if is_custom_query else request_api.value.endpoint
+        targets = raw_input
+        http_method = request_api.value.http_method
+
+        endpoint_template = request_api.value.endpoint
 
         result = None
         results = []
         for target in targets:
             new_endpoint = endpoint_template
-            query_params = None
+            query_params = target if is_custom_query else None
             encoded_for_shodan = None
 
             if filters_template:
@@ -305,12 +300,12 @@ class ShodanClientAPI:
             resolved_targets = getattr(inject_content, target_field, None)
 
             if inject_content.contract == "custom_query":
+                resolved_targets = [f"query={inject_content.custom_query}"]
+
                 return self._process_request(
-                    raw_input=inject_content.custom_query,
-                    request_api=None,
-                    filters_template=None,
+                    raw_input=resolved_targets,
+                    request_api=ShodanRestAPI.SEARCH_SHODAN,
                     is_custom_query=True,
-                    http_method_custom_query=inject_content.http_method,
                 )
         else:
             target_property_selector = inject_content.target_property_selector
