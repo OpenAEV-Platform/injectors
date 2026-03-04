@@ -2,8 +2,8 @@ openaev:
   url: 'ChangeMe'
   token: 'ChangeMe'
 
-#injector:
-#  id: 'shodan--a87488ad-2c72-4592-b429-69259d7bcef1'
+injector:
+  id: 'ChangeMe'
 #  name: 'Shodan'
 #  log_level: 'error'
 

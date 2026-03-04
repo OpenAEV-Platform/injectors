@@ -10,6 +10,8 @@ from pyoaev.contracts.contract_config import (
     ContractConfig,
     ContractElement,
     ContractExpectations,
+    ContractOutputElement,
+    ContractOutputType,
     ContractSelect,
     Expectation,
     ExpectationType,
@@ -245,7 +247,14 @@ class ShodanContracts:
     # -- OUTPUTS --
     @staticmethod
     def _base_outputs():
-        return []
+        output_assets = ContractOutputElement(
+            type=ContractOutputType.Asset,
+            field="found_assets",
+            isMultiple=True,
+            isFindingCompatible=False,
+            labels=["shodan"],
+        )
+        return [output_assets]
 
     def _build_contract(
         self,

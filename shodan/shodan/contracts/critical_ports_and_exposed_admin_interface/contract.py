@@ -74,24 +74,20 @@ class CriticalPortsAndExposedAdminInterface:
                             {
                                 "title": "Port",
                                 "path": "matches.port",
-                                "mode": "single",
                             },
                             {
                                 "title": "Hostnames",
                                 "path": "matches.hostnames",
-                                "mode": "align_to_single",
                             },
                             {
                                 "title": "IP",
                                 "path": "matches.ip_str",
-                                "mode": "align_to_single",
                             },
                             {
                                 "title": "Vulnerabilities (score)",
                                 "path": "matches.vulns.*",
                                 "use_key": True,
                                 "extra": "matches.vulns.*.cvss",
-                                "mode": "align_to_single",
                             },
                         ],
                     },

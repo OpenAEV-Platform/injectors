@@ -28,7 +28,7 @@ class IPEnumeration:
                     "icon": "CONFIG",
                     "title": "[CONFIG] Summary of all configurations used for the contract.",
                 },
-                "keys_list_to_string": ["ips", "seen_ips"],
+                "keys_list_to_string": ["ip", "ips", "seen_ips"],
                 "keys_to_exclude": [
                     "expectations",
                     "asset_ids",
@@ -72,19 +72,16 @@ class IPEnumeration:
                             {
                                 "title": "Port",
                                 "path": "matches.port",
-                                "mode": "single",
                             },
                             {
                                 "title": "Hostnames",
                                 "path": "matches.hostnames",
-                                "mode": "align_to_single",
                             },
                             {
                                 "title": "Vulnerabilities (score)",
                                 "path": "matches.vulns.*",
                                 "use_key": True,
                                 "extra": "matches.vulns.*.cvss",
-                                "mode": "align_to_single",
                             },
                         ],
                     },

@@ -73,24 +73,20 @@ class CVESpecificWatchlist:
                             {
                                 "title": "Port",
                                 "path": "data.port",
-                                "mode": "single",
                             },
                             {
                                 "title": "Hostnames",
                                 "path": "data.hostnames",
-                                "mode": "align_to_single",
                             },
                             {
                                 "title": "IP",
                                 "path": "data.ip_str",
-                                "mode": "align_to_single",
                             },
                             {
                                 "title": "Vulnerabilities (score)",
                                 "path": "data.vulns.*",
                                 "use_key": True,
                                 "extra": "data.vulns.*.cvss",
-                                "mode": "align_to_single",
                             },
                         ],
                     },

@@ -461,22 +461,33 @@ class Utils:
         return final_result
 
     @staticmethod
+    def _format_cell(value, extra=None):
+        if value in (None, ""):
+            return "-"
+
+        if isinstance(value, list):
+            if not value:
+                return "-"
+            if extra not in (None, ""):
+                if not isinstance(extra, list):
+                    extra_list = [extra] * len(value)
+                else:
+                    extra_list = extra
+                if len(value) == len(extra_list):
+                    return ", ".join(f"{v} ({e})" for v, e in zip(value, extra_list))
+            return ", ".join(str(v) for v in value)
+
+        return f"{value} ({extra})" if extra not in (None, "") else str(value)
+
     def _organizer_row(
-        tables_config_columns,
+        self,
         show_index_is_active,
         index_start,
         column_values,
         column_extras,
     ):
-
-        single_columns = [
-            values
-            for config, values in zip(tables_config_columns, column_values)
-            if config.get("mode") == "single"
-        ]
-        row_count = len(single_columns[0])
-
         final_rows = []
+        row_count = max(len(col) for col in column_values)
         index = index_start
 
         for row_idx in range(row_count):
@@ -485,107 +496,16 @@ class Utils:
             if show_index_is_active:
                 row_cells.append(str(index))
 
-            for table_config_index, table_config in enumerate(tables_config_columns):
-                mode = table_config.get("mode", "inline")
-
-                values = (
-                    column_values[table_config_index]
-                    if table_config_index < len(column_values)
-                    else []
-                )
+            for col_idx, values in enumerate(column_values):
                 extras = (
-                    column_extras[table_config_index]
-                    if column_extras and table_config_index < len(column_extras)
+                    column_extras[col_idx]
+                    if column_extras and col_idx < len(column_extras)
                     else None
                 )
+                value = values[row_idx] if row_idx < len(values) else None
+                extra = extras[row_idx] if extras and row_idx < len(extras) else None
+                row_cells.append(self._format_cell(value, extra))
 
-                cell = "-"
-                if mode == "single":
-                    if isinstance(values, list) and len(values) > 0:
-                        for value in values:
-                            if isinstance(value, list):
-                                filtered = [
-                                    str(v) for v in value if v not in (None, "")
-                                ]
-                                cell = ", ".join(filtered) if filtered else "-"
-                            else:
-                                val = values[row_idx] if row_idx < len(values) else None
-                                cell = str(val) if val not in (None, "") else "-"
-
-                    elif values not in (None, ""):
-                        cell = str(values)
-                    else:
-                        cell = "-"
-
-                elif mode == "inline":
-                    if row_idx == 0:
-                        all_vals = []
-                        for val in values:
-                            if isinstance(val, list):
-                                all_vals.extend(
-                                    str(v) for v in val if v not in (None, "")
-                                )
-                            elif val not in (None, ""):
-                                all_vals.append(str(val))
-                        cell = ", ".join(all_vals) if all_vals else "-"
-
-                    else:
-                        cell = ""
-
-                elif mode == "align_to_single":
-                    if row_idx < len(values):
-                        val = values[row_idx]
-                        extra = (
-                            extras[row_idx]
-                            if extras and row_idx < len(extras)
-                            else None
-                        )
-                        if isinstance(val, list):
-                            if val:
-                                if extra:
-                                    cell = ", ".join(
-                                        f"{v} ({e if e is not None else '-'})"
-                                        for v, e in zip(val, extra or ["-"] * len(val))
-                                    )
-                                else:
-                                    cell = ", ".join(str(v) for v in val)
-                            else:
-                                cell = "-"
-                        elif val not in (None, ""):
-                            if extra:
-                                cell = f"{val} ({extra})"
-                            else:
-                                cell = str(val)
-                        else:
-                            cell = "-"
-                    else:
-                        cell = "-"
-
-                elif mode == "repeat":
-                    if values:
-                        val = values
-                        extra = extras if extras else None
-
-                        if isinstance(val, list):
-                            if val:
-                                val_join = ", ".join(str(v) for v in val)
-                                cell = val_join
-                                if extra and isinstance(extra, list):
-                                    extra_join = ", ".join(str(v) for v in extra)
-                                    cell = f"{val_join} ({extra_join})"
-                            else:
-                                cell = "-"
-                        elif val not in (None, ""):
-                            if extra:
-                                cell = f"{val} ({extra})"
-                            else:
-                                cell = str(val)
-                        else:
-                            cell = "-"
-                    else:
-                        cell = "-"
-
-                row_cells.append(cell)
             final_rows.append(row_cells)
             index += 1
 
@@ -715,7 +635,6 @@ class Utils:
                         column_extras.append(None)
 
                 final_rows = self._organizer_row(
-                    tables_config_columns,
                     show_index_is_active,
                     index_start,
                     column_values,

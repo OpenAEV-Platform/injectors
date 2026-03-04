@@ -18,6 +18,10 @@ from shodan.models.normalize_input_data import (
     NormalizeInputData,
     TargetsType,
 )
+from shodan.models.output_structured import (
+    Asset,
+    AssetExtendedAttributes,
+)
 
 __all__ = [
     "ConfigLoader",
@@ -34,4 +38,6 @@ __all__ = [
     "ContractHTTPDefinition",
     "FilterDefinition",
     "Operator",
+    "Asset",
+    "AssetExtendedAttributes",
 ]
