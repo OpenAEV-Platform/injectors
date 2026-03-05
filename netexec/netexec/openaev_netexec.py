@@ -176,10 +176,9 @@ class OpenAEVNetExecInjector:
                 "execution_action": "complete",
             }
 
-            if parsed and parsed["outputs"]:
-                callback_data["execution_output_structured"] = json.dumps(
-                    parsed["outputs"]
-                )
+            callback_data["execution_output_structured"] = json.dumps(
+                parsed["outputs"] if parsed and parsed.get("outputs") else {}
+            )
 
             self.helper.api.inject.execution_callback(
                 inject_id=inject_id,
