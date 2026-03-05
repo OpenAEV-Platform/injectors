@@ -54,14 +54,10 @@ def parse_contract_id(contract_id: str) -> ParsedContractId:
     rest = parts[2]
 
     if rest.startswith("opt_"):
-        return ParsedContractId(
-            protocol=protocol, family="option", identifier=rest[4:]
-        )
+        return ParsedContractId(protocol=protocol, family="option", identifier=rest[4:])
 
     if rest.startswith("mod_"):
-        return ParsedContractId(
-            protocol=protocol, family="module", identifier=rest[4:]
-        )
+        return ParsedContractId(protocol=protocol, family="module", identifier=rest[4:])
 
     raise ValueError(f"Cannot determine contract family from ID: '{contract_id}'")
 

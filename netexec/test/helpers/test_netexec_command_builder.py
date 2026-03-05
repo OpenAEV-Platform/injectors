@@ -4,8 +4,8 @@ from netexec.helpers.netexec_command_builder import (
     build_command,
     build_command_version,
     extract_data_base,
-    extract_data_option,
     extract_data_module,
+    extract_data_option,
 )
 
 
@@ -60,7 +60,9 @@ class NetExecCommandBuilderTest(TestCase):
         self.assertEqual(cmd2, ["netexec", "smb", "10.0.0.1"])
 
     def test_falsy_credential_values_skipped(self):
-        cmd = build_command("smb", ["10.0.0.1"], credentials={"username": "", "password": None})
+        cmd = build_command(
+            "smb", ["10.0.0.1"], credentials={"username": "", "password": None}
+        )
         self.assertNotIn("-u", cmd)
         self.assertNotIn("-p", cmd)
 
@@ -102,7 +104,9 @@ class NetExecCommandBuilderTest(TestCase):
     def test_special_chars_in_password_stay_as_single_element(self):
         """Passwords with shell metacharacters must remain a single list element."""
         malicious = "P@ss;rm -rf / && echo pwned"
-        cmd = build_command("smb", ["10.0.0.1"], credentials={"username": "u", "password": malicious})
+        cmd = build_command(
+            "smb", ["10.0.0.1"], credentials={"username": "u", "password": malicious}
+        )
         p_idx = cmd.index("-p")
         self.assertEqual(cmd[p_idx + 1], malicious)
 
@@ -183,13 +187,17 @@ class NetExecCommandBuilderTest(TestCase):
         self.assertIn("-M", data["extra_args"])
         self.assertIn("-o", data["extra_args"])
         o_idx = data["extra_args"].index("-o")
-        opts_after = data["extra_args"][o_idx + 1:]
+        opts_after = data["extra_args"][o_idx + 1 :]
         opt_strings = [o for o in opts_after if "=" in o]
         self.assertTrue(any("LISTENER=10.0.0.5" in o for o in opt_strings))
         self.assertTrue(any("METHOD=All" in o for o in opt_strings))
 
     def test_extract_module_with_freetext_fallback(self):
-        content = {"username": "admin", "password": "pass", "module_options": "KEY1=val1 KEY2=val2"}
+        content = {
+            "username": "admin",
+            "password": "pass",
+            "module_options": "KEY1=val1 KEY2=val2",
+        }
         data = extract_data_module(content, "smb", "spooler")
         self.assertIn("-o", data["extra_args"])
 

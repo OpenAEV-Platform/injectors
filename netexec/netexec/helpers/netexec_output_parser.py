@@ -8,7 +8,7 @@ Only data produced by modules / options qualifies as finding material.
 """
 
 import re
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Tuple
 
 from netexec.helpers.credential_extractors import (
     get_account_pw_not_required_extractor,
@@ -26,7 +26,6 @@ from netexec.helpers.credential_extractors import (
     get_vulnerability_extractor,
 )
 
-
 # ---------------------------------------------------------------------------
 # Line-level helpers
 # ---------------------------------------------------------------------------
@@ -43,9 +42,7 @@ _LINE_PREFIX = re.compile(
 
 # Authentication confirmation -- must be SKIPPED everywhere.
 #   [+] domain\user:secret   or   [+] domain\user:secret (Pwn3d!)
-_AUTH_LINE = re.compile(
-    r"\[\+\]\s+\S+\\\S+:\S+"
-)
+_AUTH_LINE = re.compile(r"\[\+\]\s+\S+\\\S+:\S+")
 
 
 def _parse_line(raw: str) -> Tuple[str, str, str, str]:
@@ -99,6 +96,7 @@ def _is_noise(rest: str) -> bool:
 # Generic dispatch helper
 # ---------------------------------------------------------------------------
 
+
 def _dispatch(getter, finding_lines, ip_to_asset_id_map, family, identifier):
     """Run a per-contract extractor looked up via *getter*, if one exists."""
     if family and identifier:
@@ -112,25 +110,26 @@ def _dispatch(getter, finding_lines, ip_to_asset_id_map, family, identifier):
 # Output field names — must match ContractOutputElement.field
 # ---------------------------------------------------------------------------
 _DISPATCHERS = [
-    ("credentials",                get_credential_extractor),
-    ("usernames",                  get_username_extractor),
-    ("shares",                     get_share_extractor),
-    ("admin_usernames",            get_admin_username_extractor),
-    ("groups",                     get_group_extractor),
-    ("computers",                  get_computer_extractor),
-    ("password_policy",            get_password_policy_extractor),
-    ("delegations",                get_delegation_extractor),
-    ("sids",                       get_sid_extractor),
-    ("vulnerabilities",            get_vulnerability_extractor),
-    ("accounts_pw_not_required",   get_account_pw_not_required_extractor),
-    ("asreproastable_accounts",    get_asreproastable_extractor),
-    ("kerberoastable_accounts",    get_kerberoastable_extractor),
+    ("credentials", get_credential_extractor),
+    ("usernames", get_username_extractor),
+    ("shares", get_share_extractor),
+    ("admin_usernames", get_admin_username_extractor),
+    ("groups", get_group_extractor),
+    ("computers", get_computer_extractor),
+    ("password_policy", get_password_policy_extractor),
+    ("delegations", get_delegation_extractor),
+    ("sids", get_sid_extractor),
+    ("vulnerabilities", get_vulnerability_extractor),
+    ("accounts_pw_not_required", get_account_pw_not_required_extractor),
+    ("asreproastable_accounts", get_asreproastable_extractor),
+    ("kerberoastable_accounts", get_kerberoastable_extractor),
 ]
 
 
 # ---------------------------------------------------------------------------
 # Public parser
 # ---------------------------------------------------------------------------
+
 
 class NetExecOutputParser:
     """Parses raw netexec stdout into structured findings for OpenAEV."""

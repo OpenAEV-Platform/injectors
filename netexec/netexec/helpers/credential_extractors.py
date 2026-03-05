@@ -19,10 +19,10 @@ New extractors are added here -- either manually or via the
 import re
 from typing import Dict, List, Tuple
 
-
 # ---------------------------------------------------------------------------
 # Helper used internally by extractor functions (NOT shared as an extractor)
 # ---------------------------------------------------------------------------
+
 
 def _extract_password_from_description(
     finding_lines: List[Tuple[str, str, str]],
@@ -105,8 +105,10 @@ def extract_opt_users_credentials(
         samwell.tarly  2025-12-11 10:33:21  0  Samwell Tarly (Password : Heartsbane)
     """
     return _extract_password_from_description(
-        finding_lines, ip_to_asset_id_map,
-        _OPT_USERS_PW_RE, _OPT_USERS_USER_RE,
+        finding_lines,
+        ip_to_asset_id_map,
+        _OPT_USERS_PW_RE,
+        _OPT_USERS_USER_RE,
     )
 
 
@@ -116,6 +118,7 @@ def extract_opt_users_credentials(
 # Same format as --users but should NOT produce credentials.
 # The output lists active users; a password match here would be
 # coincidental (e.g. ":Heartsbane" without context).
+
 
 def extract_opt_active_users_credentials(
     finding_lines: List[Tuple[str, str, str]],
@@ -150,8 +153,10 @@ def extract_mod_get_desc_users_credentials(
         User: samwell.tarly description: Samwell Tarly (Password : Heartsbane)
     """
     return _extract_password_from_description(
-        finding_lines, ip_to_asset_id_map,
-        _MOD_GET_DESC_USERS_PW_RE, _MOD_GET_DESC_USERS_USER_RE,
+        finding_lines,
+        ip_to_asset_id_map,
+        _MOD_GET_DESC_USERS_PW_RE,
+        _MOD_GET_DESC_USERS_USER_RE,
     )
 
 
@@ -180,8 +185,10 @@ def extract_mod_user_desc_credentials(
         User: samwell.tarly - Description: Samwell Tarly (Password : Heartsbane)
     """
     return _extract_password_from_description(
-        finding_lines, ip_to_asset_id_map,
-        _MOD_USER_DESC_PW_RE, _MOD_USER_DESC_USER_RE,
+        finding_lines,
+        ip_to_asset_id_map,
+        _MOD_USER_DESC_PW_RE,
+        _MOD_USER_DESC_USER_RE,
     )
 
 
@@ -258,14 +265,10 @@ _OPT_LSA_NTLM_RE = re.compile(
 )
 
 # 4. Cleartext: DOMAIN\user:password (NOT dpapi_, NOT [+])
-_OPT_LSA_CLEARTEXT_RE = re.compile(
-    r"^(?P<account>[^\s:]+\\[^\s:]+):(?P<password>.+)$"
-)
+_OPT_LSA_CLEARTEXT_RE = re.compile(r"^(?P<account>[^\s:]+\\[^\s:]+):(?P<password>.+)$")
 
 # Lines to skip
-_OPT_LSA_SKIP_RE = re.compile(
-    r"^(?:dpapi_(?:machinekey|userkey):|\[\+\])"
-)
+_OPT_LSA_SKIP_RE = re.compile(r"^(?:dpapi_(?:machinekey|userkey):|\[\+\])")
 
 
 def extract_opt_lsa_credentials(
@@ -480,9 +483,7 @@ def extract_opt_kerberoasting_accounts(
 # -------------------------------------------------------------------
 # Example:  goadmin:$DPAPImk$1*1*S-1-5-21-...*des3*sha1*18000*hex*208*hex
 
-_MOD_DPAPI_HASH_RE = re.compile(
-    r"^(?P<username>[^:]+):(?P<hash>\$DPAPImk\$.+)\s*$"
-)
+_MOD_DPAPI_HASH_RE = re.compile(r"^(?P<username>[^:]+):(?P<hash>\$DPAPImk\$.+)\s*$")
 
 
 def extract_mod_dpapi_hash_credentials(
@@ -781,9 +782,7 @@ def extract_opt_admin_count_admin_usernames(
 # -------------------------------------------------------------------
 # Example:  546 - Guests
 
-_OPT_LOCAL_GROUPS_RE = re.compile(
-    r"^(?P<rid>\d+)\s+-\s+(?P<group_name>.+?)\s*$"
-)
+_OPT_LOCAL_GROUPS_RE = re.compile(r"^(?P<rid>\d+)\s+-\s+(?P<group_name>.+?)\s*$")
 
 
 def extract_opt_local_groups_groups(
@@ -905,9 +904,7 @@ def extract_opt_computers_computers(
 # -------------------------------------------------------------------
 # Example:  Minimum password length: 5
 
-_OPT_PASS_POL_RE = re.compile(
-    r"^(?P<key>[^:]+):\s*(?P<value>.+?)\s*$"
-)
+_OPT_PASS_POL_RE = re.compile(r"^(?P<key>[^:]+):\s*(?P<value>.+?)\s*$")
 
 
 def extract_opt_pass_pol_password_policy(
@@ -1038,9 +1035,7 @@ def extract_opt_find_delegation_delegations(
 # -------------------------------------------------------------------
 # Example:  Domain SID S-1-5-21-3455315044-2247855524-2949207569
 
-_OPT_GET_SID_RE = re.compile(
-    r"^Domain SID\s+(?P<sid>S-\d+-\d+-\d+(?:-\d+)+)\s*$"
-)
+_OPT_GET_SID_RE = re.compile(r"^Domain SID\s+(?P<sid>S-\d+-\d+-\d+(?:-\d+)+)\s*$")
 
 
 def extract_opt_get_sid_sids(
@@ -1199,7 +1194,11 @@ def extract_mod_coerce_plus_vulnerabilities(
         if m.group("status") != "VULNERABLE":
             continue
         finding: Dict = {
-            "name": m.group("details").strip() if m.group("details").strip() else "coerce_plus",
+            "name": (
+                m.group("details").strip()
+                if m.group("details").strip()
+                else "coerce_plus"
+            ),
             "status": "VULNERABLE",
             "details": rest,
             "host": ip,
@@ -1283,52 +1282,54 @@ def extract_mod_ldap_checker_vulnerabilities(
 
 _CREDENTIAL_EXTRACTORS = {
     # Options
-    ("option", "users"):           extract_opt_users_credentials,
-    ("option", "sam"):             extract_opt_sam_credentials,
-    ("option", "lsa"):             extract_opt_lsa_credentials,
-    ("option", "ntds"):            extract_opt_ntds_credentials,
-
+    ("option", "users"): extract_opt_users_credentials,
+    ("option", "sam"): extract_opt_sam_credentials,
+    ("option", "lsa"): extract_opt_lsa_credentials,
+    ("option", "ntds"): extract_opt_ntds_credentials,
     # Modules
-    ("module", "get_desc_users"):       extract_mod_get_desc_users_credentials,
-    ("module", "user_desc"):            extract_mod_user_desc_credentials,
-    ("module", "dpapi_hash"):           extract_mod_dpapi_hash_credentials,
+    ("module", "get_desc_users"): extract_mod_get_desc_users_credentials,
+    ("module", "user_desc"): extract_mod_user_desc_credentials,
+    ("module", "dpapi_hash"): extract_mod_dpapi_hash_credentials,
 }
 
 _USERNAME_EXTRACTORS = {
-    ("option", "users"):           extract_opt_users_usernames,
-    ("option", "active_users"):    extract_opt_active_users_usernames,
-    ("option", "rid_brute"):       extract_opt_rid_brute_usernames,
-    ("option", "loggedon_users"):  extract_opt_loggedon_users_usernames,
+    ("option", "users"): extract_opt_users_usernames,
+    ("option", "active_users"): extract_opt_active_users_usernames,
+    ("option", "rid_brute"): extract_opt_rid_brute_usernames,
+    ("option", "loggedon_users"): extract_opt_loggedon_users_usernames,
 }
 
 _SHARE_EXTRACTORS = {
-    ("option", "shares"):          extract_opt_shares_shares,
+    ("option", "shares"): extract_opt_shares_shares,
 }
 
 _ADMIN_USERNAME_EXTRACTORS = {
-    ("option", "admin_count"):     extract_opt_admin_count_admin_usernames,
+    ("option", "admin_count"): extract_opt_admin_count_admin_usernames,
 }
 
 _GROUP_EXTRACTORS = {
-    ("option", "local_groups"):    extract_opt_local_groups_groups,
-    ("option", "groups"):          extract_opt_groups_groups,
+    ("option", "local_groups"): extract_opt_local_groups_groups,
+    ("option", "groups"): extract_opt_groups_groups,
 }
 
 _COMPUTER_EXTRACTORS = {
-    ("option", "computers"):       extract_opt_computers_computers,
+    ("option", "computers"): extract_opt_computers_computers,
 }
 
 _PASSWORD_POLICY_EXTRACTORS = {
-    ("option", "pass_pol"):        extract_opt_pass_pol_password_policy,
+    ("option", "pass_pol"): extract_opt_pass_pol_password_policy,
 }
 
 _DELEGATION_EXTRACTORS = {
-    ("option", "trusted_for_delegation"): extract_opt_trusted_for_delegation_delegations,
-    ("option", "find_delegation"):        extract_opt_find_delegation_delegations,
+    (
+        "option",
+        "trusted_for_delegation",
+    ): extract_opt_trusted_for_delegation_delegations,
+    ("option", "find_delegation"): extract_opt_find_delegation_delegations,
 }
 
 _SID_EXTRACTORS = {
-    ("option", "get_sid"):         extract_opt_get_sid_sids,
+    ("option", "get_sid"): extract_opt_get_sid_sids,
 }
 
 _ACCOUNT_PW_NOT_REQUIRED_EXTRACTORS = {
@@ -1336,17 +1337,17 @@ _ACCOUNT_PW_NOT_REQUIRED_EXTRACTORS = {
 }
 
 _ASREPROASTABLE_EXTRACTORS = {
-    ("option", "asreproast"):      extract_opt_asreproast_accounts,
+    ("option", "asreproast"): extract_opt_asreproast_accounts,
 }
 
 _KERBEROASTABLE_EXTRACTORS = {
-    ("option", "kerberoasting"):   extract_opt_kerberoasting_accounts,
+    ("option", "kerberoasting"): extract_opt_kerberoasting_accounts,
 }
 
 _VULNERABILITY_EXTRACTORS = {
-    ("module", "spooler"):         extract_mod_spooler_vulnerabilities,
-    ("module", "coerce_plus"):     extract_mod_coerce_plus_vulnerabilities,
-    ("module", "ldap_checker"):    extract_mod_ldap_checker_vulnerabilities,
+    ("module", "spooler"): extract_mod_spooler_vulnerabilities,
+    ("module", "coerce_plus"): extract_mod_coerce_plus_vulnerabilities,
+    ("module", "ldap_checker"): extract_mod_ldap_checker_vulnerabilities,
 }
 
 

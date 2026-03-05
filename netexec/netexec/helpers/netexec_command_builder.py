@@ -4,7 +4,7 @@ import uuid
 from typing import Dict, List, Optional
 
 from netexec.contracts.protocol_config import PROTOCOL_CONFIGS, get_option_flag
-from netexec.modules_registry import get_module_by_safe_key, safe_module_key
+from netexec.modules_registry import get_module_by_safe_key
 
 # Options that require writing their output to a file (mandatory argument).
 # The command builder auto-generates a temp file path for these.
@@ -58,6 +58,7 @@ def build_command_version() -> List[str]:
 # Credential / port helpers shared by the three extract functions
 # ---------------------------------------------------------------------------
 
+
 def _extract_credentials(content: Dict) -> Optional[Dict[str, str]]:
     credentials: Dict[str, str] = {}
     for key in ("username", "password", "hash", "domain", "key_file"):
@@ -77,6 +78,7 @@ def _extract_port_args(content: Dict) -> List[str]:
 # ---------------------------------------------------------------------------
 # Family-specific data extractors
 # ---------------------------------------------------------------------------
+
 
 def extract_data_base(content: Dict, protocol: str) -> Optional[Dict]:
     """Extract form data for a **base protocol** contract (Family 1).
@@ -105,9 +107,7 @@ def extract_data_base(content: Dict, protocol: str) -> Optional[Dict]:
     return data or None
 
 
-def extract_data_option(
-    content: Dict, protocol: str, option_id: str
-) -> Optional[Dict]:
+def extract_data_option(content: Dict, protocol: str, option_id: str) -> Optional[Dict]:
     """Extract form data for a **protocol + option** contract (Family 2).
 
     The CLI flag is derived from *option_id* -- it is not in the form content.
@@ -136,9 +136,7 @@ def extract_data_option(
     return data or None
 
 
-def extract_data_module(
-    content: Dict, protocol: str, safe_key: str
-) -> Optional[Dict]:
+def extract_data_module(content: Dict, protocol: str, safe_key: str) -> Optional[Dict]:
     """Extract form data for a **protocol + module** contract (Family 3).
 
     The module name is recovered from *safe_key* via the modules registry.
@@ -165,7 +163,7 @@ def extract_data_module(
     module_opts: List[str] = []
     for key, value in content.items():
         if key.startswith(prefix) and value:
-            opt_name = key[len(prefix):]
+            opt_name = key[len(prefix) :]
             module_opts.append(f"{opt_name}={value}")
 
     # Free-text fallback

@@ -160,7 +160,9 @@ def build_outputs_for_types(output_types: Set[str]) -> List[ContractOutputElemen
     """Return the built output list for a given set of output type keys."""
     if not output_types:
         return []
-    elements = [_TYPE_TO_ELEMENT[t] for t in sorted(output_types) if t in _TYPE_TO_ELEMENT]
+    elements = [
+        _TYPE_TO_ELEMENT[t] for t in sorted(output_types) if t in _TYPE_TO_ELEMENT
+    ]
     if not elements:
         return []
     return ContractBuilder().add_outputs(elements).build_outputs()

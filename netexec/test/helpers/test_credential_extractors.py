@@ -1,30 +1,30 @@
 from unittest import TestCase
 
 from netexec.helpers.credential_extractors import (
+    extract_mod_coerce_plus_vulnerabilities,
+    extract_mod_dpapi_hash_credentials,
+    extract_mod_ldap_checker_vulnerabilities,
+    extract_mod_spooler_vulnerabilities,
     extract_no_credentials,
-    extract_opt_sam_credentials,
+    extract_opt_active_users_credentials,
+    extract_opt_active_users_usernames,
+    extract_opt_asreproast_accounts,
+    extract_opt_computers_computers,
+    extract_opt_groups_groups,
+    extract_opt_kerberoasting_accounts,
+    extract_opt_local_groups_groups,
+    extract_opt_loggedon_users_usernames,
     extract_opt_lsa_credentials,
     extract_opt_ntds_credentials,
-    extract_opt_users_credentials,
-    extract_opt_active_users_credentials,
-    extract_opt_users_usernames,
-    extract_opt_active_users_usernames,
-    extract_opt_rid_brute_usernames,
-    extract_opt_loggedon_users_usernames,
-    extract_opt_shares_shares,
-    extract_opt_local_groups_groups,
-    extract_opt_groups_groups,
-    extract_opt_computers_computers,
     extract_opt_pass_pol_password_policy,
-    extract_opt_asreproast_accounts,
-    extract_opt_kerberoasting_accounts,
-    extract_mod_dpapi_hash_credentials,
-    extract_mod_spooler_vulnerabilities,
-    extract_mod_coerce_plus_vulnerabilities,
-    extract_mod_ldap_checker_vulnerabilities,
+    extract_opt_rid_brute_usernames,
+    extract_opt_sam_credentials,
+    extract_opt_shares_shares,
+    extract_opt_users_credentials,
+    extract_opt_users_usernames,
     get_credential_extractor,
-    get_username_extractor,
     get_share_extractor,
+    get_username_extractor,
     get_vulnerability_extractor,
 )
 
@@ -51,7 +51,10 @@ class CredentialExtractorsTest(TestCase):
         results = extract_opt_sam_credentials(lines, self.ip_map)
         self.assertEqual(len(results), 1)
         self.assertEqual(results[0]["username"], "Administrator")
-        self.assertEqual(results[0]["hash"], "aad3b435b51404eeaad3b435b51404ee:dbd13e1c4e338284ac4e9874f7de6ef4")
+        self.assertEqual(
+            results[0]["hash"],
+            "aad3b435b51404eeaad3b435b51404ee:dbd13e1c4e338284ac4e9874f7de6ef4",
+        )
         self.assertEqual(results[0]["host"], self.ip)
         self.assertEqual(results[0]["hostname"], self.hostname)
         self.assertEqual(results[0]["asset_id"], "asset-001")
@@ -83,9 +86,7 @@ class CredentialExtractorsTest(TestCase):
         self.assertIn("aes256-cts-hmac-sha1-96:", results[0]["hash"])
 
     def test_lsa_plain_password_hex(self):
-        lines = self._lines(
-            "NORTH\\WINTERFELL$:plain_password_hex:0a1b2c3d4e5f"
-        )
+        lines = self._lines("NORTH\\WINTERFELL$:plain_password_hex:0a1b2c3d4e5f")
         results = extract_opt_lsa_credentials(lines, self.ip_map)
         self.assertEqual(len(results), 1)
         self.assertEqual(results[0]["hash"], "plain_password_hex:0a1b2c3d4e5f")
@@ -96,7 +97,10 @@ class CredentialExtractorsTest(TestCase):
         )
         results = extract_opt_lsa_credentials(lines, self.ip_map)
         self.assertEqual(len(results), 1)
-        self.assertEqual(results[0]["hash"], "aad3b435b51404eeaad3b435b51404ee:dbd13e1c4e338284ac4e9874f7de6ef4")
+        self.assertEqual(
+            results[0]["hash"],
+            "aad3b435b51404eeaad3b435b51404ee:dbd13e1c4e338284ac4e9874f7de6ef4",
+        )
 
     def test_lsa_cleartext_password(self):
         lines = self._lines("NORTH\\goadmin:SecretPassword123")
@@ -107,7 +111,9 @@ class CredentialExtractorsTest(TestCase):
         self.assertNotIn("hash", results[0])
 
     def test_lsa_skips_dpapi_keys(self):
-        lines = self._lines("dpapi_machinekey:0xabcdef1234567890abcdef1234567890abcdef12")
+        lines = self._lines(
+            "dpapi_machinekey:0xabcdef1234567890abcdef1234567890abcdef12"
+        )
         results = extract_opt_lsa_credentials(lines, self.ip_map)
         self.assertEqual(results, [])
 
@@ -261,7 +267,9 @@ class CredentialExtractorsTest(TestCase):
         self.assertIn("$krb5asrep$", results[0]["hash"])
 
     def test_asreproast_deduplication(self):
-        line = "$krb5asrep$23$brandon.stark@NORTH.SEVENKINGDOMS.LOCAL:1ae83ac0abcdef1234"
+        line = (
+            "$krb5asrep$23$brandon.stark@NORTH.SEVENKINGDOMS.LOCAL:1ae83ac0abcdef1234"
+        )
         lines = self._lines(line, line)
         results = extract_opt_asreproast_accounts(lines, self.ip_map)
         self.assertEqual(len(results), 1)

@@ -15,11 +15,8 @@ from pyoaev.security_domain.types import SecurityDomains
 from netexec.contracts.base_fields import build_protocol_base_fields
 from netexec.contracts.contract_outputs import build_outputs_for_types
 from netexec.contracts.output_registry import get_module_output_types
-from netexec.contracts.protocol_config import SUPPORTED_PROTOCOLS, build_command_template
-from netexec.modules_registry import (
-    get_modules_for_protocol,
-    safe_module_key,
-)
+from netexec.contracts.protocol_config import SUPPORTED_PROTOCOLS
+from netexec.modules_registry import get_modules_for_protocol, safe_module_key
 
 
 def _build_module_option_fields(module: dict) -> List[ContractElement]:

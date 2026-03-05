@@ -20,7 +20,6 @@ from injector_common.constants import (
     TARGETS_KEY,
 )
 from injector_common.targets import TargetProperty, target_property_choices_dict
-
 from netexec.contracts.protocol_config import PROTOCOL_CONFIGS
 
 # Credential field definitions keyed by their field name.
