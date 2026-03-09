@@ -1,0 +1,10 @@
+services:
+  injector-netexec:
+    image: openaev/injector-netexec:latest
+    environment:
+      - OPENAEV_URL=${OPENAEV_URL}
+      - OPENAEV_TOKEN=${OPENAEV_TOKEN}
+      - INJECTOR_ID=${INJECTOR_ID}
+      - INJECTOR_NAME=${INJECTOR_NAME}
+      - INJECTOR_LOG_LEVEL=${INJECTOR_LOG_LEVEL}
+    restart: always

@@ -1,0 +1,47 @@
+[project]
+name = "openaev-netexec-injector"
+version = "2.1.7"
+description = "An injector for network execution and credential testing with NetExec"
+license = "Apache-2.0"
+readme = "README.md"
+authors = [
+    { name = "Filigran", email = "contact@filigran.io" },
+]
+requires-python = ">=3.11,<4.0"
+dependencies = [
+    "pyoaev (==2.1.6); extra != 'dev'",
+    "injector_common @ ../injector_common",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pyoaev @ ../../client-python",
+]
+
+[tool.poetry]
+packages = [
+    { include = "netexec" }
+]
+
+[tool.poetry.dependencies]
+pyoaev = [
+    { markers = "extra != 'dev'", source = "PyPI" },
+    { markers = "extra == 'dev'", develop = true },
+]
+injector_common = { develop = true }
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.setuptools.package-data]
+netexec = ["img/*.png"]
+
+[tool.isort]
+profile = "black"
+known_local_folder = ["netexec"]
+
+[tool.cmw]
+install-command = "poetry install"
+config-dump-command = "poetry run python -m netexec.openaev_netexec --dump-config-schema"
+icon-path = "netexec/img/icon-netexec.png"
