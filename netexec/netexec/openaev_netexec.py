@@ -143,15 +143,22 @@ class OpenAEVNetExecInjector:
 
         # Read and append temp output file for options that write to a file
         output_file = parsed_data.get("output_file") if parsed_data else None
-        if output_file:
-            try:
-                with open(output_file, "r", encoding="utf-8", errors="replace") as f:
-                    file_content = f.read()
-                if file_content.strip():
-                    stdout = stdout.rstrip("\n") + "\n" + file_content
-            except FileNotFoundError:
-                pass
-            finally:
+        try:
+            stdout, stderr, returncode = execute_netexec(cmd)
+
+            # Read and append temp output file for options that write to a file
+            if output_file:
+                try:
+                    with open(
+                        output_file, "r", encoding="utf-8", errors="replace"
+                    ) as f:
+                        file_content = f.read()
+                    if file_content.strip():
+                        stdout = stdout.rstrip("\n") + "\n" + file_content
+                except FileNotFoundError:
+                    pass
+        finally:
+            if output_file:
                 try:
                     os.remove(output_file)
                 except OSError:
