@@ -3,12 +3,12 @@ import os
 import time
 from importlib.resources import files
 
+from pyoaev.helpers import OpenAEVConfigHelper, OpenAEVInjectorHelper
+
 from injector_common.constants import TARGET_PROPERTY_SELECTOR_KEY, TARGET_SELECTOR_KEY
 from injector_common.data_helpers import DataHelpers
 from injector_common.dump_config import intercept_dump_argument
 from injector_common.targets import TargetProperty, Targets
-from pyoaev.helpers import OpenAEVConfigHelper, OpenAEVInjectorHelper
-
 from netexec.configuration.config_loader import ConfigLoader
 from netexec.contracts import parse_contract_id
 from netexec.helpers.netexec_command_builder import (
@@ -196,7 +196,6 @@ class OpenAEVNetExecInjector:
                 execution_message = (
                     f"NetExec failed:\n{stderr or stdout or 'No error output'}"
                 )
-
 
             callback_data = {
                 "execution_message": execution_message,
