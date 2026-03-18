@@ -1,7 +1,5 @@
 """Family 1 -- Base protocol contracts (one per protocol)."""
 
-from typing import List
-
 from pyoaev.contracts import ContractBuilder
 from pyoaev.contracts.contract_config import (
     Contract,
@@ -46,6 +44,6 @@ def _build_base_contract(protocol: str, config: ContractConfig) -> Contract:
     )
 
 
-def build_base_contracts(config: ContractConfig) -> List[Contract]:
+def build_base_contracts(config: ContractConfig) -> list[Contract]:
     """Generate one base contract per supported protocol."""
     return [_build_base_contract(proto, config) for proto in SUPPORTED_PROTOCOLS]

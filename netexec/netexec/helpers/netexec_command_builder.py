@@ -1,7 +1,6 @@
 """Command builder for NetExec CLI invocations."""
 
 import uuid
-from typing import Dict, List, Optional, Union
 
 from netexec.contracts.protocol_config import PROTOCOL_CONFIGS, get_option_flag
 from netexec.modules_registry import get_module_by_safe_key
@@ -13,11 +12,11 @@ OPTIONS_REQUIRING_OUTPUT_FILE = {"asreproast", "kerberoasting"}
 
 def build_command(
     protocol: str,
-    targets: List[str],
-    credentials: Optional[Dict[str, str]] = None,
-    options: Optional[Union[str, List[str]]] = None,
-    extra_args: Optional[List[str]] = None,
-) -> List[str]:
+    targets: list[str],
+    credentials: dict[str, str] | None = None,
+    options: str | list[str] | None = None,
+    extra_args: list[str] | None = None,
+) -> list[str]:
     if not targets:
         raise ValueError(
             f"At least one target is required for {protocol.upper()} command"
@@ -50,7 +49,7 @@ def build_command(
     return cmd
 
 
-def build_command_version() -> List[str]:
+def build_command_version() -> list[str]:
     return ["netexec", "--version"]
 
 
@@ -59,8 +58,8 @@ def build_command_version() -> List[str]:
 # ---------------------------------------------------------------------------
 
 
-def _extract_credentials(content: Dict) -> Optional[Dict[str, str]]:
-    credentials: Dict[str, str] = {}
+def _extract_credentials(content: dict) -> dict[str, str] | None:
+    credentials: dict[str, str] = {}
     for key in ("username", "password", "hash", "domain", "key_file"):
         value = content.get(key)
         if value:
@@ -68,7 +67,7 @@ def _extract_credentials(content: Dict) -> Optional[Dict[str, str]]:
     return credentials or None
 
 
-def _extract_port_args(content: Dict) -> List[str]:
+def _extract_port_args(content: dict) -> list[str]:
     port = content.get("port")
     if port:
         return ["--port", str(port)]
@@ -80,21 +79,19 @@ def _extract_port_args(content: Dict) -> List[str]:
 # ---------------------------------------------------------------------------
 
 
-def extract_data_base(content: Dict, protocol: str) -> Optional[Dict]:
+def extract_data_base(content: dict, protocol: str) -> dict | None:
     """Extract form data for a **base protocol** contract (Family 1).
 
     Handles credentials, port, and protocol-specific extra fields
     (command, ps_command, query, wmi_query).
     """
-    data: Dict = {}
+    data: dict = {}
 
     creds = _extract_credentials(content)
     if creds:
         data["credentials"] = creds
 
-    extra_args: List[str] = _extract_port_args(content)
-
-    # Protocol-specific extra fields
+    extra_args: list[str] = _extract_port_args(content)
     proto_config = PROTOCOL_CONFIGS[protocol]
     for ef in proto_config["base_extra_fields"]:
         value = content.get(ef["key"])
@@ -107,14 +104,14 @@ def extract_data_base(content: Dict, protocol: str) -> Optional[Dict]:
     return data or None
 
 
-def extract_data_option(content: Dict, protocol: str, option_id: str) -> Optional[Dict]:
+def extract_data_option(content: dict, protocol: str, option_id: str) -> dict | None:
     """Extract form data for a **protocol + option** contract (Family 2).
 
     The CLI flag is derived from *option_id* -- it is not in the form content.
     Options in ``OPTIONS_REQUIRING_OUTPUT_FILE`` get an auto-generated temp
     file path appended as argument (e.g. ``--asreproast /tmp/nxc_asreproast_xxxx.txt``).
     """
-    data: Dict = {}
+    data: dict = {}
 
     creds = _extract_credentials(content)
     if creds:
@@ -136,18 +133,18 @@ def extract_data_option(content: Dict, protocol: str, option_id: str) -> Optiona
     return data or None
 
 
-def extract_data_module(content: Dict, protocol: str, safe_key: str) -> Optional[Dict]:
+def extract_data_module(content: dict, protocol: str, safe_key: str) -> dict | None:
     """Extract form data for a **protocol + module** contract (Family 3).
 
     The module name is recovered from *safe_key* via the modules registry.
     """
-    data: Dict = {}
+    data: dict = {}
 
     creds = _extract_credentials(content)
     if creds:
         data["credentials"] = creds
 
-    extra_args: List[str] = _extract_port_args(content)
+    extra_args: list[str] = _extract_port_args(content)
 
     # Resolve module name
     mod = get_module_by_safe_key(protocol, safe_key)
@@ -160,7 +157,7 @@ def extract_data_module(content: Dict, protocol: str, safe_key: str) -> Optional
 
     # Per-module option fields (keys: mo_<safe_key>_<OPTION>)
     prefix = f"mo_{safe_key}_"
-    module_opts: List[str] = []
+    module_opts: list[str] = []
     for key, value in content.items():
         if key.startswith(prefix) and value:
             opt_name = key[len(prefix) :]

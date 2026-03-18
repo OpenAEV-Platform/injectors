@@ -1,14 +1,13 @@
 import subprocess
-from typing import Optional, Tuple
 
 DEFAULT_TIMEOUT = 300  # 5 minutes
 
 
 def execute_netexec(
     cmd: list[str],
-    input_data: Optional[str] = None,
+    input_data: str | None = None,
     timeout: int = DEFAULT_TIMEOUT,
-) -> Tuple[str, str, int]:
+) -> tuple[str, str, int]:
     kwargs = {
         "capture_output": True,
         "check": False,

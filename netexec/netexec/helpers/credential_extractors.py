@@ -1,6 +1,6 @@
 """Per-contract credential extractors for NetExec output parsing.
 
-Each extractor is a callable: (finding_lines, ip_to_asset_id_map) -> List[Dict]
+Each extractor is a callable: (finding_lines, ip_to_asset_id_map) -> list[dict]
 
 IMPORTANT: Every contract MUST have its own dedicated extractor function.
 Never share an extractor between contracts — even if the regex is identical
@@ -17,7 +17,6 @@ New extractors are added here -- either manually or via the
 """
 
 import re
-from typing import Dict, List, Optional, Tuple
 
 # ---------------------------------------------------------------------------
 # Helper used internally by extractor functions (NOT shared as an extractor)
@@ -25,15 +24,15 @@ from typing import Dict, List, Optional, Tuple
 
 
 def _extract_password_from_description(
-    finding_lines: List[Tuple[str, str, str]],
-    ip_to_asset_id_map: Dict,
+    finding_lines: list[tuple[str, str, str]],
+    ip_to_asset_id_map: dict,
     password_re: re.Pattern,
     username_re: re.Pattern,
-) -> List[Dict]:
+) -> list[dict]:
     """Internal helper — extracts credentials from lines matching the given
     password and username regexes. Each extractor function calls this with
     its own compiled patterns."""
-    results: List[Dict] = []
+    results: list[dict] = []
     for ip, hostname, rest in finding_lines:
         m = password_re.search(rest)
         if not m:
@@ -47,7 +46,7 @@ def _extract_password_from_description(
         if user_match:
             username = user_match.group(1)
 
-        credential: Dict = {
+        credential: dict = {
             "username": username,
             "password": password.strip(),
             "host": ip,
@@ -64,9 +63,9 @@ def _extract_password_from_description(
 
 
 def extract_no_credentials(
-    finding_lines: List[Tuple[str, str, str]],
-    ip_to_asset_id_map: Dict,
-) -> List[Dict]:
+    finding_lines: list[tuple[str, str, str]],
+    ip_to_asset_id_map: dict,
+) -> list[dict]:
     """Explicitly produce no credentials.
 
     Used for contracts whose output format is not yet analysed, or that
@@ -111,9 +110,9 @@ _OPT_USERS_USER_RE = re.compile(r"^\s*(\S+)\s+\d{4}-\d{2}-\d{2}")
 
 
 def extract_opt_users_credentials(
-    finding_lines: List[Tuple[str, str, str]],
-    ip_to_asset_id_map: Dict,
-) -> List[Dict]:
+    finding_lines: list[tuple[str, str, str]],
+    ip_to_asset_id_map: dict,
+) -> list[dict]:
     """Extract credentials from ``--users`` option output.
 
     Line format::
@@ -136,9 +135,9 @@ def extract_opt_users_credentials(
 
 
 def extract_opt_active_users_credentials(
-    finding_lines: List[Tuple[str, str, str]],
-    ip_to_asset_id_map: Dict,
-) -> List[Dict]:
+    finding_lines: list[tuple[str, str, str]],
+    ip_to_asset_id_map: dict,
+) -> list[dict]:
     """``--active-users`` — no credential extraction."""
     return []
 
@@ -152,9 +151,9 @@ _MOD_GET_DESC_USERS_USER_RE = re.compile(r"(?i)User:\s*(\S+)")
 
 
 def extract_mod_get_desc_users_credentials(
-    finding_lines: List[Tuple[str, str, str]],
-    ip_to_asset_id_map: Dict,
-) -> List[Dict]:
+    finding_lines: list[tuple[str, str, str]],
+    ip_to_asset_id_map: dict,
+) -> list[dict]:
     """Extract credentials from ``get-desc-users`` module output.
 
     Line format::
@@ -177,9 +176,9 @@ _MOD_USER_DESC_USER_RE = re.compile(r"(?i)User:\s*(\S+)")
 
 
 def extract_mod_user_desc_credentials(
-    finding_lines: List[Tuple[str, str, str]],
-    ip_to_asset_id_map: Dict,
-) -> List[Dict]:
+    finding_lines: list[tuple[str, str, str]],
+    ip_to_asset_id_map: dict,
+) -> list[dict]:
     """Extract credentials from ``user-desc`` module output.
 
     Line format::
@@ -200,20 +199,20 @@ def extract_mod_user_desc_credentials(
 
 
 def extract_opt_sam_credentials(
-    finding_lines: List[Tuple[str, str, str]],
-    ip_to_asset_id_map: Dict,
-) -> List[Dict]:
+    finding_lines: list[tuple[str, str, str]],
+    ip_to_asset_id_map: dict,
+) -> list[dict]:
     """Extract credentials from ``--sam`` option output.
 
     Line format::
         Administrator:500:aad3b435b51404eeaad3b435b51404ee:dbd13e1c4e338284ac4e9874f7de6ef4:::
     """
-    results: List[Dict] = []
+    results: list[dict] = []
     for ip, hostname, rest in finding_lines:
         m = _NTLM_HASH_DUMP_RE.match(rest)
         if not m:
             continue
-        credential: Dict = {
+        credential: dict = {
             "username": m.group("username"),
             "hash": f"{m.group('lm_hash')}:{m.group('nt_hash')}",
             "host": ip,
@@ -267,9 +266,9 @@ _OPT_LSA_SKIP_RE = re.compile(r"^(?:dpapi_(?:machinekey|userkey):|\[\+\])")
 
 
 def extract_opt_lsa_credentials(
-    finding_lines: List[Tuple[str, str, str]],
-    ip_to_asset_id_map: Dict,
-) -> List[Dict]:
+    finding_lines: list[tuple[str, str, str]],
+    ip_to_asset_id_map: dict,
+) -> list[dict]:
     """Extract credentials from ``--lsa`` option output.
 
     Handles multiple formats in sequence:
@@ -280,13 +279,13 @@ def extract_opt_lsa_credentials(
 
     Skips dpapi_machinekey/dpapi_userkey and info lines.
     """
-    results: List[Dict] = []
+    results: list[dict] = []
     for ip, hostname, rest in finding_lines:
         # Skip dpapi keys and info lines
         if _OPT_LSA_SKIP_RE.match(rest):
             continue
 
-        credential: Optional[Dict] = None
+        credential: dict | None = None
 
         # 1. Kerberos key
         m = _OPT_LSA_KERBEROS_RE.match(rest)
@@ -352,20 +351,20 @@ def extract_opt_lsa_credentials(
 
 
 def extract_opt_ntds_credentials(
-    finding_lines: List[Tuple[str, str, str]],
-    ip_to_asset_id_map: Dict,
-) -> List[Dict]:
+    finding_lines: list[tuple[str, str, str]],
+    ip_to_asset_id_map: dict,
+) -> list[dict]:
     """Extract credentials from ``--ntds`` option output.
 
     Line format::
         goadmin:500:aad3b435b51404eeaad3b435b51404ee:dbd13e1c4e338284ac4e9874f7de6ef4:::
     """
-    results: List[Dict] = []
+    results: list[dict] = []
     for ip, hostname, rest in finding_lines:
         m = _NTLM_HASH_DUMP_RE.match(rest)
         if not m:
             continue
-        credential: Dict = {
+        credential: dict = {
             "username": m.group("username"),
             "hash": f"{m.group('lm_hash')}:{m.group('nt_hash')}",
             "host": ip,
@@ -390,15 +389,15 @@ _OPT_ASREPROAST_RE = re.compile(
 
 
 def extract_opt_asreproast_accounts(
-    finding_lines: List[Tuple[str, str, str]],
-    ip_to_asset_id_map: Dict,
-) -> List[Dict]:
+    finding_lines: list[tuple[str, str, str]],
+    ip_to_asset_id_map: dict,
+) -> list[dict]:
     """Extract AS-REP roastable accounts from ``--asreproast`` option output.
 
     Line format::
         $krb5asrep$23$brandon.stark@NORTH.SEVENKINGDOMS.LOCAL:salt$hash
     """
-    results: List[Dict] = []
+    results: list[dict] = []
     seen: set = set()
     for ip, hostname, rest in finding_lines:
         m = _OPT_ASREPROAST_RE.match(rest)
@@ -409,7 +408,7 @@ def extract_opt_asreproast_accounts(
         if hash_val in seen:
             continue
         seen.add(hash_val)
-        finding: Dict = {
+        finding: dict = {
             "username": m.group("username"),
             "hash": hash_val,
             "host": ip,
@@ -435,15 +434,15 @@ _OPT_KERBEROASTING_RE = re.compile(
 
 
 def extract_opt_kerberoasting_accounts(
-    finding_lines: List[Tuple[str, str, str]],
-    ip_to_asset_id_map: Dict,
-) -> List[Dict]:
+    finding_lines: list[tuple[str, str, str]],
+    ip_to_asset_id_map: dict,
+) -> list[dict]:
     """Extract Kerberoastable accounts from ``--kerberoasting`` option output.
 
     Line format::
         $krb5tgs$23$*username$REALM$spn*$salt$hash
     """
-    results: List[Dict] = []
+    results: list[dict] = []
     seen: set = set()
     for ip, hostname, rest in finding_lines:
         m = _OPT_KERBEROASTING_RE.match(rest)
@@ -453,7 +452,7 @@ def extract_opt_kerberoasting_accounts(
         if hash_val in seen:
             continue
         seen.add(hash_val)
-        finding: Dict = {
+        finding: dict = {
             "username": m.group("username"),
             "hash": hash_val,
             "host": ip,
@@ -476,20 +475,20 @@ _MOD_DPAPI_HASH_RE = re.compile(r"^(?P<username>[^:]+):(?P<hash>\$DPAPImk\$.+)\s
 
 
 def extract_mod_dpapi_hash_credentials(
-    finding_lines: List[Tuple[str, str, str]],
-    ip_to_asset_id_map: Dict,
-) -> List[Dict]:
+    finding_lines: list[tuple[str, str, str]],
+    ip_to_asset_id_map: dict,
+) -> list[dict]:
     """Extract credentials from ``dpapi_hash`` module output.
 
     Line format::
         goadmin:$DPAPImk$1*1*S-1-5-21-...*des3*sha1*18000*salt*208*hash
     """
-    results: List[Dict] = []
+    results: list[dict] = []
     for ip, hostname, rest in finding_lines:
         m = _MOD_DPAPI_HASH_RE.match(rest)
         if not m:
             continue
-        credential: Dict = {
+        credential: dict = {
             "username": m.group("username"),
             "hash": m.group("hash"),
             "host": ip,
@@ -515,21 +514,21 @@ def extract_mod_dpapi_hash_credentials(
 
 
 def extract_opt_users_usernames(
-    finding_lines: List[Tuple[str, str, str]],
-    ip_to_asset_id_map: Dict,
-) -> List[Dict]:
+    finding_lines: list[tuple[str, str, str]],
+    ip_to_asset_id_map: dict,
+) -> list[dict]:
     """Extract usernames from ``--users`` option output.
 
     Line format::
         goadmin                       2026-02-17 09:40:12 0       Built-in account ...
         Guest                         <never>             0       Built-in account ...
     """
-    results: List[Dict] = []
+    results: list[dict] = []
     for ip, hostname, rest in finding_lines:
         m = _USERS_LISTING_RE.match(rest)
         if not m:
             continue
-        finding: Dict = {
+        finding: dict = {
             "username": m.group("username"),
             "host": ip,
             "hostname": hostname,
@@ -550,20 +549,20 @@ def extract_opt_users_usernames(
 
 
 def extract_opt_active_users_usernames(
-    finding_lines: List[Tuple[str, str, str]],
-    ip_to_asset_id_map: Dict,
-) -> List[Dict]:
+    finding_lines: list[tuple[str, str, str]],
+    ip_to_asset_id_map: dict,
+) -> list[dict]:
     """Extract usernames from ``--active-users`` option output.
 
     Line format::
         arya.stark                    2025-12-11 11:32:45 0        Arya Stark
     """
-    results: List[Dict] = []
+    results: list[dict] = []
     for ip, hostname, rest in finding_lines:
         m = _USERS_LISTING_RE.match(rest)
         if not m:
             continue
-        finding: Dict = {
+        finding: dict = {
             "username": m.group("username"),
             "host": ip,
             "hostname": hostname,
@@ -588,9 +587,9 @@ _OPT_RID_BRUTE_USERNAME_RE = re.compile(
 
 
 def extract_opt_rid_brute_usernames(
-    finding_lines: List[Tuple[str, str, str]],
-    ip_to_asset_id_map: Dict,
-) -> List[Dict]:
+    finding_lines: list[tuple[str, str, str]],
+    ip_to_asset_id_map: dict,
+) -> list[dict]:
     """Extract usernames from ``--rid-brute`` option output.
 
     Line format::
@@ -599,12 +598,12 @@ def extract_opt_rid_brute_usernames(
 
     Only SidTypeUser entries are extracted.
     """
-    results: List[Dict] = []
+    results: list[dict] = []
     for ip, hostname, rest in finding_lines:
         m = _OPT_RID_BRUTE_USERNAME_RE.match(rest)
         if not m:
             continue
-        finding: Dict = {
+        finding: dict = {
             "username": m.group("username"),
             "domain": m.group("domain"),
             "rid": m.group("rid"),
@@ -630,20 +629,20 @@ _OPT_LOGGEDON_USERS_USERNAME_RE = re.compile(
 
 
 def extract_opt_loggedon_users_usernames(
-    finding_lines: List[Tuple[str, str, str]],
-    ip_to_asset_id_map: Dict,
-) -> List[Dict]:
+    finding_lines: list[tuple[str, str, str]],
+    ip_to_asset_id_map: dict,
+) -> list[dict]:
     """Extract usernames from ``--loggedon-users`` option output.
 
     Line format::
         NORTH\\goadmin                   logon_server: WINTERFELL
     """
-    results: List[Dict] = []
+    results: list[dict] = []
     for ip, hostname, rest in finding_lines:
         m = _OPT_LOGGEDON_USERS_USERNAME_RE.match(rest)
         if not m:
             continue
-        finding: Dict = {
+        finding: dict = {
             "username": m.group("username"),
             "domain": m.group("domain"),
             "host": ip,
@@ -675,9 +674,9 @@ _OPT_SHARES_RE = re.compile(
 
 
 def extract_opt_shares_shares(
-    finding_lines: List[Tuple[str, str, str]],
-    ip_to_asset_id_map: Dict,
-) -> List[Dict]:
+    finding_lines: list[tuple[str, str, str]],
+    ip_to_asset_id_map: dict,
+) -> list[dict]:
     """Extract shares from ``--shares`` option output.
 
     Line format::
@@ -688,7 +687,7 @@ def extract_opt_shares_shares(
     Administrative shares (ending with ``$``) are excluded.
     Shares with no permissions are excluded.
     """
-    results: List[Dict] = []
+    results: list[dict] = []
     for ip, hostname, rest in finding_lines:
         m = _OPT_SHARES_RE.match(rest)
         if not m:
@@ -697,7 +696,7 @@ def extract_opt_shares_shares(
         # Skip administrative shares (ending with $)
         if share_name.endswith("$"):
             continue
-        finding: Dict = {
+        finding: dict = {
             "share_name": share_name,
             "permissions": m.group("permissions"),
             "host": ip,
@@ -726,21 +725,21 @@ _OPT_ADMIN_COUNT_RE = re.compile(r"^(?P<username>\S+)\s*$")
 
 
 def extract_opt_admin_count_admin_usernames(
-    finding_lines: List[Tuple[str, str, str]],
-    ip_to_asset_id_map: Dict,
-) -> List[Dict]:
+    finding_lines: list[tuple[str, str, str]],
+    ip_to_asset_id_map: dict,
+) -> list[dict]:
     """Extract admin usernames from ``--admin-count`` option output.
 
     Line format::
         goadmin
         ansible
     """
-    results: List[Dict] = []
+    results: list[dict] = []
     for ip, hostname, rest in finding_lines:
         m = _OPT_ADMIN_COUNT_RE.match(rest)
         if not m:
             continue
-        finding: Dict = {
+        finding: dict = {
             "username": m.group("username"),
             "host": ip,
             "hostname": hostname,
@@ -767,21 +766,21 @@ _OPT_LOCAL_GROUPS_RE = re.compile(r"^(?P<rid>\d+)\s+-\s+(?P<group_name>.+?)\s*$"
 
 
 def extract_opt_local_groups_groups(
-    finding_lines: List[Tuple[str, str, str]],
-    ip_to_asset_id_map: Dict,
-) -> List[Dict]:
+    finding_lines: list[tuple[str, str, str]],
+    ip_to_asset_id_map: dict,
+) -> list[dict]:
     """Extract groups from ``--local-groups`` option output.
 
     Line format::
         546 - Guests
         544 - Administrators
     """
-    results: List[Dict] = []
+    results: list[dict] = []
     for ip, hostname, rest in finding_lines:
         m = _OPT_LOCAL_GROUPS_RE.match(rest)
         if not m:
             continue
-        finding: Dict = {
+        finding: dict = {
             "group_name": m.group("group_name"),
             "rid": m.group("rid"),
             "host": ip,
@@ -806,21 +805,21 @@ _OPT_GROUPS_RE = re.compile(
 
 
 def extract_opt_groups_groups(
-    finding_lines: List[Tuple[str, str, str]],
-    ip_to_asset_id_map: Dict,
-) -> List[Dict]:
+    finding_lines: list[tuple[str, str, str]],
+    ip_to_asset_id_map: dict,
+) -> list[dict]:
     """Extract groups from ``--groups`` option output.
 
     Line format::
         Domain Admins                            membercount: 3
         Stark                                    membercount: 9
     """
-    results: List[Dict] = []
+    results: list[dict] = []
     for ip, hostname, rest in finding_lines:
         m = _OPT_GROUPS_RE.match(rest)
         if not m:
             continue
-        finding: Dict = {
+        finding: dict = {
             "group_name": m.group("group_name"),
             "member_count": int(m.group("member_count")),
             "host": ip,
@@ -848,21 +847,21 @@ _OPT_COMPUTERS_RE = re.compile(r"^(?P<computer_name>\S+)\s*$")
 
 
 def extract_opt_computers_computers(
-    finding_lines: List[Tuple[str, str, str]],
-    ip_to_asset_id_map: Dict,
-) -> List[Dict]:
+    finding_lines: list[tuple[str, str, str]],
+    ip_to_asset_id_map: dict,
+) -> list[dict]:
     """Extract computer accounts from ``--computers`` option output.
 
     Line format::
         WINTERFELL$
         CASTELBLACK$
     """
-    results: List[Dict] = []
+    results: list[dict] = []
     for ip, hostname, rest in finding_lines:
         m = _OPT_COMPUTERS_RE.match(rest)
         if not m:
             continue
-        finding: Dict = {
+        finding: dict = {
             "computer_name": m.group("computer_name"),
             "host": ip,
             "hostname": hostname,
@@ -889,9 +888,9 @@ _OPT_PASS_POL_RE = re.compile(r"^(?P<key>[^:]+):\s*(?P<value>.+?)\s*$")
 
 
 def extract_opt_pass_pol_password_policy(
-    finding_lines: List[Tuple[str, str, str]],
-    ip_to_asset_id_map: Dict,
-) -> List[Dict]:
+    finding_lines: list[tuple[str, str, str]],
+    ip_to_asset_id_map: dict,
+) -> list[dict]:
     """Extract password policy settings from ``--pass-pol`` option output.
 
     Line format::
@@ -899,12 +898,12 @@ def extract_opt_pass_pol_password_policy(
         Account Lockout Threshold: 5
         Domain Password Complex: 0
     """
-    results: List[Dict] = []
+    results: list[dict] = []
     for ip, hostname, rest in finding_lines:
         m = _OPT_PASS_POL_RE.match(rest)
         if not m:
             continue
-        finding: Dict = {
+        finding: dict = {
             "key": m.group("key").strip(),
             "value": m.group("value"),
             "host": ip,
@@ -932,20 +931,20 @@ _OPT_TRUSTED_DELEG_RE = re.compile(r"^(?P<account>\S+)\s*$")
 
 
 def extract_opt_trusted_for_delegation_delegations(
-    finding_lines: List[Tuple[str, str, str]],
-    ip_to_asset_id_map: Dict,
-) -> List[Dict]:
+    finding_lines: list[tuple[str, str, str]],
+    ip_to_asset_id_map: dict,
+) -> list[dict]:
     """Extract delegation info from ``--trusted-for-delegation`` output.
 
     Line format::
         WINTERFELL$
     """
-    results: List[Dict] = []
+    results: list[dict] = []
     for ip, hostname, rest in finding_lines:
         m = _OPT_TRUSTED_DELEG_RE.match(rest)
         if not m:
             continue
-        finding: Dict = {
+        finding: dict = {
             "account": m.group("account"),
             "delegation_type": "Unconstrained",
             "host": ip,
@@ -977,21 +976,21 @@ _OPT_FIND_DELEG_RE = re.compile(
 
 
 def extract_opt_find_delegation_delegations(
-    finding_lines: List[Tuple[str, str, str]],
-    ip_to_asset_id_map: Dict,
-) -> List[Dict]:
+    finding_lines: list[tuple[str, str, str]],
+    ip_to_asset_id_map: dict,
+) -> list[dict]:
     """Extract delegation info from ``--find-delegation`` output.
 
     Line format::
         jon.snow     Person      Constrained w/ Protocol Transition CIFS/winterfell, ...
         CASTELBLACK$ Computer    Constrained                        HTTP/winterfell, ...
     """
-    results: List[Dict] = []
+    results: list[dict] = []
     for ip, hostname, rest in finding_lines:
         m = _OPT_FIND_DELEG_RE.match(rest)
         if not m:
             continue
-        finding: Dict = {
+        finding: dict = {
             "account": m.group("account"),
             "delegation_type": m.group("delegation_type").strip(),
             "rights_to": m.group("rights_to").strip(),
@@ -1020,20 +1019,20 @@ _OPT_GET_SID_RE = re.compile(r"^Domain SID\s+(?P<sid>S-\d+-\d+-\d+(?:-\d+)+)\s*$
 
 
 def extract_opt_get_sid_sids(
-    finding_lines: List[Tuple[str, str, str]],
-    ip_to_asset_id_map: Dict,
-) -> List[Dict]:
+    finding_lines: list[tuple[str, str, str]],
+    ip_to_asset_id_map: dict,
+) -> list[dict]:
     """Extract domain SID from ``--get-sid`` option output.
 
     Line format::
         Domain SID S-1-5-21-3455315044-2247855524-2949207569
     """
-    results: List[Dict] = []
+    results: list[dict] = []
     for ip, hostname, rest in finding_lines:
         m = _OPT_GET_SID_RE.match(rest)
         if not m:
             continue
-        finding: Dict = {
+        finding: dict = {
             "sid": m.group("sid"),
             "host": ip,
             "hostname": hostname,
@@ -1062,21 +1061,21 @@ _OPT_PW_NOT_REQUIRED_RE = re.compile(
 
 
 def extract_opt_password_not_required_accounts(
-    finding_lines: List[Tuple[str, str, str]],
-    ip_to_asset_id_map: Dict,
-) -> List[Dict]:
+    finding_lines: list[tuple[str, str, str]],
+    ip_to_asset_id_map: dict,
+) -> list[dict]:
     """Extract accounts with PASSWD_NOTREQD flag from ``--password-not-required``.
 
     Line format::
         User: SEVENKINGDOMS$ Status: enabled
         User: Guest Status: disabled
     """
-    results: List[Dict] = []
+    results: list[dict] = []
     for ip, hostname, rest in finding_lines:
         m = _OPT_PW_NOT_REQUIRED_RE.match(rest)
         if not m:
             continue
-        finding: Dict = {
+        finding: dict = {
             "account": m.group("account"),
             "status": m.group("status"),
             "host": ip,
@@ -1118,22 +1117,22 @@ _MOD_SPOOLER_RE = re.compile(
 
 
 def extract_mod_spooler_vulnerabilities(
-    finding_lines: List[Tuple[str, str, str]],
-    ip_to_asset_id_map: Dict,
-) -> List[Dict]:
+    finding_lines: list[tuple[str, str, str]],
+    ip_to_asset_id_map: dict,
+) -> list[dict]:
     """Extract vulnerability info from ``spooler`` module output.
 
     Line format::
         Spooler service enabled
     """
-    results: List[Dict] = []
+    results: list[dict] = []
     for ip, hostname, rest in finding_lines:
         m = _MOD_SPOOLER_RE.match(rest)
         if not m:
             continue
         if m.group("status") != "enabled":
             continue
-        finding: Dict = {
+        finding: dict = {
             "name": "Spooler",
             "status": "VULNERABLE",
             "details": m.group("details"),
@@ -1159,22 +1158,22 @@ _MOD_COERCE_PLUS_RE = re.compile(
 
 
 def extract_mod_coerce_plus_vulnerabilities(
-    finding_lines: List[Tuple[str, str, str]],
-    ip_to_asset_id_map: Dict,
-) -> List[Dict]:
+    finding_lines: list[tuple[str, str, str]],
+    ip_to_asset_id_map: dict,
+) -> list[dict]:
     """Extract vulnerability info from ``coerce_plus`` module output.
 
     Line format::
         VULNERABLE, PrinterBug
     """
-    results: List[Dict] = []
+    results: list[dict] = []
     for ip, hostname, rest in finding_lines:
         m = _MOD_COERCE_PLUS_RE.match(rest)
         if not m:
             continue
         if m.group("status") != "VULNERABLE":
             continue
-        finding: Dict = {
+        finding: dict = {
             "name": (
                 m.group("details").strip()
                 if m.group("details").strip()
@@ -1208,22 +1207,22 @@ _MOD_LDAP_CHECKER_BINDING_RE = re.compile(
 
 
 def extract_mod_ldap_checker_vulnerabilities(
-    finding_lines: List[Tuple[str, str, str]],
-    ip_to_asset_id_map: Dict,
-) -> List[Dict]:
+    finding_lines: list[tuple[str, str, str]],
+    ip_to_asset_id_map: dict,
+) -> list[dict]:
     """Extract vulnerability info from ``ldap-checker`` module output.
 
     Line formats::
         LDAP signing NOT enforced
         LDAPS channel binding is set to: Never
     """
-    results: List[Dict] = []
+    results: list[dict] = []
     for ip, hostname, rest in finding_lines:
         # LDAP signing
         m = _MOD_LDAP_CHECKER_SIGNING_RE.match(rest)
         if m:
             if m.group("status") == "NOT enforced":
-                finding: Dict = {
+                finding: dict = {
                     "name": "LDAP Signing",
                     "status": "VULNERABLE",
                     "details": "LDAP signing NOT enforced",

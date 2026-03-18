@@ -1,7 +1,5 @@
 """Family 3 -- Protocol + module contracts (one per module per protocol)."""
 
-from typing import List
-
 from pyoaev.contracts import ContractBuilder
 from pyoaev.contracts.contract_config import (
     Contract,
@@ -19,9 +17,9 @@ from netexec.contracts.protocol_config import SUPPORTED_PROTOCOLS
 from netexec.modules_registry import get_modules_for_protocol, safe_module_key
 
 
-def _build_module_option_fields(module: dict) -> List[ContractElement]:
+def _build_module_option_fields(module: dict) -> list[ContractElement]:
     """Build the per-module option fields + free-text fallback."""
-    fields: List[ContractElement] = []
+    fields: list[ContractElement] = []
     safe_name = safe_module_key(module["name"])
 
     for opt_name, opt_info in (module.get("options") or {}).items():
@@ -76,9 +74,9 @@ def _build_module_contract(
     )
 
 
-def build_module_contracts(config: ContractConfig) -> List[Contract]:
+def build_module_contracts(config: ContractConfig) -> list[Contract]:
     """Generate one contract per (protocol, module) pair."""
-    contracts: List[Contract] = []
+    contracts: list[Contract] = []
     for protocol in SUPPORTED_PROTOCOLS:
         modules = get_modules_for_protocol(protocol)
 

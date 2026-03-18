@@ -5,7 +5,7 @@ Public API:
 - ``parse_contract_id()``: parses a contract ID into protocol, family, identifier.
 """
 
-from typing import List, NamedTuple, Optional
+from typing import NamedTuple
 
 from pyoaev.contracts.contract_config import (
     Contract,
@@ -26,7 +26,7 @@ class ParsedContractId(NamedTuple):
 
     protocol: str
     family: str  # "base", "option", or "module"
-    identifier: Optional[str]  # option_id or safe_module_key; None for base
+    identifier: str | None  # option_id or safe_module_key; None for base
 
 
 def parse_contract_id(contract_id: str) -> ParsedContractId:
@@ -62,7 +62,7 @@ def parse_contract_id(contract_id: str) -> ParsedContractId:
     raise ValueError(f"Cannot determine contract family from ID: '{contract_id}'")
 
 
-def build_all_contracts() -> List[Contract]:
+def build_all_contracts() -> list[Contract]:
     """Build and return all NetExec contracts across the three families."""
     config = ContractConfig(
         type=CONTRACT_TYPE,
@@ -75,7 +75,7 @@ def build_all_contracts() -> List[Contract]:
         expose=True,
     )
 
-    all_contracts: List[Contract] = []
+    all_contracts: list[Contract] = []
     all_contracts.extend(build_base_contracts(config))
     all_contracts.extend(build_option_contracts(config))
     all_contracts.extend(build_module_contracts(config))

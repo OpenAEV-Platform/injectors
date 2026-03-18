@@ -1,7 +1,5 @@
 """Build ContractOutputElement lists based on output registry types."""
 
-from typing import List, Set
-
 from pyoaev.contracts import ContractBuilder
 from pyoaev.contracts.contract_config import ContractOutputElement, ContractOutputType
 
@@ -156,7 +154,7 @@ _TYPE_TO_ELEMENT = {
 }
 
 
-def build_outputs_for_types(output_types: Set[str]) -> List[ContractOutputElement]:
+def build_outputs_for_types(output_types: set[str]) -> list[ContractOutputElement]:
     """Return the built output list for a given set of output type keys."""
     if not output_types:
         return []

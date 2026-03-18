@@ -1,7 +1,11 @@
 """Factory functions for building shared contract fields across all families."""
 
-from typing import List
-
+from injector_common.constants import (
+    TARGET_PROPERTY_SELECTOR_KEY,
+    TARGET_SELECTOR_KEY,
+    TARGETS_KEY,
+)
+from injector_common.targets import TargetProperty, target_property_choices_dict
 from pyoaev.contracts.contract_config import (
     ContractAsset,
     ContractAssetGroup,
@@ -14,12 +18,6 @@ from pyoaev.contracts.contract_config import (
 )
 from pyoaev.contracts.contract_utils import ContractCardinality
 
-from injector_common.constants import (
-    TARGET_PROPERTY_SELECTOR_KEY,
-    TARGET_SELECTOR_KEY,
-    TARGETS_KEY,
-)
-from injector_common.targets import TargetProperty, target_property_choices_dict
 from netexec.contracts.protocol_config import PROTOCOL_CONFIGS
 
 # Credential field definitions keyed by their field name.
@@ -32,10 +30,10 @@ _CREDENTIAL_DEFS = {
 }
 
 
-def build_credential_fields(protocol: str) -> List[ContractElement]:
+def build_credential_fields(protocol: str) -> list[ContractElement]:
     """Return credential ContractText fields for *protocol*."""
     config = PROTOCOL_CONFIGS[protocol]
-    fields: List[ContractElement] = []
+    fields: list[ContractElement] = []
     for cred_key in config["credentials"]:
         defn = _CREDENTIAL_DEFS[cred_key]
         fields.append(ContractText(key=cred_key, label=defn["label"], mandatory=False))
@@ -53,7 +51,7 @@ def build_port_field(protocol: str) -> ContractText:
     )
 
 
-def build_core_fields() -> List[ContractElement]:
+def build_core_fields() -> list[ContractElement]:
     """Target selector, asset groups, manual targets, and expectations.
 
     Identical to the former ``NetExecContracts.core_contract_fields()``.
@@ -133,12 +131,12 @@ def build_core_fields() -> List[ContractElement]:
     ]
 
 
-def build_protocol_base_fields(protocol: str) -> List[ContractElement]:
+def build_protocol_base_fields(protocol: str) -> list[ContractElement]:
     """Assemble the shared fields present in **every** contract for *protocol*.
 
     Order: credentials -> port -> core (target selector, assets, expectations).
     """
-    fields: List[ContractElement] = []
+    fields: list[ContractElement] = []
     fields.extend(build_credential_fields(protocol))
     fields.append(build_port_field(protocol))
     fields.extend(build_core_fields())

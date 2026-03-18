@@ -2,14 +2,13 @@ import json
 import os
 import time
 from importlib.resources import files
-from typing import Dict, List
-
-from pyoaev.helpers import OpenAEVConfigHelper, OpenAEVInjectorHelper
 
 from injector_common.constants import TARGET_PROPERTY_SELECTOR_KEY, TARGET_SELECTOR_KEY
 from injector_common.data_helpers import DataHelpers
 from injector_common.dump_config import intercept_dump_argument
 from injector_common.targets import TargetProperty, Targets
+from pyoaev.helpers import OpenAEVConfigHelper, OpenAEVInjectorHelper
+
 from netexec.configuration.config_loader import ConfigLoader
 from netexec.contracts import parse_contract_id
 from netexec.helpers.netexec_command_builder import (
@@ -22,7 +21,6 @@ from netexec.helpers.netexec_command_builder import (
 from netexec.helpers.netexec_output_parser import NetExecOutputParser
 from netexec.helpers.netexec_process import execute_netexec
 
-
 _SENSITIVE_KEYS = {"password", "hash", "key_file", "username", "domain"}
 
 
@@ -34,7 +32,7 @@ def _redact_content(content: dict) -> dict:
 _CREDENTIAL_FLAGS = {"-u", "-p", "-H", "-d", "--key-file"}
 
 
-def _redact_cmd(cmd: List[str]) -> List[str]:
+def _redact_cmd(cmd: list[str]) -> list[str]:
     """Return a copy of cmd with credential values replaced by '***'."""
     redacted = []
     skip_next = False
@@ -74,7 +72,7 @@ class OpenAEVNetExecInjector:
             return
         self.helper.injector_logger.info("NetExec version: " + stdout.strip())
 
-    def execute(self, start: float, data: Dict) -> Dict:
+    def execute(self, start: float, data: dict) -> dict:
         inject_id = DataHelpers.get_inject_id(data)
         inject_contract = DataHelpers.get_injector_contract_id(data)
 
@@ -173,7 +171,7 @@ class OpenAEVNetExecInjector:
             "parsed": parse_result,
         }
 
-    def process_message(self, data: Dict) -> None:
+    def process_message(self, data: dict) -> None:
         start = time.time()
         inject_id = DataHelpers.get_inject_id(data)
 
@@ -199,12 +197,14 @@ class OpenAEVNetExecInjector:
                     f"NetExec failed:\n{stderr or stdout or 'No error output'}"
                 )
 
+
             callback_data = {
                 "execution_message": execution_message,
                 "execution_status": "SUCCESS" if result["success"] else "ERROR",
                 "execution_duration": int(time.time() - start),
                 "execution_action": "complete",
             }
+            breakpoint()
 
             callback_data["execution_output_structured"] = json.dumps(
                 parsed["outputs"] if parsed and parsed.get("outputs") else {}
@@ -217,7 +217,7 @@ class OpenAEVNetExecInjector:
 
         except Exception as e:
             self.helper.injector_logger.error(
-                "Execution failed for inject %s: %s", inject_id, e, exc_info=True
+                "Execution failed for inject %s: %s", inject_id, e
             )
             callback_data = {
                 "execution_message": str(e),

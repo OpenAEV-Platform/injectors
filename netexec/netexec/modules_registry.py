@@ -1,9 +1,7 @@
 """NetExec modules registry - maps all modules to their protocols and options."""
 
-from typing import Dict, List, Optional
 
-
-def _mod(name: str, label: str, protocols: List[str], options: Dict = None) -> Dict:
+def _mod(name: str, label: str, protocols: list[str], options: dict = None) -> dict:
     return {
         "name": name,
         "label": label,
@@ -12,14 +10,14 @@ def _mod(name: str, label: str, protocols: List[str], options: Dict = None) -> D
     }
 
 
-def _opt(desc: str, required: bool = False) -> Dict:
+def _opt(desc: str, required: bool = False) -> dict:
     return {"desc": desc, "required": required}
 
 
 # ---------------------------------------------------------------------------
 # Complete NetExec modules registry (sorted alphabetically)
 # ---------------------------------------------------------------------------
-NETEXEC_MODULES: List[Dict] = [
+NETEXEC_MODULES: list[dict] = [
     # ---- A ----
     _mod(
         "add-computer",
@@ -682,7 +680,7 @@ NETEXEC_MODULES: List[Dict] = [
 ]
 
 
-def get_modules_for_protocol(protocol: str) -> List[Dict]:
+def get_modules_for_protocol(protocol: str) -> list[dict]:
     """Return all modules that support the given protocol, sorted by name."""
     return sorted(
         [m for m in NETEXEC_MODULES if protocol in m["protocols"]],
@@ -695,7 +693,7 @@ def safe_module_key(name: str) -> str:
     return name.replace("-", "_").replace("+", "plus")
 
 
-def get_module_by_safe_key(protocol: str, safe_key: str) -> Optional[Dict]:
+def get_module_by_safe_key(protocol: str, safe_key: str) -> dict | None:
     """Look up a module by its safe_module_key for a given protocol.
 
     Returns ``None`` if no matching module is found.

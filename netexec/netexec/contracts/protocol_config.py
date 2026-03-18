@@ -1,17 +1,15 @@
 """Centralised protocol configuration for all NetExec contracts."""
 
-from typing import Dict, List
 
-
-def _opt(option_id: str, flag: str, label: str) -> Dict:
+def _opt(option_id: str, flag: str, label: str) -> dict:
     return {"id": option_id, "flag": flag, "label": label}
 
 
-def _extra(key: str, label: str, flag: str) -> Dict:
+def _extra(key: str, label: str, flag: str) -> dict:
     return {"key": key, "label": label, "flag": flag}
 
 
-PROTOCOL_CONFIGS: Dict[str, Dict] = {
+PROTOCOL_CONFIGS: dict[str, dict] = {
     "smb": {
         "default_port": "445",
         "credentials": ["username", "password", "hash", "domain"],
@@ -158,7 +156,7 @@ PROTOCOL_CONFIGS: Dict[str, Dict] = {
     },
 }
 
-SUPPORTED_PROTOCOLS: List[str] = list(PROTOCOL_CONFIGS.keys())
+SUPPORTED_PROTOCOLS: list[str] = list(PROTOCOL_CONFIGS.keys())
 
 
 def get_option_flag(protocol: str, option_id: str) -> str:

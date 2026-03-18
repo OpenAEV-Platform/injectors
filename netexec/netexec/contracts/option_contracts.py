@@ -1,7 +1,5 @@
 """Family 2 -- Protocol + option contracts (one per option per protocol)."""
 
-from typing import List
-
 from pyoaev.contracts import ContractBuilder
 from pyoaev.contracts.contract_config import (
     Contract,
@@ -39,9 +37,9 @@ def _build_option_contract(
     )
 
 
-def build_option_contracts(config: ContractConfig) -> List[Contract]:
+def build_option_contracts(config: ContractConfig) -> list[Contract]:
     """Generate one contract per (protocol, option) pair."""
-    contracts: List[Contract] = []
+    contracts: list[Contract] = []
     for protocol in SUPPORTED_PROTOCOLS:
         proto_config = PROTOCOL_CONFIGS[protocol]
         for option in proto_config["options"]:

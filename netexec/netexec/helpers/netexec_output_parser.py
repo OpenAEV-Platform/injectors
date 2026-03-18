@@ -8,7 +8,6 @@ Only data produced by modules / options qualifies as finding material.
 """
 
 import re
-from typing import Dict, List, Tuple
 
 from netexec.helpers.credential_extractors import (
     get_account_pw_not_required_extractor,
@@ -45,7 +44,7 @@ _LINE_PREFIX = re.compile(
 _AUTH_LINE = re.compile(r"\[\+\]\s+\S+\\\S+:\S+")
 
 
-def _parse_line(raw: str) -> Tuple[str, str, str, str]:
+def _parse_line(raw: str) -> tuple[str, str, str, str]:
     """Return (label, ip, hostname, rest) or ("", "", "", "") if unparseable."""
     m = _LINE_PREFIX.match(raw)
     if not m:
@@ -137,10 +136,10 @@ class NetExecOutputParser:
     def parse(
         self,
         stdout: str,
-        ip_to_asset_id_map: Dict = None,
+        ip_to_asset_id_map: dict = None,
         family: str = None,
         identifier: str = None,
-    ) -> Dict:
+    ) -> dict:
         """Parse netexec output and extract structured findings.
 
         Parameters
@@ -164,7 +163,7 @@ class NetExecOutputParser:
         lines = stdout.splitlines()
 
         # Collect module-output lines (skip auth, banners, errors, noise)
-        finding_lines: List[Tuple[str, str, str]] = []  # (ip, hostname, rest)
+        finding_lines: list[tuple[str, str, str]] = []  # (ip, hostname, rest)
         for raw in lines:
             label, ip, hostname, rest = _parse_line(raw)
             if not rest:
@@ -180,8 +179,8 @@ class NetExecOutputParser:
             finding_lines.append((ip, hostname, rest))
 
         # Run all registered dispatchers
-        outputs: Dict = {}
-        parts: List[str] = []
+        outputs: dict = {}
+        parts: list[str] = []
         for field_name, getter in _DISPATCHERS:
             results = _dispatch(
                 getter, finding_lines, ip_to_asset_id_map, family, identifier
