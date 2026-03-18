@@ -203,7 +203,6 @@ class OpenAEVNetExecInjector:
                 "execution_duration": int(time.time() - start),
                 "execution_action": "complete",
             }
-            breakpoint()
 
             callback_data["execution_output_structured"] = json.dumps(
                 parsed["outputs"] if parsed and parsed.get("outputs") else {}
