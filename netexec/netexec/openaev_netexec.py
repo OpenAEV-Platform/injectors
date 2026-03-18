@@ -101,14 +101,14 @@ class OpenAEVNetExecInjector:
             message = f"No target identified for the property {TargetProperty[selector_property.upper()].value}"
             raise ValueError(message)
 
-        if parsed.family == "base":
+        if contract_family == "base":
             parsed_data = extract_data_base(content, protocol)
-        elif parsed.family == "option":
-            parsed_data = extract_data_option(content, protocol, parsed.identifier)
-        elif parsed.family == "module":
-            parsed_data = extract_data_module(content, protocol, parsed.identifier)
+        elif contract_family == "option":
+            parsed_data = extract_data_option(content, protocol, contract_identifier)
+        elif contract_family == "module":
+            parsed_data = extract_data_module(content, protocol, contract_identifier)
         else:
-            raise ValueError(f"Unknown contract family: '{parsed.family}'")
+            raise ValueError(f"Unknown contract family: '{contract_family}'")
 
         credentials = parsed_data.get("credentials") if parsed_data else None
         options = parsed_data.get("options") if parsed_data else None
