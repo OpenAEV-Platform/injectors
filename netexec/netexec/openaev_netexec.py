@@ -2,7 +2,7 @@ import json
 import os
 import time
 from importlib.resources import files
-from typing import Dict
+from typing import Dict, List
 
 from pyoaev.helpers import OpenAEVConfigHelper, OpenAEVInjectorHelper
 
@@ -21,6 +21,33 @@ from netexec.helpers.netexec_command_builder import (
 )
 from netexec.helpers.netexec_output_parser import NetExecOutputParser
 from netexec.helpers.netexec_process import execute_netexec
+
+
+_SENSITIVE_KEYS = {"password", "hash", "key_file", "username", "domain"}
+
+
+def _redact_content(content: dict) -> dict:
+    """Return a shallow copy with sensitive values masked."""
+    return {k: "***" if k in _SENSITIVE_KEYS else v for k, v in content.items()}
+
+
+_CREDENTIAL_FLAGS = {"-u", "-p", "-H", "-d", "--key-file"}
+
+
+def _redact_cmd(cmd: List[str]) -> List[str]:
+    """Return a copy of cmd with credential values replaced by '***'."""
+    redacted = []
+    skip_next = False
+    for arg in cmd:
+        if skip_next:
+            redacted.append("***")
+            skip_next = False
+        elif arg in _CREDENTIAL_FLAGS:
+            redacted.append(arg)
+            skip_next = True
+        else:
+            redacted.append(arg)
+    return redacted
 
 
 class OpenAEVNetExecInjector:
@@ -87,7 +114,7 @@ class OpenAEVNetExecInjector:
         options = parsed_data.get("options") if parsed_data else None
         extra_args = parsed_data.get("extra_args") if parsed_data else None
 
-        self.helper.injector_logger.info("Data: " + str(content))
+        self.helper.injector_logger.info("Data: " + str(_redact_content(content)))
         cmd = build_command(
             protocol=protocol,
             targets=targets,
@@ -100,7 +127,7 @@ class OpenAEVNetExecInjector:
             "execution_message": Targets.build_execution_message(
                 selector_key=selector_key,
                 data=parsed_data,
-                command_args=cmd,
+                command_args=_redact_cmd(cmd),
             ),
             "execution_status": "INFO",
             "execution_duration": int(time.time() - start),
