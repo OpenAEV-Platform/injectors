@@ -59,7 +59,6 @@ class OpenAEVNetExecInjector:
         icon_path = files("netexec").joinpath("img/icon-netexec.png")
         with icon_path.open("rb") as icon_file:
             icon_bytes = icon_file.read()
-        print(self.config)
         self.helper = OpenAEVInjectorHelper(self.config, icon_bytes)
 
         self.parser = NetExecOutputParser()
@@ -139,9 +138,6 @@ class OpenAEVNetExecInjector:
             data=callback_data,
         )
 
-        stdout, stderr, returncode = execute_netexec(cmd)
-
-        # Read and append temp output file for options that write to a file
         output_file = parsed_data.get("output_file") if parsed_data else None
         try:
             stdout, stderr, returncode = execute_netexec(cmd)
@@ -220,6 +216,9 @@ class OpenAEVNetExecInjector:
             )
 
         except Exception as e:
+            self.helper.injector_logger.error(
+                "Execution failed for inject %s: %s", inject_id, e, exc_info=True
+            )
             callback_data = {
                 "execution_message": str(e),
                 "execution_status": "ERROR",
