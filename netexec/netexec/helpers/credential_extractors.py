@@ -17,7 +17,7 @@ New extractors are added here -- either manually or via the
 """
 
 import re
-from typing import Dict, List, Tuple
+from typing import Dict, List, Optional, Tuple
 
 # ---------------------------------------------------------------------------
 # Helper used internally by extractor functions (NOT shared as an extractor)
@@ -75,6 +75,28 @@ def extract_no_credentials(
     return []
 
 
+# Password-in-description pattern (used by --users, get-desc-users, user-desc)
+_PASSWORD_IN_DESC_RE = re.compile(
+    r"(?i)(?:"
+    r"\(Password\s*:\s*(?P<pw1>[^)]+)\)"
+    r"|password\s*[=:]\s*(?P<pw2>\S+)"
+    r"|pwd\s*[=:]\s*(?P<pw3>\S+)"
+    r")"
+)
+
+# NTLM hash dump format (used by --sam and --ntds)
+_NTLM_HASH_DUMP_RE = re.compile(
+    r"^(?P<username>[^:]+):(?P<rid>\d+):"
+    r"(?P<lm_hash>[a-f0-9]{32}):"
+    r"(?P<nt_hash>[a-f0-9]{32}):::\s*$"
+)
+
+# User listing format (used by --users and --active-users)
+_USERS_LISTING_RE = re.compile(
+    r"^(?P<username>\S+)\s+(?P<last_pw_set>\S+(?:\s+\S+)?)\s+(?P<bad_pw>\d+)\s*(?P<description>.*)$"
+)
+
+
 # ===================================================================
 # Per-contract extractors — ONE function per contract, never shared
 # ===================================================================
@@ -85,13 +107,6 @@ def extract_no_credentials(
 # -------------------------------------------------------------------
 # Example:  samwell.tarly  2025-12-11 10:33:21  0  Samwell Tarly (Password : Heartsbane)
 
-_OPT_USERS_PW_RE = re.compile(
-    r"(?i)(?:"
-    r"\(Password\s*:\s*(?P<pw1>[^)]+)\)"
-    r"|password\s*[=:]\s*(?P<pw2>\S+)"
-    r"|pwd\s*[=:]\s*(?P<pw3>\S+)"
-    r")"
-)
 _OPT_USERS_USER_RE = re.compile(r"^\s*(\S+)\s+\d{4}-\d{2}-\d{2}")
 
 
@@ -107,7 +122,7 @@ def extract_opt_users_credentials(
     return _extract_password_from_description(
         finding_lines,
         ip_to_asset_id_map,
-        _OPT_USERS_PW_RE,
+        _PASSWORD_IN_DESC_RE,
         _OPT_USERS_USER_RE,
     )
 
@@ -133,13 +148,6 @@ def extract_opt_active_users_credentials(
 # -------------------------------------------------------------------
 # Example:  User: samwell.tarly description: Samwell Tarly (Password : Heartsbane)
 
-_MOD_GET_DESC_USERS_PW_RE = re.compile(
-    r"(?i)(?:"
-    r"\(Password\s*:\s*(?P<pw1>[^)]+)\)"
-    r"|password\s*[=:]\s*(?P<pw2>\S+)"
-    r"|pwd\s*[=:]\s*(?P<pw3>\S+)"
-    r")"
-)
 _MOD_GET_DESC_USERS_USER_RE = re.compile(r"(?i)User:\s*(\S+)")
 
 
@@ -155,7 +163,7 @@ def extract_mod_get_desc_users_credentials(
     return _extract_password_from_description(
         finding_lines,
         ip_to_asset_id_map,
-        _MOD_GET_DESC_USERS_PW_RE,
+        _PASSWORD_IN_DESC_RE,
         _MOD_GET_DESC_USERS_USER_RE,
     )
 
@@ -165,13 +173,6 @@ def extract_mod_get_desc_users_credentials(
 # -------------------------------------------------------------------
 # Example:  User: samwell.tarly - Description: Samwell Tarly (Password : Heartsbane)
 
-_MOD_USER_DESC_PW_RE = re.compile(
-    r"(?i)(?:"
-    r"\(Password\s*:\s*(?P<pw1>[^)]+)\)"
-    r"|password\s*[=:]\s*(?P<pw2>\S+)"
-    r"|pwd\s*[=:]\s*(?P<pw3>\S+)"
-    r")"
-)
 _MOD_USER_DESC_USER_RE = re.compile(r"(?i)User:\s*(\S+)")
 
 
@@ -187,7 +188,7 @@ def extract_mod_user_desc_credentials(
     return _extract_password_from_description(
         finding_lines,
         ip_to_asset_id_map,
-        _MOD_USER_DESC_PW_RE,
+        _PASSWORD_IN_DESC_RE,
         _MOD_USER_DESC_USER_RE,
     )
 
@@ -196,12 +197,6 @@ def extract_mod_user_desc_credentials(
 # Option: sam (smb --sam)
 # -------------------------------------------------------------------
 # Example:  Administrator:500:aad3b435b51404eeaad3b435b51404ee:dbd13e1c4e338284ac4e9874f7de6ef4:::
-
-_OPT_SAM_HASH_RE = re.compile(
-    r"^(?P<username>[^:]+):(?P<rid>\d+):"
-    r"(?P<lm_hash>[a-f0-9]{32}):"
-    r"(?P<nt_hash>[a-f0-9]{32}):::\s*$"
-)
 
 
 def extract_opt_sam_credentials(
@@ -215,7 +210,7 @@ def extract_opt_sam_credentials(
     """
     results: List[Dict] = []
     for ip, hostname, rest in finding_lines:
-        m = _OPT_SAM_HASH_RE.match(rest)
+        m = _NTLM_HASH_DUMP_RE.match(rest)
         if not m:
             continue
         credential: Dict = {
@@ -291,7 +286,7 @@ def extract_opt_lsa_credentials(
         if _OPT_LSA_SKIP_RE.match(rest):
             continue
 
-        credential: Dict = None
+        credential: Optional[Dict] = None
 
         # 1. Kerberos key
         m = _OPT_LSA_KERBEROS_RE.match(rest)
@@ -355,12 +350,6 @@ def extract_opt_lsa_credentials(
 # Example:  goadmin:500:aad3b435b51404eeaad3b435b51404ee:dbd13e1c4e338284ac4e9874f7de6ef4:::
 # Same hash format as SAM but domain-wide dump.
 
-_OPT_NTDS_HASH_RE = re.compile(
-    r"^(?P<username>[^:]+):(?P<rid>\d+):"
-    r"(?P<lm_hash>[a-f0-9]{32}):"
-    r"(?P<nt_hash>[a-f0-9]{32}):::\s*$"
-)
-
 
 def extract_opt_ntds_credentials(
     finding_lines: List[Tuple[str, str, str]],
@@ -373,7 +362,7 @@ def extract_opt_ntds_credentials(
     """
     results: List[Dict] = []
     for ip, hostname, rest in finding_lines:
-        m = _OPT_NTDS_HASH_RE.match(rest)
+        m = _NTLM_HASH_DUMP_RE.match(rest)
         if not m:
             continue
         credential: Dict = {
@@ -524,10 +513,6 @@ def extract_mod_dpapi_hash_credentials(
 # -------------------------------------------------------------------
 # Example:  goadmin                       2026-02-17 09:40:12 0       Built-in account for administering the computer/domain
 
-_OPT_USERS_USERNAME_RE = re.compile(
-    r"^(?P<username>\S+)\s+(?P<last_pw_set>\S+(?:\s+\S+)?)\s+(?P<bad_pw>\d+)\s*(?P<description>.*)$"
-)
-
 
 def extract_opt_users_usernames(
     finding_lines: List[Tuple[str, str, str]],
@@ -541,7 +526,7 @@ def extract_opt_users_usernames(
     """
     results: List[Dict] = []
     for ip, hostname, rest in finding_lines:
-        m = _OPT_USERS_USERNAME_RE.match(rest)
+        m = _USERS_LISTING_RE.match(rest)
         if not m:
             continue
         finding: Dict = {
@@ -563,10 +548,6 @@ def extract_opt_users_usernames(
 # Same line format as --users but only enabled accounts.
 # Example:  arya.stark                    2025-12-11 11:32:45 0        Arya Stark
 
-_OPT_ACTIVE_USERS_USERNAME_RE = re.compile(
-    r"^(?P<username>\S+)\s+(?P<last_pw_set>\S+(?:\s+\S+)?)\s+(?P<bad_pw>\d+)\s*(?P<description>.*)$"
-)
-
 
 def extract_opt_active_users_usernames(
     finding_lines: List[Tuple[str, str, str]],
@@ -579,7 +560,7 @@ def extract_opt_active_users_usernames(
     """
     results: List[Dict] = []
     for ip, hostname, rest in finding_lines:
-        m = _OPT_ACTIVE_USERS_USERNAME_RE.match(rest)
+        m = _USERS_LISTING_RE.match(rest)
         if not m:
             continue
         finding: Dict = {
