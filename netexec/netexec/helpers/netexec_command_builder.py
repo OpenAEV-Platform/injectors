@@ -1,7 +1,7 @@
 """Command builder for NetExec CLI invocations."""
 
 import uuid
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Union
 
 from netexec.contracts.protocol_config import PROTOCOL_CONFIGS, get_option_flag
 from netexec.modules_registry import get_module_by_safe_key
@@ -15,7 +15,7 @@ def build_command(
     protocol: str,
     targets: List[str],
     credentials: Optional[Dict[str, str]] = None,
-    options: Optional[List[str]] = None,
+    options: Optional[Union[str, List[str]]] = None,
     extra_args: Optional[List[str]] = None,
 ) -> List[str]:
     if not targets:
