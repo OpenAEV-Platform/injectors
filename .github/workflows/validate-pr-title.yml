@@ -16,10 +16,17 @@ jobs:
         shell: bash
         run: |
           TITLE="${{ github.event.pull_request.title }}"
+          AUTHOR="${{ github.event.pull_request.user.login }}"
           echo "PR title: $TITLE"
+          echo "PR author: $AUTHOR"
+
+          if [[ "$AUTHOR" =~ ^renovate(\[bot\])?$ ]]; then
+            echo "✅ Skipping title pattern validation for Renovate PR."
+            exit 0
+          fi
           
           # Regex for:
-          # [category/subcategory] type(scope?): description (#123?)
+          # [category/subcategory] type(scope?): description (#123)
           PATTERN='^\[([a-z]+(/[a-z]+)*)\] (feat|fix|chore|docs|style|refactor|perf|test|build|ci|revert)(\([a-z]+\))?: [a-z].*( \(#[0-9]+\))$'
           
           if [[ ! "$TITLE" =~ $PATTERN ]]; then
