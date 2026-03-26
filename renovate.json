@@ -9,6 +9,7 @@
   ],
   "prConcurrentLimit": 2,
   "baseBranches": ["release/current", "main"],
+  "commitMessagePrefix": "[tool] chore(deps):",
   "packageRules": [
     {
       "matchUpdateTypes": [
