@@ -1,0 +1,62 @@
+name: "Test Injectors"
+
+on:
+  push:
+    branches:
+      - main
+      - "release/**"
+    tags:
+      - "[0-9]+.[0-9]+.[0-9]*"
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        injector_name: ["nuclei", "nmap", "http-query"]
+    name: "Test ${{ matrix.injector_name }}"
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.13"
+
+      - name: Clone pyoaev # this is only to satisfy poetry; not used
+        run: |
+          if [ "$GITHUB_REF_NAME" = "main" ]; then
+            CLONE_BRANCH="main"
+          else
+            CLONE_BRANCH="release/current"
+          fi
+          git clone -b "$CLONE_BRANCH" https://github.com/OpenAEV-Platform/client-python "$GITHUB_WORKSPACE/../client-python"
+
+      - name: Install poetry
+        run: pip install poetry==2.3.2 && poetry config installer.re-resolve false
+
+      - name: Run injector tests
+        working-directory: ${{ matrix.injector_name }}
+        run: |
+          if [ "$GITHUB_REF_NAME" = "main" ] || [ "$GITHUB_REF_TYPE" = "tag" ]; then
+            PYOAEV_REF="main"
+          else
+            PYOAEV_REF="release/current"
+          fi
+
+          echo "Running tests for injector: ${{ matrix.injector_name }}"
+          poetry install
+          poetry run pip install --force-reinstall git+https://github.com/OpenAEV-Platform/client-python.git@${PYOAEV_REF}
+          poetry run pip install coverage
+          poetry run coverage run -m unittest
+          poetry run coverage xml -o coverage.xml
+          
+      - name: Upload coverage to Codecov
+        if: ${{ !cancelled() }}
+        uses: codecov/codecov-action@v6
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          flags: connectors
+          fail_ci_if_error: false
+          verbose: true
