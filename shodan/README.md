@@ -51,18 +51,26 @@ file (`config.yml`, manual).
 
 ### Base OpenAEV environment variables
 
-| Parameter     | config.yml | Docker environment variable | Mandatory | Description                                          |
-|---------------|------------|-----------------------------|-----------|------------------------------------------------------|
-| OpenAEV URL   | url        | `OPENAEV_URL`               | Yes       | The URL of the OpenAEV platform.                     |
-| OpenAEV Token | token      | `OPENAEV_TOKEN`             | Yes       | The default admin token set in the OpenAEV platform. |
+| Parameter         | config.yml | Docker environment variable | Mandatory | Description                                           |
+|-------------------|------------|-----------------------------|-----------|-------------------------------------------------------|
+| OpenAEV URL       | url        | `OPENAEV_URL`               | Yes       | The URL of the OpenAEV platform.                      |
+| OpenAEV Token     | token      | `OPENAEV_TOKEN`             | Yes       | The default admin token set in the OpenAEV platform.  |
+| OpenAEV Tenant ID | tenant_id  | `OPENAEV_TENANT_ID`         | No        | Identifier of the tenant within the OpenAEV platform. |
+
+> ⚠️ Warning ⚠️
+> 
+> The `tenant_id` parameter is a new configuration option. A period of backward compatibility is ensured: if this key is not defined, 
+> existing configurations will not be affected, and the default value will be `None`. However, if a value is provided, it will be
+> validated by Pydantic and must conform to a valid UUID format, otherwise, a validation error will be returned.
+
 
 ### Base injector environment variables
 
-| Parameter     | config.yml  | Docker environment variable  | Default          | Mandatory | Description                                                                            |
-|---------------|-------------|------------------------------|------------------|-----------|----------------------------------------------------------------------------------------|
-| Injector ID   | id          | `INJECTOR_ID`                | `shodan--<uuid>` | No        | A unique `UUIDv4` identifier for this injector instance.                               |
-| Injector Name | name        | `INJECTOR_NAME`              | `Shodan`         | No        | Name of the injector.                                                                  |
-| Log Level     | log_level   | `INJECTOR_LOG_LEVEL`         | `error`          | No        | Determines the verbosity of the logs. Options: `debug`, `info`, `warning`, or `error`. |
+| Parameter     | config.yml | Docker environment variable  | Default          | Mandatory | Description                                                                            |
+|---------------|------------|------------------------------|------------------|-----------|----------------------------------------------------------------------------------------|
+| Injector ID   | id         | `INJECTOR_ID`                | `shodan--<uuid>` | No        | A unique `UUIDv4` identifier for this injector instance.                               |
+| Injector Name | name       | `INJECTOR_NAME`              | `Shodan`         | No        | Name of the injector.                                                                  |
+| Log Level     | log_level  | `INJECTOR_LOG_LEVEL`         | `error`          | No        | Determines the verbosity of the logs. Options: `debug`, `info`, `warning`, or `error`. |
 
 
 ### Base Shodan environment variables
@@ -229,7 +237,7 @@ For the Shodan injector, we have 7 contracts available.
 
 Targets are selected based on the `target_selector` field.
 
-#### If target type is **Assets** / **Asset-Groups**: (Currently disabled)
+#### If target type is **Assets** / **Asset-Groups**:
 
 | Selected Property | Uses Asset Field           |
 |-------------------|----------------------------|
