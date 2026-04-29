@@ -50,6 +50,14 @@ jobs:
     steps:
       - checkout
       - setup_remote_docker
+      - run:
+          working_directory: ~/openaev/<< parameters.injector_name >>
+          name: Check if injector exists
+          command: |
+            if [ ! -f pyproject.toml ]; then
+              echo "pyproject.toml not found, injector may not exist on this branch"
+              circleci-agent step halt
+            fi;
       - run: # this is only to satisfy poetry; not used
           working_directory: ~/
           name: Clone pyoaev
@@ -87,6 +95,14 @@ jobs:
         type: string
     steps:
       - checkout
+      - run:
+          working_directory: ~/openaev/<< parameters.injector_name >>
+          name: Check if injector exists
+          command: |
+            if [ ! -f pyproject.toml ]; then
+              echo "pyproject.toml not found, injector may not exist on this branch"
+              circleci-agent step halt
+            fi;
       - run:
           working_directory: ~/openaev
           name: Set semantic version environment
@@ -138,6 +154,14 @@ jobs:
         type: string
     steps:
       - checkout
+      - run:
+          working_directory: ~/openaev/<< parameters.injector_name >>
+          name: Check if injector exists
+          command: |
+            if [ ! -f pyproject.toml ]; then
+              echo "pyproject.toml not found, injector may not exist on this branch"
+              circleci-agent step halt
+            fi;
       - run:
           working_directory: ~/openaev
           name: Set semantic version environment
@@ -231,14 +255,14 @@ workflows:
       - test:
           matrix:
             parameters:
-              injector_name: ["nuclei", "nmap", "http-query"]
+              injector_name: ["http-query", "netexec", "nmap", "nuclei"]
           filters:
             tags:
               only: /[0-9]+(\.[0-9]+)+(\.[0-9]+)*/
       - build_docker_images:
           matrix:
             parameters:
-              injector_name: [ "aws", "http-query", "nmap", "nuclei", "shodan", "teams" ]
+              injector_name: [ "aws", "http-query", "netexec", "nmap", "nuclei", "shodan", "teams" ]
           requires:
             - ensure_formatting
             - linter
@@ -249,7 +273,7 @@ workflows:
       - publish_images:
           matrix:
             parameters:
-              injector_name: [ "aws", "http-query", "nmap", "nuclei", "shodan", "teams" ]
+              injector_name: [ "aws", "http-query", "netexec", "nmap", "nuclei", "shodan", "teams" ]
           requires:
             - build_docker_images
           filters:
