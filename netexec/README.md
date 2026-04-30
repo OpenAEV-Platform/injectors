@@ -37,20 +37,27 @@ Configuration values can be provided either:
 
 The following parameters are required to connect the injector to the OpenAEV platform:
 
-| Parameter     | `config.yml` | Docker Variable | Mandatory | Description                                         |
-|---------------|--------------|-----------------|-----------|-----------------------------------------------------|
-| OpenAEV URL   | `url`        | `OPENAEV_URL`   | Yes       | Base URL of the OpenAEV platform.                   |
-| OpenAEV Token | `token`      | `OPENAEV_TOKEN` | Yes       | Admin API token configured in the OpenAEV platform. |
+| Parameter         | `config.yml` | Docker Variable     | Mandatory | Description                                           |
+|-------------------|--------------|---------------------|-----------|-------------------------------------------------------|
+| OpenAEV URL       | `url`        | `OPENAEV_URL`       | Yes       | Base URL of the OpenAEV platform.                     |
+| OpenAEV Token     | `token`      | `OPENAEV_TOKEN`     | Yes       | Admin API token configured in the OpenAEV platform.   |
+| OpenAEV Tenant ID | `tenant_id`  | `OPENAEV_TENANT_ID` | No        | Identifier of the tenant within the OpenAEV platform. |
+
+> ⚠️ Warning ⚠️
+>
+> The `tenant_id` parameter is a new configuration option. A period of backward compatibility is ensured: if this key is not defined,
+> existing configurations will not be affected, and the default value will be `None`. However, if a value is provided, it will be
+> validated by Pydantic and must conform to a valid UUID format, otherwise, a validation error will be returned.
 
 ### Injector Environment Variables
 
 The following parameters control the injector runtime behavior:
 
-| Parameter     | `config.yml` | Docker Variable      | Default | Mandatory | Description                                             |
-|---------------|--------------|----------------------|---------|-----------|---------------------------------------------------------|
-| Injector ID   | `id`         | `INJECTOR_ID`        | —       | Yes       | Unique `UUIDv4` identifying this injector instance.     |
-| Injector Name | `name`       | `INJECTOR_NAME`      | —       | Yes       | Human-readable name of the injector.                    |
-| Log Level     | `log_level`  | `INJECTOR_LOG_LEVEL` | `info`  | Yes       | Logging verbosity: `debug`, `info`, `warn`, or `error`. |
+| Parameter     | `config.yml` | Docker Variable      | Default   | Mandatory | Description                                             |
+|---------------|--------------|----------------------|-----------|-----------|---------------------------------------------------------|
+| Injector ID   | `id`         | `INJECTOR_ID`        | —         | Yes       | Unique `UUIDv4` identifying this injector instance.     |
+| Injector Name | `name`       | `INJECTOR_NAME`      | `NetExec` | Yes       | Human-readable name of the injector.                    |
+| Log Level     | `log_level`  | `INJECTOR_LOG_LEVEL` | `info`    | Yes       | Logging verbosity: `debug`, `info`, `warn`, or `error`. |
 
 ## Deployment
 
