@@ -69,6 +69,38 @@ docker compose up -d
 # -d for detached
 ```
 
+---
+
+#### Domain name resolution - Local openAEV with Injector container
+**Note:** If you are running OpenAEV locally on your host machine and want to run this injector inside a Docker container, the `openaev` URL defined in `config.yml` and `.env` must be reachable from inside the container.
+
+Inside a container, `localhost` refers to the container itself - not your host machine. Therefore, you cannot use `localhost` as the OpenAEV URL unless OpenAEV is running inside the same container.
+
+Instead, use: `host.docker.internal`. This hostname allows the container to access services running on your host machine.
+
+**In short**:
+- `localhost` -> container itself
+- `host.docker.internal` -> your host machine
+
+**Platform-specific notes**:
+- **macOS / Windows (Docker Desktop):**     
+  `host.docker.internal` works out of the box. No additional configuration is needed.
+- **Linux:**  
+  You must explicitly map it using `extra_hosts`:
+```yaml
+services:
+  your-injector-name:
+    image: your-image-name
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+```
+
+**Important**:
+- Avoid mapping `host.docker.internal` to a fixed IP (e.g. `1.2.3.4`) unless you have a specific reason. The host IP can change, and Docker provides `host-gateway` to handle this dynamically.
+- Make sure your OpenAEV service is listening on `0.0.0.0` (not just `localhost`), otherwise it may NOT be accessible from the container.
+
+---
+
 ### Manual Deployment
 
 #### Prerequisites
