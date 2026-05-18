@@ -1,9 +1,10 @@
 openaev:
   url: 'http://localhost:3001'
   token: 'ChangeMe'
+# tenant_id: 'ChangeMe'
 
 injector:
-  id: 'changeme'
+  id: 'ChangeMe'
   name: 'HTTP query'
-  log_level: 'info'
+  log_level: 'error'
 

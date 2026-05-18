@@ -1,8 +1,9 @@
 openaev:
-  url: 'http://localhost:3001'
+  url: 'ChangeMe'
   token: 'ChangeMe'
+# tenant_id: 'ChangeMe'
 
 injector:
   id: 'ChangeMe'
   name: 'Nuclei'
-  log_level: 'WARN'
+  log_level: 'ChangeMe'

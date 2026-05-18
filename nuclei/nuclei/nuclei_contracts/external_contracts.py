@@ -212,7 +212,7 @@ class ExternalContractsManager:
                 "and",
                 [
                     Filter(
-                        "injector_contract_injector", "and", "eq", [self._injector_id]
+                        "injector_contract_injectors", "and", "eq", [self._injector_id]
                     ),
                 ],
             ),

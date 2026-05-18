@@ -1,0 +1,10 @@
+openaev:
+  url: 'http://localhost:3001'
+  token: 'ChangeMe'
+# tenant_id: 'ChangeMe'
+
+injector:
+  id: 'ChangeMe'
+  name: 'NetExec'
+  log_level: 'info'
+
