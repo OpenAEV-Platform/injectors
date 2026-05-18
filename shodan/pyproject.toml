@@ -9,8 +9,8 @@ requires-python = ">=3.11,<4.0"
 dependencies = [
     "pyoaev (==2.3.5); extra != 'dev'",
     "injector_common @ ../injector_common",
-    "pydantic~=2.11.7",
-    "pydantic-settings~=2.11.0",
+    "pydantic (>=2.11.3,<2.14.0)",
+    "pydantic-settings (>=2.11.0,<2.15.0)",
     "requests~=2.32",
     "limiter==0.5.0",
     "tenacity~=9.1.2",
