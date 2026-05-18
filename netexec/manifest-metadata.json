@@ -1,0 +1,18 @@
+{
+  "title": "NetExec",
+  "slug": "openaev_netexec",
+  "description": "Allow OAEV to perform network execution and credential testing with NetExec",
+  "short_description": "Allow OAEV to perform network execution with NetExec",
+  "use_cases": ["Technical"],
+  "verified": true,
+  "last_verified_date": "",
+  "playbook_supported": false,
+  "max_confidence_level": 80,
+  "support_version": "",
+  "subscription_link": "https://www.netexec.wiki/",
+  "source_code": "",
+  "manager_supported": true,
+  "container_version": "rolling",
+  "container_image": "openaev/injector-netexec",
+  "container_type": "INJECTOR"
+}

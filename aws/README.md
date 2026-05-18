@@ -94,10 +94,17 @@ in `config.yml` (for manual deployment).
 
 Below are the parameters you'll need to set for OpenAEV:
 
-| Parameter     | config.yml | Docker environment variable | Mandatory | Description                                          |
-|---------------|------------|-----------------------------|-----------|------------------------------------------------------|
-| OpenAEV URL   | url        | `OPENAEV_URL`               | Yes       | The URL of the OpenAEV platform.                     |
-| OpenAEV Token | token      | `OPENAEV_TOKEN`             | Yes       | The default admin token set in the OpenAEV platform. |
+| Parameter         | config.yml | Docker environment variable | Mandatory | Description                                           |
+|-------------------|------------|-----------------------------|-----------|-------------------------------------------------------|
+| OpenAEV URL       | url        | `OPENAEV_URL`               | Yes       | The URL of the OpenAEV platform.                      |
+| OpenAEV Token     | token      | `OPENAEV_TOKEN`             | Yes       | The default admin token set in the OpenAEV platform.  |
+| OpenAEV Tenant ID | tenant_id  | `OPENAEV_TENANT_ID`         | No        | Identifier of the tenant within the OpenAEV platform. |
+
+> ⚠️ Warning ⚠️
+>
+> The `tenant_id` parameter is a new configuration option. A period of backward compatibility is ensured: if this key is not defined,
+> existing configurations will not be affected, and the default value will be `None`. However, if a value is provided, it will be
+> validated by Pydantic and must conform to a valid UUID format, otherwise, a validation error will be returned.
 
 ### Base injector environment variables
 
@@ -106,8 +113,8 @@ Below are the parameters you'll need to set for running the injector properly:
 | Parameter        | config.yml | Docker environment variable | Default | Mandatory | Description                                                                            |
 |------------------|------------|-----------------------------|---------|-----------|----------------------------------------------------------------------------------------|
 | Injector ID      | id         | `INJECTOR_ID`               | /       | Yes       | A unique `UUIDv4` identifier for this injector instance.                               |
-| Collector Name   | name       | `INJECTOR_NAME`             |         | Yes       | Name of the injector.                                                                  |
-| Log Level        | log_level  | `INJECTOR_LOG_LEVEL`        | info    | Yes       | Determines the verbosity of the logs. Options are `debug`, `info`, `warn`, or `error`. |
+| Collector Name   | name       | `INJECTOR_NAME`             | AWS     | Yes       | Name of the injector.                                                                  |
+| Log Level        | log_level  | `INJECTOR_LOG_LEVEL`        | error   | Yes       | Determines the verbosity of the logs. Options are `debug`, `info`, `warn`, or `error`. |
 
 
 ## Deployment
@@ -124,6 +131,38 @@ docker build --build-context injector_common=../injector_common -t openaev/injec
 ```bash
 docker-compose up -d
 ```
+
+---
+
+#### Domain name resolution - Local openAEV with Injector container
+**Note:** If you are running OpenAEV locally on your host machine and want to run this injector inside a Docker container, the `openaev` URL defined in `config.yml` and `.env` must be reachable from inside the container.
+
+Inside a container, `localhost` refers to the container itself - not your host machine. Therefore, you cannot use `localhost` as the OpenAEV URL unless OpenAEV is running inside the same container.
+
+Instead, use: `host.docker.internal`. This hostname allows the container to access services running on your host machine.
+
+**In short**:
+- `localhost` -> container itself
+- `host.docker.internal` -> your host machine
+
+**Platform-specific notes**:
+- **macOS / Windows (Docker Desktop):**     
+  `host.docker.internal` works out of the box. No additional configuration is needed.
+- **Linux:**  
+  You must explicitly map it using `extra_hosts`:
+```yaml
+services:
+  your-injector-name:
+    image: your-image-name
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+```
+
+**Important**:
+- Avoid mapping `host.docker.internal` to a fixed IP (e.g. `1.2.3.4`) unless you have a specific reason. The host IP can change, and Docker provides `host-gateway` to handle this dynamically.
+- Make sure your OpenAEV service is listening on `0.0.0.0` (not just `localhost`), otherwise it may NOT be accessible from the container.
+
+---
 
 ### Manual Installation
 

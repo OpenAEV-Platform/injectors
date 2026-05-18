@@ -51,18 +51,26 @@ file (`config.yml`, manual).
 
 ### Base OpenAEV environment variables
 
-| Parameter     | config.yml | Docker environment variable | Mandatory | Description                                          |
-|---------------|------------|-----------------------------|-----------|------------------------------------------------------|
-| OpenAEV URL   | url        | `OPENAEV_URL`               | Yes       | The URL of the OpenAEV platform.                     |
-| OpenAEV Token | token      | `OPENAEV_TOKEN`             | Yes       | The default admin token set in the OpenAEV platform. |
+| Parameter         | config.yml | Docker environment variable | Mandatory | Description                                           |
+|-------------------|------------|-----------------------------|-----------|-------------------------------------------------------|
+| OpenAEV URL       | url        | `OPENAEV_URL`               | Yes       | The URL of the OpenAEV platform.                      |
+| OpenAEV Token     | token      | `OPENAEV_TOKEN`             | Yes       | The default admin token set in the OpenAEV platform.  |
+| OpenAEV Tenant ID | tenant_id  | `OPENAEV_TENANT_ID`         | No        | Identifier of the tenant within the OpenAEV platform. |
+
+> ⚠️ Warning ⚠️
+> 
+> The `tenant_id` parameter is a new configuration option. A period of backward compatibility is ensured: if this key is not defined, 
+> existing configurations will not be affected, and the default value will be `None`. However, if a value is provided, it will be
+> validated by Pydantic and must conform to a valid UUID format, otherwise, a validation error will be returned.
+
 
 ### Base injector environment variables
 
-| Parameter     | config.yml  | Docker environment variable  | Default          | Mandatory | Description                                                                            |
-|---------------|-------------|------------------------------|------------------|-----------|----------------------------------------------------------------------------------------|
-| Injector ID   | id          | `INJECTOR_ID`                | `shodan--<uuid>` | No        | A unique `UUIDv4` identifier for this injector instance.                               |
-| Injector Name | name        | `INJECTOR_NAME`              | `Shodan`         | No        | Name of the injector.                                                                  |
-| Log Level     | log_level   | `INJECTOR_LOG_LEVEL`         | `error`          | No        | Determines the verbosity of the logs. Options: `debug`, `info`, `warning`, or `error`. |
+| Parameter     | config.yml | Docker environment variable  | Default          | Mandatory | Description                                                                            |
+|---------------|------------|------------------------------|------------------|-----------|----------------------------------------------------------------------------------------|
+| Injector ID   | id         | `INJECTOR_ID`                | `shodan--<uuid>` | No        | A unique `UUIDv4` identifier for this injector instance.                               |
+| Injector Name | name       | `INJECTOR_NAME`              | `Shodan`         | No        | Name of the injector.                                                                  |
+| Log Level     | log_level  | `INJECTOR_LOG_LEVEL`         | `error`          | No        | Determines the verbosity of the logs. Options: `debug`, `info`, `warning`, or `error`. |
 
 
 ### Base Shodan environment variables
@@ -98,6 +106,36 @@ docker compose up -d
 
 > ✅ The Docker image already includes the Shodan injector and its runtime dependencies.  
 Only a valid `SHODAN_API_KEY` and access to the OpenAEV platform are required at runtime.
+
+---
+
+#### Domain name resolution - Local openAEV with Injector container
+**Note:** If you are running OpenAEV locally on your host machine and want to run this injector inside a Docker container, the `openaev` URL defined in `config.yml` and `.env` must be reachable from inside the container.
+
+Inside a container, `localhost` refers to the container itself - not your host machine. Therefore, you cannot use `localhost` as the OpenAEV URL unless OpenAEV is running inside the same container.
+
+Instead, use: `host.docker.internal`. This hostname allows the container to access services running on your host machine.
+
+**In short**:
+- `localhost` -> container itself
+- `host.docker.internal` -> your host machine
+
+**Platform-specific notes**:
+- **macOS / Windows (Docker Desktop):**     
+  `host.docker.internal` works out of the box. No additional configuration is needed.
+- **Linux:**  
+  You must explicitly map it using `extra_hosts`:
+```yaml
+services:
+  your-injector-name:
+    image: your-image-name
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+```
+
+**Important**:
+- Avoid mapping `host.docker.internal` to a fixed IP (e.g. `1.2.3.4`) unless you have a specific reason. The host IP can change, and Docker provides `host-gateway` to handle this dynamically.
+- Make sure your OpenAEV service is listening on `0.0.0.0` (not just `localhost`), otherwise it may NOT be accessible from the container.
 
 ---
 
@@ -229,7 +267,7 @@ For the Shodan injector, we have 7 contracts available.
 
 Targets are selected based on the `target_selector` field.
 
-#### If target type is **Assets** / **Asset-Groups**: (Currently disabled)
+#### If target type is **Assets** / **Asset-Groups**:
 
 | Selected Property | Uses Asset Field           |
 |-------------------|----------------------------|
