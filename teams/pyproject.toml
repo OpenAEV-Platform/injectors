@@ -9,7 +9,7 @@ requires-python = ">=3.11,<4.0"
 dependencies = [
     "pyoaev (==2.260520.0); extra != 'dev'",
     "injector_common @ ../injector_common",
-    "requests~=2.32",
+    "requests~=2.33",
 ]
 
 [project.optional-dependencies]
