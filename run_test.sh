@@ -17,11 +17,7 @@ BRANCH="${CIRCLE_BRANCH:-${GITHUB_REF_NAME:-$RELEASE_REF}}"
 REPO_ROOT="$(cd "$(dirname "$0")" && pwd)"
 
 # Determine pyoaev git branch
-if [ "$BRANCH" = "main" ]; then
-  PYOAEV_BRANCH="main"
-else
-  PYOAEV_BRANCH="release/current"
-fi
+PYOAEV_BRANCH="main"
 
 # Discover injectors with test directories
 discover_injectors() {

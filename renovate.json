@@ -8,7 +8,7 @@
     "filigran team"
   ],
   "prConcurrentLimit": 2,
-  "baseBranches": ["release/current", "main"],
+  "baseBranches": ["main"],
   "commitMessagePrefix": "[tool] chore(deps):",
   "packageRules": [
     {
@@ -18,13 +18,8 @@
       "prPriority": 5
     },
     {
-      "matchBaseBranches": ["release/current"],
+      "matchBaseBranches": ["main"],
       "commitMessageSuffix": null
-    },
-    {
-      "matchJsonata": ["$exists(isVulnerabilityAlert)"],
-      "matchBaseBranches": ["release/current"],
-      "enabled": false
     },
     {
       "matchJsonata": ["$not($exists(isVulnerabilityAlert))"],
