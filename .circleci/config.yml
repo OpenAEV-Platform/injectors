@@ -62,11 +62,7 @@ jobs:
           working_directory: ~/
           name: Clone pyoaev
           command: |
-            if [ "${CIRCLE_BRANCH}" = "main" ]; then
-              git clone -b main https://github.com/OpenAEV-Platform/client-python
-            else
-              git clone -b release/current https://github.com/OpenAEV-Platform/client-python
-            fi
+            git clone -b main https://github.com/OpenAEV-Platform/client-python
       - run:
           working_directory: ~/openaev
           name: Install poetry
@@ -75,11 +71,7 @@ jobs:
           name: Run injector tests
           working_directory: ~/openaev/<< parameters.injector_name >>
           command: |
-            if [ "${CIRCLE_BRANCH:-main}" = "main" ]; then
-              PYOAEV_REF="main"
-            else
-              PYOAEV_REF="release/current"
-            fi
+            PYOAEV_REF="main"
 
             echo "Running tests for injector: << parameters.injector_name >>"
             poetry install
@@ -123,7 +115,7 @@ jobs:
           # We safely expand the CIRCLE_BRANCH variable because the CircleCI filters already enforce a strict release/x.x.x pattern using regex
           command: |
             if [ "${CIRCLE_BRANCH}" = "main" ]; then
-              find . -name pyproject.toml | xargs -I ___ sed "s|branch = 'release/current'|branch = '${CIRCLE_BRANCH}'|" -i ___;
+              find . -name pyproject.toml | xargs -I ___ sed "s|branch = 'main'|branch = '${CIRCLE_BRANCH}'|" -i ___;
             fi;
       - run:
           name: Build injector Docker images
@@ -131,7 +123,7 @@ jobs:
           command: |
             echo "Building injector: << parameters.injector_name >>"
           
-            if [[ "${CIRCLE_BRANCH}" =~ ^("release/current"|"main")$ ]]; then
+            if [[ "${CIRCLE_BRANCH}" == "main" ]]; then
               docker build --progress=plain --build-context injector_common=../injector_common -t openaev/injector-<< parameters.injector_name >>:${CIRCLE_SHA1} --build-arg PYOAEV_GIT_BRANCH_OVERRIDE="${CIRCLE_BRANCH}" .
             else
               docker build --progress=plain --build-context injector_common=../injector_common -t openaev/injector-<< parameters.injector_name >>:${CIRCLE_SHA1} .
@@ -182,11 +174,8 @@ jobs:
             elif [ "${CIRCLE_BRANCH}" = "main" ]
             then
               export IMAGETAG="rolling"
-            elif [ "${CIRCLE_BRANCH}" = "release/current" ]
-            then
-              export IMAGETAG="prerelease"
             else
-              echo "No tag supplied or branch is neither 'main' nor 'release/current' (was: '${CIRCLE_BRANCH}')"
+              echo "The tag supplied or branch is not 'main' (was: '${CIRCLE_BRANCH}')"
               exit 1
             fi
             echo "Image tag: ${IMAGETAG}"
@@ -282,23 +271,15 @@ workflows:
             branches:
               only:
                 - main
-                - release/current
       - deploy_testing:
           requires:
             - publish_images
           filters:
             branches:
               only: main
-      - deploy_prerelease:
-          requires:
-            - publish_images
-          filters:
-            branches:
-              only: release/current
       - notify_rolling:
           requires:
             - deploy_testing
-            - deploy_prerelease
       - notify:
           requires:
             - publish_images
