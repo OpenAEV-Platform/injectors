@@ -15,6 +15,7 @@ class TestNmapCommandBuilder(unittest.TestCase):
             args,
             ["nmap", "-Pn", "-sS", "-oX", "-", sentinel.target],
         )
+
     def test_build_args_tcp_connect_scan(self):
         contract_id = module.TCP_CONNECT_SCAN_CONTRACT
         targets = [sentinel.target]
@@ -25,6 +26,7 @@ class TestNmapCommandBuilder(unittest.TestCase):
             args,
             ["nmap", "-Pn", "-sT", "-oX", "-", sentinel.target],
         )
+
     def test_build_args_fin_scan(self):
         contract_id = module.FIN_SCAN_CONTRACT
         targets = [sentinel.target]
@@ -35,6 +37,7 @@ class TestNmapCommandBuilder(unittest.TestCase):
             args,
             ["nmap", "-Pn", "-sF", "-oX", "-", sentinel.target],
         )
+
     def test_build_args_other(self):
         contract_id = sentinel.contract_id
         targets = [sentinel.target]

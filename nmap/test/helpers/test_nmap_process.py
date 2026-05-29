@@ -11,7 +11,9 @@ class TestNmapProcess(unittest.TestCase):
 
         module.NmapProcess.nmap_execute(args)
 
-        m_subprocess.run.assert_called_once_with(sentinel.args, check=True, capture_output=True)
+        m_subprocess.run.assert_called_once_with(
+            sentinel.args, check=True, capture_output=True
+        )
 
     def test_js_execute(self, m_subprocess):
         args = sentinel.args
@@ -19,4 +21,6 @@ class TestNmapProcess(unittest.TestCase):
 
         module.NmapProcess.js_execute(args, m_input)
 
-        m_subprocess.run.assert_called_once_with(sentinel.args, input=m_input.stdout, capture_output=True)
+        m_subprocess.run.assert_called_once_with(
+            sentinel.args, input=m_input.stdout, capture_output=True
+        )
