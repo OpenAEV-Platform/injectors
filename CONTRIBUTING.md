@@ -15,7 +15,6 @@ status: Draft
   - [Introduction](#introduction)
     - [What is an Injector?](#what-is-an-injector)
       - [Inject Types Covered](#inject-types-covered)
-      - [What is a verified injector?](#what-is-a-verified-injector)
       - [What is a contract?](#what-is-a-contract)
   - [Prerequisites](#prerequisites)
     - [Technical Requirements](#technical-requirements)
@@ -55,7 +54,7 @@ Welcome to the OpenAEV Injector Development Guidelines. This documentation provi
 and contribute an injector to the OpenAEV ecosystem, whether you are a Filigran partner, a community contributor, or an 
 internal team member.
 
-> ⚠️ Important
+> [!WARNING]
 >
 > This document is subject to change. We are currently working on a standardized template for injectors.
 
@@ -68,7 +67,7 @@ or API, and reports the result back to the platform.
 Injectors are stateless by design: all configuration is supplied at startup via environment variables or a config.yml 
 file, and each execution is independent.
 
-> ℹ️ Information
+> [!NOTE]
 > 
 > Built-in injectors: Some injectors such as email, SMS, media pressure, etc. are directly embedded into the application OpenAEV. To configure them, just add the proper configuration parameters in your platform configuration.
 
@@ -87,19 +86,6 @@ The following inject types are officially documented in the [OpenAEV site](https
 
 Deeply documented type in this repository:
 - [Common implementation](./docs/inject_types/01-common-implementation.md)
-
-#### What is a verified injector?
-Verified injectors are injectors that have been reviewed, tested and validated by the Integrations and Product Team.
-They meet all the requirements described in this document, are available for installation directly from the 
-OpenAEV catalog.
-
-Verified injectors:
-
-- Follow all standards code described in this guide
-- Ship a `manifest-metadata.json` file enabling Integration Manager support
-- Are published to [Docker Hub](https://hub.docker.com/u/openaev) under the `openaev` namespace
-- Appear in the [OpenAEV Ecosystem](https://filigran.notion.site/OpenAEV-Ecosystem-30d8eb73d7d04611843e758ddef8941b) listing
-- Are maintained as part of the repository release cycle
 
 #### What is a contract?
 A contract is the formal definition of the parameters, validation rules, and execution schema that an injector exposes 
@@ -128,8 +114,9 @@ A contract serves two complementary purposes:
   before the execution callback is invoked.
 
 For Python injectors, contracts are defined using the `pyoaev` library maintained by the XTM Integrations Team.
-Each contract class lives in its own subdirectory under `<injector>/contracts/`, keeping individual contracts
-independently navigable as the number grows.
+
+Contract classes are defined at the level of each injector and are stored in the `<myinjector>/contracts/` directory. 
+Each contract has its own subdirectory to facilitate navigation and code organization.
 
 An injector may expose **one or more contracts**, depending on the inject types and execution paths it supports.
 
@@ -181,7 +168,7 @@ You can develop injector using either:
 
 1. Identify the appropriate injector type for your use case
 2. Prepare your local development environment
-3. Bootstrap the injector from the provided template
+3. Bootstrap the injector from the provided template (WIP - In the meantime, see `Injector Structure` in [Common implementation](./docs/inject_types/01-common-implementation.md))
 4. Review the documentation and specifications for the targeted inject type
 5. Design and implement the injector contracts
 6. Implement the runtime and business logic
@@ -273,68 +260,7 @@ This determines:
 
 ### Understanding the Template Structure
 
-All injectors follow this standardized structure:
-
-```
-my_injector/
-├── my_injector/
-│   ├── __init__.py
-│   ├── __main__.py
-│   ├── contracts/
-│   │   ├── __init__.py
-│   │   ├── my_contracts.py
-│   │   ├── contract_a/
-│   │   │   ├── __init__.py
-│   │   │   └── contract.py
-│   │   └── contract_b/
-│   │       ├── __init__.py
-│   │       └── contract.py
-│   └── img/
-│   │   └── icon-my-injector.png
-│   ├── injector/
-│   │   ├── __init__.py
-│   │   └── openaev_my_injector.py
-│   ├── models/
-│   │   ├── __init__.py
-│   │   ├── configs/
-│   │   │   ├── config_loader.py
-│   │   │   ├── injector_config_override.py
-│   │   │   └── my_injector_configs.py
-│   │   └── ...
-│   ├── services/
-│   │   ├── __init__.py
-│   │   ├── client_api.py
-│   │   └── utils.py
-├── tests/
-│   ├── __init__.py
-│   ├── conftest.py
-│   └── my_injector_contracts/
-│      ├── constraints/
-│      │   ├── myconstraint.constraint.feature
-│      │   └── test_myconstraint.py
-│      ├── contract_a/
-│      │   ├── contract_a.feature
-│      │   └── test_contract_a.py
-│      └── contract_b/
-│          ├── contract_b.feature
-│          └── test_contract_b.py
-├── .dockerignore
-├── .env.sample
-├── .gitignore
-├── config.yml.sample
-├── CONTRIBUTING.md
-├── docker-compose.yml
-├── Dockerfile
-├── manifest-metadata.json
-├── pyproject.toml
-└── README.md
-```
-
-The `__main__.py` file is the single entry point. It is registered as a console script in `pyproject.toml`.
-```toml
-[project.scripts]
-MyInjector = "my_injector.__main__:main"
-```
+All injectors follow this standardized structure (see section `Injector Structure`) in [Common Implementation Guidelines](./docs/inject_types/01-common-implementation.md)
 
 ---
 ## Documentation Structure
@@ -382,13 +308,13 @@ See full reference: [Common Implementation Guidelines](./docs/inject_types/01-co
 For HTTP Request injectors:
 
 - Authentication credentials are stored as pydantic.SecretStr and never logged.
-- Rate limiting uses `limiter` (leaky bucket algorithm).
-- Retry logic uses `tenacity` with exponential jitter — not the requests retry adapter.
+- Rate limiting to control request throughput.
+- Retry handling with exponential backoff.
 - Request construction is isolated in a dedicated `services/client_api.py` layer.
 - Input is normalised and validated through `Pydantic` discriminated union models before execution.
 - Remove API keys from URLs before any logging.
 
-> ℹ️ Note
+> [!NOTE]
 > 
 > The all guidelines are currently being developed.
 
@@ -456,8 +382,7 @@ By project convention, `.feature` files are located in the same directory as the
 Example:
 ```
 tests/shodan_contracts/domain_discovery/
-├── domain_discovery.feature   <- Gherkin specification
-└── test_domain_discovery.py   <- pytest implementation (GWT pattern)
+└── domain_discovery.feature   <- Gherkin specification
 ```
 
 #### Why use Gherkin?
@@ -471,7 +396,7 @@ tests/shodan_contracts/domain_discovery/
 Every injector must include a functional `Dockerfile` and `docker-compose.yml`. 
 
 Key requirements:
-- Use `python:3.12-alpine` base image
+- Use a `python:3.x-alpine` base image with a Python version >=3.11 and <3.14
 - Minimize layer count and image size
 - Include health checks where applicable
 - Follow security best practices (non-root user, minimal packages)
@@ -501,8 +426,8 @@ Every injector must ship with:
   - Prerequisites and dependencies
   - Troubleshooting guide
 
-- `config.yml.sample` (and `.env.sample`) with all supported keys and ChangeMe placeholders — no real credentials.
-- `manifest-metadata.json` for Integration Manager support (required for verified injectors):
+- `config.yml.sample` (and `.env.sample`) with all supported keys and `ChangeMe` placeholders — no real credentials.
+- `manifest-metadata.json` for Integration Manager support:
 
 Example (`manifest-metadata.json`):
 ```json
@@ -584,8 +509,8 @@ Format:
 All PRs must pass the following checks before review:
 
 - [ ] isort + black + ruff + mypy pass locally
-- [ ] pytest runs successfully
-- [ ] Gherkin .feature tests added or updated
+- [ ] Test coverage is sufficient and pytest runs successfully
+- [ ] Gherkin .feature added or updated
 - [ ] README.md updated if needed
 - [ ] config.yml.sample updated if configuration changed
 - [ ] manifest-metadata.json present and valid
@@ -595,7 +520,7 @@ All PRs must pass the following checks before review:
 - [ ] All environment variables documented
 - [ ] Responsive to review feedback from maintainers
 
-> ⚠️ Important
+> [!WARNING]
 > 
 > - All Pull Requests must be accompanied by a linked GitHub issue describing the motivation and impact of the change.
 > - All commits must be signed (GPG or SSH signing enabled).

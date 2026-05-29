@@ -5,7 +5,7 @@
 
 This document describes implementation patterns shared by **all** `OpenAEV` injectors, regardless of the inject type they handle. Read this before diving into the inject-type-specific guide.
 
-> ⚠️ Important
+> [!WARNING]
 >
 > This document is subject to change. We are currently working on a standardized template for injectors.
 
@@ -158,12 +158,6 @@ if __name__ == "__main__":
     main()
 ```
 
-The pyoaev library abstracts transport-level concerns including:
-- RabbitMQ connectivity
-- message consumption and acknowledgement
-- reconnection handling
-- injector runtime lifecycle
-
 Injector authors should focus exclusively on business-specific execution logic implemented in `process_message()` 
 and `start()`.
 
@@ -272,8 +266,6 @@ class ConfigLoader(BaseSettings):
     injector: _ConfigLoaderInjector
     my_service: _ConfigLoaderMyService
 ```
-
-Fields are populated from environment variables (priority) or `config.yml`. Secrets use `SecretStr` — access the value only when needed via `.get_secret_value()`.
 
 ### Environment Variables
 
