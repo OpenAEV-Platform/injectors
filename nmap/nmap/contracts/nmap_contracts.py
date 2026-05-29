@@ -112,7 +112,14 @@ class NmapContracts:
                     expectation_description="",
                     expectation_score=100,
                     expectation_expectation_group=False,
-                )
+                ),
+                Expectation(
+                    expectation_type=ExpectationType.prevention,
+                    expectation_name="Prevention",
+                    expectation_description="",
+                    expectation_score=100,
+                    expectation_expectation_group=False,
+                ),
             ],
         )
 
@@ -127,6 +134,13 @@ class NmapContracts:
         output_port = ContractOutputElement(
             type=ContractOutputType.Port,
             field="ports",
+            isMultiple=True,
+            isFindingCompatible=False,
+            labels=["scan"],
+        )
+        expectation_signature = ContractOutputElement(
+            type=ContractOutputType.ExpectationSignature,
+            field="expectation_signature",
             isMultiple=True,
             isFindingCompatible=False,
             labels=["scan"],
@@ -148,7 +162,7 @@ class NmapContracts:
         )
         nmap_contract_outputs: List[ContractOutputElement] = (
             ContractBuilder()
-            .add_outputs([output_ports_scans, output_port])
+            .add_outputs([output_ports_scans, output_port, expectation_signature])
             .build_outputs()
         )
         syn_scan_contract = Contract(
