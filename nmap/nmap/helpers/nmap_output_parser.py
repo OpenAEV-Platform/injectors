@@ -10,7 +10,7 @@ class NmapOutputParser:
         asset_list = list(target_results.ip_to_asset_id_map.values())
         targets = target_results.targets or []
 
-        run = result["nmaprun"]
+        run = result["nmaprun"]  # TODO WTF (ain't result supposed to be an str?)
         if not isinstance(run["host"], list):
             run["host"] = [run["host"]]
 
