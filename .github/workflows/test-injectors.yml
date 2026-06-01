@@ -75,3 +75,10 @@ jobs:
           fail_ci_if_error: false
           flags: ${{ matrix.injector }}
           verbose: true
+
+      - name: Upload test results to Codecov
+        if: ${{ !cancelled() }}
+        uses: codecov/codecov-action@v6
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          report_type: test_results
