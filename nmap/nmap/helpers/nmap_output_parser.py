@@ -1,16 +1,14 @@
-from typing import Dict
-
 from injector_common.targets import TargetExtractionResult
 
 
 class NmapOutputParser:
     @staticmethod
-    def parse(data: Dict, result: str, target_results: TargetExtractionResult) -> Dict:
+    def parse(data: dict, result: dict, target_results: TargetExtractionResult) -> dict:
         """Parse nmap results and extract open ports."""
         asset_list = list(target_results.ip_to_asset_id_map.values())
         targets = target_results.targets or []
 
-        run = result["nmaprun"]  # TODO WTF (ain't result supposed to be an str?)
+        run = result["nmaprun"]
         if not isinstance(run["host"], list):
             run["host"] = [run["host"]]
 

@@ -11,6 +11,7 @@ requires-python = ">=3.11,<4.0"
 dependencies = [
     "pyoaev (==2.260604.0); extra != 'dev'",
     "injector_common @ ../injector_common",
+    "jc (==1.25.6)",
 ]
 
 [tool.poetry]
