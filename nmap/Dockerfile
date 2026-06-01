@@ -20,7 +20,7 @@ RUN poetry install
 
 FROM python:3.13-alpine AS runner
 
-RUN apk update && apk upgrade && apk add nmap jc
+RUN apk update && apk upgrade && apk add nmap
 
 WORKDIR /opt/injector_common
 COPY --from=injector_common ./ ./

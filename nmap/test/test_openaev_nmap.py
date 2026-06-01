@@ -95,8 +95,7 @@ class TestOpenAEVNmap(unittest.TestCase):
         )
 
     @patch.object(module.NmapOutputParser, "parse")
-    @patch.object(module.json, "loads")
-    @patch.object(module.NmapProcess, "js_execute")
+    @patch.object(module.jc, "parse")
     @patch.object(module.NmapProcess, "nmap_execute")
     @patch.object(module.Targets, "build_execution_message")
     @patch.object(module.NmapCommandBuilder, "build_args")
@@ -105,8 +104,7 @@ class TestOpenAEVNmap(unittest.TestCase):
         m_build_args,
         m_build_execution_message,
         m_nmap_execute,
-        m_js_execute,
-        m_json_loads,
+        m_jc_parse,
         m_parse,
         m_to_daemon_config,
         m_helper,
@@ -146,13 +144,8 @@ class TestOpenAEVNmap(unittest.TestCase):
             },
         )
         m_nmap_execute.assert_called_once_with(m_build_args.return_value)
-        m_js_execute.assert_called_once_with(
-            ["jc", "--xml", "-p"], m_nmap_execute.return_value
-        )
-        m_json_loads.assert_called_once_with(
-            m_js_execute.return_value.stdout.decode.return_value.strip.return_value,
-        )
+        m_jc_parse.assert_called_once_with("xml", m_nmap_execute.return_value)
         m_parse.assert_called_once_with(
-            data, m_json_loads.return_value, injector.current_target_results
+            data, m_jc_parse.return_value, injector.current_target_results
         )
         self.assertEqual(nmap_output, m_parse.return_value)
