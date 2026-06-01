@@ -117,7 +117,7 @@ run_injector_tests() {
     local test_rc=0
     if uses_pytest "$injector_dir"; then
       echo "→ Running pytest"
-      poetry run python -m coverage run -m pytest -q -rA || test_rc=$?
+      poetry run python -m coverage run -m pytest --junitxml="junit.xml" -q -rA || test_rc=$?
     else
       echo "→ Running unittest"
       poetry run python -m coverage run -m unittest discover -s "$test_dir" -v || test_rc=$?
@@ -139,7 +139,7 @@ run_injector_tests() {
     local test_rc=0
     if uses_pytest "$injector_dir"; then
       echo "→ Running pytest"
-      python -m coverage run -m pytest -q -rA || test_rc=$?
+      python -m coverage run -m pytest --junitxml="junit.xml" -q -rA || test_rc=$?
     else
       echo "→ Running unittest"
       python -m coverage run -m unittest discover -s "$test_dir" -v || test_rc=$?

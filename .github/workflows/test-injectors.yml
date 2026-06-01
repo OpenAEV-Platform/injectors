@@ -73,4 +73,12 @@ jobs:
           token: ${{ secrets.CODECOV_TOKEN }}
           root_dir: ${{ github.workspace }}
           fail_ci_if_error: false
+          flags: ${{ matrix.injector }}
           verbose: true
+
+      - name: Upload test results to Codecov
+        if: ${{ !cancelled() && hashFiles(format('{0}/junit.xml', matrix.injector)) != '' }}
+        uses: codecov/codecov-action@v6
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          report_type: test_results
