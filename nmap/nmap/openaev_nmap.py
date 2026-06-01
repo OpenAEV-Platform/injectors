@@ -1,6 +1,7 @@
 import json
 import time
 
+import jc
 from pyoaev.helpers import OpenAEVConfigHelper, OpenAEVInjectorHelper
 from pyoaev.signatures import SignatureManager
 from pyoaev.signatures.models import build_network_configs
@@ -107,8 +108,7 @@ class OpenAEVNmap:
         )
 
         nmap_result = NmapProcess.nmap_execute(nmap_args)
-        jc = NmapProcess.js_execute(["jc", "--xml", "-p"], nmap_result)
-        result = json.loads(jc.stdout.decode("utf-8").strip())
+        result = jc.parse("xml", nmap_result)
 
         return NmapOutputParser.parse(data, result, self.current_target_results)
 
