@@ -73,4 +73,5 @@ jobs:
           token: ${{ secrets.CODECOV_TOKEN }}
           root_dir: ${{ github.workspace }}
           fail_ci_if_error: false
+          flags: ${{ matrix.injector }}
           verbose: true
