@@ -79,9 +79,7 @@ class OpenAEVNmap:
         return target_meta
 
     def nmap_execution(self, start: float, data: dict, targets: list) -> dict:
-        contract_id = data["injection"]["inject_injector_contract"]["convertedContent"][
-            "contract_id"
-        ]
+        contract_id = data["injection"]["inject_injector_contract"]["injector_contract_id"]
         # Build Arguments to execute
         nmap_args = NmapCommandBuilder.build_args(contract_id, targets)
 

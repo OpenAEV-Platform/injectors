@@ -118,9 +118,7 @@ class TestOpenAEVNmap(unittest.TestCase):
         data = {
             "injection": {
                 "inject_injector_contract": {
-                    "convertedContent": {
-                        "contract_id": "my-current-contract-id",
-                    }
+                    "injector_contract_id": "my-current-contract-id",
                 }
             }
         }
