@@ -35,6 +35,10 @@ packages = [
 ]
 
 [tool.poetry.dependencies]
+pyoaev = [
+    { markers = "extra != 'dev'", source = "PyPI" },
+    { markers = "extra == 'dev'", develop = true },
+]
 injector_common = { develop = true }
 
 [build-system]
