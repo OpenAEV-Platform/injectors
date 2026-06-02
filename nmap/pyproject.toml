@@ -14,12 +14,21 @@ dependencies = [
     "jc (==1.25.6)",
 ]
 
+[project.optional-dependencies]
+dev = [
+    "pyoaev @ ../../client-python",
+]
+
 [tool.poetry]
 packages = [
     { include = "nmap" }
 ]
 
 [tool.poetry.dependencies]
+pyoaev = [
+    { markers = "extra != 'dev'", source = "PyPI" },
+    { markers = "extra == 'dev'", develop = true },
+]
 injector_common = { develop = true }
 
 [build-system]
