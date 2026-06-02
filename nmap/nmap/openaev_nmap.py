@@ -134,15 +134,17 @@ class OpenAEVNmap:
         try:
             execution_result = self.nmap_execution(start, data, targets)
             execution_message = execution_result["message"]
-            execution_status = "SUCCESS"
+            tool_status = None
         except Exception as err:
             execution_result = None
             execution_message = str(err)
-            execution_status = "ERROR"
+            tool_status = {
+                "exit_code": 1,
+            }
 
         callback_data = {
             "execution_message": execution_message,
-            "execution_status": execution_status,
+            "execution_status": "ERROR" if tool_status else "SUCCESS",
             "execution_action": "complete",
         }
         if execution_result:
@@ -150,19 +152,22 @@ class OpenAEVNmap:
                 execution_result["outputs"]
             )
 
+        extra_signatures = {
+            "ports_discovered": [],
+            "services_discovered": [],
+        }
+        if execution_result:
+            outputs = execution_result.get("outputs", {})
+            extra_signatures["ports_discovered"] = outputs.get("ports", [])
+            extra_signatures["services_discovered"] = outputs.get("scan_results", [])
+
         tool_output = {
-            "status": {"SUCCESS": "success", "ERROR": "failed"}[execution_status]
+            "status": tool_status,
+            "extra_signatures": extra_signatures,
         }
         post = self.signature_manager.compile_post_execution_signatures(
             pre, tool_output
         )
-
-        post["ports_discovered"] = []
-        post["services_discovered"] = []
-        if execution_result:
-            outputs = execution_result.get("outputs", {})
-            post["ports_discovered"] = outputs.get("ports", [])
-            post["services_discovered"] = outputs.get("scan_results", [])
 
         target_meta = self.build_target_meta()
 
