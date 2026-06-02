@@ -108,7 +108,7 @@ class OpenAEVNmap:
         )
 
         nmap_result = subprocess.run(nmap_args, check=True, capture_output=True)
-        result = jc.parse("xml", nmap_result)
+        result = jc.parse("xml", nmap_result.stdout.decode())
 
         return NmapOutputParser.parse(data, result, self.current_target_results)
 
@@ -137,7 +137,6 @@ class OpenAEVNmap:
         execution_result = None
         tool_error_info = None
         try:
-            execution_message = execution_result["message"]
             execution_result = self.nmap_execution(start, data, targets)
         except subprocess.CalledProcessError as err:
             execution_message = str(err.stderr.strip().decode())
@@ -149,6 +148,8 @@ class OpenAEVNmap:
             tool_error_info = {
                 "exit_code": 1,
             }
+        else:
+            execution_message = execution_result["message"]
 
         # formatting callback data and tool_output
         callback_data = {

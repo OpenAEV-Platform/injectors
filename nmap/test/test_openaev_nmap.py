@@ -146,7 +146,9 @@ class TestOpenAEVNmap(unittest.TestCase):
         m_subprocess_run.assert_called_once_with(
             m_build_args.return_value, check=True, capture_output=True
         )
-        m_jc_parse.assert_called_once_with("xml", m_subprocess_run.return_value)
+        m_jc_parse.assert_called_once_with(
+            "xml", m_subprocess_run.return_value.stdout.decode.return_value
+        )
         m_parse.assert_called_once_with(
             data, m_jc_parse.return_value, injector.current_target_results
         )
