@@ -1,4 +1,5 @@
 import json
+import subprocess
 import time
 
 import jc
@@ -12,7 +13,6 @@ from injector_common.targets import TargetProperty, Targets
 from nmap.configuration.config_loader import ConfigLoader
 from nmap.helpers.nmap_command_builder import NmapCommandBuilder
 from nmap.helpers.nmap_output_parser import NmapOutputParser
-from nmap.helpers.nmap_process import NmapProcess
 
 
 class OpenAEVNmap:
@@ -107,7 +107,7 @@ class OpenAEVNmap:
             data=callback_data,
         )
 
-        nmap_result = NmapProcess.nmap_execute(nmap_args)
+        nmap_result = subprocess.run(nmap_args, check=True, capture_output=True)
         result = jc.parse("xml", nmap_result)
 
         return NmapOutputParser.parse(data, result, self.current_target_results)
@@ -117,34 +117,43 @@ class OpenAEVNmap:
         # Notify API of reception and expected number of operations
         reception_data = {"tracking_total_count": 1}
 
-        # setting the current
+        # setting the current elements
         self.update_current_elements(data)
 
         targets = self.get_targets()
 
+        # generate pre execution signatures
         network_injector_config = build_network_configs(targets)
         pre = self.signature_manager.compile_pre_execution_signatures(
             network_injector_config
         )
 
+        # sending execution reception
         self.helper.api.inject.execution_reception(
             inject_id=self.current_inject_id, data=reception_data
         )
+
         # Execute inject
+        execution_result = None
+        tool_error_info = None
         try:
-            execution_result = self.nmap_execution(start, data, targets)
             execution_message = execution_result["message"]
-            tool_status = None
+            execution_result = self.nmap_execution(start, data, targets)
+        except subprocess.CalledProcessError as err:
+            execution_message = str(err.stderr.strip().decode())
+            tool_error_info = {
+                "exit_code": err.returncode,
+            }
         except Exception as err:
-            execution_result = None
             execution_message = str(err)
-            tool_status = {
+            tool_error_info = {
                 "exit_code": 1,
             }
 
+        # formatting callback data and tool_output
         callback_data = {
             "execution_message": execution_message,
-            "execution_status": "ERROR" if tool_status else "SUCCESS",
+            "execution_status": "ERROR" if tool_error_info else "SUCCESS",
             "execution_action": "complete",
         }
         if execution_result:
@@ -162,9 +171,11 @@ class OpenAEVNmap:
             extra_signatures["services_discovered"] = outputs.get("scan_results", [])
 
         tool_output = {
-            "status": tool_status,
+            "error_info": tool_error_info,
             "extra_signatures": extra_signatures,
         }
+
+        # generate post execution signatures
         post = self.signature_manager.compile_post_execution_signatures(
             pre, tool_output
         )
@@ -172,10 +183,13 @@ class OpenAEVNmap:
         target_meta = self.build_target_meta()
 
         callback_data["execution_duration"] = int(time.time() - start)
+
+        # sending execution callback
         self.helper.api.inject.execution_callback(
             inject_id=self.current_inject_id, data=callback_data
         )
 
+        # sending injection signatures per expectation type
         for expectation_type in ["DETECTION", "PREVENTION"]:
             payload = self.signature_manager.build_payload(
                 post, target_meta, expectation_type=expectation_type

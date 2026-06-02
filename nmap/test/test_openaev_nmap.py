@@ -96,14 +96,14 @@ class TestOpenAEVNmap(unittest.TestCase):
 
     @patch.object(module.NmapOutputParser, "parse")
     @patch.object(module.jc, "parse")
-    @patch.object(module.NmapProcess, "nmap_execute")
+    @patch.object(module.subprocess, "run")
     @patch.object(module.Targets, "build_execution_message")
     @patch.object(module.NmapCommandBuilder, "build_args")
     def test_openaev_nmap_execution(
         self,
         m_build_args,
         m_build_execution_message,
-        m_nmap_execute,
+        m_subprocess_run,
         m_jc_parse,
         m_parse,
         m_to_daemon_config,
@@ -143,8 +143,10 @@ class TestOpenAEVNmap(unittest.TestCase):
                 "execution_action": "command_execution",
             },
         )
-        m_nmap_execute.assert_called_once_with(m_build_args.return_value)
-        m_jc_parse.assert_called_once_with("xml", m_nmap_execute.return_value)
+        m_subprocess_run.assert_called_once_with(
+            m_build_args.return_value, check=True, capture_output=True
+        )
+        m_jc_parse.assert_called_once_with("xml", m_subprocess_run.return_value)
         m_parse.assert_called_once_with(
             data, m_jc_parse.return_value, injector.current_target_results
         )
