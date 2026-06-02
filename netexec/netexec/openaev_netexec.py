@@ -4,6 +4,7 @@ import time
 from importlib.resources import files
 
 from pyoaev.helpers import OpenAEVConfigHelper, OpenAEVInjectorHelper
+from pyoaev.signatures import SignatureManager, build_network_configs
 
 from injector_common.constants import TARGET_PROPERTY_SELECTOR_KEY, TARGET_SELECTOR_KEY
 from injector_common.data_helpers import DataHelpers
@@ -168,8 +169,44 @@ class OpenAEVNetExecInjector:
             "success": returncode == 0,
             "stdout": stdout,
             "stderr": stderr,
+            "stderr_raw": stderr,
+            "returncode": returncode,
             "parsed": parse_result,
+            "targets": targets,
+            "ip_to_asset_id_map": target_results.ip_to_asset_id_map,
         }
+
+    def _build_tool_output(self, returncode: int) -> dict:
+        """Build the tool_output dict for SignatureManager from a netexec returncode."""
+        if returncode != 0:
+            return {"error_info": {"exit_code": returncode}}
+        return {}
+
+    def _send_signatures(
+        self,
+        inject_id: str,
+        targets: list[str],
+        ip_to_asset_id_map: dict[str, str],
+        tool_output: dict,
+    ) -> None:
+        """Compile and send ExpectationSignature structured output via SignatureManager."""
+        sm = SignatureManager(self.helper.api)
+        configs = build_network_configs(targets)
+        pre_sigs = sm.compile_pre_execution_signatures(config=configs)
+        post_sigs = sm.compile_post_execution_signatures(pre_sigs, tool_output)
+        targets_meta = [
+            {"asset": ip_to_asset_id_map[t]} if t in ip_to_asset_id_map else {}
+            for t in targets
+        ]
+        payload = sm.build_payload(
+            post_sigs if isinstance(post_sigs, list) else [post_sigs],
+            targets_meta=targets_meta,
+        )
+        sm.send_signatures(
+            inject_id=inject_id,
+            phase="execution_complete",
+            signatures=payload,
+        )
 
     def process_message(self, data: dict) -> None:
         start = time.time()
@@ -186,6 +223,9 @@ class OpenAEVNetExecInjector:
             stdout = (result.get("stdout") or "").strip()
             stderr = (result.get("stderr") or "").strip()
             parsed = result.get("parsed")
+            targets = result.get("targets", [])
+            ip_to_asset_id_map = result.get("ip_to_asset_id_map", {})
+            returncode = result.get("returncode", 0 if result["success"] else 1)
 
             if result["success"]:
                 if stdout:
@@ -212,6 +252,12 @@ class OpenAEVNetExecInjector:
                 inject_id=inject_id,
                 data=callback_data,
             )
+
+            if targets:
+                tool_output = self._build_tool_output(returncode)
+                self._send_signatures(
+                    inject_id, targets, ip_to_asset_id_map, tool_output
+                )
 
         except Exception as e:
             self.helper.injector_logger.error(

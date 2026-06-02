@@ -136,6 +136,14 @@ _KERBEROASTABLE_OUTPUT = ContractOutputElement(
     labels=["netexec"],
 )
 
+_EXPECTATION_SIGNATURE_OUTPUT = ContractOutputElement(
+    type=ContractOutputType.ExpectationSignature,
+    field="expectation_signature",
+    isMultiple=False,
+    isFindingCompatible=False,
+    labels=["netexec"],
+)
+
 _TYPE_TO_ELEMENT = {
     TEXT: _TEXT_OUTPUT,
     CREDENTIALS: _CREDENTIALS_OUTPUT,
@@ -155,12 +163,14 @@ _TYPE_TO_ELEMENT = {
 
 
 def build_outputs_for_types(output_types: set[str]) -> list[ContractOutputElement]:
-    """Return the built output list for a given set of output type keys."""
-    if not output_types:
-        return []
+    """Return the built output list for a given set of output type keys.
+
+    The ExpectationSignature element is always appended regardless of the
+    requested types, so the backend can route structured signature data to the
+    correct processor on every contract.
+    """
     elements = [
         _TYPE_TO_ELEMENT[t] for t in sorted(output_types) if t in _TYPE_TO_ELEMENT
     ]
-    if not elements:
-        return []
+    elements.append(_EXPECTATION_SIGNATURE_OUTPUT)
     return ContractBuilder().add_outputs(elements).build_outputs()
