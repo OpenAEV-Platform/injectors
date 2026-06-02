@@ -189,15 +189,14 @@ class OpenAEVNmap:
         )
 
         # sending injection signatures per expectation type
-        for expectation_type in ["DETECTION", "PREVENTION"]:
-            payload = self.signature_manager.build_payload(
-                post, target_meta, expectation_type=expectation_type
-            )
-            self.signature_manager.send_signatures(
-                inject_id=self.current_inject_id,
-                phase="execution_complete",
-                signatures=payload,
-            )
+        payload = self.signature_manager.build_payload(
+            post, target_meta, expectation_types=["DETECTION", "PREVENTION"]
+        )
+        self.signature_manager.send_signatures(
+            inject_id=self.current_inject_id,
+            phase="execution_complete",
+            signatures=payload,
+        )
 
     # Start the main loop
     def start(self):
