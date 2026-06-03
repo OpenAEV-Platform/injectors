@@ -31,6 +31,7 @@ class OpenAEVNmap:
         self.current_selector_property = ""
         self.current_assets = []
         self.current_target_results = None
+        self.current_expectation_types = []
 
     def update_current_elements(self, data: dict) -> None:
         self.current_inject_id = data["injection"]["inject_id"]
@@ -44,6 +45,10 @@ class OpenAEVNmap:
         self.current_target_results = Targets.extract_targets(
             self.current_selector_key, self.current_selector_property, data, self.helper
         )
+
+        self.current_expectation_types = [
+            expectation["expectation_type"] for expectation in content["expectations"]
+        ]
 
     def get_targets(self) -> list:
         targets = self.current_target_results.targets
@@ -79,7 +84,9 @@ class OpenAEVNmap:
         return target_meta
 
     def nmap_execution(self, start: float, data: dict, targets: list) -> dict:
-        contract_id = data["injection"]["inject_injector_contract"]["injector_contract_id"]
+        contract_id = data["injection"]["inject_injector_contract"][
+            "injector_contract_id"
+        ]
         # Build Arguments to execute
         nmap_args = NmapCommandBuilder.build_args(contract_id, targets)
 
@@ -190,7 +197,9 @@ class OpenAEVNmap:
 
         # sending injection signatures per expectation type
         payload = self.signature_manager.build_payload(
-            post, target_meta, expectation_types=["DETECTION", "PREVENTION"]
+            post,
+            target_meta,
+            expectation_types=self.current_expectation_types,
         )
         self.signature_manager.send_signatures(
             inject_id=self.current_inject_id,
