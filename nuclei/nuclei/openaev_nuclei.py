@@ -4,6 +4,10 @@ import time
 from typing import Dict
 
 from pyoaev.helpers import OpenAEVConfigHelper, OpenAEVInjectorHelper
+from pyoaev.signatures import (
+    SignatureManager,
+    build_network_configs,
+)
 
 from injector_common.constants import TARGET_PROPERTY_SELECTOR_KEY, TARGET_SELECTOR_KEY
 from injector_common.dump_config import intercept_dump_argument
@@ -32,26 +36,36 @@ class OpenAEVNuclei:
         self.command_builder = NucleiCommandBuilder()
         self.parser = NucleiOutputParser()
 
-    def nuclei_execution(self, start: float, data: Dict) -> Dict:
-        inject_id = data["injection"]["inject_id"]
-        contract_id = data["injection"]["inject_injector_contract"]["convertedContent"][
-            "contract_id"
-        ]
-        content = data["injection"]["inject_content"]
-        selector_key = content[TARGET_SELECTOR_KEY]
-        selector_property = content[TARGET_PROPERTY_SELECTOR_KEY]
+        self.inject_id = ""
+        self.contract_id = ""
+        self.inject_content = {}
+        self.selector_key = ""
+        self.selector_property = ""
+        self.expectation_types = []
 
+        self.assets = []
+        self.asset_groups = []
+
+    def _extract_targets(self, data: Dict):
+        # Extract Targets
         target_results = Targets.extract_targets(
-            selector_key, selector_property, data, self.helper
+            self.selector_key, self.selector_property, data, self.helper
         )
+
         # Deduplicate targets
         targets = target_results.targets
+
         # Handle empty targets as an error
         if not targets:
-            message = f"No target identified for the property {TargetProperty[selector_property.upper()].value}"
+            message = f"No target identified for the property {TargetProperty[self.selector_property.upper()].value}"
             raise ValueError(message)
+
+        return target_results, targets
+
+    def nuclei_execution(self, start: float, data: Dict, target_results, targets) -> Dict:
+
         # Build Arguments to execute
-        nuclei_args = self.command_builder.build_args(contract_id, content, targets)
+        nuclei_args = self.command_builder.build_args(self.contract_id, self.inject_content, targets)
         input_data = "\n".join(targets).encode("utf-8")
 
         self.helper.injector_logger.info(
@@ -60,7 +74,7 @@ class OpenAEVNuclei:
 
         callback_data = {
             "execution_message": Targets.build_execution_message(
-                selector_key=selector_key,
+                selector_key=self.selector_key,
                 data=data,
                 command_args=nuclei_args,
             ),
@@ -70,7 +84,7 @@ class OpenAEVNuclei:
         }
 
         self.helper.api.inject.execution_callback(
-            inject_id=inject_id,
+            inject_id=self.inject_id,
             data=callback_data,
         )
 
@@ -79,41 +93,133 @@ class OpenAEVNuclei:
             result.stdout.decode("utf-8"), target_results.ip_to_asset_id_map
         )
 
+    @staticmethod
+    def build_target_meta(all_targets: list[dict]) -> list[dict]:
+        target_meta = []
+        for asset in all_targets:
+            asset_meta = {key: None for key in ["agent", "asset", "asset_group"]}
+            if asset_id := asset.get("asset_id"):
+                asset_meta["asset"] = asset_id
+            if asset_group_id := asset.get("asset_group_id"):
+                asset_meta["asset_group"] = asset_group_id
+            if asset_agents := asset.get("asset_agents"):
+                agents_id = list(
+                    set(
+                        agent["agent_id"]
+                        for agent in asset_agents
+                        if agent.get("agent_id")
+                    )
+                )
+                # logger warning if more than 1?
+                if agents_id:
+                    asset_meta["agent"] = agents_id[0]
+            target_meta.append(asset_meta)
+        return target_meta
+
     def process_message(self, data: Dict) -> None:
         start = time.time()
-        inject_id = data["injection"]["inject_id"]
+
+        data_injection = data.get("injection", {})
+        data_injector_contract = data_injection.get("inject_injector_contract", {})
+
+        self.contract_id = data_injector_contract.get("convertedContent", {}).get("contract_id")
+        self.inject_id = data_injection.get("inject_id")
+        self.inject_content = data_injection.get("inject_content", {})
+        self.selector_key = self.inject_content.get(TARGET_SELECTOR_KEY)
+        self.selector_property = self.inject_content.get(TARGET_PROPERTY_SELECTOR_KEY)
+
+        # Retrieving expectation_types
+        expectations_content = self.inject_content.get("expectations")
+        self.expectation_types = [
+            item.get("expectation_type")
+            for item in expectations_content
+        ]
+
+        # Triggering by assets / asset_groups
+        self.assets = data.get("assets", [])
+        self.asset_groups = data.get("assetGroups", [])
 
         # Notify API of reception and expected number of operations
         reception_data = {"tracking_total_count": 1}
         self.helper.api.inject.execution_reception(
-            inject_id=inject_id, data=reception_data
+            inject_id=self.inject_id, data=reception_data
         )
+
+        # Injector Signature Manager
+        signature_manager = SignatureManager(self.helper.api)
+
+        target_results, targets = self._extract_targets(data)
+        configs = build_network_configs(targets)
+
+        # Compile pre-execution signatures
+        pre_signatures = signature_manager.compile_pre_execution_signatures(config=configs)
 
         # Execute inject
         try:
-            result = self.nuclei_execution(start, data)
-            callback_data = {
-                "execution_message": result["message"],
-                "execution_output_structured": json.dumps(result["outputs"]),
-                "execution_status": "SUCCESS",
-                "execution_duration": int(time.time() - start),
-                "execution_action": "complete",
-            }
-            self.helper.api.inject.execution_callback(
-                inject_id=inject_id, data=callback_data
-            )
-        except Exception as e:
-            callback_data = {
-                "execution_message": str(e),
-                "execution_status": "ERROR",
-                "execution_duration": int(time.time() - start),
-                "execution_action": "complete",
-            }
-            self.helper.api.inject.execution_callback(
-                inject_id=inject_id, data=callback_data
-            )
 
-    def _check_nuclei_installed(self):
+            execution_result = self.nuclei_execution(start, data, target_results, targets)
+            execution_message = execution_result.get("message")
+            execution_result_outputs = execution_result.get("outputs")
+            execution_status = "SUCCESS"
+            tool_output = {}
+
+        except Exception as e:
+
+            execution_result = None
+            execution_result_outputs = None
+            execution_message = str(e)
+            execution_status = "ERROR"
+            tool_output = {"error_info": {"exit_code": 1}}
+
+        callback_data = {
+            "execution_message": execution_message,
+            "execution_status": execution_status,
+            "execution_duration": int(time.time() - start),
+            "execution_action": "complete",
+        }
+
+        if execution_result:
+            callback_data["execution_result"] = execution_result
+            # Todo Need to prepare the mapping for "expectation_type" vulnerability
+            tool_output["extra_signatures"] = {
+                "cves_tested": [],
+                "cves_found_vulnerable": [],
+            }
+        if execution_result_outputs:
+            callback_data["execution_output_structured"] = json.dumps(execution_result_outputs)
+
+        self.helper.api.inject.execution_callback(
+            inject_id=self.inject_id, data=callback_data
+        )
+
+        # Compile post-execution signatures
+        post_signatures = signature_manager.compile_post_execution_signatures(
+            pre_signatures=pre_signatures,
+            tool_output=tool_output,
+        )
+
+        all_targets = []
+        if self.selector_key == "assets":
+            all_targets.extend(self.assets)
+        if self.selector_key == "asset-groups":
+            all_targets.extend(self.asset_groups)
+
+        target_meta = self.build_target_meta(all_targets)
+        expectation_signature = signature_manager.build_payload(
+            post_signatures=post_signatures,
+            targets_meta=target_meta,
+            expectation_types=self.expectation_types,
+        )
+
+        # Send signature to backend
+        signature_manager.send_signatures(
+            inject_id=self.inject_id,
+            phase="execution_complete",
+            signatures=expectation_signature,
+        )
+
+    @staticmethod
+    def _check_nuclei_installed():
         try:
             NucleiProcess.nuclei_version()
             return True
