@@ -263,3 +263,9 @@ class NetexecSignatureTypesTest(TestCase):
 
     def test_netexec_signature_types_contains_end_date(self):
         self.assertIn("end_date", NETEXEC_SIGNATURE_TYPES)
+
+    def test_netexec_signature_types_contains_protocols_tested(self):
+        self.assertIn("protocols_tested", NETEXEC_SIGNATURE_TYPES)
+
+    def test_netexec_signature_types_contains_protocols_succeeded(self):
+        self.assertIn("protocols_succeeded", NETEXEC_SIGNATURE_TYPES)
