@@ -92,6 +92,15 @@ class OpenAEVNetExecInjector:
         selector_key = content[TARGET_SELECTOR_KEY]
         selector_property = content[TARGET_PROPERTY_SELECTOR_KEY]
 
+        expectations = content.get("expectations", [])
+        expectation_types = list(
+            {
+                exp.get("expectation_type", "").upper()
+                for exp in expectations
+                if exp.get("expectation_type")
+            }
+        ) or ["DETECTION"]
+
         target_results = Targets.extract_targets(
             selector_key, selector_property, data, self.helper
         )
@@ -178,6 +187,7 @@ class OpenAEVNetExecInjector:
             "ip_to_asset_id_map": target_results.ip_to_asset_id_map,
             "pre_sigs": pre_sigs,
             "protocol": protocol,
+            "expectation_types": expectation_types,
         }
 
     def _build_tool_output(self, returncode: int, protocol: str) -> dict:
@@ -203,6 +213,7 @@ class OpenAEVNetExecInjector:
         ip_to_asset_id_map: dict[str, str],
         pre_sigs: dict | list[dict],
         tool_output: dict,
+        expectation_types: list[str],
     ) -> None:
         """Compile post-execution signatures and send the payload."""
         post_sigs = self.sm.compile_post_execution_signatures(pre_sigs, tool_output)
@@ -213,6 +224,7 @@ class OpenAEVNetExecInjector:
         payload = self.sm.build_payload(
             post_sigs if isinstance(post_sigs, list) else [post_sigs],
             targets_meta=targets_meta,
+            expectation_types=expectation_types,
         )
         self.sm.send_signatures(
             inject_id=inject_id,
@@ -268,9 +280,15 @@ class OpenAEVNetExecInjector:
 
             if targets:
                 protocol = result.get("protocol", "")
+                expectation_types = result.get("expectation_types", ["DETECTION"])
                 tool_output = self._build_tool_output(returncode, protocol)
                 self._send_signatures(
-                    inject_id, targets, ip_to_asset_id_map, pre_sigs, tool_output
+                    inject_id,
+                    targets,
+                    ip_to_asset_id_map,
+                    pre_sigs,
+                    tool_output,
+                    expectation_types,
                 )
 
         except Exception as e:
