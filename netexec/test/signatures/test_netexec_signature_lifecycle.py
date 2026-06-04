@@ -84,6 +84,7 @@ class SignatureLifecycleTest(TestCase):
             injector.parser = MagicMock()
             injector.parser.parse.return_value = {"outputs": {}}
             injector.config = MagicMock()
+            injector.sm = self.mock_sm
             return injector
 
     def _run_process_message(self, injector, data: dict, returncode: int = 0):
