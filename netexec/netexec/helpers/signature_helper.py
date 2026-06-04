@@ -10,5 +10,7 @@ NETEXEC_SIGNATURE_TYPES: frozenset[str] = frozenset(
         "target_hostname_address",
         "start_date",
         "end_date",
+        "protocols_tested",
+        "protocols_succeeded",
     }
 )
