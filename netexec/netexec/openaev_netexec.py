@@ -61,6 +61,7 @@ class OpenAEVNetExecInjector:
         self.helper = OpenAEVInjectorHelper(self.config, icon_bytes)
 
         self.parser = NetExecOutputParser()
+        self.sm = SignatureManager(self.helper.api)
         self._check_netexec_version()
 
     def _check_netexec_version(self):
@@ -190,19 +191,18 @@ class OpenAEVNetExecInjector:
         tool_output: dict,
     ) -> None:
         """Compile and send ExpectationSignature structured output via SignatureManager."""
-        sm = SignatureManager(self.helper.api)
         configs = build_network_configs(targets)
-        pre_sigs = sm.compile_pre_execution_signatures(config=configs)
-        post_sigs = sm.compile_post_execution_signatures(pre_sigs, tool_output)
+        pre_sigs = self.sm.compile_pre_execution_signatures(config=configs)
+        post_sigs = self.sm.compile_post_execution_signatures(pre_sigs, tool_output)
         targets_meta = [
             {"asset": ip_to_asset_id_map[t]} if t in ip_to_asset_id_map else {}
             for t in targets
         ]
-        payload = sm.build_payload(
+        payload = self.sm.build_payload(
             post_sigs if isinstance(post_sigs, list) else [post_sigs],
             targets_meta=targets_meta,
         )
-        sm.send_signatures(
+        self.sm.send_signatures(
             inject_id=inject_id,
             phase="execution_complete",
             signatures=payload,
