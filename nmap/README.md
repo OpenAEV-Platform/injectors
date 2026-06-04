@@ -105,7 +105,7 @@ services:
 
 #### Prerequisites
 
-The `nmap` and `jc` commands must be installed and available on the system you are running.
+The `nmap` command must be installed and available on the system you are running.
 
 The poetry package management system (version 2.1 or later) must also be available: https://python-poetry.org/
 Install the environment:
