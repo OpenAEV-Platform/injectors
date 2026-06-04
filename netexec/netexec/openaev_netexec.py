@@ -139,6 +139,7 @@ class OpenAEVNetExecInjector:
         )
 
         output_file = parsed_data.get("output_file") if parsed_data else None
+        pre_sigs = self._compile_pre_signatures(targets)
         try:
             stdout, stderr, returncode = execute_netexec(cmd)
 
@@ -175,6 +176,7 @@ class OpenAEVNetExecInjector:
             "parsed": parse_result,
             "targets": targets,
             "ip_to_asset_id_map": target_results.ip_to_asset_id_map,
+            "pre_sigs": pre_sigs,
         }
 
     def _build_tool_output(self, returncode: int) -> dict:
@@ -183,16 +185,20 @@ class OpenAEVNetExecInjector:
             return {"error_info": {"exit_code": returncode}}
         return {}
 
+    def _compile_pre_signatures(self, targets: list[str]) -> dict | list[dict]:
+        """Compile pre-execution signatures (captures start_time)."""
+        configs = build_network_configs(targets)
+        return self.sm.compile_pre_execution_signatures(config=configs)
+
     def _send_signatures(
         self,
         inject_id: str,
         targets: list[str],
         ip_to_asset_id_map: dict[str, str],
+        pre_sigs: dict | list[dict],
         tool_output: dict,
     ) -> None:
-        """Compile and send ExpectationSignature structured output via SignatureManager."""
-        configs = build_network_configs(targets)
-        pre_sigs = self.sm.compile_pre_execution_signatures(config=configs)
+        """Compile post-execution signatures and send the payload."""
         post_sigs = self.sm.compile_post_execution_signatures(pre_sigs, tool_output)
         targets_meta = [
             {"asset": ip_to_asset_id_map[t]} if t in ip_to_asset_id_map else {}
@@ -225,6 +231,7 @@ class OpenAEVNetExecInjector:
             parsed = result.get("parsed")
             targets = result.get("targets", [])
             ip_to_asset_id_map = result.get("ip_to_asset_id_map", {})
+            pre_sigs = result.get("pre_sigs")
             returncode = result.get("returncode", 0 if result["success"] else 1)
 
             if result["success"]:
@@ -256,7 +263,7 @@ class OpenAEVNetExecInjector:
             if targets:
                 tool_output = self._build_tool_output(returncode)
                 self._send_signatures(
-                    inject_id, targets, ip_to_asset_id_map, tool_output
+                    inject_id, targets, ip_to_asset_id_map, pre_sigs, tool_output
                 )
 
         except Exception as e:
