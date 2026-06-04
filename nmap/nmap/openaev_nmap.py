@@ -2,7 +2,6 @@ import json
 import subprocess
 import time
 
-import jc
 from pyoaev.helpers import OpenAEVConfigHelper, OpenAEVInjectorHelper
 from pyoaev.signatures import SignatureManager
 from pyoaev.signatures.models import build_network_configs
@@ -86,9 +85,9 @@ class OpenAEVNmap:
         )
 
         nmap_result = subprocess.run(nmap_args, check=True, capture_output=True)
-        result = jc.parse("xml", nmap_result.stdout.decode())
-
-        return NmapOutputParser.parse(data, result, self.current_target_results)
+        return NmapOutputParser.xmlparse(
+            nmap_result.stdout, self.current_selector_key, self.current_target_results
+        )
 
     def process_message(self, data: dict) -> None:
         start = time.time()

@@ -1,41 +1,45 @@
+from lxml import objectify
+
 from injector_common.targets import TargetExtractionResult
 
 
 class NmapOutputParser:
     @staticmethod
-    def parse(data: dict, result: dict, target_results: TargetExtractionResult) -> dict:
-        """Parse nmap results and extract open ports."""
-        asset_list = list(target_results.ip_to_asset_id_map.values())
-        targets = target_results.targets or []
-        selector_is_asset = data["injection"]["inject_content"]["target_selector"] in [
-            "assets",
-            "asset-groups",
-        ]
+    def xmlparse(
+        stdout: bytes, selector_key: str, target_results: TargetExtractionResult
+    ) -> dict:
+        """Parse XML formatted nmap outputs and extract open ports."""
+        xml_parser = objectify.makeparser(resolve_entities=False)
+        xml_tree = objectify.fromstring(stdout, xml_parser)
 
-        run = result["nmaprun"]
-        if not isinstance(run["host"], list):
-            run["host"] = [run["host"]]
+        if xml_tree.tag != "nmaprun":
+            raise ValueError("provided stdout does not match expected nmap XML output")
+
+        asset_list = (
+            list(target_results.ip_to_asset_id_map.values()) or []
+        )  # list of IDs post asset-groups resolution
+        targets = target_results.targets or []
+
+        selector_is_asset = selector_key in ["assets", "asset-groups"]
 
         ports_scans_results = []
         ports_results = []
 
-        for idx, host in enumerate(run["host"]):
-            for port in host.get("ports", {}).get("port", []):
-                if port.get("state", {}).get("@state") == "open":
-                    portid = int(port["@portid"])
+        for idx, host in enumerate(xml_tree.host):
+            for port in host.ports.iterchildren(tag="port"):
+                if port.state.get("state") == "open":
+                    portid = int(port.get("portid"))
                     ports_results.append(portid)
 
                     port_result = {
                         "port": portid,
-                        "service": port.get("service", {}).get("@name", "missing name"),
+                        "service": port.service.get("name", "missing name"),
                         "asset_id": None,
                         "host": None,
                     }
                     if selector_is_asset:
                         port_result["asset_id"] = asset_list[idx]
-                        port_result["host"] = host.get("address", {}).get(
-                            "@addr", "missing IP"
-                        )
+                        port_result["host"] = host.address.get("addr", "missing IP")
                     elif idx < len(targets):
                         port_result["host"] = targets[idx]
 

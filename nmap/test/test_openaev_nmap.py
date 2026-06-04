@@ -92,8 +92,7 @@ class TestOpenAEVNmap(unittest.TestCase):
             str(context.exception), "No target identified for the property Automatic"
         )
 
-    @patch.object(module.NmapOutputParser, "parse")
-    @patch.object(module.jc, "parse")
+    @patch.object(module.NmapOutputParser, "xmlparse")
     @patch.object(module.subprocess, "run")
     @patch.object(module.Targets, "build_execution_message")
     @patch.object(module.NmapCommandBuilder, "build_args")
@@ -102,8 +101,7 @@ class TestOpenAEVNmap(unittest.TestCase):
         m_build_args,
         m_build_execution_message,
         m_subprocess_run,
-        m_jc_parse,
-        m_parse,
+        m_xmlparse,
         m_to_daemon_config,
         m_helper,
         _,
@@ -142,13 +140,12 @@ class TestOpenAEVNmap(unittest.TestCase):
         m_subprocess_run.assert_called_once_with(
             m_build_args.return_value, check=True, capture_output=True
         )
-        m_jc_parse.assert_called_once_with(
-            "xml", m_subprocess_run.return_value.stdout.decode.return_value
+        m_xmlparse.assert_called_once_with(
+            m_subprocess_run.return_value.stdout,
+            injector.current_selector_key,
+            injector.current_target_results,
         )
-        m_parse.assert_called_once_with(
-            data, m_jc_parse.return_value, injector.current_target_results
-        )
-        self.assertEqual(nmap_output, m_parse.return_value)
+        self.assertEqual(nmap_output, m_xmlparse.return_value)
 
     @patch.object(module.OpenAEVNmap, "nmap_execution")
     @patch.object(module, "SignatureManager")
