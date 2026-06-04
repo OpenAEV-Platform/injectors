@@ -29,7 +29,6 @@ class OpenAEVNmap:
         self.current_inject_id = ""
         self.current_selector_key = ""
         self.current_selector_property = ""
-        self.current_assets = []
         self.current_target_results = None
         self.current_expectation_types = []
 
@@ -39,8 +38,6 @@ class OpenAEVNmap:
         content = data["injection"]["inject_content"]
         self.current_selector_key = content[TARGET_SELECTOR_KEY]
         self.current_selector_property = content[TARGET_PROPERTY_SELECTOR_KEY]
-
-        self.current_assets = data.get(self.current_selector_key, [])
 
         self.current_target_results = Targets.extract_targets(
             self.current_selector_key, self.current_selector_property, data, self.helper
@@ -58,30 +55,6 @@ class OpenAEVNmap:
             raise ValueError(message)
 
         return targets
-
-    def build_target_meta(self) -> list[dict]:
-        target_meta = []
-
-        for asset in self.current_assets:
-            asset_meta = {key: None for key in ["agent", "asset", "asset_group"]}
-            if asset_id := asset.get("asset_id"):
-                asset_meta["asset"] = asset_id
-            if asset_group_id := asset.get("asset_group_id"):
-                asset_meta["asset_group"] = asset_group_id
-            if asset_agents := asset.get("asset_agents"):
-                agents_id = list(
-                    set(
-                        agent["agent_id"]
-                        for agent in asset_agents
-                        if agent.get("agent_id")
-                    )
-                )
-                # logger warning if more than 1?
-                if agents_id:
-                    asset_meta["agent"] = agents_id[0]
-            target_meta.append(asset_meta)
-
-        return target_meta
 
     def nmap_execution(self, start: float, data: dict, targets: list) -> dict:
         contract_id = data["injection"]["inject_injector_contract"][
@@ -128,9 +101,9 @@ class OpenAEVNmap:
         targets = self.get_targets()
 
         # generate pre execution signatures
-        network_injector_config = build_network_configs(targets)
+        network_injector_configs = build_network_configs(targets)
         pre = self.signature_manager.compile_pre_execution_signatures(
-            network_injector_config
+            network_injector_configs
         )
 
         # sending execution reception
@@ -146,7 +119,7 @@ class OpenAEVNmap:
         except subprocess.CalledProcessError as err:
             execution_message = str(err.stderr.strip().decode())
             tool_error_info = {
-                "exit_code": err.returncode,
+                "exit_code": int(err.returncode),
             }
         except Exception as err:
             execution_message = str(err)
@@ -186,8 +159,6 @@ class OpenAEVNmap:
             pre, tool_output
         )
 
-        target_meta = self.build_target_meta()
-
         callback_data["execution_duration"] = int(time.time() - start)
 
         # sending execution callback
@@ -198,7 +169,6 @@ class OpenAEVNmap:
         # sending injection signatures per expectation type
         payload = self.signature_manager.build_payload(
             post,
-            target_meta,
             expectation_types=self.current_expectation_types,
         )
         self.signature_manager.send_signatures(

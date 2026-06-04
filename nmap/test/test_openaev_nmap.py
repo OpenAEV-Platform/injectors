@@ -23,7 +23,6 @@ class TestOpenAEVNmap(unittest.TestCase):
         self.assertEqual(injector.current_inject_id, "")
         self.assertEqual(injector.current_selector_key, "")
         self.assertEqual(injector.current_selector_property, "")
-        self.assertEqual(injector.current_assets, [])
         self.assertIsNone(injector.current_target_results)
 
     @patch.object(module.Targets, "extract_targets")
@@ -56,7 +55,6 @@ class TestOpenAEVNmap(unittest.TestCase):
         self.assertEqual(injector.current_inject_id, sentinel.inject_id)
         self.assertEqual(injector.current_selector_key, "assets")
         self.assertEqual(injector.current_selector_property, "automatic")
-        self.assertEqual(injector.current_assets, [sentinel.asset])
         self.assertEqual(injector.current_target_results, sentinel.target_results)
         m_extract_targets.assert_called_with(
             "assets",
@@ -92,27 +90,6 @@ class TestOpenAEVNmap(unittest.TestCase):
             injector.get_targets()
         self.assertEqual(
             str(context.exception), "No target identified for the property Automatic"
-        )
-
-    def test_openaev_nmap_build_target_meta(self, m_to_daemon_config, m_helper, _):
-        m_helper.return_value.api = MagicMock()
-        injector = module.OpenAEVNmap()
-        current_assets = [
-            {"asset_id": "deadbeef"},
-            {"asset_id": "baadcafe", "asset_agents": [{"agent_id": "f0cacc1a"}]},
-            {"asset_group_id": "000ff1ce"},
-        ]
-        injector.current_assets = current_assets
-
-        target_meta = injector.build_target_meta()
-
-        self.assertEqual(
-            target_meta,
-            [
-                {"agent": None, "asset": "deadbeef", "asset_group": None},
-                {"agent": "f0cacc1a", "asset": "baadcafe", "asset_group": None},
-                {"agent": None, "asset": None, "asset_group": "000ff1ce"},
-            ],
         )
 
     @patch.object(module.NmapOutputParser, "parse")
@@ -173,7 +150,6 @@ class TestOpenAEVNmap(unittest.TestCase):
         )
         self.assertEqual(nmap_output, m_parse.return_value)
 
-    @patch.object(module.OpenAEVNmap, "build_target_meta")
     @patch.object(module.OpenAEVNmap, "nmap_execution")
     @patch.object(module, "SignatureManager")
     @patch.object(module, "build_network_configs")
@@ -186,7 +162,6 @@ class TestOpenAEVNmap(unittest.TestCase):
         m_build_network_configs,
         m_signaturemanager,
         m_nmap_execution,
-        m_build_target_meta,
         m_to_daemon_config,
         m_helper,
         _,
@@ -215,24 +190,85 @@ class TestOpenAEVNmap(unittest.TestCase):
         injector.helper.api.inject.execution_reception.assert_called_once_with(
             inject_id=injector.current_inject_id, data={"tracking_total_count": 1}
         )
-        m_nmap_execution(ANY, data, m_get_targets.return_value)
-        m_signaturemanager.return_valuecompile_post_execution_signatures(
-            m_signaturemanager.return_valuecompile_pre_execution_signatures.return_value,
+        m_nmap_execution.assert_called_once_with(ANY, data, m_get_targets.return_value)
+        m_signaturemanager.return_value.compile_post_execution_signatures.assert_called_once_with(
+            m_signaturemanager.return_value.compile_pre_execution_signatures.return_value,
             {
                 "error_info": None,
+                "extra_signatures": {
+                    "ports_discovered": [1, 2, 3, 4],
+                    "services_discovered": ["result0", "result1", "result2", "result3"],
+                },
+            },
+        )
+        injector.helper.api.inject.execution_callback.assert_called_once_with(
+            inject_id=injector.current_inject_id, data=ANY
+        )
+        m_signaturemanager.return_value.build_payload.assert_called_once_with(
+            m_signaturemanager.return_value.compile_post_execution_signatures.return_value,
+            expectation_types=injector.current_expectation_types,
+        )
+        m_signaturemanager.return_value.send_signatures.assert_called_once_with(
+            inject_id=injector.current_inject_id,
+            phase="execution_complete",
+            signatures=m_signaturemanager.return_value.build_payload.return_value,
+        )
+
+    @patch.object(module.OpenAEVNmap, "nmap_execution")
+    @patch.object(module, "SignatureManager")
+    @patch.object(module, "build_network_configs")
+    @patch.object(module.OpenAEVNmap, "get_targets")
+    @patch.object(module.OpenAEVNmap, "update_current_elements")
+    def test_openaev_nmap_process_message_failure(
+        self,
+        m_update_current_elements,
+        m_get_targets,
+        m_build_network_configs,
+        m_signaturemanager,
+        m_nmap_execution,
+        m_to_daemon_config,
+        m_helper,
+        _,
+    ):
+        m_helper.return_value.api = MagicMock()
+        injector = module.OpenAEVNmap()
+
+        m_nmap_execution.side_effect = module.subprocess.CalledProcessError(
+            returncode=42, cmd="", stderr=b"this is an error message"
+        )
+
+        injector.curent_inject_id = "deadbeef"
+        data = MagicMock()
+
+        injector.process_message(data)
+
+        m_update_current_elements.assert_called_once_with(data)
+        m_get_targets.assert_called_once()
+        m_build_network_configs.assert_called_once_with(m_get_targets.return_value)
+        m_signaturemanager.return_value.compile_pre_execution_signatures.assert_called_once_with(
+            m_build_network_configs.return_value
+        )
+        injector.helper.api.inject.execution_reception.assert_called_once_with(
+            inject_id=injector.current_inject_id, data={"tracking_total_count": 1}
+        )
+        m_nmap_execution.assert_called_once_with(ANY, data, m_get_targets.return_value)
+        m_signaturemanager.return_value.compile_post_execution_signatures.assert_called_once_with(
+            m_signaturemanager.return_value.compile_pre_execution_signatures.return_value,
+            {
+                "error_info": {
+                    "exit_code": 42,
+                },
                 "extra_signatures": {
                     "ports_discovered": [],
                     "services_discovered": [],
                 },
             },
         )
-        m_build_target_meta.assert_called_once()
         injector.helper.api.inject.execution_callback.assert_called_once_with(
             inject_id=injector.current_inject_id, data=ANY
         )
         m_signaturemanager.return_value.build_payload.assert_called_once_with(
             m_signaturemanager.return_value.compile_post_execution_signatures.return_value,
-            m_build_target_meta.return_value,
             expectation_types=injector.current_expectation_types,
         )
         m_signaturemanager.return_value.send_signatures.assert_called_once_with(
