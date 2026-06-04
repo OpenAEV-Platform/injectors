@@ -177,13 +177,19 @@ class OpenAEVNetExecInjector:
             "targets": targets,
             "ip_to_asset_id_map": target_results.ip_to_asset_id_map,
             "pre_sigs": pre_sigs,
+            "protocol": protocol,
         }
 
-    def _build_tool_output(self, returncode: int) -> dict:
+    def _build_tool_output(self, returncode: int, protocol: str) -> dict:
         """Build the tool_output dict for SignatureManager from a netexec returncode."""
+        tool_output: dict = {}
         if returncode != 0:
-            return {"error_info": {"exit_code": returncode}}
-        return {}
+            tool_output["error_info"] = {"exit_code": returncode}
+        tool_output["extra_signatures"] = {
+            "protocols_tested": [protocol],
+            "protocols_succeeded": [protocol] if returncode == 0 else [],
+        }
+        return tool_output
 
     def _compile_pre_signatures(self, targets: list[str]) -> dict | list[dict]:
         """Compile pre-execution signatures (captures start_time)."""
@@ -261,7 +267,8 @@ class OpenAEVNetExecInjector:
             )
 
             if targets:
-                tool_output = self._build_tool_output(returncode)
+                protocol = result.get("protocol", "")
+                tool_output = self._build_tool_output(returncode, protocol)
                 self._send_signatures(
                     inject_id, targets, ip_to_asset_id_map, pre_sigs, tool_output
                 )
