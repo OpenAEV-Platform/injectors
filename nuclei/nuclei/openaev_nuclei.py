@@ -3,15 +3,15 @@ import subprocess
 import time
 from typing import Dict
 
-from injector_common.constants import TARGET_PROPERTY_SELECTOR_KEY, TARGET_SELECTOR_KEY
-from injector_common.dump_config import intercept_dump_argument
-from injector_common.targets import TargetProperty, Targets
 from pyoaev.helpers import OpenAEVConfigHelper, OpenAEVInjectorHelper
 from pyoaev.signatures import (
     SignatureManager,
     build_network_configs,
 )
 
+from injector_common.constants import TARGET_PROPERTY_SELECTOR_KEY, TARGET_SELECTOR_KEY
+from injector_common.dump_config import intercept_dump_argument
+from injector_common.targets import TargetProperty, Targets
 from nuclei.configuration.config_loader import ConfigLoader
 from nuclei.helpers.nuclei_command_builder import NucleiCommandBuilder
 from nuclei.helpers.nuclei_output_parser import NucleiOutputParser
