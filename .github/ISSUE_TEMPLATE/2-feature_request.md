@@ -1,7 +1,7 @@
 ---
 name: Feature request
 about: Suggest a new feature or capability for the OpenAEV injectors
-title: 'feat: '
+title: 'feat(injector-name): '
 labels: needs triage, feature
 assignees: ''
 type: feature
