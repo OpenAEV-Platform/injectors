@@ -4,7 +4,7 @@ import time
 
 from pyoaev.helpers import OpenAEVConfigHelper, OpenAEVInjectorHelper
 from pyoaev.signatures import SignatureManager
-from pyoaev.signatures.models import build_network_configs
+from pyoaev.signatures.models import ExtraSignatureData, build_network_configs
 
 from injector_common.constants import TARGET_PROPERTY_SELECTOR_KEY, TARGET_SELECTOR_KEY
 from injector_common.dump_config import intercept_dump_argument
@@ -127,6 +127,9 @@ class OpenAEVNmap:
             }
         else:
             execution_message = execution_result["message"]
+        tool_output = {
+            "error_info": tool_error_info,
+        }
 
         # formatting callback data and tool_output
         callback_data = {
@@ -139,36 +142,32 @@ class OpenAEVNmap:
                 execution_result["outputs"]
             )
 
-        extra_signatures = {
-            "ports_discovered": [],
-            "services_discovered": [],
-        }
-        if execution_result:
-            outputs = execution_result.get("outputs", {})
-            extra_signatures["ports_discovered"] = outputs.get("ports", [])
-            extra_signatures["services_discovered"] = outputs.get("scan_results", [])
-
-        tool_output = {
-            "error_info": tool_error_info,
-            "extra_signatures": extra_signatures,
-        }
+        # sending execution callback
+        callback_data["execution_duration"] = int(time.time() - start)
+        self.helper.api.inject.execution_callback(
+            inject_id=self.current_inject_id, data=callback_data
+        )
 
         # generate post execution signatures
         post = self.signature_manager.compile_post_execution_signatures(
             pre, tool_output
         )
 
-        callback_data["execution_duration"] = int(time.time() - start)
-
-        # sending execution callback
-        self.helper.api.inject.execution_callback(
-            inject_id=self.current_inject_id, data=callback_data
-        )
+        extra_signatures = ExtraSignatureData()
+        if execution_result:
+            outputs = execution_result.get("outputs", {})
+            extra_data = {
+                "ports_discovered": outputs.get("ports", []),
+                "services_discovered": outputs.get("scan_results", []),
+            }
+            extra_signatures.detection = extra_data
+            extra_signatures.prevention = extra_data
 
         # sending injection signatures per expectation type
         payload = self.signature_manager.build_payload(
             post,
             expectation_types=self.current_expectation_types,
+            extra_signatures=extra_signatures,
         )
         self.signature_manager.send_signatures(
             inject_id=self.current_inject_id,

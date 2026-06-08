@@ -174,6 +174,10 @@ class TestOpenAEVNmap(unittest.TestCase):
             },
         }
         injector.curent_inject_id = "deadbeef"
+        extra_data = {
+            "ports_discovered": [1, 2, 3, 4],
+            "services_discovered": ["result0", "result1", "result2", "result3"],
+        }
         data = MagicMock()
 
         injector.process_message(data)
@@ -192,10 +196,6 @@ class TestOpenAEVNmap(unittest.TestCase):
             m_signaturemanager.return_value.compile_pre_execution_signatures.return_value,
             {
                 "error_info": None,
-                "extra_signatures": {
-                    "ports_discovered": [1, 2, 3, 4],
-                    "services_discovered": ["result0", "result1", "result2", "result3"],
-                },
             },
         )
         injector.helper.api.inject.execution_callback.assert_called_once_with(
@@ -204,6 +204,11 @@ class TestOpenAEVNmap(unittest.TestCase):
         m_signaturemanager.return_value.build_payload.assert_called_once_with(
             m_signaturemanager.return_value.compile_post_execution_signatures.return_value,
             expectation_types=injector.current_expectation_types,
+            extra_signatures=module.ExtraSignatureData(
+                detection=extra_data,
+                prevention=extra_data,
+                vulnerability={},
+            ),
         )
         m_signaturemanager.return_value.send_signatures.assert_called_once_with(
             inject_id=injector.current_inject_id,
@@ -255,10 +260,6 @@ class TestOpenAEVNmap(unittest.TestCase):
                 "error_info": {
                     "exit_code": 42,
                 },
-                "extra_signatures": {
-                    "ports_discovered": [],
-                    "services_discovered": [],
-                },
             },
         )
         injector.helper.api.inject.execution_callback.assert_called_once_with(
@@ -267,6 +268,11 @@ class TestOpenAEVNmap(unittest.TestCase):
         m_signaturemanager.return_value.build_payload.assert_called_once_with(
             m_signaturemanager.return_value.compile_post_execution_signatures.return_value,
             expectation_types=injector.current_expectation_types,
+            extra_signatures=module.ExtraSignatureData(
+                detection={},
+                prevention={},
+                vulnerability={},
+            ),
         )
         m_signaturemanager.return_value.send_signatures.assert_called_once_with(
             inject_id=injector.current_inject_id,
