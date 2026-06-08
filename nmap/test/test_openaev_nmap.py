@@ -3,18 +3,12 @@ from unittest.mock import ANY, MagicMock, patch, sentinel
 
 import nmap.openaev_nmap as module
 
-daemon_config_data = {
-    "openaev_url": "http://fake.url",
-    "openaev_token": "my_awesome_token",
-    "injector_type": "network",
-}
-
 
 @patch.object(module, "intercept_dump_argument")
 @patch.object(module, "OpenAEVInjectorHelper", autospec=True)
-@patch.object(module.ConfigLoader, "to_daemon_config", return_value=daemon_config_data)
+@patch.object(module, "ConfigLoader")
 class TestOpenAEVNmap(unittest.TestCase):
-    def test_openaev_nmap_init(self, m_to_daemon_config, m_helper, _):
+    def test_openaev_nmap_init(self, m_configloader, m_helper, _):
         m_helper.return_value.api = MagicMock()
         injector = module.OpenAEVNmap()
 
@@ -27,7 +21,7 @@ class TestOpenAEVNmap(unittest.TestCase):
 
     @patch.object(module.Targets, "extract_targets")
     def test_openaev_nmap_update_current_elements(
-        self, m_extract_targets, m_to_daemon_config, m_helper, _
+        self, m_extract_targets, m_configloader, m_helper, _
     ):
         m_helper.return_value.api = MagicMock()
         injector = module.OpenAEVNmap()
@@ -66,7 +60,7 @@ class TestOpenAEVNmap(unittest.TestCase):
             injector.current_expectation_types, ["DETECTION", "PREVENTION"]
         )
 
-    def test_openaev_nmap_get_targets(self, m_to_daemon_config, m_helper, _):
+    def test_openaev_nmap_get_targets(self, m_configloader, m_helper, _):
         m_helper.return_value.api = MagicMock()
         target_results = MagicMock()
         targets = MagicMock()
@@ -78,7 +72,7 @@ class TestOpenAEVNmap(unittest.TestCase):
 
         self.assertEqual(_targets, targets)
 
-    def test_openaev_nmap_get_targets_no_targets(self, m_to_daemon_config, m_helper, _):
+    def test_openaev_nmap_get_targets_no_targets(self, m_configloader, m_helper, _):
         m_helper.return_value.api = MagicMock()
         target_results = MagicMock()
         target_results.targets = []
@@ -102,7 +96,7 @@ class TestOpenAEVNmap(unittest.TestCase):
         m_build_execution_message,
         m_subprocess_run,
         m_xmlparse,
-        m_to_daemon_config,
+        m_configloader,
         m_helper,
         _,
     ):
@@ -159,7 +153,7 @@ class TestOpenAEVNmap(unittest.TestCase):
         m_build_network_configs,
         m_signaturemanager,
         m_nmap_execution,
-        m_to_daemon_config,
+        m_configloader,
         m_helper,
         _,
     ):
@@ -228,7 +222,7 @@ class TestOpenAEVNmap(unittest.TestCase):
         m_build_network_configs,
         m_signaturemanager,
         m_nmap_execution,
-        m_to_daemon_config,
+        m_configloader,
         m_helper,
         _,
     ):
@@ -280,7 +274,7 @@ class TestOpenAEVNmap(unittest.TestCase):
             signatures=m_signaturemanager.return_value.build_payload.return_value,
         )
 
-    def test_openaev_nmap_start(self, m_to_daemon_config, m_helper, _):
+    def test_openaev_nmap_start(self, m_configloader, m_helper, _):
         m_helper.return_value.api = MagicMock()
         injector = module.OpenAEVNmap()
 
