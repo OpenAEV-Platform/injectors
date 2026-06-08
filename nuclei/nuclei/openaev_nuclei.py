@@ -5,6 +5,7 @@ from typing import Dict
 
 from pyoaev.helpers import OpenAEVConfigHelper, OpenAEVInjectorHelper
 from pyoaev.signatures import (
+    ExtraSignatureData,
     SignatureManager,
     build_network_configs,
 )
@@ -185,12 +186,12 @@ class OpenAEVNuclei:
         expectation_signatures = signature_manager.build_payload(
             post_signatures=post_signatures,
             expectation_types=self.expectation_types,
-            extra_signature={
-                "vulnerability": {
+            extra_signatures=ExtraSignatureData(
+                vulnerability={
                     "cves_tested": [],
                     "cves_found_vulnerable": [],
                 }
-            },
+            ),
         )
 
         # Send signature to backend
