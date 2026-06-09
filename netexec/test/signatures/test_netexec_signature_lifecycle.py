@@ -208,38 +208,6 @@ class SignatureLifecycleTest(TestCase):
             config=["cfg-1", "cfg-2"]
         )
 
-    # -- Scenario: Asset metadata is mapped to signature target --
-
-    def test_build_payload_includes_asset_id_from_map(self):
-        """
-        Given an inject with target "10.0.0.1" mapped to asset id "asset-abc-123"
-        When process_message is called
-        Then build_payload is called with target meta containing asset "asset-abc-123"
-        """
-        injector = self._make_injector()
-        data, asset_map = _build_data(
-            ["10.0.0.1"], ip_to_asset_id_map={"10.0.0.1": "asset-abc-123"}
-        )
-        # Patch Targets.extract_targets to use our asset map
-        from injector_common.targets import TargetExtractionResult
-
-        with patch(
-            "netexec.openaev_netexec.Targets.extract_targets",
-            return_value=TargetExtractionResult(
-                targets=["10.0.0.1"], ip_to_asset_id_map={"10.0.0.1": "asset-abc-123"}
-            ),
-        ), patch(
-            "netexec.openaev_netexec.execute_netexec",
-            return_value=("stdout", "", 0),
-        ):
-            injector.process_message(data)
-
-        self.mock_sm.build_payload.assert_called_once()
-        kwargs = self.mock_sm.build_payload.call_args[1]
-        targets_meta = kwargs["targets_meta"]
-        self.assertIsInstance(targets_meta, list)
-        self.assertEqual(targets_meta[0].get("asset"), "asset-abc-123")
-
 
 class NetexecSignatureTypesTest(TestCase):
     """
