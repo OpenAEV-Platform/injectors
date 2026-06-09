@@ -4,7 +4,8 @@ import time
 from importlib.resources import files
 
 from pyoaev.helpers import OpenAEVConfigHelper, OpenAEVInjectorHelper
-from pyoaev.signatures import SignatureManager, build_network_configs
+from pyoaev.signatures import SignatureManager
+from pyoaev.signatures.models import ExtraSignatureData, build_network_configs
 
 from injector_common.constants import TARGET_PROPERTY_SELECTOR_KEY, TARGET_SELECTOR_KEY
 from injector_common.data_helpers import DataHelpers
@@ -80,10 +81,10 @@ class OpenAEVNetExecInjector:
 
         try:
             parsed = parse_contract_id(inject_contract)
-        except ValueError:
+        except ValueError as err:
             raise ValueError(
                 f"Unsupported contract '{inject_contract}' for NetExec injector"
-            )
+            ) from err
 
         contract_family = parsed.family
         contract_identifier = parsed.identifier
@@ -184,22 +185,10 @@ class OpenAEVNetExecInjector:
             "returncode": returncode,
             "parsed": parse_result,
             "targets": targets,
-            "ip_to_asset_id_map": target_results.ip_to_asset_id_map,
             "pre_sigs": pre_sigs,
             "protocol": protocol,
             "expectation_types": expectation_types,
         }
-
-    def _build_tool_output(self, returncode: int, protocol: str) -> dict:
-        """Build the tool_output dict for SignatureManager from a netexec returncode."""
-        tool_output: dict = {}
-        if returncode != 0:
-            tool_output["error_info"] = {"exit_code": returncode}
-        tool_output["extra_signatures"] = {
-            "protocols_tested": [protocol],
-            "protocols_succeeded": [protocol] if returncode == 0 else [],
-        }
-        return tool_output
 
     def _compile_pre_signatures(self, targets: list[str]) -> dict | list[dict]:
         """Compile pre-execution signatures (captures start_time)."""
@@ -209,22 +198,30 @@ class OpenAEVNetExecInjector:
     def _send_signatures(
         self,
         inject_id: str,
-        targets: list[str],
-        ip_to_asset_id_map: dict[str, str],
         pre_sigs: dict | list[dict],
-        tool_output: dict,
+        returncode: int,
+        protocol: str,
         expectation_types: list[str],
     ) -> None:
         """Compile post-execution signatures and send the payload."""
+        tool_output: dict = {}
+        if returncode != 0:
+            tool_output["error_info"] = {"exit_code": returncode}
         post_sigs = self.sm.compile_post_execution_signatures(pre_sigs, tool_output)
-        targets_meta = [
-            {"asset": ip_to_asset_id_map[t]} if t in ip_to_asset_id_map else {}
-            for t in targets
-        ]
+
+        extra_data = {
+            "protocols_tested": [protocol],
+            "protocols_succeeded": [protocol] if returncode == 0 else [],
+        }
+        extra_signatures = ExtraSignatureData(
+            detection=extra_data,
+            prevention=extra_data,
+        )
+
         payload = self.sm.build_payload(
             post_sigs if isinstance(post_sigs, list) else [post_sigs],
-            targets_meta=targets_meta,
             expectation_types=expectation_types,
+            extra_signatures=extra_signatures,
         )
         self.sm.send_signatures(
             inject_id=inject_id,
@@ -248,7 +245,6 @@ class OpenAEVNetExecInjector:
             stderr = (result.get("stderr") or "").strip()
             parsed = result.get("parsed")
             targets = result.get("targets", [])
-            ip_to_asset_id_map = result.get("ip_to_asset_id_map", {})
             pre_sigs = result.get("pre_sigs")
             returncode = result.get("returncode", 0 if result["success"] else 1)
 
@@ -281,13 +277,11 @@ class OpenAEVNetExecInjector:
             if targets:
                 protocol = result.get("protocol", "")
                 expectation_types = result.get("expectation_types", ["DETECTION"])
-                tool_output = self._build_tool_output(returncode, protocol)
                 self._send_signatures(
                     inject_id,
-                    targets,
-                    ip_to_asset_id_map,
                     pre_sigs,
-                    tool_output,
+                    returncode,
+                    protocol,
                     expectation_types,
                 )
 
