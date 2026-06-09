@@ -137,7 +137,7 @@ An injector may expose **one or more contracts**, depending on the inject types 
 ### Knowledge Requirements
 
 To contribute an injector, you should be comfortable with:
-- Proficiency in **Python programming** (Python 3.11+)
+- Proficiency in **Python programming (3.11+)**
 - **Pydantic** v2 models and **Pydantic Settings**
 - **Git branching** and the **Pull Request** workflow
 - **Docker** and **Docker Compose** fundamentals
@@ -149,17 +149,17 @@ required before starting.
 A running OpenAEV instance is required to register and test an injector locally. 
 The quickest path is the OpenAEV Docker stack. 
 
-You can develop injector using either:
+You can develop an injector using either:
 
 1. **Docker Environment** (Recommended for production-like testing)
   - Requires Docker Compose knowledge
   - Best for integration testing
-  - See [Docker Setup Guide](./docs/01-common-implementation.md#docker-environment)
+  - See [Docker Setup Guide](./docs/inject_types/01-common-implementation.md#docker-packaging)
 
 2. **Local Environment** (Recommended for development)
   - Faster iteration cycle
   - Easier debugging
-  - See [Local Setup Guide](./docs/01-common-implementation.md#local-environment)
+  - See [Local Setup Guide](./docs/inject_types/01-common-implementation.md#configuration)
 
 ---
 ## Getting Started
@@ -255,7 +255,7 @@ This determines:
 
 - Which `pyoaev` contract classes to use.
 - Whether an `executor / agent` is involved.
-- Whether a call API extern is involved.
+- Whether an external API call is involved.
 - Which documentation file under `docs/inject_types/` applies.
 
 ### Understanding the Template Structure
@@ -316,7 +316,7 @@ For HTTP Request injectors:
 
 > [!NOTE]
 > 
-> The all guidelines are currently being developed.
+> All guidelines are currently being developed.
 
 ### Code quality standards
 - Code style follows Black and Ruff conventions (PEP 8 compatible).
@@ -457,7 +457,7 @@ Example (`manifest-metadata.json`):
 ### Resources
 - **Filigran Homepage**: https://filigran.io/
 - **GitHub Repository**: https://github.com/OpenAEV-Platform/injectors/
-- **GitHub Documentation**: https://github.com/OpenAEV-Platform/injectors/tree/main/shodan/README.md
+- **GitHub Documentation**: https://github.com/OpenAEV-Platform/injectors/blob/main/README.md
 - **GitHub Issues**: https://github.com/OpenAEV-Platform/injectors/issues
 - **OpenAEV Ecosystem**: https://filigran.notion.site/OpenAEV-Ecosystem-30d8eb73d7d04611843e758ddef8941b
 - **OpenAEV client for Python**: https://pypi.org/project/pyoaev/
@@ -502,9 +502,10 @@ This helps avoid duplicated work and ensures alignment with maintainers.
 Format:
 ```
 # GitHub issue reference is mandatory
-[<category>] <type>(<scope>): <description> (#<issue>)
-[<category>/<other>] <type>(<scope>/<other>): <description> (#<issue>)
+<type>(<optional scope>): <description> (#<issue>)
 ```
+
+For more information, see [Conventional Commits](https://www.conventionalcommits.org/en/v1.0.0/)
 
 All PRs must pass the following checks before review:
 

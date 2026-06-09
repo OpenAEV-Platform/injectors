@@ -57,8 +57,8 @@ my_injector/
 │   │   ├── __init__.py
 │   │   ├── configs/
 │   │   │   ├── config_loader.py
-│   │   │   ├── injector_config_override.py
-│   │   │   └── my_injector_configs.py
+│   │   │   ├── injector_configs.py
+│   │   │   └── <my_injector_name>_configs.py
 │   │   └── ...
 │   ├── services/
 │   │   ├── __init__.py
@@ -228,13 +228,41 @@ to register with the `OpenAEV` platform.
 All configuration uses **Pydantic BaseSettings** (`pydantic-settings`). This replaces manual YAML parsing used in older 
 injectors.
 
+Create the following files in `models/configs`:
+- `config_loader.py`: Main configuration entry point
+- `injector_configs.py`: Common configuration shared by all injectors 
+- `<my_injector_name>_configs.py`: Configuration specific to the injector being implemented
+
 ```python
-# models/configs/my_service_configs.py
+# models/configs/config_loader.py
+
+from pydantic import Field
+from pyoaev.configuration import ConfigLoaderOAEV, SettingsLoader
+
+class ConfigLoader(SettingsLoader):
+    """Configuration loader for the injector."""
+  
+    openaev: ConfigLoaderOAEV = Field(
+      default_factory=ConfigLoaderOAEV, 
+      description="Base OpenAEV configurations."
+    )
+    injector: _ConfigLoaderInjector = Field(
+      default_factory=_ConfigLoaderInjector,
+      description="Base Injector configurations.",
+    )
+    my_injector_name: _ConfigLoaderMyInjectorName = Field(
+      default_factory=_ConfigLoaderMyInjectorName,
+      description="MyInjectorName configurations.",
+    )
+```
+
+```python
+# models/configs/<my_injector_name>_configs.py
 
 from pydantic import Field, SecretStr, PositiveInt
 from pydantic_settings import BaseSettings
 
-class _ConfigLoaderMyService(BaseSettings):
+class _ConfigLoaderMyInjectorName(BaseSettings):
     """Service-specific configuration."""
 
     base_url: str = Field(
@@ -248,23 +276,6 @@ class _ConfigLoaderMyService(BaseSettings):
         default=5,
         description="Maximum number of retry attempts.",
     )
-```
-
-```python
-# models/configs/config_loader.py
-
-from pydantic_settings import BaseSettings, SettingsConfigDict
-
-class ConfigLoader(BaseSettings):
-    model_config = SettingsConfigDict(
-        env_nested_delimiter="__",
-        yaml_file="config.yml",
-        env_ignore_empty=True,
-    )
-
-    openaev: _ConfigLoaderOpenAEV
-    injector: _ConfigLoaderInjector
-    my_service: _ConfigLoaderMyService
 ```
 
 ### Environment Variables
