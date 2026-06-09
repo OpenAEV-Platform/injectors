@@ -16,6 +16,16 @@ dependencies = [
 [project.optional-dependencies]
 dev = [
     "pyoaev @ ../../client-python",
+    "black (>=26.3.1,<26.4.0)",
+    "isort (>=8.0.1,<8.1.0)",
+    "ruff~=0.14.2",
+    "mypy~=1.18.2",
+    "pip_audit~=2.9.0",
+    "pre-commit (>=4.6.0,<4.7.0)",
+    "types-PyYAML~=6.0.12",
+    "coverage>=7.13.5",
+    "pytest (>=9.0.0,<9.1.0)",
+    "polyfactory~=2.22.2",
 ]
 
 [tool.poetry]
