@@ -498,12 +498,16 @@ This helps avoid duplicated work and ensures alignment with maintainers.
 | Documentation | `docs/<issue>-<description>`           | 
 | CI            | `ci/<issue>-<description>`             |
 
-**Commit message format**: This repository enforces a strict commit convention validated in CI.
+**Commit and PR title format**: This repository enforces a strict commit convention validated in CI.
 Format:
 ```
-# GitHub issue reference is mandatory
-<type>(<optional scope>): <description> (#<issue>)
+type(scope?)!?: description (#123)
 ```
+- **type**: one of `feat`, `fix`, `chore`, `docs`, `style`, `refactor`, `perf`, `test`, `build`, `ci`, `revert`
+- **scope**: optional — use the injector name or affected area
+- **description**: must start with a lowercase letter
+- **`(#123)`**: required — the linked issue number at the end
+- Examples: `feat(http-request): add retry mechanism (#42)`, `fix: resolve config loading issue (#99)`
 
 For more information, see [Conventional Commits](https://www.conventionalcommits.org/en/v1.0.0/)
 
