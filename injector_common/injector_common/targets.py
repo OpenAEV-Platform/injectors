@@ -19,6 +19,13 @@ class TargetExtractionResult:
     ip_to_asset_id_map: Dict[str, str]
 
 
+@dataclass
+class TargetMeta:
+    agent_id: str | None = None
+    asset_id: str | None = None
+    asset_group_id: str | None = None
+
+
 class TargetProperty(Enum):
     AUTOMATIC = "Automatic"
     HOSTNAME = "Hostname"
@@ -32,6 +39,74 @@ target_property_choices_dict = {
 
 
 class Targets:
+    @staticmethod
+    def extract_target_meta(
+        selector_key: str,
+        selector_property: str,
+        data: dict,
+        helper: OpenAEVInjectorHelper,
+    ) -> list[TargetMeta]:
+        """Return 1+ TargetMeta providing the matching between 1+ asset ID, 0+ asset group ID and 0+ agent ID"""
+        targets: list[TargetMeta] = []
+
+        if selector_key == "asset-groups" and data[ASSET_GROUPS_KEY_RABBITMQ]:
+            helper.injector_logger.info(
+                "Fetching all endpoint targets from asset groups with pagination"
+            )
+            asset_group_ids = [
+                g["asset_group_id"] for g in data[ASSET_GROUPS_KEY_RABBITMQ]
+            ]
+            for asset_group_id in asset_group_ids:
+                assets = Pagination.fetch_all_targets(helper, asset_group_id)
+                helper.injector_logger.info(
+                    f"Fetched {len(assets)} assets from groups."
+                )
+                for asset in assets:
+                    meta = {
+                        "asset_group_id": asset_group_id,
+                    }
+                    if asset_id := asset.get("asset_id"):
+                        meta["asset_id"] = asset_id
+                    if asset_agents := asset.get("asset_agents"):
+                        agents_id = list(
+                            set(
+                                agent["agent_id"]
+                                for agent in asset_agents
+                                if agent.get("agent_id")
+                            )
+                        )
+                        if agents_id:
+                            meta["agent_id"] = agents_id[0]
+                    targets.append(TargetMeta(**meta))
+            return targets
+
+        if selector_key == "assets" and data[ASSETS_KEY_RABBITMQ]:
+            assets = data[ASSETS_KEY_RABBITMQ]
+            for asset in assets:
+                meta = {}
+                if asset_id := asset.get("asset_id"):
+                    meta["asset_id"] = asset_id
+                if asset_agents := asset.get("asset_agents"):
+                    agents_id = list(
+                        set(
+                            agent["agent_id"]
+                            for agent in asset_agents
+                            if agent.get("agent_id")
+                        )
+                    )
+                    if agents_id:
+                        meta["agent_id"] = agents_id[0]
+                targets.append(TargetMeta(**meta))
+            return targets
+
+        if selector_key == "manual":
+            helper.injector_logger.info(
+                "target meta extraction unsupported for manual inputs, reason: lack of ID"
+            )
+            return []
+
+        raise ValueError("No targets provided for this injection")
+
     @staticmethod
     def extract_targets(
         selector_key: str,
