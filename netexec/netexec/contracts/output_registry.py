@@ -27,6 +27,7 @@ VULNERABILITY = "vulnerability"
 ACCOUNT_PW_NOT_REQUIRED = "account_with_password_not_required"
 ASREPROASTABLE = "asreproastable_account"
 KERBEROASTABLE = "kerberoastable_account"
+EXPECTATION_SIGNATURE = "expectation_signature"
 
 # ---------------------------------------------------------------------------
 # Options that produce NO structured output (actions, config toggles)
