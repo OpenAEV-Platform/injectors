@@ -11,6 +11,7 @@ requires-python = ">=3.11,<4.0"
 dependencies = [
     "pyoaev (==2.260604.0); extra != 'dev'",
     "injector_common @ ../injector_common",
+    "lxml (==6.1.1)",
 ]
 
 [project.optional-dependencies]
