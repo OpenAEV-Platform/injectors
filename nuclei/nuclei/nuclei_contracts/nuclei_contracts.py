@@ -99,12 +99,26 @@ class NucleiContracts:
             cardinality=ContractCardinality.Multiple,
             predefinedExpectations=[
                 Expectation(
+                    expectation_type=ExpectationType.detection,
+                    expectation_name="Detection",
+                    expectation_description="",
+                    expectation_score=100,
+                    expectation_expectation_group=False,
+                ),
+                Expectation(
+                    expectation_type=ExpectationType.prevention,
+                    expectation_name="Prevention",
+                    expectation_description="",
+                    expectation_score=100,
+                    expectation_expectation_group=False,
+                ),
+                Expectation(
                     expectation_type=ExpectationType.vulnerability,
                     expectation_name="Not vulnerable",
                     expectation_description="",
                     expectation_score=100,
                     expectation_expectation_group=False,
-                )
+                ),
             ],
         )
 
@@ -119,6 +133,13 @@ class NucleiContracts:
 
     @staticmethod
     def core_outputs():
+        output_expectation_signature = ContractOutputElement(
+            type=ContractOutputType.ExpectationSignature,
+            field="expectation_signature",
+            isMultiple=True,
+            isFindingCompatible=True,
+            labels=["nuclei"],
+        )
         output_vulns = ContractOutputElement(
             type=ContractOutputType.CVE,
             field="cve",
@@ -133,7 +154,7 @@ class NucleiContracts:
             isFindingCompatible=True,
             labels=["nuclei"],
         )
-        return [output_vulns, output_others]
+        return [output_expectation_signature, output_vulns, output_others]
 
     @staticmethod
     def build_contract(
