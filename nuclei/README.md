@@ -63,6 +63,86 @@ file (`config.yml`, manual).
 
 ---
 
+### Nuclei environment variables
+
+| Parameter                              | config.yml                              | Docker environment variable             | Default      | Mandatory | Description                                                                                          |
+|----------------------------------------|-----------------------------------------|-----------------------------------------|--------------|-----------|------------------------------------------------------------------------------------------------------|
+| Nuclei Scan Strategy                   | `nuclei.scan_strategy`                  | `NUCLEI_SCAN_STRATEGY`                  | `host-spray` | No        | Strategy to use while scanning (auto, host-spray, template-spray). Nuclei Flags: -ss, -scan-strategy |
+| Nuclei Templates Parallelism           | `nuclei.templates_parallelism`          | `NUCLEI_TEMPLATES_PARALLELISM`          | `5`          | No        | Maximum number of templates to be executed in parallel. Nuclei Flags: -c, -concurrency               |
+| Nuclei Hosts parallelism per templates | `nuclei.hosts_parallelism_per_template` | `NUCLEI_HOSTS_PARALLELISM_PER_TEMPLATE` | `5`          | No        | Maximum number of hosts to be analyzed in parallel per template. Nuclei Flags: -bs, -bulk-size       |
+| Nuclei Max requests per second         | `nuclei.max_requests_per_second`        | `NUCLEI_MAX_REQUESTS_PER_SECOND`        | `50`         | No        | Maximum number of requests to send per second. Nuclei Flags: -rl, -rate-limit                        |
+| Nuclei Timeout                         | `nuclei.timeout`                        | `NUCLEI_TIMEOUT`                        | `10`         | No        | Time to wait in seconds before timeout. Nuclei Flags: -timeout                                       |
+| Nuclei Retries                         | `nuclei.retries`                        | `NUCLEI_RETRIES`                        | `1`          | No        | Number of times to retry a failed request. Nuclei Flags: -retries                                    |
+| Nuclei Max host error                  | `nuclei.max_host_error`                 | `NUCLEI_MAX_HOST_ERROR`                 | `30`         | No        | Max errors for a host before skipping from scan. Nuclei Flags: -mhe, -max-host-error                 |
+| Nuclei response size read              | `nuclei.response_size_read`             | `NUCLEI_RESPONSE_SIZE_READ`             | `1048576`    | No        | Max response size to read in bytes. Nuclei Flags: -rsr, -response-size-read                          |
+| Nuclei response size save              | `nuclei.response_size_save`             | `NUCLEI_RESPONSE_SIZE_SAVE`             | `1048576`    | No        | Max response size to save in bytes. Nuclei Flags: -rss, -response-size-save                          |
+| Nuclei exclude type                    | `nuclei.exclude_type`                   | `NUCLEI_EXCLUDE_TYPE`                   | `headless`   | No        | Templates to exclude based on protocol type (comma-separated). Nuclei Flags: -ept, -exclude-type     |
+| Nuclei exclude severity                | `nuclei.exclude_severity`               | `NUCLEI_EXCLUDE_SEVERITY`               | /            | No        | Templates to exclude based on severity (comma-separated). Nuclei Flags: -es, -exclude-severity       |
+
+#### Nuclei Resource Management
+
+> [!IMPORTANT]
+> 
+> To ensure optimal stability, security, and compatibility, Nuclei must be kept up to date. 
+> Recommended Nuclei version: v3.8.0
+
+Nuclei is a highly concurrent vulnerability scanner. While this enables fast and scalable scans, it can also lead to 
+significant CPU, memory, and network consumption if not properly configured. For this reason, Nuclei injector exposes a 
+controlled subset of Nuclei performance and safety parameters that can be adjusted based on infrastructure capacity and 
+scanning requirements.
+
+The default injector configuration is intentionally conservative and designed as a safe baseline for containerized 
+environments, including Kubernetes clusters with typical memory limits of `256Mi`-`512Mi` per pod.
+
+> [!WARNING]
+> 
+> If flags and available options are not properly configured, Nuclei can overutilize resources and can cause following issues:
+> - OOM Killed by the system
+> - Hangs and crashes
+> - Error code 137 etc
+
+Resource consumption scales multiplicatively rather than linearly, meaning that increasing multiple parameters 
+simultaneously significantly amplifies memory and CPU usage.
+
+| Parameter                        | Corresponding Flag   | Safe  | Balanced | Fast    |
+|----------------------------------|----------------------|-------|----------|---------|
+| `templates_parallelism`          | `-c`, `-concurrency` | 5–10  | 10–15    | 15–25   |
+| `hosts_parallelism_per_template` | `-bs`, `-bulk-size`  | 5–10  | 10–15    | 15–25   |
+| `max_requests_per_second`        | `-rl`, `-rate-limit` | 20–50 | 50–100   | 100–150 |
+
+These parameters are interdependent and must be adjusted together rather than in isolation. They should also be 
+adjusted gradually according to the infrastructure capacity and workload characteristics.
+
+Configuration tuning should always take into account the execution context:
+- For `single-target` scans, higher concurrency values can be safely used to improve performance.
+- For `multi-target` scans, it is recommended to use more conservative settings to avoid resource saturation.
+
+Nuclei configuration requires careful trade-offs, as these parameters directly impact performance, stability, and 
+resource consumption.
+
+The following guidelines should be considered:
+- Higher safety settings increase scan duration but improve stability.
+- `host-spray` is the recommended scan strategy for predictable and stable resource usage.
+- `max_host_error` must be greater than `templates_parallelism` and `hosts_parallelism_per_template` to prevent 
+premature host exclusion under high concurrency workloads.
+- `headless` templates should be used with caution due to their high resource consumption (embedded headless browser 
+execution).
+- Increasing template exclusions (`exclude_type`, `exclude_severity`) reduces the active template set and improves scan 
+performance.
+
+> [!WARNING]
+> 
+> The `response_size_read` parameter has a direct impact on memory consumption:
+> Memory usage is approximately proportional to:
+> - 1–1.5 × (`templates_parallelism` × `response_size_read`)
+> 
+> For this reason, increasing both `templates_parallelism` and `response_size_read` simultaneously can significantly 
+> increase memory pressure and lead to `OOM Killed` in constrained environments.
+
+For more information:
+- See [Nuclei's documentation on mass scanning](https://docs.projectdiscovery.io/opensource/nuclei/mass-scanning-cli#understanding-how-nuclei-consumes-resources)
+- See [Nuclei's documentation on flags](https://docs.projectdiscovery.io/opensource/nuclei/running#nuclei-flags)
+
 ## Deployment
 
 ### Docker Deployment

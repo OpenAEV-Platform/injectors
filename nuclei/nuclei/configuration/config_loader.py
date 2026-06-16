@@ -2,12 +2,25 @@ from pydantic import Field
 from pyoaev.configuration import ConfigLoaderOAEV, Configuration, SettingsLoader
 
 from nuclei.configuration.injector_config_override import InjectorConfigOverride
+from nuclei.configuration.nuclei_configs import _ConfigLoaderNuclei
 from nuclei.nuclei_contracts.nuclei_contracts import NucleiContracts
 
 
 class ConfigLoader(SettingsLoader):
-    openaev: ConfigLoaderOAEV = Field(default_factory=ConfigLoaderOAEV)
-    injector: InjectorConfigOverride = Field(default_factory=InjectorConfigOverride)
+    """Configuration loader for the injector."""
+
+    openaev: ConfigLoaderOAEV = Field(
+        default_factory=ConfigLoaderOAEV,
+        description="Base OpenAEV configurations.",
+    )
+    injector: InjectorConfigOverride = Field(
+        default_factory=InjectorConfigOverride,
+        description="Base Injector configurations.",
+    )
+    nuclei: _ConfigLoaderNuclei = Field(
+        default_factory=_ConfigLoaderNuclei,
+        description="Nuclei configurations.",
+    )
 
     def to_daemon_config(self) -> Configuration:
         return Configuration(

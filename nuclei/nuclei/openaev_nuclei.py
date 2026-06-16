@@ -17,6 +17,7 @@ from nuclei.nuclei_contracts.external_contracts import ExternalContractsSchedule
 
 class OpenAEVNuclei:
     def __init__(self):
+        self.config_loader = ConfigLoader()
         self.config = OpenAEVConfigHelper.from_configuration_object(
             ConfigLoader().to_daemon_config()
         )
@@ -29,7 +30,6 @@ class OpenAEVNuclei:
             raise RuntimeError(
                 "Nuclei is not installed or is not accessible from your PATH."
             )
-        self.command_builder = NucleiCommandBuilder()
         self.parser = NucleiOutputParser()
 
     def nuclei_execution(self, start: float, data: Dict) -> Dict:
@@ -50,9 +50,15 @@ class OpenAEVNuclei:
         if not targets:
             message = f"No target identified for the property {TargetProperty[selector_property.upper()].value}"
             raise ValueError(message)
-        # Build Arguments to execute
-        nuclei_args = self.command_builder.build_args(contract_id, content, targets)
-        input_data = "\n".join(targets).encode("utf-8")
+
+        # Nuclei Args Builder
+        nuclei_builder = NucleiCommandBuilder(
+            nuclei_configs=self.config_loader.nuclei,
+            contract_id=contract_id,
+            content=content,
+            targets=targets,
+        )
+        nuclei_args = nuclei_builder.build()
 
         self.helper.injector_logger.info(
             "Executing nuclei with: " + " ".join(nuclei_args)
@@ -74,7 +80,9 @@ class OpenAEVNuclei:
             data=callback_data,
         )
 
+        input_data = ("\n".join(targets) + "\n").encode("utf-8")
         result = NucleiProcess.nuclei_execute(nuclei_args, input_data)
+
         return self.parser.parse(
             result.stdout.decode("utf-8"), target_results.ip_to_asset_id_map
         )
@@ -113,7 +121,8 @@ class OpenAEVNuclei:
                 inject_id=inject_id, data=callback_data
             )
 
-    def _check_nuclei_installed(self):
+    @staticmethod
+    def _check_nuclei_installed():
         try:
             NucleiProcess.nuclei_version()
             return True
