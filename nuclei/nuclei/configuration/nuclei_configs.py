@@ -94,7 +94,7 @@ class _ConfigLoaderNuclei(BaseSettings):
             "javascript",
         ]
     ] = Field(
-        default=["headless"],
+        default_factory=lambda: ["headless"],
         description=(
             "Templates to exclude based on protocol type (comma-separated). "
             "Nuclei Flags: -ept, -exclude-type"
@@ -111,7 +111,7 @@ class _ConfigLoaderNuclei(BaseSettings):
             "unknown",
         ]
     ] = Field(
-        default=[],
+        default_factory=list,
         description=(
             "Templates to exclude based on severity (comma-separated). "
             "Nuclei Flags: -es, -exclude-severity"

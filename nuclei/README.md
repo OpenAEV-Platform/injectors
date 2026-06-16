@@ -96,7 +96,8 @@ environments, including Kubernetes clusters with typical memory limits of `256Mi
 
 > [!WARNING]
 > 
-> If flags and available options are not properly configured, Nuclei can overutilize resources and can cause following issues:
+> If flags and available options are not properly configured, Nuclei can overutilize resources and can cause the 
+> following issues:
 > - OOM Killed by the system
 > - Hangs and crashes
 > - Error code 137 etc

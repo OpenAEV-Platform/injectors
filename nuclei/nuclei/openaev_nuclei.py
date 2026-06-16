@@ -19,7 +19,7 @@ class OpenAEVNuclei:
     def __init__(self):
         self.config_loader = ConfigLoader()
         self.config = OpenAEVConfigHelper.from_configuration_object(
-            ConfigLoader().to_daemon_config()
+            self.config_loader.to_daemon_config()
         )
         intercept_dump_argument(self.config.get_config_obj())
         self.helper = OpenAEVInjectorHelper(
