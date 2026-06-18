@@ -1,3 +1,5 @@
+import shlex
+
 from nuclei.nuclei_contracts.nuclei_constants import (
     CLOUD_SCAN_CONTRACT,
     CVE_SCAN_CONTRACT,
@@ -34,6 +36,7 @@ class NucleiCommandBuilder:
         self.targets = targets
 
     def build(self):
+        self.args = []
         build = (
             self._with_nuclei()
             ._with_configs()
@@ -50,13 +53,6 @@ class NucleiCommandBuilder:
     def _with_nuclei(self):
         self.args += ["nuclei"]
         return self
-
-    # def _with_targets(self):
-    #     # Target URLs/hosts to scan.
-    #     # Nuclei Flags: -u, -target
-    #     for target in self.targets:
-    #         self.args += ["-u", target]
-    #     return self
 
     def _with_tags(self):
         # Templates to run based on tags.
@@ -84,7 +80,8 @@ class NucleiCommandBuilder:
     def _with_options(self):
         options = self.content.get("options")
         if options:
-            self.args += [options]
+            options_parsed = shlex.split(options)
+            self.args += options_parsed
         return self
 
     def _with_jsonl_output(self):

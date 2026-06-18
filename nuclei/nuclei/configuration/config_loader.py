@@ -2,7 +2,7 @@ from pydantic import Field
 from pyoaev.configuration import ConfigLoaderOAEV, Configuration, SettingsLoader
 
 from nuclei.configuration.injector_config_override import InjectorConfigOverride
-from nuclei.configuration.nuclei_configs import _ConfigLoaderNuclei
+from nuclei.configuration.nuclei_configs import ConfigLoaderNuclei
 from nuclei.nuclei_contracts.nuclei_contracts import NucleiContracts
 
 
@@ -17,8 +17,8 @@ class ConfigLoader(SettingsLoader):
         default_factory=InjectorConfigOverride,
         description="Base Injector configurations.",
     )
-    nuclei: _ConfigLoaderNuclei = Field(
-        default_factory=_ConfigLoaderNuclei,
+    nuclei: ConfigLoaderNuclei = Field(
+        default_factory=ConfigLoaderNuclei,
         description="Nuclei configurations.",
     )
 

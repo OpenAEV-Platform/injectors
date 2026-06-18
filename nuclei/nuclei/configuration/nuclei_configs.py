@@ -6,7 +6,7 @@ from pydantic import Field, PositiveInt, field_validator
 from pydantic_settings import BaseSettings
 
 
-class _ConfigLoaderNuclei(BaseSettings):
+class ConfigLoaderNuclei(BaseSettings):
     """Nuclei configurations"""
 
     scan_strategy: Literal["auto", "host-spray", "template-spray"] = Field(
