@@ -4,7 +4,11 @@ import time
 
 from pyoaev.helpers import OpenAEVConfigHelper, OpenAEVInjectorHelper
 from pyoaev.signatures import SignatureManager
-from pyoaev.signatures.models import ExtraSignatureData, build_network_configs
+from pyoaev.signatures.models import (
+    ExecutionDetails,
+    ExtraSignatureData,
+    build_network_configs,
+)
 
 from injector_common.constants import TARGET_PROPERTY_SELECTOR_KEY, TARGET_SELECTOR_KEY
 from injector_common.dump_config import intercept_dump_argument
@@ -41,9 +45,14 @@ class OpenAEVNmap:
         self.current_target_results = Targets.extract_targets(
             self.current_selector_key, self.current_selector_property, data, self.helper
         )
+        self.current_targets_meta = Targets.extract_target_meta(
+            self.current_selector_key, self.current_selector_property, data, self.helper
+        )
 
         self.current_expectation_types = [
-            expectation["expectation_type"] for expectation in content["expectations"]
+            expectation.get("expectation_type")
+            for expectation in content.get("expectations", [])
+            if expectation.get("expectation_type")
         ]
 
     def get_targets(self) -> list:
@@ -99,9 +108,12 @@ class OpenAEVNmap:
 
         targets = self.get_targets()
 
-        # generate pre execution signatures
+        # create execution details object
+        execution_details = ExecutionDetails()
+
+        # generate execution signatures
         network_injector_configs = build_network_configs(targets)
-        pre = self.signature_manager.compile_pre_execution_signatures(
+        execution_signatures = self.signature_manager.build_execution_signatures(
             network_injector_configs
         )
 
@@ -148,10 +160,12 @@ class OpenAEVNmap:
             inject_id=self.current_inject_id, data=callback_data
         )
 
-        # generate post execution signatures
-        post = self.signature_manager.compile_post_execution_signatures(
-            pre, tool_output
+        # update post execution
+        self.helper.injector_logger.info("post execution updates")
+        self.signature_manager.post_execution_updates(
+            execution_details, execution_signatures, tool_output
         )
+        self.helper.injector_logger.info(execution_details)
 
         extra_signatures = ExtraSignatureData()
         if execution_result:
@@ -164,14 +178,18 @@ class OpenAEVNmap:
             extra_signatures.prevention = extra_data
 
         # sending injection signatures per expectation type
+        self.helper.injector_logger.info("build payload")
         payload = self.signature_manager.build_payload(
-            post,
+            execution_signatures=execution_signatures,
+            targets_meta=self.current_targets_meta,
             expectation_types=self.current_expectation_types,
             extra_signatures=extra_signatures,
         )
+        self.helper.injector_logger.info(payload)
+        self.helper.injector_logger.info("send signatures")
         self.signature_manager.send_signatures(
             inject_id=self.current_inject_id,
-            phase="execution_complete",
+            execution_details=execution_details,
             signatures=payload,
         )
 
