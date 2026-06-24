@@ -1,9 +1,22 @@
 openaev:
-  url: 'ChangeMe'
-  token: 'ChangeMe'
-# tenant_id: 'ChangeMe'
+  url: "ChangeMe"
+  token: "ChangeMe"
+  tenant_id: "ChangeMe"
 
 injector:
-  id: 'ChangeMe'
-  name: 'Nuclei'
-  log_level: 'ChangeMe'
+  id: "nuclei--ChangeMe"
+  name: "Nuclei"
+  log_level: "error"
+
+nuclei:
+  scan_strategy: "host-spray" # Available values: auto / host-spray / template-spray
+  templates_parallelism: 5 # (concurrency)
+  hosts_parallelism_per_template: 5 # (bulk_size)
+  max_requests_per_second: 50 # (rate_limit)
+  timeout: 10
+  retries: 1
+  max_host_error: 30
+  response_size_read: 1048576  # in bytes
+  response_size_save: 1048576  # in bytes
+  exclude_type: "headless" # Available values: dns, file, http, headless, tcp, workflow, ssl, websocket, whois, code, javascript
+#  exclude_severity: "ChangeMe" # Available values: info, low, medium, high, critical, unknown
