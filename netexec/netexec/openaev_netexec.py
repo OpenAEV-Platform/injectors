@@ -164,6 +164,8 @@ class OpenAEVNetExecInjector:
                         stdout = stdout.rstrip("\n") + "\n" + file_content
                 except FileNotFoundError:
                     pass
+        except Exception:
+            pass
         finally:
             if output_file:
                 try:
