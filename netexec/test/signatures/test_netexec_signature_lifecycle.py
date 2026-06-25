@@ -57,12 +57,9 @@ class SignatureLifecycleTest(TestCase):
         self.mock_sm = self.MockSignatureManager.return_value
 
         # compile_pre returns a list matching the target count
-        self.mock_sm.compile_pre_execution_signatures.side_effect = lambda **kw: (
+        self.mock_sm.build_execution_signatures.side_effect = lambda **kw: (
             kw["config"] if isinstance(kw["config"], list) else [kw["config"]]
         )
-        # compile_post returns whatever pre returned (simple passthrough)
-        self.mock_sm.compile_post_execution_signatures.side_effect = lambda pre, _: pre
-        self.mock_sm.build_payload.return_value = {"phase": "execution_complete"}
 
     def tearDown(self):
         self.sm_patcher.stop()
@@ -101,7 +98,7 @@ class SignatureLifecycleTest(TestCase):
         """
         Given an inject with a single IPv4 target "10.0.0.1"
         When process_message is called
-        Then compile_pre_execution_signatures is called with a NetworkInjectorConfig for "10.0.0.1"
+        Then build_execution_signatures is called with a NetworkInjectorConfig for "10.0.0.1"
         """
         injector = self._make_injector()
         data, _ = _build_data(["10.0.0.1"])
@@ -111,7 +108,7 @@ class SignatureLifecycleTest(TestCase):
             self._run_process_message(injector, data)
 
         mock_build.assert_called_once_with(["10.0.0.1"])
-        self.mock_sm.compile_pre_execution_signatures.assert_called_once_with(
+        self.mock_sm.build_execution_signatures.assert_called_once_with(
             config=["cfg-10.0.0.1"]
         )
 
@@ -122,14 +119,14 @@ class SignatureLifecycleTest(TestCase):
         Given an inject with a single IPv4 target "10.0.0.1"
         And NetExec exits with return code 0
         When process_message is called
-        Then compile_post_execution_signatures is called with a success tool_output
+        Then post_execution_updates is called with a success tool_output
         """
         injector = self._make_injector()
         data, _ = _build_data(["10.0.0.1"])
         self._run_process_message(injector, data, returncode=0)
 
-        self.mock_sm.compile_post_execution_signatures.assert_called_once()
-        _, tool_output = self.mock_sm.compile_post_execution_signatures.call_args[0]
+        self.mock_sm.post_execution_updates.assert_called_once()
+        _, _, tool_output = self.mock_sm.post_execution_updates.call_args[0]
         # A successful run has no error_info with non-zero exit code
         error_info = tool_output.get("error_info") or {}
         exit_code = error_info.get("exit_code", 0)
@@ -142,26 +139,26 @@ class SignatureLifecycleTest(TestCase):
         Given an inject with a single IPv4 target "10.0.0.1"
         And NetExec exits with return code 1
         When process_message is called
-        Then compile_post_execution_signatures is called with a non-zero exit code
+        Then post_execution_updates is called with a non-zero exit code
         """
         injector = self._make_injector()
         data, _ = _build_data(["10.0.0.1"])
         self._run_process_message(injector, data, returncode=1)
 
-        self.mock_sm.compile_post_execution_signatures.assert_called_once()
-        _, tool_output = self.mock_sm.compile_post_execution_signatures.call_args[0]
+        self.mock_sm.post_execution_updates.assert_called_once()
+        _, _, tool_output = self.mock_sm.post_execution_updates.call_args[0]
         error_info = tool_output.get("error_info") or {}
         exit_code = error_info.get("exit_code", 0)
         self.assertNotEqual(exit_code, 0)
 
     # -- Scenario: Signatures are sent after execution (success or failure) --
 
-    def test_send_signatures_called_with_inject_id_and_phase(self):
+    def test_send_signatures_called_with_inject_id_and_execution_details(self):
         """
         Given an inject with a single IPv4 target "10.0.0.1"
         And NetExec exits with return code 0
         When process_message is called
-        Then send_signatures is called with the inject id and phase "execution_complete"
+        Then send_signatures is called with the inject id and execution details
         """
         injector = self._make_injector()
         data, _ = _build_data(["10.0.0.1"], inject_id="inject-xyz")
@@ -170,14 +167,13 @@ class SignatureLifecycleTest(TestCase):
         self.mock_sm.send_signatures.assert_called_once()
         kwargs = self.mock_sm.send_signatures.call_args[1]
         self.assertEqual(kwargs["inject_id"], "inject-xyz")
-        self.assertEqual(kwargs["phase"], "execution_complete")
 
     def test_send_signatures_called_on_failed_execution(self):
         """
         Given an inject with a single IPv4 target "10.0.0.1"
         And NetExec exits with return code 1
         When process_message is called
-        Then send_signatures is still called with the inject id and phase "execution_complete"
+        Then send_signatures is still called with the inject id and execution details
         """
         injector = self._make_injector()
         data, _ = _build_data(["10.0.0.1"], inject_id="inject-fail")
@@ -186,7 +182,6 @@ class SignatureLifecycleTest(TestCase):
         self.mock_sm.send_signatures.assert_called_once()
         kwargs = self.mock_sm.send_signatures.call_args[1]
         self.assertEqual(kwargs["inject_id"], "inject-fail")
-        self.assertEqual(kwargs["phase"], "execution_complete")
 
     # -- Scenario: Each target gets its own signature config --
 
@@ -194,7 +189,7 @@ class SignatureLifecycleTest(TestCase):
         """
         Given an inject with targets "10.0.0.1" and "192.168.1.1"
         When process_message is called
-        Then compile_pre_execution_signatures is called with 2 NetworkInjectorConfig entries
+        Then build_execution_signatures is called with 2 NetworkInjectorConfig entries
         """
         injector = self._make_injector()
         data, _ = _build_data(["10.0.0.1", "192.168.1.1"])
@@ -204,7 +199,7 @@ class SignatureLifecycleTest(TestCase):
             self._run_process_message(injector, data)
 
         mock_build.assert_called_once_with(["10.0.0.1", "192.168.1.1"])
-        self.mock_sm.compile_pre_execution_signatures.assert_called_once_with(
+        self.mock_sm.build_execution_signatures.assert_called_once_with(
             config=["cfg-1", "cfg-2"]
         )
 
