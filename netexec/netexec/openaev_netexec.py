@@ -5,7 +5,11 @@ from importlib.resources import files
 
 from pyoaev.helpers import OpenAEVConfigHelper, OpenAEVInjectorHelper
 from pyoaev.signatures import SignatureManager
-from pyoaev.signatures.models import ExtraSignatureData, build_network_configs
+from pyoaev.signatures.models import (
+    ExecutionDetails,
+    ExtraSignatureData,
+    build_network_configs,
+)
 
 from injector_common.constants import TARGET_PROPERTY_SELECTOR_KEY, TARGET_SELECTOR_KEY
 from injector_common.data_helpers import DataHelpers
@@ -110,6 +114,13 @@ class OpenAEVNetExecInjector:
             message = f"No target identified for the property {TargetProperty[selector_property.upper()].value}"
             raise ValueError(message)
 
+        targets_meta = Targets.extract_target_meta(
+            selector_key,
+            selector_property,
+            data,
+            self.helper,
+        )
+
         if contract_family == "base":
             parsed_data = extract_data_base(content, protocol)
         elif contract_family == "option":
@@ -149,7 +160,7 @@ class OpenAEVNetExecInjector:
         )
 
         output_file = parsed_data.get("output_file") if parsed_data else None
-        pre_sigs = self._compile_pre_signatures(targets)
+        execution_details, execution_signatures = self._pre_execution_compile(targets)
         try:
             stdout, stderr, returncode = execute_netexec(cmd)
 
@@ -162,10 +173,12 @@ class OpenAEVNetExecInjector:
                         file_content = f.read()
                     if file_content.strip():
                         stdout = stdout.rstrip("\n") + "\n" + file_content
-                except FileNotFoundError:
-                    pass
-        except Exception:
-            pass
+                except FileNotFoundError as err:
+                    self.helper.injector_logger.error(
+                        f"Unable to execute NetExec due to missing file: {err}"
+                    )
+        except Exception as err:
+            self.helper.injector_logger.error(f"Unable to execute NetExec: {err}")
         finally:
             if output_file:
                 try:
@@ -187,29 +200,40 @@ class OpenAEVNetExecInjector:
             "returncode": returncode,
             "parsed": parse_result,
             "targets": targets,
-            "pre_sigs": pre_sigs,
+            "targets_meta": targets_meta,
+            "execution_details": execution_details,
+            "execution_signatures": execution_signatures,
             "protocol": protocol,
             "expectation_types": expectation_types,
         }
 
-    def _compile_pre_signatures(self, targets: list[str]) -> dict | list[dict]:
-        """Compile pre-execution signatures (captures start_time)."""
+    def _pre_execution_compile(self, targets: list[str]) -> dict | list[dict]:
+        """Compile pre-execution elements (captures start_time)."""
+        execution_details = ExecutionDetails()
         configs = build_network_configs(targets)
-        return self.sm.compile_pre_execution_signatures(config=configs)
+        execution_signatures = self.sm.build_execution_signatures(config=configs)
+        return execution_details, execution_signatures
 
     def _send_signatures(
         self,
         inject_id: str,
-        pre_sigs: dict | list[dict],
+        execution_details: dict | list[dict],
+        execution_signatures: dict | list[dict],
         returncode: int,
         protocol: str,
         expectation_types: list[str],
+        targets_meta: list[dict],
     ) -> None:
         """Compile post-execution signatures and send the payload."""
         tool_output: dict = {}
         if returncode != 0:
             tool_output["error_info"] = {"exit_code": returncode}
-        post_sigs = self.sm.compile_post_execution_signatures(pre_sigs, tool_output)
+        self.sm.post_execution_updates(
+            execution_details, execution_signatures, tool_output
+        )
+        self.helper.injector_logger.info(
+            "Execution details updated: %s", execution_details
+        )
 
         extra_data = {
             "protocols_tested": [protocol],
@@ -221,13 +245,17 @@ class OpenAEVNetExecInjector:
         )
 
         payload = self.sm.build_payload(
-            post_sigs if isinstance(post_sigs, list) else [post_sigs],
+            execution_signatures=execution_signatures,
+            targets_meta=targets_meta,
             expectation_types=expectation_types,
             extra_signatures=extra_signatures,
         )
+        self.helper.injector_logger.info(
+            "Uploading signatures with payload: %s", payload
+        )
         self.sm.send_signatures(
             inject_id=inject_id,
-            phase="execution_complete",
+            execution_details=execution_details,
             signatures=payload,
         )
 
@@ -247,7 +275,9 @@ class OpenAEVNetExecInjector:
             stderr = (result.get("stderr") or "").strip()
             parsed = result.get("parsed")
             targets = result.get("targets", [])
-            pre_sigs = result.get("pre_sigs")
+            targets_meta = result.get("targets_meta", [])
+            execution_details = result.get("execution_details", [])
+            execution_signatures = result.get("execution_signatures", [])
             returncode = result.get("returncode", 0 if result["success"] else 1)
 
             if result["success"]:
@@ -281,10 +311,12 @@ class OpenAEVNetExecInjector:
                 expectation_types = result.get("expectation_types", ["DETECTION"])
                 self._send_signatures(
                     inject_id,
-                    pre_sigs,
+                    execution_details,
+                    execution_signatures,
                     returncode,
                     protocol,
                     expectation_types,
+                    targets_meta,
                 )
 
         except Exception as e:
