@@ -63,12 +63,14 @@ class OpenAEVNuclei:
 
         return target_results, targets
 
-    def nuclei_execution(self, start: float, data: Dict, target_results, targets) -> Dict:
+    def nuclei_execution(
+        self, start: float, data: Dict, target_results, targets
+    ) -> Dict:
         # Nuclei Args Builder
         nuclei_builder = NucleiCommandBuilder(
             nuclei_configs=self.config_loader.nuclei,
-            contract_id=contract_id,
-            content=content,
+            contract_id=self.contract_id,
+            content=self.inject_content,
             targets=targets,
         )
         nuclei_args = nuclei_builder.build()
