@@ -9,6 +9,7 @@ from pyoaev.signatures import (
     SignatureManager,
     build_network_configs,
 )
+from pyoaev.signatures.models import ExecutionDetails
 
 from injector_common.constants import TARGET_PROPERTY_SELECTOR_KEY, TARGET_SELECTOR_KEY
 from injector_common.dump_config import intercept_dump_argument
@@ -62,6 +63,11 @@ class OpenAEVNuclei:
             raise ValueError(message)
 
         return target_results, targets
+
+    def _extract_targets_meta(self, data: dict):
+        return Targets.extract_target_meta(
+            self.selector_key, self.selector_property, data, self.helper
+        )
 
     def nuclei_execution(
         self, start: float, data: Dict, target_results, targets
@@ -135,11 +141,13 @@ class OpenAEVNuclei:
         # Injector Signature Manager
         signature_manager = SignatureManager(self.helper.api)
 
+        execution_details = ExecutionDetails()
+
         target_results, targets = self._extract_targets(data)
         configs = build_network_configs(targets)
 
         # Compile pre-execution signatures
-        pre_signatures = signature_manager.compile_pre_execution_signatures(
+        execution_signatures = signature_manager.build_execution_signatures(
             config=configs
         )
 
@@ -181,14 +189,16 @@ class OpenAEVNuclei:
         )
 
         # Compile post-execution signatures
-        post_signatures = signature_manager.compile_post_execution_signatures(
-            pre_signatures=pre_signatures,
+        signature_manager.post_execution_updates(
+            execution_details=execution_details,
+            execution_signatures=execution_signatures,
             tool_output=tool_output,
         )
 
         # Build payload with extra
         expectation_signatures = signature_manager.build_payload(
-            post_signatures=post_signatures,
+            execution_signatures=execution_signatures,
+            targets_meta=self._extract_targets_meta(data),
             expectation_types=self.expectation_types,
             extra_signatures=ExtraSignatureData(
                 vulnerability={
@@ -201,7 +211,7 @@ class OpenAEVNuclei:
         # Send signature to backend
         signature_manager.send_signatures(
             inject_id=self.inject_id,
-            phase="execution_complete",
+            execution_details=execution_details,
             signatures=expectation_signatures,
         )
 
