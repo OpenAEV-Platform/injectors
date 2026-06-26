@@ -1,0 +1,14 @@
+openaev:
+  url: 'http://localhost:3001'
+  token: 'ChangeMe'
+# tenant_id: 'ChangeMe'
+
+injector:
+  id: 'ChangeMe'   # unique UUIDv4
+  name: 'AI Red Team'
+  log_level: 'error'
+  request_timeout_seconds: 120
+
+# Provider credentials are NOT stored here or in the platform. The injector resolves them from its
+# own process environment using the variable name carried by each AI Target (api_key_variable),
+# e.g. export OPENAI_API_KEY=..., ANTHROPIC_API_KEY=..., etc.
