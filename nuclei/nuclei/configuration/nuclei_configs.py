@@ -3,11 +3,13 @@
 from typing import Literal
 
 from pydantic import Field, PositiveInt, field_validator
-from pydantic_settings import BaseSettings
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class ConfigLoaderNuclei(BaseSettings):
     """Nuclei configurations"""
+
+    model_config = SettingsConfigDict(extra="ignore")
 
     scan_strategy: Literal["auto", "host-spray", "template-spray"] = Field(
         default="host-spray",
