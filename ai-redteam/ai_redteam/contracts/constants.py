@@ -48,8 +48,11 @@ ENGINE_GARAK = "garak"
 ENGINE_PYRIT = "pyrit"
 ENGINE_PROMPTFOO = "promptfoo"
 
-# Default OpenAEV security domain bucket for AI actions
+# Default OpenAEV security domain bucket for AI actions (matched by name with the platform
+# PresetDomain so the actions appear under the "Artificial Intelligence" tab in the Threat Arsenal
+# and the "Performance by Security Domain" dashboard widget).
 AI_DOMAIN = "Artificial Intelligence"
+AI_SECURITY_DOMAIN = {"domain_name": AI_DOMAIN, "domain_color": "#7C4DFF"}
 
 
 class Technique:

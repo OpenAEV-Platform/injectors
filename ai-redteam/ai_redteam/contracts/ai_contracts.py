@@ -231,6 +231,7 @@ def _build_one(technique):
         outputs=ContractBuilder().add_outputs(_outputs()).build_outputs(),
         manual=False,
         is_atomic_testing=True,
+        domains=[c.AI_SECURITY_DOMAIN],
     )
     for atlas_id in technique.atlas_ids:
         contract.add_attack_pattern(atlas_id)
