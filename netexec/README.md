@@ -1,272 +1,229 @@
 # OpenAEV NetExec Injector
 
+The NetExec injector lets OpenAEV run network execution and credential-testing actions as part of attack scenarios using
+[NetExec](https://www.netexec.wiki/) (the maintained successor to CrackMapExec). It exposes inject contracts across many
+protocols (SMB, SSH, LDAP, WinRM, MSSQL, RDP, VNC, FTP, WMI and NFS), resolves the targets from your OpenAEV assets or
+from manual input, builds and runs the corresponding `netexec` command, and reports the output (and structured findings)
+back to OpenAEV.
+
 ## Table of Contents
 
 - [OpenAEV NetExec Injector](#openaev-netexec-injector)
-    - [Prerequisites](#prerequisites)
-    - [Configuration variables](#configuration-variables)
-        - [OpenAEV environment variables](#openaev-environment-variables)
-        - [Base injector environment variables](#base-injector-environment-variables)
-    - [Deployment](#deployment)
-        - [Docker Deployment](#docker-deployment)
-        - [Manual Deployment](#manual-deployment)
-    - [Behavior](#behavior)
-    - [Supported Contracts](#supported-contracts)
-    - [Target Selection](#target-selection)
-    - [Resources](#resources)
+  - [Table of Contents](#table-of-contents)
+  - [Introduction](#introduction)
+  - [How it works](#how-it-works)
+  - [Requirements](#requirements)
+  - [Configuration variables](#configuration-variables)
+    - [OpenAEV environment variables](#openaev-environment-variables)
+    - [Base injector environment variables](#base-injector-environment-variables)
+  - [Deployment](#deployment)
+    - [Docker Deployment](#docker-deployment)
+    - [Manual Deployment](#manual-deployment)
+  - [Usage](#usage)
+  - [Inject contracts](#inject-contracts)
+  - [Target selection](#target-selection)
+  - [Behavior](#behavior)
+  - [Debugging](#debugging)
+  - [Additional information](#additional-information)
 
----
+## Introduction
 
-## Prerequisites
+OpenAEV (Breach and Attack Simulation) drives injectors to execute the technical actions of a scenario. The NetExec
+injector registers a large set of protocol contracts with the OpenAEV platform; when an inject using one of these
+contracts is played, OpenAEV dispatches a job to the injector, which builds and runs the matching NetExec command
+against the resolved targets and returns the results.
 
-This injector uses [NetExec](https://www.netexec.wiki/).
+## How it works
 
-This injector communicates with the OpenAEV platform through **RabbitMQ**, using the configuration provided by OpenAEV.
+Injectors receive their jobs through the message broker (RabbitMQ) configured by the OpenAEV platform. The injector
+fetches the broker connection details from OpenAEV at startup, so it only needs to be able to reach the OpenAEV URL and
+the RabbitMQ host/port advertised by the platform.
 
-To function properly, the injector **must be able to reach the RabbitMQ service** (hostname and port) defined in the
-OpenAEV configuration.
+## Requirements
 
-## Configuration
+- A running OpenAEV platform, reachable from the injector (along with its RabbitMQ broker).
+- The `netexec` binary must be available on the `PATH`. The Docker image installs it from source
+  (`pip install git+https://github.com/Pennyw0rth/NetExec.git`); the image build also pulls the toolchain NetExec needs
+  to compile its native dependencies (`gcc`, `musl-dev`, `libffi-dev`, `openssl-dev`, `cargo`, `git`).
+- The Docker image must be built with `--build-context injector_common=../injector_common`, because the injector depends
+  on the shared `injector_common` package located one level above this directory.
+- For a manual (non-Docker) deployment:
+  - Python >= 3.11 and [Poetry](https://python-poetry.org/) >= 2.1.
+  - NetExec installed and reachable as `netexec` (see
+    [the NetExec installation guide](https://www.netexec.wiki/getting-started/installation)).
 
-Configuration values can be provided either:
+## Configuration variables
 
-* via `docker-compose.yml` (Docker deployment), or
-* via `config.yml` (manual deployment).
+The injector is configured either through environment variables (recommended, read from `docker-compose.yml` / the
+`.env` file for a Docker deployment) or through a `config.yml` file (for a manual deployment). Copy the provided
+`.env.sample` / `config.yml.sample` and fill in the values flagged with `ChangeMe`.
 
-### OpenAEV Environment Variables
+### OpenAEV environment variables
 
-The following parameters are required to connect the injector to the OpenAEV platform:
+| Parameter         | config.yml          | Docker environment variable | Mandatory | Description                                                                        |
+|-------------------|---------------------|-----------------------------|-----------|------------------------------------------------------------------------------------|
+| OpenAEV URL       | `openaev.url`       | `OPENAEV_URL`               | Yes       | The URL of the OpenAEV platform. Must be reachable from where the injector runs.   |
+| OpenAEV Token     | `openaev.token`     | `OPENAEV_TOKEN`             | Yes       | The administrator token of the OpenAEV platform.                                   |
+| OpenAEV Tenant ID | `openaev.tenant_id` | `OPENAEV_TENANT_ID`         | No        | Tenant identifier for multi-tenant deployments. When set, it must be a valid UUID. |
 
-| Parameter         | `config.yml` | Docker Variable     | Mandatory | Description                                           |
-|-------------------|--------------|---------------------|-----------|-------------------------------------------------------|
-| OpenAEV URL       | `url`        | `OPENAEV_URL`       | Yes       | Base URL of the OpenAEV platform.                     |
-| OpenAEV Token     | `token`      | `OPENAEV_TOKEN`     | Yes       | Admin API token configured in the OpenAEV platform.   |
-| OpenAEV Tenant ID | `tenant_id`  | `OPENAEV_TENANT_ID` | No        | Identifier of the tenant within the OpenAEV platform. |
+### Base injector environment variables
 
-> ⚠️ Warning ⚠️
->
-> The `tenant_id` parameter is a new configuration option. A period of backward compatibility is ensured: if this key is not defined,
-> existing configurations will not be affected, and the default value will be `None`. However, if a value is provided, it will be
-> validated by Pydantic and must conform to a valid UUID format, otherwise, a validation error will be returned.
+| Parameter     | config.yml           | Docker environment variable | Default | Mandatory | Description                                                     |
+|---------------|----------------------|-----------------------------|---------|-----------|-----------------------------------------------------------------|
+| Injector ID   | `injector.id`        | `INJECTOR_ID`               | /       | Yes       | A unique `UUIDv4` identifier for this injector instance.        |
+| Injector Name | `injector.name`      | `INJECTOR_NAME`             | NetExec | No        | The name of the injector as shown in OpenAEV.                   |
+| Log Level     | `injector.log_level` | `INJECTOR_LOG_LEVEL`        | info    | No        | Verbosity of the logs. One of `debug`, `info`, `warn`, `error`. |
 
-### Injector Environment Variables
-
-The following parameters control the injector runtime behavior:
-
-| Parameter     | `config.yml` | Docker Variable      | Default   | Mandatory | Description                                             |
-|---------------|--------------|----------------------|-----------|-----------|---------------------------------------------------------|
-| Injector ID   | `id`         | `INJECTOR_ID`        | —         | Yes       | Unique `UUIDv4` identifying this injector instance.     |
-| Injector Name | `name`       | `INJECTOR_NAME`      | `NetExec` | Yes       | Human-readable name of the injector.                    |
-| Log Level     | `log_level`  | `INJECTOR_LOG_LEVEL` | `info`    | Yes       | Logging verbosity: `debug`, `info`, `warn`, or `error`. |
+Credentials supplied per inject (usernames, passwords, hashes, domains, key files) are never written to the logs: they
+are redacted before any logging or callback message is sent.
 
 ## Deployment
 
 ### Docker Deployment
 
-Build the Docker image using the provided `Dockerfile`.
+This injector depends on the shared `injector_common` package, so the image must be built with a build context that
+exposes it:
 
 ```shell
 docker build --build-context injector_common=../injector_common . -t openaev/injector-netexec:latest
 ```
 
-Then configure the environment variables in `docker-compose.yml` and start the injector:
+Create a `.env` file from `.env.sample` and fill in your values, then start the injector with the provided
+`docker-compose.yml`:
 
 ```shell
 docker compose up -d
 ```
 
-> The Docker image **already contains NetExec**. No further installation is needed inside the container.
+> The Docker image already bundles NetExec, so no further installation is needed inside the container.
+
+> If OpenAEV runs on your host machine while the injector runs in a container, set `OPENAEV_URL` to
+> `http://host.docker.internal:<port>` rather than `localhost`. On Linux, also add
+> `extra_hosts: ["host.docker.internal:host-gateway"]` to the service, and make sure OpenAEV listens on `0.0.0.0`.
 
 ### Manual Deployment
 
-1. Create a `config.yml` file based on `config.yml.sample`
-2. Adjust the configuration values to match your environment
-
-#### Prerequisites
-
-* **NetExec must be installed locally** and accessible via the command line (`netexec` command).
-* You can install it
-  from: [https://www.netexec.wiki/getting-started/installation](https://www.netexec.wiki/getting-started/installation)
-
-* Python package manager **Poetry** (version 2.1 or later)
-
-#### Installation
-
-**Production environment**
+Make sure `netexec` is installed and on your `PATH`, create a `config.yml` from `config.yml.sample`, then install and
+run the injector:
 
 ```shell
-poetry install --extras prod
-```
-
-**Development environment**
-
-For development, you should also clone the `pyoaev` repository following the instructions provided in the OpenAEV
-documentation.
-
-```shell
-poetry install --extras dev
-```
-
-## Development
-
-Before submitting any **Pull Request**, contributors **must** format the codebase using **isort** and **black**.
-
-```shell
-poetry run isort --profile black .
-poetry run black .
-```
-
-#### Run the Injector
-
-```shell
+poetry install
 poetry run python -m netexec.openaev_netexec
 ```
 
+> For local development against a checkout of [client-python](https://github.com/OpenAEV-Platform/client-python)
+> (cloned next to this repository), use `poetry install --extras dev`.
+
+## Usage
+
+Once started, the injector registers its contracts with OpenAEV and waits for jobs. Add a NetExec inject to a scenario
+or atomic testing, pick the protocol contract (and, if relevant, the option or module variant), set the targets and the
+credentials, then play it: the command output and structured findings are attached to the inject once it completes.
+
+At startup the injector logs the detected NetExec version (`netexec --version`).
+
+## Inject contracts
+
+Contracts are generated for each supported protocol and come in three families. The contract ID encodes the family:
+
+- `netexec_<protocol>` - base protocol contract (the bare authentication check, optionally with a command to execute).
+- `netexec_<protocol>_opt_<option_id>` - protocol + option contract (adds one NetExec flag, e.g. `--shares`).
+- `netexec_<protocol>_mod_<module>` - protocol + module contract (runs a NetExec module with `-M <module>`).
+
+All contracts share the label prefix "NetExec" and the `ENDPOINT` / `NETWORK` security domains. Every contract also
+exposes the shared target selector, the protocol credentials, an optional `port` override, and expectations. The
+following protocols are available:
+
+| Protocol | Default port | Credentials accepted                | Command-execution fields                          | Number of option contracts |
+|----------|--------------|-------------------------------------|---------------------------------------------------|-----------------------------|
+| SMB      | 445          | username, password, NTLM hash, domain | `-x` (command), `-X` (PowerShell)               | 14                          |
+| SSH      | 22           | username, password, SSH key file      | `-x` (command)                                  | 2                           |
+| LDAP     | 389          | username, password, NTLM hash, domain | -                                               | 14                          |
+| WinRM    | 5985         | username, password, NTLM hash, domain | `-x` (command), `-X` (PowerShell)               | 4                           |
+| MSSQL    | 1433         | username, password, NTLM hash, domain | `-q` (SQL), `-x` (command), `-X` (PowerShell)   | 3                           |
+| RDP      | 3389         | username, password, NTLM hash, domain | `-x` (command), `-X` (PowerShell)               | 3                           |
+| VNC      | 5900         | password                              | -                                               | 1                           |
+| FTP      | 21           | username, password                    | -                                               | 1                           |
+| WMI      | 135          | username, password, NTLM hash, domain | `-x` (command), `-X` (PowerShell), `--wmi-query` | 2                          |
+| NFS      | 111          | -                                     | -                                               | 3                           |
+
+Option contracts add a single flag on top of the base protocol contract. The available options per protocol are:
+
+- SMB: `--shares`, `--pass-pol`, `--users`, `--groups`, `--local-groups`, `--loggedon-users`, `--computers`,
+  `--rid-brute`, `--disks`, `--interfaces`, `--local-auth`, `--sam`, `--lsa`, `--ntds`
+- SSH: `--sudo-check`, `--no-output`
+- LDAP: `--users`, `--groups`, `--computers`, `--dc-list`, `--get-sid`, `--active-users`, `--trusted-for-delegation`,
+  `--find-delegation`, `--password-not-required`, `--admin-count`, `--gmsa`, `--asreproast`, `--kerberoasting`,
+  `--bloodhound`
+- WinRM: `--local-auth`, `--sam`, `--lsa`, `--no-output`
+- MSSQL: `--local-auth`, `--rid-brute`, `--no-output`
+- RDP: `--local-auth`, `--screenshot`, `--nla-screenshot`
+- VNC: `--screenshot`
+- FTP: `--ls`
+- WMI: `--local-auth`, `--no-output`
+- NFS: `--shares`, `--enum-shares`, `--ls`
+
+> The `--asreproast` and `--kerberoasting` LDAP options write their results to an auto-generated temporary file, which is
+> read back into the inject output and then removed.
+
+Module contracts wrap the NetExec module catalogue (`add-computer`, `lsassy`, `ntdsutil`, `spider_plus`, `zerologon`,
+`ms17-010`, ...). One contract is generated per (protocol, module) pair the module supports, and each module exposes its
+own option fields (mapped to `-o KEY=VALUE`) plus a free-text "Additional module options" field. Because there are many
+such combinations, browse them directly in OpenAEV rather than listing every one here.
+
+The command the injector builds follows this shape:
+
+```shell
+netexec <protocol> <targets> [-u <user>] [-p <password>] [-H <hash>] [-d <domain>] [--key-file <path>] \
+        [--port <port>] [<option flag>] [-x "<command>"] [-M <module> -o KEY=VALUE ...]
+```
+
+## Target selection
+
+Targets are resolved through the shared selection logic of `injector_common`:
+
+- Target selector: `assets`, `asset-groups` (default), or `manual`.
+- Target property selector (for assets / asset groups): `automatic` (default), `seen_ip`, `local_ip` (first), or
+  `hostname`.
+
+| Target property   | Asset field used                                   |
+|-------------------|----------------------------------------------------|
+| Automatic         | Hostname for agentless assets, else first valid IP |
+| Seen IP           | `endpoint_seen_ip`                                 |
+| Local IP (first)  | First valid entry in `endpoint_ips`                |
+| Hostname          | `endpoint_hostname`                                |
+
+For manual targets, provide hostnames or IP addresses as comma-separated values. Invalid, loopback and link-local
+addresses are filtered out.
+
 ## Behavior
 
-The NetExec injector performs **contract-based network reconnaissance and authentication checks** by dynamically
-building and executing **NetExec commands** based on the contract configuration and user inputs.
-
-Each execution translates contract fields (targets, credentials, and options) into a NetExec command and runs it against
-the selected targets.
-
-## Supported Contracts
-
-The injector supports **10 protocols** via dedicated contracts:
-
-| Contract | Protocol | Default Port | Authentication | Command Execution |
-|----------|----------|--------------|----------------|-------------------|
-| **NetExec - SMB** | SMB | 445 | username, password, NTLM hash, domain | `-x` (CMD), `-X` (PowerShell) |
-| **NetExec - SSH** | SSH | 22 | username, password, SSH key file | `-x` (CMD) |
-| **NetExec - LDAP** | LDAP | 389 | username, password, NTLM hash, domain | — |
-| **NetExec - WinRM** | WinRM | 5985 | username, password, NTLM hash, domain | `-x` (CMD), `-X` (PowerShell) |
-| **NetExec - MSSQL** | MSSQL | 1433 | username, password, NTLM hash, domain | `-x` (CMD), `-X` (PowerShell), `-q` (SQL) |
-| **NetExec - RDP** | RDP | 3389 | username, password, NTLM hash, domain | `-x` (CMD), `-X` (PowerShell) |
-| **NetExec - VNC** | VNC | 5900 | password | — |
-| **NetExec - FTP** | FTP | 21 | username, password | — |
-| **NetExec - WMI** | WMI | 135 | username, password, NTLM hash, domain | `-x` (CMD), `-X` (PowerShell), WMI query |
-| **NetExec - NFS** | NFS | 111 | — (host-based) | — |
-
-### Per-protocol options
-
-**SMB**: `--shares`, `--users`, `--groups`, `--local-groups`, `--sessions`, `--loggedon-users`, `--computers`, `--rid-brute`, `--disks`, `--interfaces`, `--pass-pol`, `--local-auth`, `--sam`, `--lsa`, `--ntds`
-
-**SSH**: `--sudo-check`, `--no-output`
-
-**LDAP**: `--users`, `--groups`, `--computers`, `--dc-list`, `--get-sid`, `--active-users`, `--pass-pol`, `--pso`, `--trusted-for-delegation`, `--find-delegation`, `--password-not-required`, `--admin-count`, `--gmsa`, `--asreproast`, `--kerberoasting`, `--bloodhound`
-
-**WinRM**: `--local-auth`, `--sam`, `--lsa`, `--dpapi`, `--no-output`
-
-**MSSQL**: `--local-auth`, `--sam`, `--lsa`, `--rid-brute`, `--no-output`
-
-**RDP**: `--local-auth`, `--screenshot`, `--nla-screenshot`, `--no-output`
-
-**VNC**: `--screenshot`
-
-**FTP**: `--ls`
-
-**WMI**: `--local-auth`, `--no-output`
-
-**NFS**: `--shares`, `--enum-shares`, `--ls`
-
-## Structured Output Parsing
-
-The injector extracts structured findings from NetExec command output. Each contract can produce multiple finding types beyond raw text.
-
-### Finding Types
-
-| Output Type | Field | Description | Mandatory Fields |
-|---|---|---|---|
-| `text` | `text` | Raw text output lines | — |
-| `credentials` | `credentials` | Reusable credentials (passwords, NTLM hashes) | `username` + (`password` or `hash`) |
-| `username` | `usernames` | Enumerated user accounts | `username` |
-| `admin_username` | `admin_usernames` | Admin accounts (adminCount=1) | `username` |
-| `share` | `shares` | SMB shares (excludes admin shares ending with `$`) | `share_name` + `permissions` |
-| `group` | `groups` | AD / local groups | `group_name` |
-| `computer` | `computers` | Computer accounts | `computer_name` |
-| `password_policy` | `password_policy` | Domain password policy settings | `key` + `value` |
-| `delegation` | `delegations` | Kerberos delegation configurations | `account` |
-| `sid` | `sids` | Domain SID | `sid` |
-| `vulnerability` | `vulnerabilities` | Vulnerability detection results | `name` + `status` |
-| `account_with_password_not_required` | `accounts_pw_not_required` | Accounts with PASSWD_NOTREQD flag | `account` |
-| `asreproastable_account` | `asreproastable_accounts` | AS-REP roastable accounts | `username` |
-| `kerberoastable_account` | `kerberoastable_accounts` | Kerberoastable accounts | `username` |
-
-### Contracts with Dedicated Output Parsers
-
-| Contract | Finding Types Extracted |
-|---|---|
-| `--users` (SMB/LDAP) | credentials, usernames |
-| `--active-users` (LDAP) | usernames |
-| `--rid-brute` (SMB) | usernames (SidTypeUser only) |
-| `--loggedon-users` (SMB) | usernames |
-| `--admin-count` (LDAP) | admin_usernames |
-| `--shares` (SMB) | shares |
-| `--groups` (LDAP) | groups (with member count) |
-| `--local-groups` (SMB) | groups (with RID) |
-| `--computers` (LDAP) | computers |
-| `--pass-pol` (SMB) | password_policy |
-| `--trusted-for-delegation` (LDAP) | delegations |
-| `--find-delegation` (LDAP) | delegations (with type and rights) |
-| `--get-sid` (LDAP) | sids |
-| `--password-not-required` (LDAP) | accounts_pw_not_required |
-| `--asreproast` (LDAP) | asreproastable_accounts |
-| `--kerberoasting` (LDAP) | kerberoastable_accounts |
-| `--sam` (SMB) | credentials (NTLM hashes) |
-| `--lsa` (SMB) | credentials (Kerberos keys, NTLM, cleartext) |
-| `--ntds` (SMB) | credentials (NTLM hashes) |
-| `-M dpapi_hash` (SMB) | credentials (DPAPI master key hashes) |
-| `-M get_desc_users` (LDAP) | credentials (passwords in descriptions) |
-| `-M user_desc` (SMB) | credentials (passwords in descriptions) |
-| `-M spooler` (SMB) | vulnerabilities |
-| `-M coerce_plus` (SMB) | vulnerabilities |
-| `-M ldap-checker` (LDAP) | vulnerabilities |
-
-> Contracts without a dedicated parser still produce `text` findings from their raw output.
-
-## Target Selection
-
-Targets are resolved using the `target_selector` field defined in the contract.
-
-### When the target type is **Assets**
-
-| Selected Property | Asset Field Used              |
-|-------------------|-------------------------------|
-| Seen IP           | `endpoint_seen_ip`            |
-| Local IP          | First entry in `endpoint_ips` |
-| Hostname          | `endpoint_hostname`           |
-
-### When the target type is **Manual**
-
-Targets are provided directly as **comma-separated IP addresses or hostnames**.
-
-## Example Executions
-
-SMB share enumeration:
-
-```bash
-netexec smb 192.168.1.50 --shares
+```mermaid
+flowchart LR
+    O[OpenAEV inject] -->|job via RabbitMQ| I(NetExec injector)
+    I -->|resolve targets| T[Assets / Asset groups / Manual]
+    I -->|netexec proto targets ...| N[NetExec]
+    N -->|stdout| P[Output parser]
+    P -->|structured findings| I
+    I -->|results and status| O
 ```
 
-SSH authentication with command execution:
+On each job the injector acknowledges reception, resolves the targets, parses the contract ID into protocol/family/
+option-or-module, builds the NetExec command (with redacted credentials reported in the command-execution callback),
+runs it (5-minute timeout), parses the output into structured findings, and returns a success or error status.
 
-```bash
-netexec ssh 192.168.1.50 -u admin -p Password123 -x "whoami"
-```
+## Debugging
 
-LDAP user enumeration:
+Set `INJECTOR_LOG_LEVEL=debug` to log the parsed contract and the (credential-redacted) command line. Common issues:
 
-```bash
-netexec ldap 192.168.1.10 -u admin -p Password123 -d CONTOSO --users
-```
+- `netexec` not found: for manual deployments, make sure NetExec is installed and on the `PATH`.
+- Connectivity / authentication failures: verify the target is reachable on the protocol port and that the supplied
+  credentials (and `--local-auth` where relevant) are correct.
+- A run that times out after 5 minutes returns an error message indicating the timeout.
 
-MSSQL SQL query:
+## Additional information
 
-```bash
-netexec mssql 192.168.1.20 -u sa -p Password123 --local-auth -q "SELECT name FROM sys.databases"
-```
-
-## Resources
-
-* [NetExec GitHub Repository](https://github.com/Pennyw0rth/NetExec)
-* [NetExec Documentation](https://www.netexec.wiki/)
+- NetExec documentation: [https://www.netexec.wiki/](https://www.netexec.wiki/)
+- NetExec source: [https://github.com/Pennyw0rth/NetExec](https://github.com/Pennyw0rth/NetExec)
+- Contracts come in three families (base protocol, protocol + option, protocol + module); the injector always invokes
+  the `netexec` binary.
