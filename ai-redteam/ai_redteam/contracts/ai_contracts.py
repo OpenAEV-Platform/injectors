@@ -218,7 +218,9 @@ def _technique_specific_fields(technique):
 
 
 def _build_one(technique):
-    fields = _target_fields() + _technique_specific_fields(technique) + [_expectations()]
+    fields = (
+        _target_fields() + _technique_specific_fields(technique) + [_expectations()]
+    )
     contract = Contract(
         contract_id=technique.contract_id,
         external_id=technique.key,

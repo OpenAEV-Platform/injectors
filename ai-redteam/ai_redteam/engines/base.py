@@ -1,5 +1,6 @@
 """Engine abstraction. An engine runs one AI red-team technique against a resolved target and returns
-an EngineResult that the injector turns into an execution callback (message + structured outputs)."""
+an EngineResult that the injector turns into an execution callback (message + structured outputs).
+"""
 
 import base64
 import codecs

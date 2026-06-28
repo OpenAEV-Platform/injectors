@@ -1,6 +1,6 @@
 FROM python:3.13-slim AS builder
 
-RUN pip3 install poetry==2.1.3
+RUN pip3 install poetry==2.3.2
 RUN apt-get update && apt-get upgrade -y
 
 ARG installdir=/injector

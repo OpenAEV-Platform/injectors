@@ -17,7 +17,12 @@ from ai_redteam.engines.base import Engine, EngineResult
 def _model_type_and_env(target):
     env = dict(os.environ)
     provider = target.provider
-    if provider in ("OPENAI_COMPATIBLE", "AZURE_OPENAI", "AWS_BEDROCK", "GOOGLE_VERTEX"):
+    if provider in (
+        "OPENAI_COMPATIBLE",
+        "AZURE_OPENAI",
+        "AWS_BEDROCK",
+        "GOOGLE_VERTEX",
+    ):
         if target.api_key:
             env["OPENAI_API_KEY"] = target.api_key
         if target.endpoint:
@@ -55,49 +60,67 @@ class GarakEngine(Engine):
         model_type, model_name, env = _model_type_and_env(target)
 
         workdir = tempfile.mkdtemp(prefix="garak_")
-        prefix = os.path.join(workdir, "scan")
-        cmd = [
-            "garak",
-            "--model_type", model_type,
-            "--model_name", model_name,
-            "--probes", probes,
-            "--generations", str(generations),
-            "--report_prefix", prefix,
-        ]
         try:
-            proc = subprocess.run(
-                cmd, capture_output=True, text=True, timeout=self.timeout, env=env, check=False
-            )
-        except subprocess.TimeoutExpired:
-            return EngineResult(
-                success=False, status="ERROR", message=f"Garak timed out after {self.timeout}s"
-            )
-
-        report_path = f"{prefix}.report.jsonl"
-        passed, total, failed_probes = self._parse_report(report_path)
-        vulnerable = total > 0 and passed < total
-        outputs = {
-            "marker": marker,
-            "target_endpoint": target.endpoint or "",
-            "garak_probes": probes,
-            "garak_passed": passed,
-            "garak_total": total,
-            "attack_succeeded": vulnerable,
-        }
-        if vulnerable:
-            outputs["vulnerability"] = [
-                {"value": f"Garak probe failed: {p}", "reason": "Detector triggered"}
-                for p in failed_probes[:50]
+            prefix = os.path.join(workdir, "scan")
+            cmd = [
+                "garak",
+                "--model_type",
+                model_type,
+                "--model_name",
+                model_name,
+                "--probes",
+                probes,
+                "--generations",
+                str(generations),
+                "--report_prefix",
+                prefix,
             ]
-        message = (
-            f"[{'VULNERABLE' if vulnerable else 'DEFENDED'}] Garak scan complete: "
-            f"{total - passed}/{total} checks failed across probes [{probes}].\n"
-            f"Exit code: {proc.returncode}\n"
-            f"{(proc.stdout or '')[-1500:]}"
-        )
-        return EngineResult(
-            success=vulnerable, status="SUCCESS", message=message, outputs=outputs
-        )
+            try:
+                proc = subprocess.run(
+                    cmd,
+                    capture_output=True,
+                    text=True,
+                    timeout=self.timeout,
+                    env=env,
+                    check=False,
+                )
+            except subprocess.TimeoutExpired:
+                return EngineResult(
+                    success=False,
+                    status="ERROR",
+                    message=f"Garak timed out after {self.timeout}s",
+                )
+
+            report_path = f"{prefix}.report.jsonl"
+            passed, total, failed_probes = self._parse_report(report_path)
+            vulnerable = total > 0 and passed < total
+            outputs = {
+                "marker": marker,
+                "target_endpoint": target.endpoint or "",
+                "garak_probes": probes,
+                "garak_passed": passed,
+                "garak_total": total,
+                "attack_succeeded": vulnerable,
+            }
+            if vulnerable:
+                outputs["vulnerability"] = [
+                    {
+                        "value": f"Garak probe failed: {p}",
+                        "reason": "Detector triggered",
+                    }
+                    for p in failed_probes[:50]
+                ]
+            message = (
+                f"[{'VULNERABLE' if vulnerable else 'DEFENDED'}] Garak scan complete: "
+                f"{total - passed}/{total} checks failed across probes [{probes}].\n"
+                f"Exit code: {proc.returncode}\n"
+                f"{(proc.stdout or '')[-1500:]}"
+            )
+            return EngineResult(
+                success=vulnerable, status="SUCCESS", message=message, outputs=outputs
+            )
+        finally:
+            shutil.rmtree(workdir, ignore_errors=True)
 
     @staticmethod
     def _parse_report(report_path):

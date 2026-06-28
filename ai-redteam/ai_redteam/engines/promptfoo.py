@@ -16,7 +16,12 @@ from ai_redteam.engines.base import Engine, EngineResult
 
 def _provider_config(target):
     provider = target.provider
-    if provider in ("OPENAI_COMPATIBLE", "AZURE_OPENAI", "AWS_BEDROCK", "GOOGLE_VERTEX"):
+    if provider in (
+        "OPENAI_COMPATIBLE",
+        "AZURE_OPENAI",
+        "AWS_BEDROCK",
+        "GOOGLE_VERTEX",
+    ):
         cfg = {"id": f"openai:chat:{target.model or 'gpt-4o-mini'}", "config": {}}
         if target.endpoint:
             cfg["config"]["apiBaseUrl"] = target.endpoint
@@ -24,7 +29,10 @@ def _provider_config(target):
             cfg["config"]["apiKey"] = target.api_key
         return cfg
     if provider == "ANTHROPIC":
-        cfg = {"id": f"anthropic:messages:{target.model or 'claude-3-5-sonnet-latest'}", "config": {}}
+        cfg = {
+            "id": f"anthropic:messages:{target.model or 'claude-3-5-sonnet-latest'}",
+            "config": {},
+        }
         if target.api_key:
             cfg["config"]["apiKey"] = target.api_key
         return cfg
@@ -54,59 +62,104 @@ class PromptfooEngine(Engine):
                 message="Promptfoo is not installed in this injector image (npm i -g promptfoo).",
             )
 
-        plugins = [p.strip() for p in (content.get(c.KEY_PROMPTFOO_PLUGINS) or "prompt-injection").split(",") if p.strip()]
-        strategies = [s.strip() for s in (content.get(c.KEY_PROMPTFOO_STRATEGIES) or "jailbreak").split(",") if s.strip()]
+        plugins = [
+            p.strip()
+            for p in (content.get(c.KEY_PROMPTFOO_PLUGINS) or "prompt-injection").split(
+                ","
+            )
+            if p.strip()
+        ]
+        strategies = [
+            s.strip()
+            for s in (content.get(c.KEY_PROMPTFOO_STRATEGIES) or "jailbreak").split(",")
+            if s.strip()
+        ]
 
         workdir = tempfile.mkdtemp(prefix="promptfoo_")
-        config_path = os.path.join(workdir, "promptfooconfig.yaml")
-        output_path = os.path.join(workdir, "results.json")
-        config = {
-            "providers": [_provider_config(target)],
-            "redteam": {
-                "plugins": plugins,
-                "strategies": strategies,
-                "purpose": "OpenAEV adversarial exposure validation",
-            },
-        }
-        with open(config_path, "w", encoding="utf-8") as handle:
-            yaml.safe_dump(config, handle)
-
         try:
-            gen = subprocess.run(
-                ["promptfoo", "redteam", "generate", "-c", config_path, "-o", os.path.join(workdir, "redteam.yaml")],
-                capture_output=True, text=True, timeout=self.timeout, cwd=workdir, check=False,
-            )
-            run = subprocess.run(
-                ["promptfoo", "redteam", "run", "-c", config_path, "--output", output_path, "--no-cache"],
-                capture_output=True, text=True, timeout=self.timeout, cwd=workdir, check=False,
-            )
-        except subprocess.TimeoutExpired:
-            return EngineResult(
-                success=False, status="ERROR", message=f"Promptfoo timed out after {self.timeout}s"
-            )
+            config_path = os.path.join(workdir, "promptfooconfig.yaml")
+            output_path = os.path.join(workdir, "results.json")
+            config = {
+                "providers": [_provider_config(target)],
+                "redteam": {
+                    "plugins": plugins,
+                    "strategies": strategies,
+                    "purpose": "OpenAEV adversarial exposure validation",
+                },
+            }
+            with open(config_path, "w", encoding="utf-8") as handle:
+                yaml.safe_dump(config, handle)
 
-        successes, failures = self._parse_results(output_path)
-        vulnerable = failures > 0
-        outputs = {
-            "marker": marker,
-            "target_endpoint": target.endpoint or "",
-            "promptfoo_plugins": ",".join(plugins),
-            "promptfoo_strategies": ",".join(strategies),
-            "promptfoo_failures": failures,
-            "promptfoo_passes": successes,
-            "attack_succeeded": vulnerable,
-        }
-        if vulnerable:
-            outputs["vulnerability"] = [
-                {"value": f"Promptfoo red-team found {failures} failing assertion(s)", "reason": "Assertion failed"}
-            ]
-        message = (
-            f"[{'VULNERABLE' if vulnerable else 'DEFENDED'}] Promptfoo red-team: "
-            f"{failures} failed / {successes} passed assertions.\n"
-            f"Plugins: {plugins} | Strategies: {strategies}\n"
-            f"{(run.stdout or gen.stdout or '')[-1500:]}"
-        )
-        return EngineResult(success=vulnerable, status="SUCCESS", message=message, outputs=outputs)
+            try:
+                gen = subprocess.run(
+                    [
+                        "promptfoo",
+                        "redteam",
+                        "generate",
+                        "-c",
+                        config_path,
+                        "-o",
+                        os.path.join(workdir, "redteam.yaml"),
+                    ],
+                    capture_output=True,
+                    text=True,
+                    timeout=self.timeout,
+                    cwd=workdir,
+                    check=False,
+                )
+                run = subprocess.run(
+                    [
+                        "promptfoo",
+                        "redteam",
+                        "run",
+                        "-c",
+                        config_path,
+                        "--output",
+                        output_path,
+                        "--no-cache",
+                    ],
+                    capture_output=True,
+                    text=True,
+                    timeout=self.timeout,
+                    cwd=workdir,
+                    check=False,
+                )
+            except subprocess.TimeoutExpired:
+                return EngineResult(
+                    success=False,
+                    status="ERROR",
+                    message=f"Promptfoo timed out after {self.timeout}s",
+                )
+
+            successes, failures = self._parse_results(output_path)
+            vulnerable = failures > 0
+            outputs = {
+                "marker": marker,
+                "target_endpoint": target.endpoint or "",
+                "promptfoo_plugins": ",".join(plugins),
+                "promptfoo_strategies": ",".join(strategies),
+                "promptfoo_failures": failures,
+                "promptfoo_passes": successes,
+                "attack_succeeded": vulnerable,
+            }
+            if vulnerable:
+                outputs["vulnerability"] = [
+                    {
+                        "value": f"Promptfoo red-team found {failures} failing assertion(s)",
+                        "reason": "Assertion failed",
+                    }
+                ]
+            message = (
+                f"[{'VULNERABLE' if vulnerable else 'DEFENDED'}] Promptfoo red-team: "
+                f"{failures} failed / {successes} passed assertions.\n"
+                f"Plugins: {plugins} | Strategies: {strategies}\n"
+                f"{(run.stdout or gen.stdout or '')[-1500:]}"
+            )
+            return EngineResult(
+                success=vulnerable, status="SUCCESS", message=message, outputs=outputs
+            )
+        finally:
+            shutil.rmtree(workdir, ignore_errors=True)
 
     @staticmethod
     def _parse_results(output_path):

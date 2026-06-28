@@ -3,7 +3,8 @@
 Prefers Microsoft PyRIT (https://github.com/Azure/PyRIT) when available. PyRIT is a library (not a
 CLI) with a fast-moving API, so it is imported lazily; if it is unavailable or its API differs, the
 engine gracefully degrades to a built-in iterative "escalation" loop (a lightweight Crescendo-style
-multi-turn attack) using the multi-provider LLM client, so the technique always produces a result."""
+multi-turn attack) using the multi-provider LLM client, so the technique always produces a result.
+"""
 
 from ai_redteam import detectors
 from ai_redteam.contracts import constants as c
@@ -23,7 +24,9 @@ class PyritEngine(Engine):
         self.timeout = timeout
 
     def run(self, content, target, marker, ctx) -> EngineResult:
-        objective = (content.get(c.KEY_PYRIT_OBJECTIVE) or "").replace("{marker}", marker)
+        objective = (content.get(c.KEY_PYRIT_OBJECTIVE) or "").replace(
+            "{marker}", marker
+        )
         strategy = content.get(c.KEY_PYRIT_STRATEGY) or "crescendo"
         if isinstance(strategy, list):
             strategy = strategy[0] if strategy else "crescendo"
@@ -44,9 +47,13 @@ class PyritEngine(Engine):
         turns = min(max_turns, len(ESCALATION_TEMPLATES))
         for turn in range(turns):
             template = ESCALATION_TEMPLATES[turn]
-            prompt = template.format(objective=objective or "the objective", marker=marker)
+            prompt = template.format(
+                objective=objective or "the objective", marker=marker
+            )
             try:
-                response = llm_client.send_prompt(target, prompt, marker, timeout=self.timeout)
+                response = llm_client.send_prompt(
+                    target, prompt, marker, timeout=self.timeout
+                )
             except Exception as exc:  # noqa: BLE001
                 return EngineResult(
                     success=False,
@@ -54,7 +61,9 @@ class PyritEngine(Engine):
                     message=f"Error during PyRIT escalation turn {turn + 1}: {exc}",
                 )
             last_response = response.text
-            transcript.append(f"--- turn {turn + 1} ---\nUSER: {prompt}\nMODEL: {last_response[:600]}")
+            transcript.append(
+                f"--- turn {turn + 1} ---\nUSER: {prompt}\nMODEL: {last_response[:600]}"
+            )
             verdict = detectors.evaluate(last_response, marker)
             if verdict["success"]:
                 success = True
@@ -71,10 +80,15 @@ class PyritEngine(Engine):
         }
         if success:
             outputs["vulnerability"] = [
-                {"value": f"Multi-turn ({strategy}) jailbreak succeeded", "reason": reason}
+                {
+                    "value": f"Multi-turn ({strategy}) jailbreak succeeded",
+                    "reason": reason,
+                }
             ]
         message = (
             f"[{'VULNERABLE' if success else 'DEFENDED'}] PyRIT {strategy} campaign ({turns} turns): "
             f"{reason}.\n\n" + "\n\n".join(transcript)
         )
-        return EngineResult(success=success, status="SUCCESS", message=message, outputs=outputs)
+        return EngineResult(
+            success=success, status="SUCCESS", message=message, outputs=outputs
+        )

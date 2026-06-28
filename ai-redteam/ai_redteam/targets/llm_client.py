@@ -44,7 +44,9 @@ def _openai_compatible(target, prompt, marker, timeout):
             extra["api-key"] = target.api_key
         else:
             extra["Authorization"] = f"Bearer {target.api_key}"
-    resp = requests.post(url, headers=_headers(target, marker, extra), json=body, timeout=timeout)
+    resp = requests.post(
+        url, headers=_headers(target, marker, extra), json=body, timeout=timeout
+    )
     data = _safe_json(resp)
     text = ""
     try:
@@ -67,7 +69,9 @@ def _anthropic(target, prompt, marker, timeout):
     }
     if target.system_prompt:
         body["system"] = target.system_prompt
-    resp = requests.post(url, headers=_headers(target, marker, extra), json=body, timeout=timeout)
+    resp = requests.post(
+        url, headers=_headers(target, marker, extra), json=body, timeout=timeout
+    )
     data = _safe_json(resp)
     text = ""
     try:
@@ -85,7 +89,9 @@ def _ollama(target, prompt, marker, timeout):
         messages.append({"role": "system", "content": target.system_prompt})
     messages.append({"role": "user", "content": prompt})
     body = {"model": target.model or "llama3", "messages": messages, "stream": False}
-    resp = requests.post(url, headers=_headers(target, marker), json=body, timeout=timeout)
+    resp = requests.post(
+        url, headers=_headers(target, marker), json=body, timeout=timeout
+    )
     data = _safe_json(resp)
     text = ""
     try:
@@ -97,11 +103,17 @@ def _ollama(target, prompt, marker, timeout):
 
 def _huggingface(target, prompt, marker, timeout):
     url = (target.endpoint or "").rstrip("/")
+    if not url:
+        raise ValueError(
+            "HUGGINGFACE target requires an endpoint URL (the inference endpoint)."
+        )
     extra = {}
     if target.api_key:
         extra["Authorization"] = f"Bearer {target.api_key}"
     body = {"inputs": prompt}
-    resp = requests.post(url, headers=_headers(target, marker, extra), json=body, timeout=timeout)
+    resp = requests.post(
+        url, headers=_headers(target, marker, extra), json=body, timeout=timeout
+    )
     data = _safe_json(resp)
     text = ""
     try:
@@ -118,6 +130,10 @@ def _custom_http(target, prompt, marker, timeout):
     """Generic POST for CUSTOM_HTTP / AGENT_HTTP / MCP_SERVER targets. The request body and the
     response field to read can be customized through the target configuration."""
     url = (target.endpoint or "").rstrip("/")
+    if not url:
+        raise ValueError(
+            f"{target.provider} target requires an endpoint URL to send the request to."
+        )
     extra = {}
     if target.api_key:
         header_name = target.configuration.get("auth_header", "Authorization")
@@ -127,11 +143,20 @@ def _custom_http(target, prompt, marker, timeout):
     body = dict(target.configuration.get("body_template", {}))
     body[input_field] = prompt
     body.setdefault("marker", marker)
-    resp = requests.post(url, headers=_headers(target, marker, extra), json=body, timeout=timeout)
+    resp = requests.post(
+        url, headers=_headers(target, marker, extra), json=body, timeout=timeout
+    )
     data = _safe_json(resp)
     text = ""
     if isinstance(data, dict):
-        for field in (target.configuration.get("output_field"), "output", "response", "content", "text", "message"):
+        for field in (
+            target.configuration.get("output_field"),
+            "output",
+            "response",
+            "content",
+            "text",
+            "message",
+        ):
             if field and field in data and isinstance(data[field], str):
                 text = data[field]
                 break

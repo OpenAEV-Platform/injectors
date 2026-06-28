@@ -12,6 +12,7 @@ from ai_redteam.targets.target_resolver import resolve_target
 try:
     from injector_common.dump_config import intercept_dump_argument
 except ImportError:  # pragma: no cover - dump tooling is optional in local dev
+
     def intercept_dump_argument(_):
         return None
 
@@ -36,7 +37,9 @@ class OpenAEVAiRedTeam:
     def ai_execution(self, start: float, data: Dict) -> Dict:
         injection = data["injection"]
         inject_id = injection["inject_id"]
-        contract_id = injection["inject_injector_contract"]["convertedContent"]["contract_id"]
+        contract_id = injection["inject_injector_contract"]["convertedContent"][
+            "contract_id"
+        ]
         content = injection.get("inject_content") or {}
 
         engine, engine_key = self._resolve_engine(contract_id)

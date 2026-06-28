@@ -31,9 +31,7 @@ class TargetConfig:
         self.system_prompt = system_prompt
         self.api_key_variable = api_key_variable
         self.configuration = configuration or {}
-        self.api_key = (
-            os.environ.get(api_key_variable) if api_key_variable else None
-        )
+        self.api_key = os.environ.get(api_key_variable) if api_key_variable else None
 
 
 def _from_ai_target_asset(asset: dict) -> TargetConfig:

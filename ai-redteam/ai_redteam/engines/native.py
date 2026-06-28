@@ -1,5 +1,6 @@
 """Native engine: single-turn adversarial prompt sent directly to the target via the multi-provider
-LLM client, with heuristic success detection. No heavy third-party dependency required."""
+LLM client, with heuristic success detection. No heavy third-party dependency required.
+"""
 
 from ai_redteam import detectors
 from ai_redteam.contracts import constants as c
@@ -23,7 +24,9 @@ class NativeEngine(Engine):
         success_keywords = [k for k in keywords_raw.split(",") if k.strip()]
 
         try:
-            llm_response = llm_client.send_prompt(target, prompt, marker, timeout=self.timeout)
+            llm_response = llm_client.send_prompt(
+                target, prompt, marker, timeout=self.timeout
+            )
         except Exception as exc:  # noqa: BLE001
             return EngineResult(
                 success=False,
