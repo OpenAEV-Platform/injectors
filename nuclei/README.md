@@ -1,316 +1,222 @@
 # OpenAEV Nuclei Injector
 
+The Nuclei injector lets OpenAEV run template-based vulnerability scans as part of attack scenarios using
+[Nuclei](https://projectdiscovery.io/nuclei) by ProjectDiscovery, the open-source vulnerability scanner. It exposes
+ready-to-use, tag-based scan contracts (cloud, misconfiguration, exposure, CVE, panel, XSS, WordPress and full
+templates) plus per-CVE contracts kept in sync with the official Nuclei CVE catalog. It resolves the targets from your
+OpenAEV assets or from manual input, runs the scan, and reports the discovered CVEs and other findings back to OpenAEV
+as structured results.
+
 ## Table of Contents
 
 - [OpenAEV Nuclei Injector](#openaev-nuclei-injector)
-  - [Prerequisites](#prerequisites)
+  - [Table of Contents](#table-of-contents)
+  - [Introduction](#introduction)
+  - [How it works](#how-it-works)
+  - [Requirements](#requirements)
   - [Configuration variables](#configuration-variables)
     - [OpenAEV environment variables](#openaev-environment-variables)
     - [Base injector environment variables](#base-injector-environment-variables)
+    - [Nuclei injector environment variables](#nuclei-injector-environment-variables)
   - [Deployment](#deployment)
     - [Docker Deployment](#docker-deployment)
     - [Manual Deployment](#manual-deployment)
+  - [Usage](#usage)
+  - [Inject contracts](#inject-contracts)
+  - [Target selection](#target-selection)
   - [Behavior](#behavior)
-    - [Template Selection](#template-selection)
-    - [Target Selection](#target-selection)
-  - [Resources](#resources)
+  - [Debugging](#debugging)
+  - [Additional information](#additional-information)
 
----
+## Introduction
 
-## Prerequisites
+OpenAEV (Breach and Attack Simulation) drives injectors to execute the technical actions of a scenario. The Nuclei
+injector registers a set of scan contracts with the OpenAEV platform; when an inject using one of these contracts is
+played, OpenAEV dispatches a job to the injector, which runs the corresponding Nuclei scan and returns the results. In
+addition to the static contracts, the injector maintains a catalog of per-CVE contracts in the background so each
+published Nuclei CVE template can be played individually.
 
-This injector uses [ProjectDiscovery Nuclei](https://github.com/projectdiscovery/nuclei) to scan assets.
+## How it works
 
-Depending on your deployment method:
+Injectors receive their jobs through the message broker (RabbitMQ) configured by the OpenAEV platform. The injector
+fetches the broker connection details from OpenAEV at startup, so it only needs to be able to reach the OpenAEV URL and
+the RabbitMQ host/port advertised by the platform.
 
-- When using the **Docker deployment**, **Nuclei is bundled** within the image.
-- When running manually (e.g., in development), **Nuclei must be installed locally** and available in the system's `PATH`.
+## Requirements
 
-In both cases, for the injector to operate correctly:
-
-- It **must be able to reach the OpenAEV platform** via the URL you provide (through `OPENAEV_URL` or `config.yml`).
-- It **must be able to reach the RabbitMQ broker** used by the OpenAEV platform.
-
----
+- A running OpenAEV platform, reachable from the injector (along with its RabbitMQ broker)
+- For a manual (non-Docker) deployment:
+  - Python >= 3.11 and [Poetry](https://python-poetry.org/) >= 2.1
+  - The `nuclei` binary available on the `PATH` (the Docker image bundles Nuclei `v3.8.0`)
+  - Outbound network access to `raw.githubusercontent.com` and `github.com` so the injector can update the Nuclei
+    templates and sync the per-CVE contracts
 
 ## Configuration variables
 
-Configuration is provided either through environment variables (Docker) or a config
-file (`config.yml`, manual).
+The injector is configured either through environment variables (recommended, read from `docker-compose.yml` / the
+`.env` file for a Docker deployment) or through a `config.yml` file (for a manual deployment). Copy the provided
+`.env.sample` / `config.yml.sample` and fill in the values flagged with `ChangeMe`.
 
 ### OpenAEV environment variables
 
-| Parameter          | config.yml | Docker environment variable | Mandatory | Description                                           |
-|--------------------|------------|-----------------------------|-----------|-------------------------------------------------------|
-| OpenAEV URL        | url        | `OPENAEV_URL`               | Yes       | The URL of the OpenAEV platform.                      |
-| OpenAEV Token      | token      | `OPENAEV_TOKEN`             | Yes       | The default admin token set in the OpenAEV platform.  |
-| OpenAEV Tenant ID  | tenant_id  | `OPENAEV_TENANT_ID`         | No        | Identifier of the tenant within the OpenAEV platform. |
-
-> ⚠️ Warning ⚠️
->
-> The `tenant_id` parameter is a new configuration option. A period of backward compatibility is ensured: if this key is not defined,
-> existing configurations will not be affected, and the default value will be `None`. However, if a value is provided, it will be
-> validated by Pydantic and must conform to a valid UUID format, otherwise, a validation error will be returned.
+| Parameter         | config.yml          | Docker environment variable | Mandatory | Description                                                                        |
+|-------------------|---------------------|-----------------------------|-----------|------------------------------------------------------------------------------------|
+| OpenAEV URL       | `openaev.url`       | `OPENAEV_URL`               | Yes       | The URL of the OpenAEV platform. Must be reachable from where the injector runs.   |
+| OpenAEV Token     | `openaev.token`     | `OPENAEV_TOKEN`             | Yes       | The administrator token of the OpenAEV platform.                                   |
+| OpenAEV Tenant ID | `openaev.tenant_id` | `OPENAEV_TENANT_ID`         | No        | Tenant identifier for multi-tenant deployments. When set, it must be a valid UUID. |
 
 ### Base injector environment variables
 
-| Parameter                               | config.yml                                                 | Docker environment variable                                | Default | Mandatory | Description                                                                                         |
-|-----------------------------------------|------------------------------------------------------------|------------------------------------------------------------|---------|-----------|-----------------------------------------------------------------------------------------------------|
-| Injector ID                             | `injector.id`                                              | `INJECTOR_ID`                                              | /       | Yes       | A unique `UUIDv4` identifier for this injector instance.                                            |
-| Injector Name                           | `injector.name`                                            | `INJECTOR_NAME`                                            |         | Yes       | Name of the injector.                                                                               |
-| Log Level                               | `injector.log_level`                                       | `INJECTOR_LOG_LEVEL`                                       | info    | Yes       | Determines the verbosity of the logs. Options: `debug`, `info`, `warn`, or `error`.                 |
-| External contracts maintenance schedule | `injector.external_contracts_maintenance_schedule_seconds` | `INJECTOR_EXTERNAL_CONTRACTS_MAINTENANCE_SCHEDULE_SECONDS` | 86400   | No        | With every tick, trigger a maintenance of the external contracts (e.g. based on Nuclei templates)   |
+| Parameter     | config.yml           | Docker environment variable | Default | Mandatory | Description                                                     |
+|---------------|----------------------|-----------------------------|---------|-----------|-----------------------------------------------------------------|
+| Injector ID   | `injector.id`        | `INJECTOR_ID`               | /       | Yes       | A unique `UUIDv4` identifier for this injector instance.        |
+| Injector Name | `injector.name`      | `INJECTOR_NAME`             | Nuclei  | No        | The name of the injector as shown in OpenAEV.                   |
+| Log Level     | `injector.log_level` | `INJECTOR_LOG_LEVEL`        | error   | No        | Verbosity of the logs. One of `debug`, `info`, `warn`, `error`. |
 
----
+### Nuclei injector environment variables
 
-### Nuclei environment variables
+These tune how Nuclei runs. Each maps to a Nuclei command-line flag (shown in the description). `exclude_type` and
+`exclude_severity` accept comma-separated values.
 
-| Parameter                              | config.yml                              | Docker environment variable             | Default      | Mandatory | Description                                                                                          |
-|----------------------------------------|-----------------------------------------|-----------------------------------------|--------------|-----------|------------------------------------------------------------------------------------------------------|
-| Nuclei Scan Strategy                   | `nuclei.scan_strategy`                  | `NUCLEI_SCAN_STRATEGY`                  | `host-spray` | No        | Strategy to use while scanning (auto, host-spray, template-spray). Nuclei Flags: -ss, -scan-strategy |
-| Nuclei Templates Parallelism           | `nuclei.templates_parallelism`          | `NUCLEI_TEMPLATES_PARALLELISM`          | `5`          | No        | Maximum number of templates to be executed in parallel. Nuclei Flags: -c, -concurrency               |
-| Nuclei Hosts parallelism per templates | `nuclei.hosts_parallelism_per_template` | `NUCLEI_HOSTS_PARALLELISM_PER_TEMPLATE` | `5`          | No        | Maximum number of hosts to be analyzed in parallel per template. Nuclei Flags: -bs, -bulk-size       |
-| Nuclei Max requests per second         | `nuclei.max_requests_per_second`        | `NUCLEI_MAX_REQUESTS_PER_SECOND`        | `50`         | No        | Maximum number of requests to send per second. Nuclei Flags: -rl, -rate-limit                        |
-| Nuclei Timeout                         | `nuclei.timeout`                        | `NUCLEI_TIMEOUT`                        | `10`         | No        | Time to wait in seconds before timeout. Nuclei Flags: -timeout                                       |
-| Nuclei Retries                         | `nuclei.retries`                        | `NUCLEI_RETRIES`                        | `1`          | No        | Number of times to retry a failed request. Nuclei Flags: -retries                                    |
-| Nuclei Max host error                  | `nuclei.max_host_error`                 | `NUCLEI_MAX_HOST_ERROR`                 | `30`         | No        | Max errors for a host before skipping from scan. Nuclei Flags: -mhe, -max-host-error                 |
-| Nuclei response size read              | `nuclei.response_size_read`             | `NUCLEI_RESPONSE_SIZE_READ`             | `1048576`    | No        | Max response size to read in bytes. Nuclei Flags: -rsr, -response-size-read                          |
-| Nuclei response size save              | `nuclei.response_size_save`             | `NUCLEI_RESPONSE_SIZE_SAVE`             | `1048576`    | No        | Max response size to save in bytes. Nuclei Flags: -rss, -response-size-save                          |
-| Nuclei exclude type                    | `nuclei.exclude_type`                   | `NUCLEI_EXCLUDE_TYPE`                   | `headless`   | No        | Templates to exclude based on protocol type (comma-separated). Nuclei Flags: -ept, -exclude-type     |
-| Nuclei exclude severity                | `nuclei.exclude_severity`               | `NUCLEI_EXCLUDE_SEVERITY`               | /            | No        | Templates to exclude based on severity (comma-separated). Nuclei Flags: -es, -exclude-severity       |
-
-#### Nuclei Resource Management
-
-> [!IMPORTANT]
-> 
-> To ensure optimal stability, security, and compatibility, Nuclei must be kept up to date. 
-> Recommended Nuclei version: v3.8.0
-
-Nuclei is a highly concurrent vulnerability scanner. While this enables fast and scalable scans, it can also lead to 
-significant CPU, memory, and network consumption if not properly configured. For this reason, Nuclei injector exposes a 
-controlled subset of Nuclei performance and safety parameters that can be adjusted based on infrastructure capacity and 
-scanning requirements.
-
-The default injector configuration is intentionally conservative and designed as a safe baseline for containerized 
-environments, including Kubernetes clusters with typical memory limits of `256Mi`-`512Mi` per pod.
-
-> [!WARNING]
-> 
-> If flags and available options are not properly configured, Nuclei can overutilize resources and can cause the 
-> following issues:
-> - OOM Killed by the system
-> - Hangs and crashes
-> - Error code 137 etc
-
-Resource consumption scales multiplicatively rather than linearly, meaning that increasing multiple parameters 
-simultaneously significantly amplifies memory and CPU usage.
-
-| Parameter                        | Corresponding Flag   | Safe  | Balanced | Fast    |
-|----------------------------------|----------------------|-------|----------|---------|
-| `templates_parallelism`          | `-c`, `-concurrency` | 5–10  | 10–15    | 15–25   |
-| `hosts_parallelism_per_template` | `-bs`, `-bulk-size`  | 5–10  | 10–15    | 15–25   |
-| `max_requests_per_second`        | `-rl`, `-rate-limit` | 20–50 | 50–100   | 100–150 |
-
-These parameters are interdependent and must be adjusted together rather than in isolation. They should also be 
-adjusted gradually according to the infrastructure capacity and workload characteristics.
-
-Configuration tuning should always take into account the execution context:
-- For `single-target` scans, higher concurrency values can be safely used to improve performance.
-- For `multi-target` scans, it is recommended to use more conservative settings to avoid resource saturation.
-
-Nuclei configuration requires careful trade-offs, as these parameters directly impact performance, stability, and 
-resource consumption.
-
-The following guidelines should be considered:
-- Higher safety settings increase scan duration but improve stability.
-- `host-spray` is the recommended scan strategy for predictable and stable resource usage.
-- `max_host_error` must be greater than `templates_parallelism` and `hosts_parallelism_per_template` to prevent 
-premature host exclusion under high concurrency workloads.
-- `headless` templates should be used with caution due to their high resource consumption (embedded headless browser 
-execution).
-- Increasing template exclusions (`exclude_type`, `exclude_severity`) reduces the active template set and improves scan 
-performance.
-
-> [!WARNING]
-> 
-> The `response_size_read` parameter has a direct impact on memory consumption:
-> Memory usage is approximately proportional to:
-> - 1–1.5 × (`templates_parallelism` × `response_size_read`)
-> 
-> For this reason, increasing both `templates_parallelism` and `response_size_read` simultaneously can significantly 
-> increase memory pressure and lead to `OOM Killed` in constrained environments.
-
-For more information:
-- See [Nuclei's documentation on mass scanning](https://docs.projectdiscovery.io/opensource/nuclei/mass-scanning-cli#understanding-how-nuclei-consumes-resources)
-- See [Nuclei's documentation on flags](https://docs.projectdiscovery.io/opensource/nuclei/running#nuclei-flags)
+| Parameter                      | config.yml                              | Docker environment variable             | Default   | Mandatory | Description                                                                                                    |
+|--------------------------------|-----------------------------------------|-----------------------------------------|-----------|-----------|----------------------------------------------------------------------------------------------------------------|
+| Scan strategy                  | `nuclei.scan_strategy`                  | `NUCLEI_SCAN_STRATEGY`                  | host-spray| No        | Strategy used while scanning. One of `auto`, `host-spray`, `template-spray` (`-scan-strategy`).                |
+| Templates parallelism          | `nuclei.templates_parallelism`          | `NUCLEI_TEMPLATES_PARALLELISM`          | 5         | No        | Maximum number of templates executed in parallel (`-concurrency`).                                             |
+| Hosts parallelism per template | `nuclei.hosts_parallelism_per_template` | `NUCLEI_HOSTS_PARALLELISM_PER_TEMPLATE` | 5         | No        | Maximum number of hosts analyzed in parallel per template (`-bulk-size`).                                      |
+| Max requests per second        | `nuclei.max_requests_per_second`        | `NUCLEI_MAX_REQUESTS_PER_SECOND`        | 50        | No        | Maximum number of requests sent per second (`-rate-limit`).                                                    |
+| Timeout                        | `nuclei.timeout`                        | `NUCLEI_TIMEOUT`                        | 10        | No        | Time to wait in seconds before timeout (`-timeout`).                                                           |
+| Retries                        | `nuclei.retries`                        | `NUCLEI_RETRIES`                        | 1         | No        | Number of times to retry a failed request (`-retries`).                                                        |
+| Max host error                 | `nuclei.max_host_error`                 | `NUCLEI_MAX_HOST_ERROR`                 | 30        | No        | Max errors for a host before skipping it from the scan (`-max-host-error`).                                    |
+| Response size read             | `nuclei.response_size_read`             | `NUCLEI_RESPONSE_SIZE_READ`             | 1048576   | No        | Max response size to read, in bytes (`-response-size-read`).                                                   |
+| Response size save             | `nuclei.response_size_save`             | `NUCLEI_RESPONSE_SIZE_SAVE`             | 1048576   | No        | Max response size to save, in bytes (`-response-size-save`).                                                   |
+| Exclude type                   | `nuclei.exclude_type`                   | `NUCLEI_EXCLUDE_TYPE`                   | headless  | No        | Protocol types to exclude: `dns`, `file`, `http`, `headless`, `tcp`, `workflow`, `ssl`, `websocket`, `whois`, `code`, `javascript` (`-exclude-type`). |
+| Exclude severity               | `nuclei.exclude_severity`               | `NUCLEI_EXCLUDE_SEVERITY`               | /         | No        | Severities to exclude: `info`, `low`, `medium`, `high`, `critical`, `unknown` (`-exclude-severity`).           |
 
 ## Deployment
 
 ### Docker Deployment
 
-Build the Docker image using the provided `Dockerfile`.
+This injector depends on the shared `injector_common` package, so the image must be built with a build context that
+exposes it:
 
-```bash
-docker build --build-context injector_common=../injector_common .  -t openaev/injector-nuclei:latest
-````
+```shell
+docker build --build-context injector_common=../injector_common . -t openaev/injector-nuclei:latest
+```
 
-Edit the `docker-compose.yml` file with your OpenAEV configuration, then start the container:
+Create a `.env` file from `.env.sample` and fill in your values, then start the injector with the provided
+`docker-compose.yml`:
 
-```bash
+```shell
 docker compose up -d
 ```
 
-> ✅ The Docker image **already contains Nuclei**. No further installation is needed inside the container.
-
----
-
-#### Domain name resolution - Local openAEV with Injector container
-**Note:** If you are running OpenAEV locally on your host machine and want to run this injector inside a Docker container, the `openaev` URL defined in `config.yml` and `.env` must be reachable from inside the container.
-
-Inside a container, `localhost` refers to the container itself - not your host machine. Therefore, you cannot use `localhost` as the OpenAEV URL unless OpenAEV is running inside the same container.
-
-Instead, use: `host.docker.internal`. This hostname allows the container to access services running on your host machine.
-
-**In short**:
-- `localhost` -> container itself
-- `host.docker.internal` -> your host machine
-
-**Platform-specific notes**:
-- **macOS / Windows (Docker Desktop):**     
-  `host.docker.internal` works out of the box. No additional configuration is needed.
-- **Linux:**  
-  You must explicitly map it using `extra_hosts`:
-```yaml
-services:
-  your-injector-name:
-    image: your-image-name
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
-```
-
-**Important**:
-- Avoid mapping `host.docker.internal` to a fixed IP (e.g. `1.2.3.4`) unless you have a specific reason. The host IP can change, and Docker provides `host-gateway` to handle this dynamically.
-- Make sure your OpenAEV service is listening on `0.0.0.0` (not just `localhost`), otherwise it may NOT be accessible from the container.
-
----
+> If OpenAEV runs on your host machine while the injector runs in a container, set `OPENAEV_URL` to
+> `http://host.docker.internal:<port>` rather than `localhost`. On Linux, also add
+> `extra_hosts: ["host.docker.internal:host-gateway"]` to the service, and make sure OpenAEV listens on `0.0.0.0`.
 
 ### Manual Deployment
 
-#### Prerequisites
-
-* **Nuclei must be installed locally** and accessible via the command line (`nuclei` command).
-* You can install it from: [https://github.com/projectdiscovery/nuclei#installation](https://github.com/projectdiscovery/nuclei#installation)
-
-The poetry package management system (version 2.1 or later) must also be available: https://python-poetry.org/
-Install the environment:
-
-**Production**:
-```shell
-# production environment
-poetry install 
-```
-
-**Development** (note that you should also clone the [pyoaev](OpenAEV-Platform/client-python) repository [according to
-these instructions](../README.md#simultaneous-development-on-pyoaev-and-an-injector))
-```shell
-# development environment
-poetry install --extras dev
-```
-
-Then, start the collector:
+Make sure the `nuclei` binary is installed and on your `PATH` (the Docker image bundles `v3.8.0`), create a `config.yml`
+from `config.yml.sample`, then install and run the injector:
 
 ```shell
+poetry install
 poetry run python -m nuclei.openaev_nuclei
 ```
 
----
+> For local development against a checkout of [client-python](https://github.com/OpenAEV-Platform/client-python)
+> (cloned next to this repository), use `poetry install --extras dev`.
+
+## Usage
+
+Once started, the injector registers its contracts with OpenAEV and waits for jobs. Add a Nuclei inject to a scenario or
+atomic testing, select the scan type and the targets, and play it: the results are attached to the inject once the scan
+completes. The injector also checks that the `nuclei` binary is available at startup and refuses to start if it is not.
+
+## Inject contracts
+
+Each contract runs `nuclei` against the resolved targets (fed on standard input) and writes JSONL output (`-jsonl`).
+The static contracts select Nuclei templates by tag:
+
+| Contract                    | Templates selected             | Nuclei flag              |
+|-----------------------------|--------------------------------|--------------------------|
+| Nuclei - Cloud Templates    | Cloud templates                | `-tags cloud`            |
+| Nuclei - Misconfigurations  | Misconfiguration templates     | `-tags misconfiguration` |
+| Nuclei - Exposures          | Exposure templates             | `-tags exposure`         |
+| Nuclei - CVE Scan           | CVE templates                  | `-tags cve`              |
+| Nuclei - Panel Scan         | Login/admin panel templates    | `-tags panel`            |
+| Nuclei - XSS Scan           | Cross-site scripting templates | `-tags xss`              |
+| Nuclei - Wordpress Scan     | WordPress templates            | `-tags wordpress`        |
+| Nuclei - TEMPLATES Scan     | Full template set              | `-templates /`           |
+
+> The `Nuclei - TEMPLATES Scan` contract runs the broadest, slowest scan: when no manual template is set it invokes
+> `nuclei -templates /` to run Nuclei's full template set instead of a tag-filtered subset. Here `/` is the template
+> path passed to Nuclei (not a special "all templates" keyword); scope the scan down with the manual template path
+> field below whenever possible.
+
+Every contract also exposes two optional free-text fields:
+
+- `Manual template path (-t)` (`template`): run a specific template or template directory (`-templates <path>`).
+- `Options` (`options`): extra raw Nuclei flags, appended to the command line.
+
+In addition to the static contracts, a background scheduler maintains one contract per CVE. On each tick (every
+`86400` seconds / 24h by default) it runs `nuclei -update-templates`, fetches the official Nuclei CVE catalog
+(`cves.json` from the `projectdiscovery/nuclei-templates` repository), and creates, updates or deletes the matching
+per-CVE contracts. Each per-CVE contract is labelled with the CVE/template ID and pre-fills the template path of that
+CVE.
+
+Common inject fields and outputs:
+
+- Inputs: target selector (`Assets`, `Asset groups` (default), `Manual`), targeted assets / asset groups, the targeted
+  asset property, manual targets (comma-separated) and expectations (predefined `Not vulnerable`, score 100).
+- Outputs: `cve` (CVE findings, finding-compatible) and `others` (other text findings). The execution message
+  summarizes how many CVEs and other vulnerabilities were found, or `Good News: Nothing Found !`.
+
+## Target selection
+
+Targets are resolved through the shared selection logic of `injector_common`:
+
+- Target selector: `assets`, `asset-groups` (default), or `manual`.
+- Target property selector (for assets / asset groups): `automatic` (default), `seen_ip`, `local_ip` (first), or
+  `hostname`.
+
+| Target property   | Asset field used                                   |
+|-------------------|----------------------------------------------------|
+| Automatic         | Hostname for agentless assets, else first valid IP |
+| Seen IP           | `endpoint_seen_ip`                                 |
+| Local IP (first)  | First valid entry in `endpoint_ips`                |
+| Hostname          | `endpoint_hostname`                                |
+
+For manual targets, provide hostnames or IP addresses as comma-separated values. Invalid, loopback, unspecified and
+link-local addresses are filtered out.
 
 ## Behavior
 
-The Nuclei injector supports contract-based scans by dynamically constructing and executing Nuclei
-commands based on provided tags or templates.
-
-### Supported Contracts
-
-The following scan types are supported via `-tags`:
-
-- Cloud
-- Misconfiguration
-- Exposure
-- Panel
-- XSS
-- WordPress
-- HTTP
-
-The CVE scan uses the `-tags cve` argument and enforces JSON output.
-
-The Template scan accepts a manual template via `-t <template>` or `template_path`.
-
-Additionally, contracts dedicated to scanning for a single, specific CVE may be provisioned in OpenAEV if
-two conditions are met:
-
-* A scan for the CVE is supported by a Nuclei template (part of the Nuclei distribution),
-* A vulnerability taxonomy entry exists in OpenAEV for that same CVE (under Settings > Taxonomies > Vulnerabilities).
-
-These CVE-specific contracts are set up out of the box to use the Nuclei template (with the `-t` argument)
-relevant to the CVE.
-
-### Target Selection
-
-Targets are selected based on the `target_selector` field.
-
-#### If target type is **Assets**:
-
-| Selected Property | Uses Asset Field           |
-|-------------------|----------------------------|
-| Seen IP           | endpoint_seen_ip           |
-| Local IP          | First IP from endpoint_ips |
-| Hostname          | endpoint_hostname          |
-
-#### If target type is **Manual**:
-
-Direct comma-separated values of IPs or hostnames are used.
-
-### Options
-
-You can add any options you want based on what is available for nuclei
-
-### Example Execution
-
-A sample command executed by this injector might look like:
-
-```bash
-nuclei -u 192.168.1.10 -tags xss
-```
-Or with a specific template:
-```bash
-nuclei -u 10.0.0.5 -t cves/2021/CVE-2021-1234.yaml -j
-```
-Or with options:
-```bash
-nuclei -u https://www.google.com -t dast/vulnerabilities/sqli/sqli-error-based.yaml -dast
+```mermaid
+flowchart LR
+    O[OpenAEV inject] -->|job via RabbitMQ| I(Nuclei injector)
+    I -->|resolve targets| T[Assets / Asset groups / Manual]
+    I -->|nuclei -tags/-templates -jsonl| N[Nuclei]
+    N -->|JSONL| P[Output parser]
+    P -->|CVE + others| I
+    I -->|structured results| O
 ```
 
-### Output Parsing
-- The injector captures and parses the JSON output of Nuclei, and returns:
+On each job the injector acknowledges reception, resolves the targets, builds the `nuclei` command line from the
+contract tag and the configured options, runs the scan with the targets on standard input, parses the JSONL output into
+CVE findings and other results, and returns a structured result (linked to the scanned asset when applicable) together
+with a success or error status. A separate background scheduler keeps the per-CVE contracts in sync with the Nuclei CVE
+catalog.
 
-- Confirmed findings (if any) with severity and CVE IDs
+## Debugging
 
-- Other lines as unstructured output
+Set `INJECTOR_LOG_LEVEL=debug` to log the resolved targets and the exact `nuclei` command line that is executed (logged
+as `Executing nuclei with: ...`). For manual deployments, the most common issue is a missing `nuclei` binary on the
+`PATH` (the injector checks `nuclei -version` at startup). If the per-CVE contracts are not appearing or updating, check
+that the injector can reach `raw.githubusercontent.com` and review the maintenance logs.
 
-### Results
+## Additional information
 
-Scan results are categorized into:
-
-- **CVEs** (based on template classifications)
-- **Other vulnerabilities** (general issues found)
-
-If no vulnerabilities are detected, the injector will clearly indicate this with a **"Nothing Found"** message.
-
----
-
-## Resources
-
-* [Nuclei Documentation](https://github.com/projectdiscovery/nuclei)
-* [Official Nuclei Templates](https://github.com/projectdiscovery/nuclei-templates)
-* http://testphp.vulnweb.com/ is a safe, intentionally vulnerable target provided by Acunetix for security testing purposes
+- Official Nuclei documentation: [https://docs.projectdiscovery.io/tools/nuclei/overview](https://docs.projectdiscovery.io/tools/nuclei/overview)
+- Nuclei flags reference: [https://docs.projectdiscovery.io/tools/nuclei/running](https://docs.projectdiscovery.io/tools/nuclei/running)
+- Nuclei templates and CVE catalog: [https://github.com/projectdiscovery/nuclei-templates](https://github.com/projectdiscovery/nuclei-templates)
