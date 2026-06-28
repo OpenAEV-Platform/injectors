@@ -1,9 +1,8 @@
-from pydantic import Field
-from pyoaev.configuration import ConfigLoaderOAEV, Configuration, SettingsLoader
-
 from ai_redteam.configuration.injector_config_override import InjectorConfigOverride
 from ai_redteam.contracts import constants as c
 from ai_redteam.contracts.ai_contracts import build_contracts
+from pydantic import Field
+from pyoaev.configuration import ConfigLoaderOAEV, Configuration, SettingsLoader
 
 
 class ConfigLoader(SettingsLoader):

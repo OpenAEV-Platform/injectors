@@ -9,7 +9,6 @@ import subprocess
 import tempfile
 
 import yaml
-
 from ai_redteam.contracts import constants as c
 from ai_redteam.engines.base import Engine, EngineResult
 

@@ -6,7 +6,6 @@ header so an in-line AI gateway / LLM firewall can log it and a defense collecto
 import json
 
 import requests
-
 from ai_redteam import marker as marker_mod
 
 

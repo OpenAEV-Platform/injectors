@@ -2,12 +2,11 @@ import json
 import time
 from typing import Dict
 
-from pyoaev.helpers import OpenAEVConfigHelper, OpenAEVInjectorHelper
-
 from ai_redteam import marker as marker_mod
 from ai_redteam.configuration.config_loader import ConfigLoader
 from ai_redteam.engines import build_registry, contract_engine_map
 from ai_redteam.targets.target_resolver import resolve_target
+from pyoaev.helpers import OpenAEVConfigHelper, OpenAEVInjectorHelper
 
 try:
     from injector_common.dump_config import intercept_dump_argument
