@@ -87,6 +87,24 @@ class SendPromptTest(TestCase):
             llm_client.send_prompt(target, "hi", "m", timeout=5)
 
     @patch("ai_redteam.targets.llm_client.requests.post")
+    def test_custom_http_falls_back_to_json_dump(self, post):
+        post.return_value = _response({"unexpected": "shape"})
+        target = _target("AGENT_HTTP", "https://agent.example.com")
+        result = llm_client.send_prompt(target, "hi", "m", timeout=5)
+        self.assertIn("unexpected", result.text)
+
+    @patch("ai_redteam.targets.llm_client.requests.post")
+    def test_custom_http_uses_custom_auth_header(self, post):
+        post.return_value = _response({"output": "ok"})
+        target = _target(
+            "AGENT_HTTP",
+            "https://agent.example.com",
+            configuration={"auth_header": "X-Api-Key", "auth_prefix": ""},
+        )
+        llm_client.send_prompt(target, "hi", "m", timeout=5)
+        self.assertEqual(post.call_args.kwargs["headers"]["X-Api-Key"], "secret-key")
+
+    @patch("ai_redteam.targets.llm_client.requests.post")
     def test_unknown_provider_falls_back_to_openai(self, post):
         post.return_value = _response({"choices": [{"message": {"content": "fb"}}]})
         target = _target("SOMETHING_NEW", "https://api.example.com")
