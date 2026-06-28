@@ -1,0 +1,36 @@
+[tool.poetry]
+name = "openaev-ai-redteam-injector"
+version = "2.260615.0"
+description = "An injector for adversarial exposure validation of LLM models and AI agents (MITRE ATLAS / OWASP)"
+authors = ["Filigran <contact@filigran.io>"]
+license = "Apache-2.0"
+readme = "README.md"
+packages = [
+    { include = "ai_redteam" }
+]
+
+[tool.poetry.dependencies]
+python = "^3.11"
+requests = "^2.32.0"
+pyyaml = "^6.0.1"
+pyoaev = [
+    { markers = "extra == 'prod' and extra != 'dev'", version = "2.260615.0", source = "pypi"  },
+    { markers = "extra == 'dev' and extra != 'prod'", path = "../../client-python", develop = true },
+]
+
+[tool.poetry.extras]
+prod = ["pyoaev"]
+dev = ["pyoaev"]
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.isort]
+profile = "black"
+known_local_folder = ["ai_redteam"]
+
+[tool.cmw]
+install-command = "poetry install --extras prod"
+config-dump-command = "poetry run python -m ai_redteam.openaev_ai_redteam --dump-config-schema"
+icon-path = "ai_redteam/img/icon-ai-redteam.png"
