@@ -138,9 +138,9 @@ class NmapContracts:
             isFindingCompatible=False,
             labels=["scan"],
         )
-        expectation_signature = ContractOutputElement(
+        expectation_signatures = ContractOutputElement(
             type=ContractOutputType.ExpectationSignature,
-            field="expectation_signature",
+            field="expectation_signatures",
             isMultiple=True,
             isFindingCompatible=False,
             labels=["scan"],
@@ -162,7 +162,7 @@ class NmapContracts:
         )
         nmap_contract_outputs: List[ContractOutputElement] = (
             ContractBuilder()
-            .add_outputs([output_ports_scans, output_port, expectation_signature])
+            .add_outputs([output_ports_scans, output_port, expectation_signatures])
             .build_outputs()
         )
         syn_scan_contract = Contract(
