@@ -93,6 +93,7 @@ The 29 symbols in `__all__` are the stable public API. Everything under `_core/`
 
 ## Documentation
 
+- [Base Injector](docs/base-injector.md) — lifecycle Protocol, configuration, message parsing, execution reporting
 - [CLI Engine](docs/cli-engine.md) — architecture, public interface, dependency injection, advanced nmap example, error handling
 
 ## Development
