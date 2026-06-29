@@ -133,9 +133,9 @@ class NucleiContracts:
 
     @staticmethod
     def core_outputs():
-        output_expectation_signature = ContractOutputElement(
+        output_expectation_signatures = ContractOutputElement(
             type=ContractOutputType.ExpectationSignature,
-            field="expectation_signature",
+            field="expectation_signatures",
             isMultiple=True,
             isFindingCompatible=True,
             labels=["nuclei"],
@@ -154,7 +154,7 @@ class NucleiContracts:
             isFindingCompatible=True,
             labels=["nuclei"],
         )
-        return [output_expectation_signature, output_vulns, output_others]
+        return [output_expectation_signatures, output_vulns, output_others]
 
     @staticmethod
     def build_contract(
