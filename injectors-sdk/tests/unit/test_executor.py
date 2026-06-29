@@ -1,13 +1,11 @@
 """RED tests for SubprocessExecutor."""
 
 import pytest
-
 from injectors_sdk import (
     BinaryNotFoundError,
     CliContractError,
     CliExecutionError,
     ExecPolicy,
-    ExecResult,
     SubprocessExecutor,
 )
 
@@ -18,6 +16,7 @@ def executor() -> SubprocessExecutor:
 
 
 # --- Happy path ---
+
 
 def test_executor_runs_echo(executor: SubprocessExecutor) -> None:
     result = executor.run(["echo", "hello"])
@@ -41,7 +40,9 @@ def test_executor_passes_env(executor: SubprocessExecutor) -> None:
     assert "hello" in result.stdout
 
 
-def test_executor_respects_cwd(executor: SubprocessExecutor, tmp_path: pytest.TempPathFactory) -> None:
+def test_executor_respects_cwd(
+    executor: SubprocessExecutor, tmp_path: pytest.TempPathFactory
+) -> None:
     result = executor.run(["pwd"], cwd=str(tmp_path))
     assert str(tmp_path) in result.stdout
 
@@ -52,6 +53,7 @@ def test_executor_passes_stdin(executor: SubprocessExecutor) -> None:
 
 
 # --- Error cases ---
+
 
 def test_executor_raises_on_timeout() -> None:
     short_timeout = SubprocessExecutor(ExecPolicy(timeout=1))
@@ -78,6 +80,7 @@ def test_executor_raises_on_non_list_argv(executor: SubprocessExecutor) -> None:
 
 # --- Shell metachar safety ---
 
+
 def test_executor_warns_on_metachars_no_shell(executor: SubprocessExecutor) -> None:
     with pytest.warns(UserWarning, match="metacharacters"):
         executor.run(["echo", "hello | world"])
@@ -92,6 +95,7 @@ def test_executor_rejects_metachars_with_shell() -> None:
 
 
 # --- Output truncation ---
+
 
 def test_executor_truncates_output() -> None:
     executor = SubprocessExecutor(ExecPolicy(timeout=5, max_output_bytes=10))

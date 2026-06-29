@@ -87,9 +87,7 @@ class SubprocessExecutor:
                 stacklevel=2,
             )
 
-        has_metachars = any(
-            any(char in arg for char in SHELL_METACHARS) for arg in argv
-        )
+        has_metachars = any(any(char in arg for char in SHELL_METACHARS) for arg in argv)
         if has_metachars:
             if shell_resolved:
                 raise CliContractError(
@@ -97,8 +95,7 @@ class SubprocessExecutor:
                     "This is a command injection risk. Sanitize input or use shell=False."
                 )
             warnings.warn(
-                "Shell metacharacters detected in argv. "
-                "This may indicate an injection risk.",
+                "Shell metacharacters detected in argv. This may indicate an injection risk.",
                 UserWarning,
                 stacklevel=2,
             )
@@ -108,10 +105,7 @@ class SubprocessExecutor:
         merged_env.update(self.policy.env_overrides)
         if env is not None and (
             not isinstance(env, dict)
-            or any(
-                not isinstance(k, str) or not isinstance(v, str)
-                for k, v in env.items()
-            )
+            or any(not isinstance(k, str) or not isinstance(v, str) for k, v in env.items())
         ):
             raise CliContractError("env must be a dict[str, str] or None")
         if env:

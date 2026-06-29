@@ -50,7 +50,9 @@ def _when_creating_binary_not_found_error(
     return BinaryNotFoundError(binary, result=result)
 
 
-def _then_binary_not_found_error_has_default_result(error: BinaryNotFoundError, binary: str) -> None:
+def _then_binary_not_found_error_has_default_result(
+    error: BinaryNotFoundError, binary: str
+) -> None:
     assert error.binary == binary
     assert isinstance(error.result, ExecResult)
     assert error.returncode == 127

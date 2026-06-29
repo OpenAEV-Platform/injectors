@@ -19,7 +19,6 @@ from injectors_sdk._core.engine.ports.protocols import (
 )
 from injectors_sdk._core.errors import ExecResult
 
-
 SUCCESS_ANY: frozenset[int] = frozenset({0})
 """Default success codes set: only 0 is considered success."""
 

@@ -1,10 +1,9 @@
 """RED tests for CliEngine and EngineResult integration."""
 
 import pytest
-
 from injectors_sdk import (
+    SUCCESS_ANY,
     CliEngine,
-    CliContractError,
     CommandSpec,
     EngineResult,
     ExecPolicy,
@@ -13,12 +12,11 @@ from injectors_sdk import (
     OptionSpec,
     OutputFormat,
     OutputSpec,
-    SUCCESS_ANY,
     create_cli_engine,
 )
 
-
 # --- Factory ---
+
 
 def test_create_cli_engine_returns_engine() -> None:
     engine = create_cli_engine("echo")
@@ -34,12 +32,14 @@ def test_create_cli_engine_with_custom_policy() -> None:
 
 # --- SUCCESS_ANY ---
 
+
 def test_success_any_contains_zero() -> None:
     assert 0 in SUCCESS_ANY
     assert 1 not in SUCCESS_ANY
 
 
 # --- CliEngine.run ---
+
 
 def test_engine_run_simple_echo() -> None:
     engine = create_cli_engine("echo", policy=ExecPolicy(timeout=5))
@@ -92,6 +92,7 @@ def test_engine_run_with_options() -> None:
 
 # --- EngineResult ---
 
+
 def test_engine_result_is_frozen() -> None:
     result = EngineResult(
         parsed="test",
@@ -105,7 +106,6 @@ def test_engine_result_is_frozen() -> None:
 
 def test_engine_result_pipe() -> None:
     engine = create_cli_engine("cat", policy=ExecPolicy(timeout=5))
-    first_cmd = CommandSpec(name="echo", argv=[])
 
     # Run echo first, then pipe to cat
     echo_engine = create_cli_engine("echo", policy=ExecPolicy(timeout=5))
@@ -120,13 +120,16 @@ def test_engine_result_pipe() -> None:
 
 # --- Public API contract ---
 
+
 def test_all_24_symbols_exported() -> None:
     import injectors_sdk
+
     assert len(injectors_sdk.__all__) == 24
 
 
 def test_all_symbols_importable() -> None:
     import injectors_sdk
+
     for symbol in injectors_sdk.__all__:
         obj = getattr(injectors_sdk, symbol)
         assert obj is not None, f"{symbol} resolved to None"

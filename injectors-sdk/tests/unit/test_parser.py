@@ -3,8 +3,6 @@
 import json
 
 import pytest
-from pydantic import BaseModel
-
 from injectors_sdk import (
     CliContractError,
     CliParseError,
@@ -13,6 +11,7 @@ from injectors_sdk import (
     OutputFormat,
     OutputSpec,
 )
+from pydantic import BaseModel
 
 
 @pytest.fixture
@@ -25,6 +24,7 @@ def _given_result(stdout: str = "", returncode: int = 0) -> ExecResult:
 
 
 # --- TEXT format ---
+
 
 def test_parse_text_returns_stdout(parser: DefaultOutputParser) -> None:
     result = _given_result(stdout="hello world")
@@ -42,6 +42,7 @@ def test_parse_text_rejects_model(parser: DefaultOutputParser) -> None:
 
 # --- RAW format ---
 
+
 def test_parse_raw_returns_stdout(parser: DefaultOutputParser) -> None:
     result = _given_result(stdout="raw bytes here")
     parsed = parser.parse(result, OutputSpec(format=OutputFormat.RAW))
@@ -50,6 +51,7 @@ def test_parse_raw_returns_stdout(parser: DefaultOutputParser) -> None:
 
 # --- LINES format ---
 
+
 def test_parse_lines_splits_by_newline(parser: DefaultOutputParser) -> None:
     result = _given_result(stdout="line1\nline2\nline3")
     parsed = parser.parse(result, OutputSpec(format=OutputFormat.LINES))
@@ -57,6 +59,7 @@ def test_parse_lines_splits_by_newline(parser: DefaultOutputParser) -> None:
 
 
 # --- JSON format ---
+
 
 def test_parse_json_returns_dict(parser: DefaultOutputParser) -> None:
     data = {"key": "value", "count": 42}
@@ -94,9 +97,12 @@ def test_parse_json_model_mismatch_raises(parser: DefaultOutputParser) -> None:
 
 # --- REGEX format ---
 
+
 def test_parse_regex_returns_groupdict(parser: DefaultOutputParser) -> None:
     result = _given_result(stdout="version 1.2.3")
-    spec = OutputSpec(format=OutputFormat.REGEX, regex=r"version (?P<major>\d+)\.(?P<minor>\d+)\.(?P<patch>\d+)")
+    spec = OutputSpec(
+        format=OutputFormat.REGEX, regex=r"version (?P<major>\d+)\.(?P<minor>\d+)\.(?P<patch>\d+)"
+    )
     parsed = parser.parse(result, spec)
     assert parsed == {"major": "1", "minor": "2", "patch": "3"}
 
@@ -111,7 +117,6 @@ def test_parse_regex_no_match_raises(parser: DefaultOutputParser) -> None:
 def test_parse_regex_missing_pattern_raises(parser: DefaultOutputParser) -> None:
     from pydantic import ValidationError as PydanticValidationError
 
-    result = _given_result(stdout="anything")
     with pytest.raises(PydanticValidationError, match="regex field is required"):
         OutputSpec(format=OutputFormat.REGEX)
 

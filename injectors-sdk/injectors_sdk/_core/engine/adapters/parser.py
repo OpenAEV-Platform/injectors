@@ -19,9 +19,7 @@ def _get_pattern(pattern: str) -> re.Pattern[str]:
     try:
         compiled = re.compile(pattern)
     except re.error as exc:
-        raise CliContractError(
-            f"invalid regex pattern in output spec: {pattern}"
-        ) from exc
+        raise CliContractError(f"invalid regex pattern in output spec: {pattern}") from exc
     _REGEX_CACHE[pattern] = compiled
     return compiled
 
@@ -87,26 +85,20 @@ class DefaultOutputParser:
             try:
                 return model.model_validate(parsed)
             except ValidationError as exc:
-                raise CliParseError(
-                    "JSON output did not match expected model contract"
-                ) from exc
+                raise CliParseError("JSON output did not match expected model contract") from exc
 
         if fmt == OutputFormat.REGEX:
             if output_spec.regex is None:
                 raise CliContractError("OutputFormat.REGEX requires OutputSpec.regex")
             match = _get_pattern(output_spec.regex).search(stdout)
             if match is None:
-                raise CliParseError(
-                    f"regex pattern did not match stdout: {output_spec.regex}"
-                )
+                raise CliParseError(f"regex pattern did not match stdout: {output_spec.regex}")
             parsed = match.groupdict()
             if model is None:
                 return parsed
             try:
                 return model.model_validate(parsed)
             except ValidationError as exc:
-                raise CliParseError(
-                    "regex output did not match expected model contract"
-                ) from exc
+                raise CliParseError("regex output did not match expected model contract") from exc
 
         raise CliContractError(f"unsupported output format: {fmt}")

@@ -21,7 +21,7 @@ class CommandExecutorPort(Protocol):
         *,
         env: dict[str, str] | None = None,
         cwd: str | None = None,
-        stdin: str | None = None,
+        stdin: str | bytes | None = None,
     ) -> ExecResult: ...
 
 

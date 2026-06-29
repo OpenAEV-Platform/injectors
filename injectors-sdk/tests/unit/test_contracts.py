@@ -3,8 +3,6 @@ from __future__ import annotations
 from typing import Any
 
 import pytest
-from pydantic import ValidationError
-
 from injectors_sdk import (
     ArgumentSpec,
     BinarySpec,
@@ -15,6 +13,7 @@ from injectors_sdk import (
     OutputFormat,
     OutputSpec,
 )
+from pydantic import ValidationError
 
 
 def _given_option_spec(**kwargs: Any) -> OptionSpec:
@@ -111,13 +110,17 @@ def test_command_spec_defaults_are_applied() -> None:
 
 def test_binary_spec_rejects_empty_name() -> None:
     _then_validation_error_is_raised(
-        lambda: _given_binary_spec(name="", binary="my-cli", commands=[_given_command_spec(name="run")]),
+        lambda: _given_binary_spec(
+            name="", binary="my-cli", commands=[_given_command_spec(name="run")]
+        ),
     )
 
 
 def test_binary_spec_rejects_empty_binary() -> None:
     _then_validation_error_is_raised(
-        lambda: _given_binary_spec(name="tool", binary="", commands=[_given_command_spec(name="run")]),
+        lambda: _given_binary_spec(
+            name="tool", binary="", commands=[_given_command_spec(name="run")]
+        ),
     )
 
 

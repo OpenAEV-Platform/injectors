@@ -52,16 +52,15 @@ class DefaultCommandRenderer:
         if raw_tokens:
             if not command.allow_raw_args:
                 raise CliContractError(
-                    f"Command '{command.name}' does not accept undeclared arguments. "
-                    f"Set allow_raw_args=True in the CommandSpec to enable raw argument passthrough."
+                    f"Command '{command.name}' does not accept undeclared "
+                    f"arguments. Set allow_raw_args=True in the CommandSpec "
+                    f"to enable raw argument passthrough."
                 )
             tokens.extend(raw_tokens)
 
         return tokens
 
-    def _render_options(
-        self, command: CommandSpec, options: dict[str, object]
-    ) -> list[str]:
+    def _render_options(self, command: CommandSpec, options: dict[str, object]) -> list[str]:
         option_specs = command.options or {}
 
         for option_name in options:
@@ -115,8 +114,7 @@ class DefaultCommandRenderer:
     def _validate_choices(self, spec: OptionSpec, value: str) -> None:
         if spec.choices and value not in spec.choices:
             raise CliContractError(
-                f"Option {spec.name} value {value!r} must be one of "
-                f"{', '.join(spec.choices)}"
+                f"Option {spec.name} value {value!r} must be one of {', '.join(spec.choices)}"
             )
 
     def _render_arguments(

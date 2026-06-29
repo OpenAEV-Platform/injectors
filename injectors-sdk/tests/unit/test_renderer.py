@@ -1,11 +1,10 @@
 """RED tests for DefaultCommandRenderer."""
 
 import pytest
-
 from injectors_sdk import (
     ArgumentSpec,
-    CommandSpec,
     CliContractError,
+    CommandSpec,
     DefaultCommandRenderer,
     OptionKind,
     OptionSpec,
@@ -18,6 +17,7 @@ def renderer() -> DefaultCommandRenderer:
 
 
 # --- GIVEN helpers ---
+
 
 def _given_simple_command() -> CommandSpec:
     return CommandSpec(name="status", argv=["status"])
@@ -76,9 +76,7 @@ def _given_command_with_equals() -> CommandSpec:
         name="config",
         argv=["config"],
         options={
-            "type": OptionSpec(
-                name="type", flag="--type", kind=OptionKind.VALUE, equals=True
-            ),
+            "type": OptionSpec(name="type", flag="--type", kind=OptionKind.VALUE, equals=True),
         },
     )
 
@@ -88,6 +86,7 @@ def _given_command_allowing_raw_args() -> CommandSpec:
 
 
 # --- THEN: basic rendering ---
+
 
 def test_render_simple_command(renderer: DefaultCommandRenderer) -> None:
     argv = renderer.render("git", _given_simple_command())
@@ -162,6 +161,7 @@ def test_render_raw_args_when_allowed(renderer: DefaultCommandRenderer) -> None:
 
 
 # --- THEN: error cases ---
+
 
 def test_render_unknown_option_raises(renderer: DefaultCommandRenderer) -> None:
     with pytest.raises(CliContractError, match="Unknown option"):
