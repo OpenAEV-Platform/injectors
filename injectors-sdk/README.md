@@ -66,7 +66,7 @@ print(result.argv)     # ['ffprobe', '-v', 'quiet', ..., '/path/to/video.mp4']
 
 | Group | Symbols | What it provides |
 |---|---|---|
-| Base | `BaseInjector`, `InjectorConfig`, `InjectorContext`, `ExecutionCallback`, `ExecutionStatus` | Lifecycle Protocol, config model, message parsing, execution reporting |
+| Base | `BaseInjector`, `DaemonProtocol`, `InjectorConfig`, `InjectorContext`, `ExecutionCallback`, `ExecutionStatus` | Lifecycle Protocol, daemon contract, config model, message parsing, execution reporting |
 | Errors | `CliError`, `CliContractError`, `CliExecutionError`, `CliParseError`, `BinaryNotFoundError`, `ExecResult` | Exception hierarchy + structured execution result |
 | Contracts | `BinarySpec`, `CommandSpec`, `OptionSpec`, `ArgumentSpec`, `OutputSpec`, `ExecPolicy`, `OptionKind`, `OutputFormat` | Frozen Pydantic models defining CLI shape and execution policy |
 | Ports | `CommandRendererPort`, `CommandExecutorPort`, `OutputParserPort` | `typing.Protocol` interfaces for custom adapter implementations |
@@ -89,7 +89,7 @@ Never import from private submodules:
 from injectors_sdk._core.engine.core.cli_engine import CliEngine
 ```
 
-The 29 symbols in `__all__` are the stable public API. Everything under `_core/` is an implementation detail. A bidirectional CI test asserts that every symbol in `__all__` is importable and every exported name is listed in `__all__`.
+The 30 symbols in `__all__` are the stable public API. Everything under `_core/` is an implementation detail. A bidirectional CI test asserts that every symbol in `__all__` is importable and every exported name is listed in `__all__`.
 
 ## Documentation
 

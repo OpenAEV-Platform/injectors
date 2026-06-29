@@ -194,10 +194,10 @@ def test_engine_run_success_codes_suppresses_raise() -> None:
 # --- Public API contract ---
 
 
-def test_all_29_symbols_exported() -> None:
+def test_all_30_symbols_exported() -> None:
     import injectors_sdk
 
-    assert len(injectors_sdk.__all__) == 29
+    assert len(injectors_sdk.__all__) == 30
 
 
 def test_all_symbols_importable() -> None:

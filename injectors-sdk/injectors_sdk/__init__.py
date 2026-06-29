@@ -3,6 +3,9 @@
 __version__ = "0.1.0"
 
 # Base injector lifecycle
+# Daemon protocol (re-exported from xtm-oaev-sdk)
+from xtm_oaev_sdk import DaemonProtocol
+
 from injectors_sdk._core.base import (
     BaseInjector,
     ExecutionCallback,
@@ -58,6 +61,7 @@ from injectors_sdk._core.errors import (
 __all__ = [
     # Base injector lifecycle
     "BaseInjector",
+    "DaemonProtocol",
     "ExecutionCallback",
     "ExecutionStatus",
     "InjectorConfig",
