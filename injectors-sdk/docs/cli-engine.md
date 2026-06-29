@@ -205,6 +205,8 @@ For `JSON` and `REGEX`, passing `output_model` to `engine.run()` validates the p
 
 ## The Engine Run Pipeline
 
+`engine.run()` raises `CliExecutionError` when the returncode is not in the active `success_codes` set. On success, it returns an `EngineResult`.
+
 ```python
 result = engine.run(
     command,              # CommandSpec — passed directly, not looked up by name
@@ -218,28 +220,57 @@ result = engine.run(
     env={...},            # Per-run env overrides (layered on top of policy.env_overrides)
     cwd="...",            # Per-run working directory override
     stdin=...,            # stdin to pass to the subprocess
+    output_file="...",    # Path to a file merged into stdout before parsing (then deleted)
 ) -> EngineResult
 ```
 
-`EngineResult` is a frozen dataclass:
+### Dry-run with `engine.render()`
+
+Preview the exact argv without executing:
+
+```python
+argv = engine.render(cmd, options={"timing": "4"}, args={"target": "localhost"})
+# ['nmap', '-T', '4', 'localhost']
+```
+
+### `output_file` merge
+
+Some CLI tools write results to a file instead of stdout (e.g. `nmap -oN /tmp/scan.txt`). Pass `output_file` to automatically read the file, merge its content into stdout before parsing, and delete the file:
+
+```python
+result = engine.run(
+    SCAN_COMMAND,
+    options={"timing": "4", "output_normal": "/tmp/scan.txt"},
+    args={"target": "localhost"},
+    output_file="/tmp/scan.txt",
+    output_spec=SCAN_COMMAND.output,
+)
+# result.raw.stdout contains both subprocess stdout AND file content
+```
+
+If the file doesn't exist, no error is raised.
+
+### `EngineResult`
+
+Frozen dataclass returned on success:
 
 ```python
 @dataclass(frozen=True)
 class EngineResult:
     parsed: Any        # Parser output (or raw stdout if output_spec is None)
     raw: ExecResult    # Full subprocess result (stdout, stderr, returncode, argv)
-    success: bool      # True if returncode in success_codes
+    success: bool      # Always True (failures raise CliExecutionError)
     argv: list[str]    # The rendered argv that was executed
 ```
 
-`EngineResult.pipe()` chains to another engine run, forwarding `parsed` as stdin:
+`EngineResult.pipe()` chains to another engine run, forwarding raw stdout as stdin:
 
 ```python
 first = engine_a.run(cmd_a, args={"input": "data"}, output_spec=cmd_a.output)
-second = first.pipe(engine_b, cmd_b)  # first.parsed becomes cmd_b's stdin
+second = first.pipe(engine_b, cmd_b)  # first.raw.stdout becomes cmd_b's stdin
 ```
 
-`SUCCESS_ANY = frozenset({0})` is the default success codes set (exit code 0 only).
+`SUCCESS_ANY = frozenset(range(256))` accepts any exit code (0-255). The engine default is `frozenset({0})` (only 0 is success). Use `SUCCESS_ANY` when any exit code is acceptable, or pass custom `success_codes` per command.
 
 ## Advanced Example: nmap
 
