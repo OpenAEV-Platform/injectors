@@ -25,5 +25,10 @@ for mod_path in (
     "pyoaev.apis.inputs.search",
     "pyoaev.client",
     "pyoaev.config",
+    "pyoaev.configuration",
+    "pyoaev.signatures",
+    "pyoaev.signatures.signature_manager",
+    "pyoaev.signatures.models",
+    "pyoaev.signatures.types",
 ):
     sys.modules[mod_path] = MagicMock()
