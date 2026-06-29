@@ -133,9 +133,7 @@ def test_engine_render_returns_argv_without_executing() -> None:
         name="status",
         argv=["status"],
         options={
-            "short": OptionSpec(
-                name="short", flag="-s", kind=OptionKind.BOOL
-            ),
+            "short": OptionSpec(name="short", flag="-s", kind=OptionKind.BOOL),
         },
     )
     argv = engine.render(cmd, options={"short": True})
@@ -196,10 +194,10 @@ def test_engine_run_success_codes_suppresses_raise() -> None:
 # --- Public API contract ---
 
 
-def test_all_24_symbols_exported() -> None:
+def test_all_29_symbols_exported() -> None:
     import injectors_sdk
 
-    assert len(injectors_sdk.__all__) == 24
+    assert len(injectors_sdk.__all__) == 29
 
 
 def test_all_symbols_importable() -> None:

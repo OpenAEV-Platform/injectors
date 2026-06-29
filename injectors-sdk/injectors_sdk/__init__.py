@@ -2,6 +2,15 @@
 
 __version__ = "0.1.0"
 
+# Base injector lifecycle
+from injectors_sdk._core.base import (
+    BaseInjector,
+    ExecutionCallback,
+    ExecutionStatus,
+    InjectorConfig,
+    InjectorContext,
+)
+
 # Errors
 from injectors_sdk._core.engine.adapters.executor import SubprocessExecutor
 from injectors_sdk._core.engine.adapters.parser import DefaultOutputParser
@@ -47,6 +56,12 @@ from injectors_sdk._core.errors import (
 )
 
 __all__ = [
+    # Base injector lifecycle
+    "BaseInjector",
+    "ExecutionCallback",
+    "ExecutionStatus",
+    "InjectorConfig",
+    "InjectorContext",
     # Errors
     "BinaryNotFoundError",
     "CliContractError",

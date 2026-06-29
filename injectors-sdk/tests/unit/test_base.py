@@ -1,10 +1,8 @@
 """RED tests for BaseInjector lifecycle Protocol and models."""
 
 from typing import Any
-from unittest.mock import MagicMock
 
 import pytest
-
 from injectors_sdk._core.base import (
     BaseInjector,
     ExecutionCallback,
@@ -12,7 +10,6 @@ from injectors_sdk._core.base import (
     InjectorConfig,
     InjectorContext,
 )
-
 
 # --- GIVEN helpers ---
 
@@ -173,9 +170,7 @@ def test_injector_context_from_message() -> None:
     raw = {
         "injection": {
             "inject_id": "inject-uuid-001",
-            "inject_injector_contract": {
-                "convertedContent": {"contract_id": "contract-001"}
-            },
+            "inject_injector_contract": {"convertedContent": {"contract_id": "contract-001"}},
             "inject_content": {"targets": ["192.168.1.1"]},
         }
     }
