@@ -33,9 +33,12 @@ def test_create_cli_engine_with_custom_policy() -> None:
 # --- SUCCESS_ANY ---
 
 
-def test_success_any_contains_zero() -> None:
+def test_success_any_contains_all_codes() -> None:
     assert 0 in SUCCESS_ANY
-    assert 1 not in SUCCESS_ANY
+    assert 1 in SUCCESS_ANY
+    assert 127 in SUCCESS_ANY
+    assert 255 in SUCCESS_ANY
+    assert len(SUCCESS_ANY) == 256
 
 
 # --- CliEngine.run ---
@@ -59,13 +62,16 @@ def test_engine_run_with_output_spec_json() -> None:
     assert result.parsed == {"key": "value"}
 
 
-def test_engine_run_nonzero_is_failure() -> None:
+def test_engine_run_nonzero_raises_cli_execution_error() -> None:
+    from injectors_sdk import CliExecutionError
+
     engine = create_cli_engine("sh", policy=ExecPolicy(timeout=5))
     cmd = CommandSpec(name="fail", argv=["-c", "exit 1"])
-    result = engine.run(cmd)
 
-    assert result.success is False
-    assert result.raw.returncode == 1
+    with pytest.raises(CliExecutionError) as exc_info:
+        engine.run(cmd)
+
+    assert exc_info.value.returncode == 1
 
 
 def test_engine_run_custom_success_codes() -> None:
@@ -116,6 +122,75 @@ def test_engine_result_pipe() -> None:
         CommandSpec(name="cat", argv=[]),
     )
     assert "piped_data" in second_result.raw.stdout
+
+
+# --- CliEngine.render (dry-run) ---
+
+
+def test_engine_render_returns_argv_without_executing() -> None:
+    engine = create_cli_engine("git", policy=ExecPolicy(timeout=5))
+    cmd = CommandSpec(
+        name="status",
+        argv=["status"],
+        options={
+            "short": OptionSpec(
+                name="short", flag="-s", kind=OptionKind.BOOL
+            ),
+        },
+    )
+    argv = engine.render(cmd, options={"short": True})
+    assert argv == ["git", "status", "-s"]
+
+
+# --- output_file merge ---
+
+
+def test_engine_run_merges_output_file(tmp_path: pytest.TempPathFactory) -> None:
+    output_path = str(tmp_path / "out.txt")  # type: ignore[operator]
+    with open(output_path, "w") as f:
+        f.write("file_content_here")
+
+    engine = create_cli_engine("echo", policy=ExecPolicy(timeout=5))
+    cmd = CommandSpec(name="echo", argv=["hello"])
+    result = engine.run(cmd, output_file=output_path)
+
+    assert "file_content_here" in result.raw.stdout
+    import os
+
+    assert not os.path.exists(output_path)
+
+
+def test_engine_run_output_file_missing_is_not_error() -> None:
+    engine = create_cli_engine("echo", policy=ExecPolicy(timeout=5))
+    cmd = CommandSpec(name="echo", argv=["hello"])
+    result = engine.run(cmd, output_file="/nonexistent/path/out.txt")
+
+    assert result.success is True
+
+
+# --- auto-raise behavior ---
+
+
+def test_engine_run_auto_raises_on_failure() -> None:
+    from injectors_sdk import CliExecutionError
+
+    engine = create_cli_engine("sh", policy=ExecPolicy(timeout=5))
+    cmd = CommandSpec(name="fail", argv=["-c", "exit 42"])
+
+    with pytest.raises(CliExecutionError) as exc_info:
+        engine.run(cmd)
+
+    assert exc_info.value.returncode == 42
+    assert exc_info.value.result.returncode == 42
+
+
+def test_engine_run_success_codes_suppresses_raise() -> None:
+    engine = create_cli_engine("sh", policy=ExecPolicy(timeout=5))
+    cmd = CommandSpec(name="diff", argv=["-c", "exit 42"])
+    result = engine.run(cmd, success_codes=frozenset({0, 42}))
+
+    assert result.success is True
+    assert result.raw.returncode == 42
 
 
 # --- Public API contract ---
