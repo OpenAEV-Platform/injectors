@@ -2,4 +2,21 @@
 
 __version__ = "0.1.0"
 
-__all__: list[str] = []
+# Errors
+from injectors_sdk._core.errors import (
+    BinaryNotFoundError,
+    CliContractError,
+    CliError,
+    CliExecutionError,
+    CliParseError,
+    ExecResult,
+)
+
+__all__ = [
+    "BinaryNotFoundError",
+    "CliContractError",
+    "CliError",
+    "CliExecutionError",
+    "CliParseError",
+    "ExecResult",
+]
