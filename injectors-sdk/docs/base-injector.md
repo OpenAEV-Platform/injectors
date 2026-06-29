@@ -284,10 +284,12 @@ The SDK owns the **abstract contract**. The OpenAEV-specific infrastructure stay
 | Concern | Owner | Why |
 |---|---|---|
 | Lifecycle shape (process_message, start, stop) | `injectors-sdk` | Injector-specific, shared by all injectors |
+| DaemonProtocol (start, set_callback, get_id) | `xtm-oaev-sdk` (re-exported) | Shared behavioral contract for daemon runtimes |
 | Config field names and validation | `injectors-sdk` | Consistent across all injectors |
 | Message parsing (`InjectorContext`) | `injectors-sdk` | Same nested dict traversal everywhere |
 | Execution callback structure | `injectors-sdk` | Same payload shape everywhere |
 | OpenAEV API client (`OpenAEV(url, token)`) | `pyoaev` | Product API coupling |
+| BaseDaemon / CollectorDaemon (concrete) | `pyoaev` | Platform runtime, API client wiring |
 | Message queue (`ListenQueue`, pika) | `pyoaev` | Transport coupling |
 | Ping thread (`PingAlive`) | `pyoaev` | Platform lifecycle coupling |
 | SSL/TLS context setup | `xtm-oaev-sdk` | Shared across injectors and collectors |
