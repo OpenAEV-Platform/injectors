@@ -138,7 +138,7 @@ _KERBEROASTABLE_OUTPUT = ContractOutputElement(
 
 _EXPECTATION_SIGNATURE_OUTPUT = ContractOutputElement(
     type=ContractOutputType.ExpectationSignature,
-    field="expectation_signature",
+    field="expectation_signatures",
     isMultiple=True,
     isFindingCompatible=False,
     labels=["netexec"],
