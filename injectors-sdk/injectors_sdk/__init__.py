@@ -12,11 +12,33 @@ from injectors_sdk._core.errors import (
     ExecResult,
 )
 
+# Contracts
+from injectors_sdk._core.engine.contracts.specs import (
+    ArgumentSpec,
+    BinarySpec,
+    CommandSpec,
+    OptionKind,
+    OptionSpec,
+    OutputFormat,
+    OutputSpec,
+)
+from injectors_sdk._core.engine.contracts.exec_policy import ExecPolicy
+
 __all__ = [
+    # Errors
     "BinaryNotFoundError",
     "CliContractError",
     "CliError",
     "CliExecutionError",
     "CliParseError",
     "ExecResult",
+    # Contracts
+    "ArgumentSpec",
+    "BinarySpec",
+    "CommandSpec",
+    "ExecPolicy",
+    "OptionKind",
+    "OptionSpec",
+    "OutputFormat",
+    "OutputSpec",
 ]

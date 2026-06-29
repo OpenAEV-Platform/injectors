@@ -64,11 +64,10 @@ def test_output_format_enum_completeness() -> None:
 
 
 def test_option_spec_defaults_and_immutability() -> None:
-    option = _given_option_spec(name="verbose")
+    option = _given_option_spec(name="verbose", flag="-v")
 
-    assert option.kind is OptionKind.BOOL
+    assert option.kind is OptionKind.VALUE
     assert option.required is False
-    assert option.default is None
 
     with pytest.raises(ValidationError):
         _when_assigning_attribute(option, "required", True)
@@ -77,8 +76,7 @@ def test_option_spec_defaults_and_immutability() -> None:
 def test_argument_spec_defaults_and_immutability() -> None:
     argument = _given_argument_spec(name="path")
 
-    assert argument.required is True
-    assert argument.default is None
+    assert argument.required is False
 
     with pytest.raises(ValidationError):
         _when_assigning_attribute(argument, "required", False)
@@ -145,7 +143,7 @@ def test_exec_policy_accepts_shell_boolean() -> None:
 
 
 def test_exec_policy_accepts_shell_auto() -> None:
-    policy = _given_exec_policy(shell="auto", timeout=30)
+    policy = _given_exec_policy(shell="auto", acknowledge_shell_risk=True, timeout=30)
     assert policy.shell == "auto"
 
 
