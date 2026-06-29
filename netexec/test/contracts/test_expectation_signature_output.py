@@ -124,6 +124,6 @@ class ExpectationSignatureOutputTest(TestCase):
     def test_expectation_signature_constant(self):
         """
         Given the output registry
-        Then EXPECTATION_SIGNATURE equals 'expectation_signature'
+        Then EXPECTATION_SIGNATURE equals 'expectation_signatures'
         """
-        self.assertEqual(EXPECTATION_SIGNATURE, "expectation_signature")
+        self.assertEqual(EXPECTATION_SIGNATURE, "expectation_signatures")
