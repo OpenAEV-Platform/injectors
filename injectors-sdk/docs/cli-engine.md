@@ -1,26 +1,31 @@
 # CLI Engine
 
-Detailed feature documentation for the injectors-sdk CLI Engine: architecture, public interface, dependency injection model, advanced nmap example, and error semantics.
+Detailed feature documentation for the injectors-sdk CLI Engine: architecture, public interface, dependency injection model, adapter reference, advanced nmap example, and error semantics.
 
 ## Architecture
+
+The CLI Engine is a **standalone feature** — a sibling of `base_injector`, not internal machinery nested inside it. An injector that does not shell out to a CLI binary never touches this feature.
 
 The engine follows **Clean Architecture / Port-Adapter** principles with hexagonal layout, justified by three I/O seams: subprocess execution, filesystem/output file handling, and shell rendering.
 
 ```
 injectors_sdk/
 └── _core/
-    └── engine/
+    └── cli_engine/
         ├── ports/              # Protocol interfaces (what adapters must satisfy)
-        │   └── protocols.py        CommandRendererPort, CommandExecutorPort, OutputParserPort
+        │   └── protocols.py        CommandExecutorPort, CommandRendererPort, OutputParserPort
         ├── contracts/          # Frozen Pydantic value objects
-        │   ├── specs.py            BinarySpec, CommandSpec, OptionSpec, ArgumentSpec, OutputSpec, OptionKind, OutputFormat
+        │   ├── specs.py            BinarySpec, CommandSpec, OptionSpec, ArgumentSpec,
+        │   │                       OutputSpec, OptionKind, OutputFormat
         │   └── exec_policy.py      ExecPolicy
         ├── adapters/           # Concrete implementations
         │   ├── renderer.py         DefaultCommandRenderer
         │   ├── executor.py         SubprocessExecutor  ← only subprocess.run user
         │   └── parser.py           DefaultOutputParser
-        └── core/               # Orchestrator
-            └── cli_engine.py       CliEngine, EngineResult, SUCCESS_ANY
+        ├── core/               # Orchestrator
+        │   └── cli_engine.py       CliEngine, EngineResult, SUCCESS_ANY
+        ├── errors.py           # ExecResult + Cli*Error hierarchy
+        └── factory.py          # create_cli_engine()
 ```
 
 **Key design principles:**
@@ -30,6 +35,7 @@ injectors_sdk/
 - **Subprocess isolation**: `subprocess.run` exists in exactly one file (`executor.py`)
 - **Public API is stable**: internal restructuring never breaks consumers
 - **Specs are frozen Pydantic models**: immutable, validatable, serializable
+- **Sibling feature**: `cli_engine` and `base_injector` are peers under `_core/`, neither depends on the other
 
 ## Public Interface and Breaking Change Protection
 
@@ -72,7 +78,15 @@ class OutputParserPort(Protocol):
     ) -> Any: ...
 ```
 
-As long as these signatures don't change, any internal adapter can be completely rewritten (different algorithm, different library, different filename) and your code still works. Ports are the wall between "your code" and "our implementation details."
+As long as these signatures don't change, any internal adapter can be completely rewritten — different algorithm, different library, different filename — and your code still works. Ports are the wall between "your code" and "our implementation details."
+
+Ports are accessible through the stable `contracts/` layer:
+
+```python
+from injectors_sdk.contracts.cli_engine.ports import CommandExecutorPort
+# or, for direct port exploration:
+from injectors_sdk._core.cli_engine.ports import CommandExecutorPort
+```
 
 ### Layer 2: `__all__` contract (the symbol contract)
 
@@ -97,13 +111,13 @@ This catches accidental leaks (new symbol exported without review) and accidenta
 
 ```
 Your code
-  └─ imports from: injectors_sdk  (top-level __all__ — 24 symbols)
-       └─ re-exports from: _core/engine/  (single private boundary)
-            └─ wires: ports/ ←→ adapters/ ←→ core/
-                      ↑ stable        ↑ freely refactorable
+  └─ imports from: injectors_sdk       (top-level __all__ — 30 symbols)
+       └─ re-exports from: public/__init__.py  (single crossing point)
+            └─ pulls from: contracts/          (feature-scoped re-export layer)
+                 └─ pulls from: _core/         (implementation details)
+                      └─ wires: ports/ ←→ adapters/ ←→ core/
+                                ↑ stable        ↑ freely refactorable
 ```
-
-Users never import from `_core/` directly. The top-level `__init__.py` is the only allowed crossing point.
 
 ## Dependency Injection
 
@@ -158,7 +172,7 @@ Renders an argv list in order: `[binary] + static_argv + rendered_options + posi
 | `OptionKind.LIST` with non-list value | `CliContractError` |
 | `choices` violation | `CliContractError` |
 | `equals=True` | Renders `--flag=value` instead of `--flag value` |
-| `allow_raw_args=False` + raw_args passed | `CliContractError` |
+| `allow_raw_args=False` + `raw_args` passed | `CliContractError` |
 
 ### SubprocessExecutor
 

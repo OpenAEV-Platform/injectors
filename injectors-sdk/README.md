@@ -4,7 +4,7 @@
 ![python](https://img.shields.io/badge/python-%3E%3D3.12-informational)
 ![license](https://img.shields.io/badge/license-Internal-lightgrey)
 
-Python SDK for building OpenAEV injector extensions with declarative CLI specs, type-safe contracts, and pluggable adapters.
+Python SDK for building OpenAEV injector extensions with a DDD + Light Hexagonal Architecture. Provides declarative CLI specs, type-safe contracts, and pluggable adapters, organized in three explicit layers: `public/` (flat API), `contracts/` (stable feature boundaries), and `_core/` (implementation details).
 
 ## Install
 
@@ -59,8 +59,29 @@ print(result.argv)     # ['ffprobe', '-v', 'quiet', ..., '/path/to/video.mp4']
 
 ## Features
 
-- **Base Injector** — Lifecycle Protocol, configuration model, and execution reporting for injector extensions
+- **Base Injector** — Lifecycle Protocol, configuration model, and execution reporting for injector extensions. [Full documentation →](docs/base-injector.md)
 - **CLI Engine** — Declarative specs, type-safe contracts, and pluggable adapters for CLI binary injection. [Full documentation →](docs/cli-engine.md)
+
+The two features are **standalone siblings**. An injector that does not shell out to a CLI binary only needs `base_injector`. An injector that purely orchestrates CLI tools can use `cli_engine` without `base_injector`.
+
+## Architecture: Three Layers
+
+```
+injectors_sdk/
+├── public/             ← Layer 1: 30 symbols, flat re-export (casual consumers)
+├── contracts/          ← Layer 2: stable feature boundaries (DDD-aware consumers)
+│   ├── base_injector/
+│   ├── cli_engine/
+│   │   ├── adapters/
+│   │   ├── contracts/
+│   │   └── ports/
+│   └── common/
+└── _core/              ← Layer 3: implementation detail (two sibling features)
+    ├── base_injector/
+    └── cli_engine/
+```
+
+`public/` funnels everything through a single crossing point. `contracts/` provides feature-scoped imports for DDD-aware code that wants to express its dependency explicitly. `_core/` is the private implementation — its layout may change without notice, but the port signatures never will without a major version bump.
 
 ## Module Map
 
@@ -76,25 +97,57 @@ print(result.argv)     # ['ffprobe', '-v', 'quiet', ..., '/path/to/video.mp4']
 
 ## Import Convention
 
-Always import from the package root:
+**Casual consumers** always import from the package root:
 
 ```python
 from injectors_sdk import CliEngine, CommandSpec, CliContractError
 ```
 
-Never import from private submodules:
+**DDD-aware consumers** may import from the `contracts/` layer to express feature-scoped dependencies explicitly:
+
+```python
+from injectors_sdk.contracts.base_injector import BaseInjector, InjectorConfig
+from injectors_sdk.contracts.cli_engine.ports import CommandExecutorPort
+from injectors_sdk.contracts.cli_engine.contracts import CommandSpec, ExecPolicy
+from injectors_sdk.contracts.common import CliError, CliExecutionError
+```
+
+**Internal architecture exploration** is allowed for consumers that want to reason about the port/adapter boundary directly:
+
+```python
+# Fine — ports are the stable structural contract
+from injectors_sdk._core.cli_engine.ports import CommandExecutorPort
+```
+
+Never import concrete implementation modules directly — their paths are not stable:
 
 ```python
 # Wrong — internal layout may change without notice
-from injectors_sdk._core.engine.core.cli_engine import CliEngine
+from injectors_sdk._core.cli_engine.core.cli_engine import CliEngine
 ```
 
-The 30 symbols in `__all__` are the stable public API. Everything under `_core/` is an implementation detail. A bidirectional CI test asserts that every symbol in `__all__` is importable and every exported name is listed in `__all__`.
+The 30 symbols in `__all__` are the stable public API. A bidirectional CI test asserts that every symbol in `__all__` is importable and every exported name is explicitly listed.
 
 ## Documentation
 
 - [Base Injector](docs/base-injector.md) — lifecycle Protocol, configuration, message parsing, execution reporting
 - [CLI Engine](docs/cli-engine.md) — architecture, public interface, dependency injection, advanced nmap example, error handling
+
+## Deprecation Shim Strategy
+
+`pyoaev.helpers.OpenAEVInjectorHelper` is a deprecated wrapper that proxies to the SDK's `BaseInjector` / `InjectorDaemon`:
+
+```python
+# Old path (triggers DeprecationWarning, still works)
+from pyoaev.helpers import OpenAEVInjectorHelper
+
+# New path (clean, no warning)
+from injectors_sdk import BaseInjector, InjectorConfig
+```
+
+The shim in `pyoaev` instantiates `InjectorDaemon` internally and delegates `listen()` calls. Once all connectors are migrated, the shim and `OpenAEVInjectorHelper` are removed from `pyoaev`.
+
+See [SECOND_README.md § Deprecation Shim Strategy](../../SECOND_README.md#deprecation-shim-strategy) for the full lifecycle.
 
 ## Development
 

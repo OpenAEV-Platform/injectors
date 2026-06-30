@@ -3,7 +3,7 @@
 from typing import Any
 
 import pytest
-from injectors_sdk._core.base import (
+from injectors_sdk._core.base_injector import (
     BaseInjector,
     ExecutionCallback,
     ExecutionStatus,

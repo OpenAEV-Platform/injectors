@@ -4,24 +4,30 @@ Lifecycle Protocol, configuration model, and execution reporting for OpenAEV inj
 
 ## Architecture
 
-The BaseInjector feature uses **flat module** layout (0-1 I/O concerns, no hex escalation needed):
+The BaseInjector feature lives in `_core/base_injector/` and uses a **flat DDD layout** (pure domain models + one Protocol, no I/O concerns, no hex escalation needed):
 
 ```
 injectors_sdk/
 └── _core/
-    └── base.py             BaseInjector, InjectorConfig, InjectorContext,
-                            ExecutionCallback, ExecutionStatus
+    └── base_injector/
+        ├── models/
+        │   └── config.py       InjectorConfig, ExecutionStatus, ExecutionCallback,
+        │                       InjectorContext
+        └── protocols/
+            └── base.py         BaseInjector
 ```
+
+The feature is a **sibling** of `cli_engine` — it does not contain or depend on the CLI Engine. An injector that only makes HTTP calls or uses a Python library satisfies `BaseInjector` without ever touching `CliEngine`.
 
 **Key design principles:**
 
-- **Protocol, not ABC**: `BaseInjector` is a `typing.Protocol` with `@runtime_checkable`. Implementations satisfy it structurally, no inheritance required.
+- **Protocol, not ABC**: `BaseInjector` is a `typing.Protocol` with `@runtime_checkable`. Implementations satisfy it structurally — no inheritance required.
 - **Pydantic for data, Protocol for behavior**: Config and callback models are frozen Pydantic; the lifecycle contract is a Protocol.
-- **SDK defines the contract, pyoaev provides the wiring**: The SDK owns the abstract lifecycle shape. The OpenAEV-specific infrastructure (API client, message queue, ping thread) stays in `pyoaev`.
+- **SDK defines the contract, pyoaev provides the wiring**: The SDK owns the abstract lifecycle shape. OpenAEV-specific infrastructure (API client, message queue, ping thread) stays in `pyoaev`.
 
 ## The Lifecycle
 
-Every injector extension follows the same three-phase lifecycle, observed across all 6 production injectors (nmap, nuclei, aws, http-query, shodan, teams):
+Every injector extension follows the same three-phase lifecycle, observed across all production injectors (nmap, nuclei, aws, http-query, shodan, teams):
 
 ```
 __init__()           → configure + connect
@@ -95,7 +101,7 @@ config = InjectorConfig(
 | `injector_executor_commands` | `list[str] \| None` | No | `None` | Executor command definitions |
 | `injector_executor_clear_commands` | `list[str] \| None` | No | `None` | Executor cleanup commands |
 
-Validation: `injector_id`, `injector_name`, and `injector_type` reject empty strings at construction time.
+Validation: `injector_id`, `injector_name`, and `injector_type` reject empty or whitespace-only strings at construction time.
 
 ## Message Parsing
 
@@ -135,7 +141,7 @@ ctx.content       # {"targets": ["192.168.1.1"]}
 
 ### ExecutionStatus
 
-StrEnum with the three status values used across all injectors:
+`StrEnum` with the three status values used across all injectors:
 
 ```python
 from injectors_sdk import ExecutionStatus
@@ -182,7 +188,7 @@ error = ExecutionCallback(
 |---|---|---|---|---|
 | `execution_message` | `str` | Yes | | Human-readable status message |
 | `execution_status` | `ExecutionStatus` | Yes | | INFO, SUCCESS, or ERROR |
-| `execution_action` | `str \| None` | No | `None` | Action identifier (e.g. "command_execution", "complete") |
+| `execution_action` | `str \| None` | No | `None` | Action identifier (e.g. `"command_execution"`, `"complete"`) |
 | `execution_duration` | `int \| None` | No | `None` | Elapsed time in seconds |
 | `execution_output_structured` | `str \| None` | No | `None` | JSON-serialized structured output |
 
@@ -216,7 +222,7 @@ SCAN_CMD = CommandSpec(
             choices=["0", "1", "2", "3", "4", "5"],
         ),
     },
-    arguments=[...],
+    arguments=[],
     allow_raw_args=True,
 )
 
@@ -274,22 +280,22 @@ class NmapInjector:
 
 
 # Type-check at runtime
-assert isinstance(NmapInjector(...), BaseInjector)
+assert isinstance(NmapInjector, BaseInjector)
 ```
 
 ## Scope Boundary
 
-The SDK owns the **abstract contract**. The OpenAEV-specific infrastructure stays in `pyoaev`:
+The SDK owns the **abstract contract**. OpenAEV-specific infrastructure stays in `pyoaev`:
 
 | Concern | Owner | Why |
 |---|---|---|
-| Lifecycle shape (process_message, start, stop) | `injectors-sdk` | Injector-specific, shared by all injectors |
-| DaemonProtocol (start, set_callback, get_id) | `xtm-oaev-sdk` (re-exported) | Shared behavioral contract for daemon runtimes |
+| Lifecycle shape (`process_message`, `start`, `stop`) | `injectors-sdk` | Injector-specific, shared by all injectors |
+| `DaemonProtocol` (`start`, `set_callback`, `get_id`) | `xtm-oaev-sdk` (re-exported) | Shared behavioral contract for daemon runtimes |
 | Config field names and validation | `injectors-sdk` | Consistent across all injectors |
 | Message parsing (`InjectorContext`) | `injectors-sdk` | Same nested dict traversal everywhere |
 | Execution callback structure | `injectors-sdk` | Same payload shape everywhere |
 | OpenAEV API client (`OpenAEV(url, token)`) | `pyoaev` | Product API coupling |
-| BaseDaemon / CollectorDaemon (concrete) | `pyoaev` | Platform runtime, API client wiring |
+| `BaseDaemon` / `CollectorDaemon` (concrete) | `pyoaev` | Platform runtime, API client wiring |
 | Message queue (`ListenQueue`, pika) | `pyoaev` | Transport coupling |
 | Ping thread (`PingAlive`) | `pyoaev` | Platform lifecycle coupling |
 | SSL/TLS context setup | `xtm-oaev-sdk` | Shared across injectors and collectors |
