@@ -1,6 +1,6 @@
 [project]
 name = "openaev-netexec-injector"
-version = "2.260623.0"
+version = "2.260703.1"
 description = "An injector for network execution and credential testing with NetExec"
 license = "Apache-2.0"
 readme = "README.md"
@@ -9,7 +9,7 @@ authors = [
 ]
 requires-python = ">=3.11,<4.0"
 dependencies = [
-    "pyoaev (==2.260623.0); extra != 'dev'",
+    "pyoaev (==2.260703.1); extra != 'dev'",
     "injector_common @ ../injector_common",
 ]
 
@@ -30,7 +30,7 @@ dev = [
 
 [tool.poetry]
 packages = [
-    { include = "netexec" }
+    { include = "netexec" },
 ]
 
 [tool.poetry.dependencies]
@@ -38,20 +38,28 @@ pyoaev = [
     { markers = "extra != 'dev'", source = "PyPI" },
     { markers = "extra == 'dev'", develop = true },
 ]
-injector_common = { develop = true }
 
-[build-system]
-requires = ["poetry-core"]
-build-backend = "poetry.core.masonry.api"
+[tool.poetry.dependencies.injector_common]
+develop = true
 
 [tool.setuptools.package-data]
-netexec = ["img/*.png"]
+netexec = [
+    "img/*.png",
+]
 
 [tool.isort]
 profile = "black"
-known_local_folder = ["netexec"]
+known_local_folder = [
+    "netexec",
+]
 
 [tool.cmw]
 install-command = "poetry install"
 config-dump-command = "poetry run python -m netexec.openaev_netexec --dump-config-schema"
 icon-path = "netexec/img/icon-netexec.png"
+
+[build-system]
+requires = [
+    "poetry-core",
+]
+build-backend = "poetry.core.masonry.api"

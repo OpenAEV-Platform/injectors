@@ -1,6 +1,6 @@
 [project]
 name = "openaev-http-query-injector"
-version = "2.260623.0"
+version = "2.260703.1"
 description = "An injector for executing arbitrary http requests"
 license = "Apache-2.0"
 readme = "README.md"
@@ -9,7 +9,7 @@ authors = [
 ]
 requires-python = ">=3.11,<4.0"
 dependencies = [
-    "pyoaev (==2.260623.0); extra != 'dev'",
+    "pyoaev (==2.260703.1); extra != 'dev'",
     "injector_common @ ../injector_common",
 ]
 
@@ -30,7 +30,7 @@ dev = [
 
 [tool.poetry]
 packages = [
-    { include = "http_query" }
+    { include = "http_query" },
 ]
 
 [tool.poetry.dependencies]
@@ -38,17 +38,23 @@ pyoaev = [
     { markers = "extra != 'dev'", source = "PyPI" },
     { markers = "extra == 'dev'", develop = true },
 ]
-injector_common = { develop = true }
 
-[build-system]
-requires = ["poetry-core"]
-build-backend = "poetry.core.masonry.api"
+[tool.poetry.dependencies.injector_common]
+develop = true
 
 [tool.isort]
 profile = "black"
-known_local_folder = ["http_query"]
+known_local_folder = [
+    "http_query",
+]
 
 [tool.cmw]
 install-command = "poetry install"
 config-dump-command = "poetry run python -m http_query.openaev_http --dump-config-schema"
 icon-path = "http_query/img/icon-http.png"
+
+[build-system]
+requires = [
+    "poetry-core",
+]
+build-backend = "poetry.core.masonry.api"

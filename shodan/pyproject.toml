@@ -1,13 +1,15 @@
 [project]
 name = "openaev-shodan-injector"
-version = "2.260623.0"
+version = "2.260703.1"
 description = "An injector for running with Shodan"
 readme = "README.md"
-authors = [{ name = "Filigran", email = "contact@filigran.io" }]
+authors = [
+    { name = "Filigran", email = "contact@filigran.io" },
+]
 license = "Apache-2.0"
 requires-python = ">=3.11,<4.0"
 dependencies = [
-    "pyoaev (==2.260623.0); extra != 'dev'",
+    "pyoaev (==2.260703.1); extra != 'dev'",
     "injector_common @ ../injector_common",
     "pydantic (>=2.11.3,<2.14.0)",
     "pydantic-settings (>=2.11.0,<2.15.0)",
@@ -43,7 +45,7 @@ dev = [
 
 [tool.poetry]
 packages = [
-    { include = "shodan" }
+    { include = "shodan" },
 ]
 
 [tool.poetry.dependencies]
@@ -52,16 +54,16 @@ pyoaev = [
     { markers = "extra == 'dev'", develop = true },
 ]
 
-[build-system]
-requires = ["poetry-core"]
-build-backend = "poetry.core.masonry.api"
-
 [tool.isort]
 profile = "black"
-src_paths = ["shodan"]
+src_paths = [
+    "shodan",
+]
 
 [tool.pytest.ini_options]
-testpaths = ["./tests"]
+testpaths = [
+    "./tests",
+]
 
 [tool.ruff]
 exclude = [
@@ -91,21 +93,9 @@ exclude = [
     "site-packages",
     "venv",
 ]
-
 target-version = "py312"
 
 [tool.ruff.lint]
-# Never enforce `I001` (unsorted import). Already handle with isort
-# Never enforce `E501` (line length violations). Already handle with black
-# Never enforce `F821` (Undefined name `null`). incorrect issue with notebook
-# Never enforce `D213` (Multi-line docstring summary should start at the second line) conflict with our docstring convention
-# Never enforce `D211` (NoBlankLinesBeforeClass)`
-# Never enforce `G004` (logging-f-string) Logging statement uses f-string
-# Never enforce `TRY003`() Avoid specifying long messages outside the exception class not useful
-# Never enforce `D104` (Missing docstring in public package)
-# Never enforce `D407` (Missing dashed underline after section)
-# Never enforce `D408` (Section underline should be in the line following the section’s name)
-# Never enforce `D409` (Section underline should match the length of its name)
 ignore = [
     "I001",
     "D203",
@@ -121,23 +111,43 @@ ignore = [
     "D408",
     "D409",
 ]
-select = ["E", "F", "W", "D", "G", "T", "B", "C", "N", "I", "S"]
+select = [
+    "E",
+    "F",
+    "W",
+    "D",
+    "G",
+    "T",
+    "B",
+    "C",
+    "N",
+    "I",
+    "S",
+]
 
 [tool.mypy]
 strict = true
 exclude = [
-    '^tests',
-    '^docs',
-    '^build',
-    '^dist',
-    '^venv',
-    '^site-packages',
-    '^__pypackages__',
-    '^.venv',
+    "^tests",
+    "^docs",
+    "^build",
+    "^dist",
+    "^venv",
+    "^site-packages",
+    "^__pypackages__",
+    "^.venv",
 ]
-plugins = ["pydantic.mypy"]
+plugins = [
+    "pydantic.mypy",
+]
 
 [tool.cmw]
 install-command = "poetry install"
 config-dump-command = "poetry run python -m shodan --dump-config-schema"
 icon-path = "shodan/img/icon-shodan.png"
+
+[build-system]
+requires = [
+    "poetry-core",
+]
+build-backend = "poetry.core.masonry.api"
