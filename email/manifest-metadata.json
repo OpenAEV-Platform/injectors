@@ -1,0 +1,18 @@
+{
+  "title": "Email",
+  "slug": "openaev_email",
+  "description": "Send emails via SMTP",
+  "short_description": "Send emails via SMTP",
+  "use_cases": ["Technical"],
+  "verified": true,
+  "last_verified_date": "",
+  "playbook_supported": false,
+  "max_confidence_level": 80,
+  "support_version": "",
+  "subscription_link": "",
+  "source_code": "",
+  "manager_supported": true,
+  "container_version": "rolling",
+  "container_image": "openaev/injector-email",
+  "container_type": "INJECTOR"
+}
