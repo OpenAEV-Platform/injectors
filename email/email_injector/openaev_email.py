@@ -38,11 +38,11 @@ class OpenAEVEmailInjector:
         payload = EmailPayloadBuilder.build(content)
 
         return EmailClient.send_email(
-            smtp_hostname=payload["smtp_hostname"],
-            smtp_port=payload["smtp_port"],
-            smtp_use_tls=payload["smtp_use_tls"],
-            smtp_username=payload["smtp_username"],
-            smtp_password=payload["smtp_password"],
+            smtp_hostname=self.config.get_conf("smtp_hostname", required=True),
+            smtp_port=int(self.config.get_conf("smtp_port", default=587)),
+            smtp_use_tls=self.config.get_conf("smtp_use_tls", default=False),
+            smtp_username=self.config.get_conf("smtp_username", default=None),
+            smtp_password=self.config.get_conf("smtp_password", default=None),
             from_email=payload["from"],
             to_email=payload["to"],
             subject=payload["subject"],
