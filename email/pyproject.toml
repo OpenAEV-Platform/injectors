@@ -1,0 +1,48 @@
+[project]
+name = "openaev-email-injector"
+version = "2.260619.0"
+description = "An injector for sending emails"
+readme = "README.md"
+authors = [{ name = "Filigran", email = "contact@filigran.io" }]
+license = "Apache-2.0"
+requires-python = ">=3.11,<4.0"
+dependencies = [
+    "pyoaev (==2.260615.0); extra != 'dev'",
+    "injector_common @ ../injector_common",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pyoaev @ ../../client-python",
+    "black (>=26.3.1,<26.4.0)",
+    "isort (>=8.0.1,<8.1.0)",
+    "ruff~=0.14.2",
+    "mypy~=1.18.2",
+    "coverage>=7.13.5",
+    "pytest (>=9.0.0,<9.1.0)",
+]
+
+[tool.poetry]
+packages = [
+    { include = "email_injector" }
+]
+
+[tool.poetry.dependencies]
+pyoaev = [
+    { markers = "extra != 'dev'", source = "PyPI" },
+    { markers = "extra == 'dev'", develop = true },
+]
+injector_common = { develop = true }
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.isort]
+profile = "black"
+known_local_folder = ["email_injector"]
+
+[tool.cmw]
+install-command = "poetry install"
+config-dump-command = "poetry run python -m email_injector.openaev_email --dump-config-schema"
+icon-path = "email_injector/img/icon-email.png"
