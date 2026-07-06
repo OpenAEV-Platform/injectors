@@ -22,3 +22,22 @@ class InjectorConfigOverride(ConfigLoaderCollector):
         description="Determines the verbosity of the logs. Options: debug, info, warn, or error.",
         default="info",
     )
+    smtp_hostname: str = Field(
+        description="Hostname of the SMTP server used to send emails.",
+    )
+    smtp_port: int = Field(
+        description="Port of the SMTP server used to send emails.",
+        default=587,
+    )
+    smtp_use_tls: bool = Field(
+        description="Whether to use STARTTLS when connecting to the SMTP server.",
+        default=False,
+    )
+    smtp_username: str | None = Field(
+        description="Username used to authenticate against the SMTP server.",
+        default=None,
+    )
+    smtp_password: str | None = Field(
+        description="Password used to authenticate against the SMTP server.",
+        default=None,
+    )
