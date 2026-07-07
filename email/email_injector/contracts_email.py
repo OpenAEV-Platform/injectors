@@ -42,7 +42,14 @@ class EmailContracts:
             ContractBuilder()
             .mandatory(ContractText(key="smtp_hostname", label="SMTP Hostname"))
             .mandatory(ContractText(key="smtp_port", label="SMTP Port"))
-            .mandatory(ContractCheckbox(key="smtp_use_tls", label="Use TLS (STARTTLS)"))
+            .optional(
+                ContractCheckbox(
+                    key="smtp_use_tls",
+                    label="Use TLS (STARTTLS)",
+                    defaultValue=False,
+                    mandatory=False,
+                )
+            )
             .optional(ContractText(key="smtp_username", label="SMTP Username"))
             .optional(ContractText(key="smtp_password", label="SMTP Password"))
             .mandatory(ContractText(key="from", label="From Email"))
@@ -64,6 +71,8 @@ class EmailContracts:
             fields=email_fields,
             outputs=[],
             manual=False,
-            domains=[SecurityDomains.TABLE_TOP.value],
+            domains=[
+                SecurityDomains.TABLE_TOP.value
+            ],  # ty:ignore[invalid-argument-type]
         )
         return prepare_contracts([email_contract])
