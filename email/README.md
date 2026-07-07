@@ -16,5 +16,5 @@ injector:
 Injects carry the message-specific fields: `from`, `to`, `subject`, `body`,
 optional `cc` and `bcc` (comma-separated email lists), and SMTP fields:
 `smtp_hostname`, `smtp_port`, `smtp_use_tls`, `smtp_username`,
-`smtp_password`. They can also carry one optional attachment through the
+`smtp_password`. They can also carry optional attachments through the
 contract attachment field.
