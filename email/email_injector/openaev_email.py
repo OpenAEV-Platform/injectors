@@ -38,7 +38,7 @@ class OpenAEVEmailInjector:
         payload = EmailPayloadBuilder.build(content)
         attachment_filename, attachment_content = self._extract_attachment(data)
         self.helper.injector_logger.info(
-            f"Sending email (to={payload['to']}, cc_count={len(payload['cc'])}, bcc_count={len(payload['bcc'])}, attachment={attachment_filename is not None}, subject={payload['subject']}, smtp_host={payload['smtp_hostname']}, smtp_port={payload['smtp_port']}, tls={payload['smtp_use_tls']})"
+            f"Crafting email (to={payload['to']}, cc_count={len(payload['cc'])}, bcc_count={len(payload['bcc'])}, attachment={attachment_filename is not None}, subject={payload['subject']}, smtp_host={payload['smtp_hostname']}, smtp_port={payload['smtp_port']}, tls={payload['smtp_use_tls']})"
         )
 
         result = EmailClient.send_email(
@@ -58,10 +58,12 @@ class OpenAEVEmailInjector:
         )
         if result.success:
             self.helper.injector_logger.info(
-                f"Email sent successfully (to={payload['to']})"
+                f"Email crafted successfully (to={payload['to']})"
             )
         else:
-            self.helper.injector_logger.error(f"Email send failed: {result.message}")
+            self.helper.injector_logger.error(
+                f"Email crafting failed: {result.message}"
+            )
         return result
 
     def _extract_attachment(self, data: Dict) -> tuple[str | None, bytes | None]:

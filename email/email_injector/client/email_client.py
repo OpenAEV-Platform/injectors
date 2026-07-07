@@ -56,10 +56,10 @@ class EmailClient:
 
             return ExecutionResult(
                 success=True,
-                message=f"Email sent successfully to {to_email}",
+                message=f"Email crafted successfully for {to_email}",
             )
         except Exception as e:
             return ExecutionResult(
                 success=False,
-                message=f"Failed to send email: {str(e)}",
+                message=f"Failed to craft email: {str(e)}",
             )

@@ -60,8 +60,8 @@ class EmailContracts:
             contract_id=CONTRACT_ID,
             config=contract_config,
             label={
-                SupportedLanguage.en: "Email - Send email",
-                SupportedLanguage.fr: "Email - Envoyer un email",
+                SupportedLanguage.en: "Email - Craft email",
+                SupportedLanguage.fr: "Email - Rédiger un email",
             },
             fields=email_fields,
             outputs=[],
