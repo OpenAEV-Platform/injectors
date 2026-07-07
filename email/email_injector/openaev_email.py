@@ -26,7 +26,16 @@ class OpenAEVEmailInjector:
             icon_bytes = b""  # Placeholder if icon is missing
 
         self.helper = OpenAEVInjectorHelper(self.config, icon_bytes)
-        pass
+        smtp_hostname = self.config.get_conf("smtp_hostname", required=True)
+        smtp_port = int(self.config.get_conf("smtp_port", default=587))
+        smtp_use_tls = self.config.get_conf("smtp_use_tls", default=False)
+        smtp_auth = bool(
+            self.config.get_conf("smtp_username", default=None)
+            and self.config.get_conf("smtp_password", default=None)
+        )
+        self.helper.injector_logger.info(
+            f"Email injector initialized (smtp_host={smtp_hostname}, smtp_port={smtp_port}, tls={smtp_use_tls}, smtp_auth={smtp_auth})"
+        )
 
     def execute(self, data: Dict) -> ExecutionResult:
         # Contract execution
@@ -36,22 +45,40 @@ class OpenAEVEmailInjector:
 
         content = DataHelpers.get_content(data)
         payload = EmailPayloadBuilder.build(content)
+        smtp_hostname = self.config.get_conf("smtp_hostname", required=True)
+        smtp_port = int(self.config.get_conf("smtp_port", default=587))
+        smtp_use_tls = self.config.get_conf("smtp_use_tls", default=False)
+        smtp_username = self.config.get_conf("smtp_username", default=None)
+        smtp_password = self.config.get_conf("smtp_password", default=None)
+        self.helper.injector_logger.info(
+            f"Sending email (to={payload['to']}, subject={payload['subject']}, smtp_host={smtp_hostname}, smtp_port={smtp_port}, tls={smtp_use_tls})"
+        )
 
-        return EmailClient.send_email(
-            smtp_hostname=self.config.get_conf("smtp_hostname", required=True),
-            smtp_port=int(self.config.get_conf("smtp_port", default=587)),
-            smtp_use_tls=self.config.get_conf("smtp_use_tls", default=False),
-            smtp_username=self.config.get_conf("smtp_username", default=None),
-            smtp_password=self.config.get_conf("smtp_password", default=None),
+        result = EmailClient.send_email(
+            smtp_hostname=smtp_hostname,
+            smtp_port=smtp_port,
+            smtp_use_tls=smtp_use_tls,
+            smtp_username=smtp_username,
+            smtp_password=smtp_password,
             from_email=payload["from"],
             to_email=payload["to"],
             subject=payload["subject"],
             body=payload["body"],
         )
+        if result.success:
+            self.helper.injector_logger.info(
+                f"Email sent successfully (to={payload['to']})"
+            )
+        else:
+            self.helper.injector_logger.error(f"Email send failed: {result.message}")
+        return result
 
     def process_message(self, data: Dict) -> None:
         start = time.time()
         inject_id = DataHelpers.get_inject_id(data)
+        self.helper.injector_logger.info(
+            f"Received email inject message (inject_id={inject_id})"
+        )
 
         # Notify API of reception and expected number of operations
         self.helper.api.inject.execution_reception(
@@ -72,6 +99,14 @@ class OpenAEVEmailInjector:
             self.helper.api.inject.execution_callback(
                 inject_id=inject_id, data=callback_data
             )
+            if result.success:
+                self.helper.injector_logger.info(
+                    f"Inject completed successfully (inject_id={inject_id})"
+                )
+            else:
+                self.helper.injector_logger.error(
+                    f"Inject completed with error (inject_id={inject_id}): {result.message}"
+                )
 
         except Exception as e:
             callback_data = {
@@ -83,8 +118,12 @@ class OpenAEVEmailInjector:
             self.helper.api.inject.execution_callback(
                 inject_id=inject_id, data=callback_data
             )
+            self.helper.injector_logger.error(
+                f"Unexpected error while processing inject (inject_id={inject_id}): {str(e)}"
+            )
 
     def start(self):
+        self.helper.injector_logger.info("Starting email injector listener")
         self.helper.listen(message_callback=self.process_message)
 
 
