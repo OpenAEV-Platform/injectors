@@ -1,14 +1,14 @@
 import time
 from typing import Dict
 
-from injector_common.data_helpers import DataHelpers
-from injector_common.dump_config import intercept_dump_argument
-from pyoaev.helpers import OpenAEVConfigHelper, OpenAEVInjectorHelper
-
 from email_injector.client.email_client import EmailClient, ExecutionResult
 from email_injector.configuration.config_loader import ConfigLoader
 from email_injector.contracts_email import CONTRACT_ID
 from email_injector.helpers.email_helper import EmailPayloadBuilder
+from pyoaev.helpers import OpenAEVConfigHelper, OpenAEVInjectorHelper
+
+from injector_common.data_helpers import DataHelpers
+from injector_common.dump_config import intercept_dump_argument
 
 
 class OpenAEVEmailInjector:
