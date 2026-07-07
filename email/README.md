@@ -1,6 +1,6 @@
 # Email Injector
 
-This injector allows sending emails via SMTP.
+This injector allows crafting emails via SMTP.
 
 ## Configuration
 
