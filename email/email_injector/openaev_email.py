@@ -75,11 +75,14 @@ class OpenAEVEmailInjector:
             raise ValueError("Only one attachment is supported for email injects")
         attachment = attachments[0]
         response = self.helper.api.document.download(attachment["document_id"])
-        if response.status_code != 200:
+        if response.status_code != 200:  # ty:ignore[unresolved-attribute]
             raise ValueError(
                 f"Attachment download failed for {attachment['document_name']}"
             )
-        return attachment["document_name"], response.content
+        return (
+            attachment["document_name"],
+            response.content,  # ty:ignore[unresolved-attribute]
+        )
 
     def process_message(self, data: Dict) -> None:
         start = time.time()
