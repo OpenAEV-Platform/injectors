@@ -66,3 +66,19 @@ def test_email_payload_builder_parse_bool_from_string():
     payload = EmailPayloadBuilder.build(content)
 
     assert payload["smtp_use_tls"] is True
+
+
+def test_email_payload_builder_parse_bool_from_empty_string():
+    content = {
+        "smtp_hostname": "smtp.example.com",
+        "smtp_port": "25",
+        "smtp_use_tls": "",
+        "from": "sender@example.com",
+        "to": "recipient@example.com",
+        "subject": "Hello",
+        "body": "World",
+    }
+
+    payload = EmailPayloadBuilder.build(content)
+
+    assert payload["smtp_use_tls"] is False
