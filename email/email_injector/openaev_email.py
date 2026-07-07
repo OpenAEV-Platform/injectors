@@ -1,14 +1,14 @@
 import time
 from typing import Dict
 
+from injector_common.data_helpers import DataHelpers
+from injector_common.dump_config import intercept_dump_argument
+from pyoaev.helpers import OpenAEVConfigHelper, OpenAEVInjectorHelper
+
 from email_injector.client.email_client import EmailClient, ExecutionResult
 from email_injector.configuration.config_loader import ConfigLoader
 from email_injector.contracts_email import CONTRACT_ID
 from email_injector.helpers.email_helper import EmailPayloadBuilder
-from pyoaev.helpers import OpenAEVConfigHelper, OpenAEVInjectorHelper
-
-from injector_common.data_helpers import DataHelpers
-from injector_common.dump_config import intercept_dump_argument
 
 
 class OpenAEVEmailInjector:
@@ -34,9 +34,9 @@ class OpenAEVEmailInjector:
 
         content = DataHelpers.get_content(data)
         payload = EmailPayloadBuilder.build(content)
-        attachment_filename, attachment_content = self._extract_attachment(data)
+        attachments = self._extract_attachments(data)
         self.helper.injector_logger.info(
-            f"Crafting email (to={payload['to']}, cc_count={len(payload['cc'])}, bcc_count={len(payload['bcc'])}, attachment={attachment_filename is not None}, subject={payload['subject']}, smtp_host={payload['smtp_hostname']}, smtp_port={payload['smtp_port']}, tls={payload['smtp_use_tls']})"
+            f"Crafting email (to={payload['to']}, cc_count={len(payload['cc'])}, bcc_count={len(payload['bcc'])}, attachments_count={len(attachments)}, subject={payload['subject']}, smtp_host={payload['smtp_hostname']}, smtp_port={payload['smtp_port']}, tls={payload['smtp_use_tls']})"
         )
 
         result = EmailClient.send_email(
@@ -51,8 +51,7 @@ class OpenAEVEmailInjector:
             bcc_emails=payload["bcc"],
             subject=payload["subject"],
             body=payload["body"],
-            attachment_filename=attachment_filename,
-            attachment_content=attachment_content,
+            attachments=attachments,
         )
         if result.success:
             self.helper.injector_logger.info(
@@ -64,23 +63,41 @@ class OpenAEVEmailInjector:
             )
         return result
 
-    def _extract_attachment(self, data: Dict) -> tuple[str | None, bytes | None]:
+    def _extract_attachments(self, data: Dict) -> list[tuple[str, bytes]]:
         documents = data.get("injection", {}).get("inject_documents", [])
         attachments = [doc for doc in documents if doc.get("document_attached") is True]
         if not attachments:
-            return None, None
-        if len(attachments) > 1:
-            raise ValueError("Only one attachment is supported for email injects")
-        attachment = attachments[0]
-        response = self.helper.api.document.download(attachment["document_id"])
-        if response.status_code != 200:  # ty:ignore[unresolved-attribute]
-            raise ValueError(
-                f"Attachment download failed for {attachment['document_name']}"
+            return []
+
+        extracted_attachments: list[tuple[str, bytes]] = []
+        for attachment in attachments:
+            attachment_name = attachment.get("document_name")
+            if not attachment_name:
+                raise ValueError("Attachment is missing a document_name")
+            response = self.helper.api.document.download(attachment["document_id"])
+            status_code = (
+                response.get("status_code")
+                if isinstance(response, dict)
+                else getattr(response, "status_code", None)
             )
-        return (
-            attachment["document_name"],
-            response.content,  # ty:ignore[unresolved-attribute]
-        )
+            if status_code != 200:
+                raise ValueError(f"Attachment download failed for {attachment_name}")
+            content = (
+                response.get("content")
+                if isinstance(response, dict)
+                else getattr(response, "content", None)
+            )
+            if content is None:
+                raise ValueError(f"Attachment content missing for {attachment_name}")
+            if isinstance(content, str):
+                content = content.encode()
+            if not isinstance(content, (bytes, bytearray)):
+                raise ValueError(
+                    f"Attachment content is not binary for {attachment_name}"
+                )
+            extracted_attachments.append((attachment_name, bytes(content)))
+
+        return extracted_attachments
 
     def process_message(self, data: Dict) -> None:
         start = time.time()

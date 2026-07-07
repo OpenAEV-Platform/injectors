@@ -19,6 +19,7 @@ def test_send_email_success():
             bcc_emails=["bcc@example.com"],
             subject="Test Subject",
             body="Test Body",
+            attachments=[],
         )
 
         assert result.success is True
@@ -54,6 +55,7 @@ def test_send_email_no_auth_no_tls():
             bcc_emails=[],
             subject="Test Subject",
             body="Test Body",
+            attachments=[],
         )
 
         assert result.success is True
@@ -79,8 +81,7 @@ def test_send_email_with_attachment():
             bcc_emails=[],
             subject="Attachment Subject",
             body="Attachment Body",
-            attachment_filename="test.txt",
-            attachment_content=b"hello",
+            attachments=[("test.txt", b"hello")],
         )
 
         assert result.success is True
@@ -91,6 +92,35 @@ def test_send_email_with_attachment():
             if part.get_filename() == "test.txt"
         ]
         assert len(attachment_parts) == 1
+
+
+def test_send_email_with_multiple_attachments():
+    with patch("smtplib.SMTP") as mock_smtp:
+        instance = mock_smtp.return_value
+
+        result = EmailClient.send_email(
+            smtp_hostname="localhost",
+            smtp_port=1025,
+            smtp_use_tls=False,
+            smtp_username=None,
+            smtp_password=None,
+            from_email="from@example.com",
+            to_email="to@example.com",
+            cc_emails=[],
+            bcc_emails=[],
+            subject="Attachment Subject",
+            body="Attachment Body",
+            attachments=[("a.txt", b"a"), ("b.txt", b"b")],
+        )
+
+        assert result.success is True
+        sent_message = instance.send_message.call_args.args[0]
+        attachment_parts = [
+            part.get_filename()
+            for part in sent_message.get_payload()
+            if part.get_filename() is not None
+        ]
+        assert attachment_parts == ["a.txt", "b.txt"]
 
 
 def test_send_email_failure():
@@ -109,6 +139,7 @@ def test_send_email_failure():
             bcc_emails=[],
             subject="Test Subject",
             body="Test Body",
+            attachments=[],
         )
 
         assert result.success is False

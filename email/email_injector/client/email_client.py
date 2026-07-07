@@ -27,8 +27,7 @@ class EmailClient:
         bcc_emails: list[str],
         subject: str,
         body: str,
-        attachment_filename: str | None = None,
-        attachment_content: bytes | None = None,
+        attachments: list[tuple[str, bytes]] | None = None,
     ) -> ExecutionResult:
         try:
             msg = MIMEMultipart()
@@ -38,7 +37,7 @@ class EmailClient:
                 msg["Cc"] = ", ".join(cc_emails)
             msg["Subject"] = subject
             msg.attach(MIMEText(body, "plain"))
-            if attachment_filename and attachment_content is not None:
+            for attachment_filename, attachment_content in attachments or []:
                 attachment_part = MIMEApplication(attachment_content)
                 attachment_part.add_header(
                     "Content-Disposition", "attachment", filename=attachment_filename
