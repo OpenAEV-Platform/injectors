@@ -22,7 +22,7 @@ def test_send_email_success():
         )
 
         assert result.success is True
-        assert "Email sent successfully" in result.message
+        assert "Email crafted successfully" in result.message
 
         mock_smtp.assert_called_with("localhost", 1025)
         instance.starttls.assert_called_once()
@@ -112,4 +112,4 @@ def test_send_email_failure():
         )
 
         assert result.success is False
-        assert "Failed to send email: Connection error" in result.message
+        assert "Failed to craft email: Connection error" in result.message

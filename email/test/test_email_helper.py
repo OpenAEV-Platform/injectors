@@ -50,3 +50,19 @@ def test_email_payload_builder_defaults():
     assert payload["smtp_password"] is None
     assert payload["cc"] == []
     assert payload["bcc"] == []
+
+
+def test_email_payload_builder_parse_bool_from_string():
+    content = {
+        "smtp_hostname": "smtp.example.com",
+        "smtp_port": "25",
+        "smtp_use_tls": "yes",
+        "from": "sender@example.com",
+        "to": "recipient@example.com",
+        "subject": "Hello",
+        "body": "World",
+    }
+
+    payload = EmailPayloadBuilder.build(content)
+
+    assert payload["smtp_use_tls"] is True
