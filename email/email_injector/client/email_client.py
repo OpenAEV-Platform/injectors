@@ -1,5 +1,6 @@
 import smtplib
 from dataclasses import dataclass
+from email.mime.application import MIMEApplication
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from typing import Optional
@@ -22,22 +23,35 @@ class EmailClient:
         smtp_password: Optional[str],
         from_email: str,
         to_email: str,
+        cc_emails: list[str],
+        bcc_emails: list[str],
         subject: str,
         body: str,
+        attachment_filename: str | None = None,
+        attachment_content: bytes | None = None,
     ) -> ExecutionResult:
         try:
             msg = MIMEMultipart()
             msg["From"] = from_email
             msg["To"] = to_email
+            if cc_emails:
+                msg["Cc"] = ", ".join(cc_emails)
             msg["Subject"] = subject
             msg.attach(MIMEText(body, "plain"))
+            if attachment_filename and attachment_content is not None:
+                attachment_part = MIMEApplication(attachment_content)
+                attachment_part.add_header(
+                    "Content-Disposition", "attachment", filename=attachment_filename
+                )
+                msg.attach(attachment_part)
+            recipients = [to_email, *cc_emails, *bcc_emails]
 
             server = smtplib.SMTP(smtp_hostname, smtp_port)
             if smtp_use_tls:
                 server.starttls()
             if smtp_username and smtp_password:
                 server.login(smtp_username, smtp_password)
-            server.send_message(msg)
+            server.send_message(msg, to_addrs=recipients)
             server.quit()
 
             return ExecutionResult(

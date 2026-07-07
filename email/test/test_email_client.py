@@ -1,4 +1,4 @@
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 from email_injector.client.email_client import EmailClient
 
@@ -15,6 +15,8 @@ def test_send_email_success():
             smtp_password="password",
             from_email="from@example.com",
             to_email="to@example.com",
+            cc_emails=["cc@example.com"],
+            bcc_emails=["bcc@example.com"],
             subject="Test Subject",
             body="Test Body",
         )
@@ -26,6 +28,13 @@ def test_send_email_success():
         instance.starttls.assert_called_once()
         instance.login.assert_called_with("user", "password")
         instance.send_message.assert_called_once()
+        sent_message = instance.send_message.call_args.args[0]
+        assert sent_message["Cc"] == "cc@example.com"
+        assert instance.send_message.call_args.kwargs["to_addrs"] == [
+            "to@example.com",
+            "cc@example.com",
+            "bcc@example.com",
+        ]
         instance.quit.assert_called_once()
 
 
@@ -41,6 +50,8 @@ def test_send_email_no_auth_no_tls():
             smtp_password=None,
             from_email="from@example.com",
             to_email="to@example.com",
+            cc_emails=[],
+            bcc_emails=[],
             subject="Test Subject",
             body="Test Body",
         )
@@ -50,6 +61,36 @@ def test_send_email_no_auth_no_tls():
         instance.starttls.assert_not_called()
         instance.login.assert_not_called()
         instance.send_message.assert_called_once()
+
+
+def test_send_email_with_attachment():
+    with patch("smtplib.SMTP") as mock_smtp:
+        instance = mock_smtp.return_value
+
+        result = EmailClient.send_email(
+            smtp_hostname="localhost",
+            smtp_port=1025,
+            smtp_use_tls=False,
+            smtp_username=None,
+            smtp_password=None,
+            from_email="from@example.com",
+            to_email="to@example.com",
+            cc_emails=[],
+            bcc_emails=[],
+            subject="Attachment Subject",
+            body="Attachment Body",
+            attachment_filename="test.txt",
+            attachment_content=b"hello",
+        )
+
+        assert result.success is True
+        sent_message = instance.send_message.call_args.args[0]
+        attachment_parts = [
+            part
+            for part in sent_message.get_payload()
+            if part.get_filename() == "test.txt"
+        ]
+        assert len(attachment_parts) == 1
 
 
 def test_send_email_failure():
@@ -64,6 +105,8 @@ def test_send_email_failure():
             smtp_password=None,
             from_email="from@example.com",
             to_email="to@example.com",
+            cc_emails=[],
+            bcc_emails=[],
             subject="Test Subject",
             body="Test Body",
         )

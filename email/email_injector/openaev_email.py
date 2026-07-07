@@ -26,16 +26,7 @@ class OpenAEVEmailInjector:
             icon_bytes = b""  # Placeholder if icon is missing
 
         self.helper = OpenAEVInjectorHelper(self.config, icon_bytes)
-        smtp_hostname = self.config.get_conf("smtp_hostname", required=True)
-        smtp_port = int(self.config.get_conf("smtp_port", default=587))
-        smtp_use_tls = self.config.get_conf("smtp_use_tls", default=False)
-        smtp_auth = bool(
-            self.config.get_conf("smtp_username", default=None)
-            and self.config.get_conf("smtp_password", default=None)
-        )
-        self.helper.injector_logger.info(
-            f"Email injector initialized (smtp_host={smtp_hostname}, smtp_port={smtp_port}, tls={smtp_use_tls}, smtp_auth={smtp_auth})"
-        )
+        self.helper.injector_logger.info("Email injector initialized")
 
     def execute(self, data: Dict) -> ExecutionResult:
         # Contract execution
@@ -45,25 +36,25 @@ class OpenAEVEmailInjector:
 
         content = DataHelpers.get_content(data)
         payload = EmailPayloadBuilder.build(content)
-        smtp_hostname = self.config.get_conf("smtp_hostname", required=True)
-        smtp_port = int(self.config.get_conf("smtp_port", default=587))
-        smtp_use_tls = self.config.get_conf("smtp_use_tls", default=False)
-        smtp_username = self.config.get_conf("smtp_username", default=None)
-        smtp_password = self.config.get_conf("smtp_password", default=None)
+        attachment_filename, attachment_content = self._extract_attachment(data)
         self.helper.injector_logger.info(
-            f"Sending email (to={payload['to']}, subject={payload['subject']}, smtp_host={smtp_hostname}, smtp_port={smtp_port}, tls={smtp_use_tls})"
+            f"Sending email (to={payload['to']}, cc_count={len(payload['cc'])}, bcc_count={len(payload['bcc'])}, attachment={attachment_filename is not None}, subject={payload['subject']}, smtp_host={payload['smtp_hostname']}, smtp_port={payload['smtp_port']}, tls={payload['smtp_use_tls']})"
         )
 
         result = EmailClient.send_email(
-            smtp_hostname=smtp_hostname,
-            smtp_port=smtp_port,
-            smtp_use_tls=smtp_use_tls,
-            smtp_username=smtp_username,
-            smtp_password=smtp_password,
+            smtp_hostname=payload["smtp_hostname"],
+            smtp_port=payload["smtp_port"],
+            smtp_use_tls=payload["smtp_use_tls"],
+            smtp_username=payload["smtp_username"],
+            smtp_password=payload["smtp_password"],
             from_email=payload["from"],
             to_email=payload["to"],
+            cc_emails=payload["cc"],
+            bcc_emails=payload["bcc"],
             subject=payload["subject"],
             body=payload["body"],
+            attachment_filename=attachment_filename,
+            attachment_content=attachment_content,
         )
         if result.success:
             self.helper.injector_logger.info(
@@ -72,6 +63,21 @@ class OpenAEVEmailInjector:
         else:
             self.helper.injector_logger.error(f"Email send failed: {result.message}")
         return result
+
+    def _extract_attachment(self, data: Dict) -> tuple[str | None, bytes | None]:
+        documents = data.get("injection", {}).get("inject_documents", [])
+        attachments = [doc for doc in documents if doc.get("document_attached") is True]
+        if not attachments:
+            return None, None
+        if len(attachments) > 1:
+            raise ValueError("Only one attachment is supported for email injects")
+        attachment = attachments[0]
+        response = self.helper.api.document.download(attachment["document_id"])
+        if response.status_code != 200:
+            raise ValueError(
+                f"Attachment download failed for {attachment['document_name']}"
+            )
+        return attachment["document_name"], response.content
 
     def process_message(self, data: Dict) -> None:
         start = time.time()
