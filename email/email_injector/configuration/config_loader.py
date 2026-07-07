@@ -22,12 +22,6 @@ class ConfigLoader(SettingsLoader):
                 "injector_contracts": {"data": EmailContracts.build()},
                 "injector_log_level": {"data": self.injector.log_level},
                 "injector_icon_filepath": {"data": self.injector.icon_filepath},
-                # SMTP configuration (flattened)
-                "smtp_hostname": {"data": self.injector.smtp_hostname},
-                "smtp_port": {"data": self.injector.smtp_port},
-                "smtp_use_tls": {"data": self.injector.smtp_use_tls},
-                "smtp_username": {"data": self.injector.smtp_username},
-                "smtp_password": {"data": self.injector.smtp_password},
             },
             config_base_model=self,
         )
