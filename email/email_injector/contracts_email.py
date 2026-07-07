@@ -16,14 +16,13 @@ from pyoaev.contracts.contract_config import (
 from pyoaev.security_domain.types import SecurityDomains
 
 CONTRACT_TYPE = "openaev_email"
-CONTRACT_ID = "d3b4e5f6-a7b8-4c9d-8e0f-1a2b3c4d5e6f"  # Generated a new UUID
+CONTRACT_ID = "d3b4e5f6-a7b8-4c9d-8e0f-1a2b3c4d5e6f"
 
 
 class EmailContracts:
 
     @staticmethod
     def build() -> List[Contract]:
-        # Config
         contract_config = ContractConfig(
             type=CONTRACT_TYPE,
             label={
@@ -34,7 +33,6 @@ class EmailContracts:
             color_light="#4caf50",
             expose=True,
         )
-        # Fields
         attachment_field = ContractAttachment(
             key="attachments",
             label="Attachment",

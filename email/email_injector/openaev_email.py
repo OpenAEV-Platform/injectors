@@ -18,18 +18,16 @@ class OpenAEVEmailInjector:
             ConfigLoader().to_daemon_config()
         )
         intercept_dump_argument(self.config.get_config_obj())
-        # Note: We'll need to create this icon later or use a placeholder
         try:
             with open("email_injector/img/icon-email.png", "rb") as icon_file:
                 icon_bytes = icon_file.read()
         except FileNotFoundError:
-            icon_bytes = b""  # Placeholder if icon is missing
+            icon_bytes = b""
 
         self.helper = OpenAEVInjectorHelper(self.config, icon_bytes)
         self.helper.injector_logger.info("Email injector initialized")
 
     def execute(self, data: Dict) -> ExecutionResult:
-        # Contract execution
         inject_contract = DataHelpers.get_injector_contract_id(data)
         if inject_contract != CONTRACT_ID:
             raise ValueError("Unsupported contract for Email injector")
@@ -91,12 +89,10 @@ class OpenAEVEmailInjector:
             f"Received email inject message (inject_id={inject_id})"
         )
 
-        # Notify API of reception and expected number of operations
         self.helper.api.inject.execution_reception(
             inject_id=inject_id, data={"tracking_total_count": 1}
         )
 
-        # Execute inject
         try:
             result = self.execute(data)
 
