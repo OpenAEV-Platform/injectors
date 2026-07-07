@@ -11,10 +11,8 @@ class ConfigLoader(SettingsLoader):
     def to_daemon_config(self) -> Configuration:
         return Configuration(
             config_hints={
-                # OpenAEV configuration (flattened)
                 "openaev_url": {"data": str(self.openaev.url)},
                 "openaev_token": {"data": self.openaev.token},
-                # Injector configuration (flattened)
                 "injector_id": {"data": self.injector.id},
                 "injector_name": {"data": self.injector.name},
                 "injector_type": {"data": self.injector.type},
