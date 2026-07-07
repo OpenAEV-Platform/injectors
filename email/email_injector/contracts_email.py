@@ -3,6 +3,9 @@ from typing import List
 from pyoaev.contracts import ContractBuilder
 from pyoaev.contracts.contract_config import (
     Contract,
+    ContractAttachment,
+    ContractCardinality,
+    ContractCheckbox,
     ContractConfig,
     ContractElement,
     ContractText,
@@ -32,12 +35,25 @@ class EmailContracts:
             expose=True,
         )
         # Fields
+        attachment_field = ContractAttachment(
+            key="attachments",
+            label="Attachment",
+            cardinality=ContractCardinality.Multiple,
+        )
         email_fields: List[ContractElement] = (
             ContractBuilder()
+            .mandatory(ContractText(key="smtp_hostname", label="SMTP Hostname"))
+            .mandatory(ContractText(key="smtp_port", label="SMTP Port"))
+            .mandatory(ContractCheckbox(key="smtp_use_tls", label="Use TLS (STARTTLS)"))
+            .optional(ContractText(key="smtp_username", label="SMTP Username"))
+            .optional(ContractText(key="smtp_password", label="SMTP Password"))
             .mandatory(ContractText(key="from", label="From Email"))
             .mandatory(ContractText(key="to", label="To Email"))
+            .optional(ContractText(key="cc", label="Cc (comma-separated emails)"))
+            .optional(ContractText(key="bcc", label="Bcc (comma-separated emails)"))
             .mandatory(ContractText(key="subject", label="Subject"))
             .mandatory(ContractTextArea(key="body", label="Body"))
+            .optional(attachment_field)
             .build_fields()
         )
         email_contract = Contract(

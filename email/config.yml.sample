@@ -6,8 +6,3 @@ injector:
   id: 'changeme'
   name: 'Email'
   log_level: 'info'
-  smtp_hostname: 'smtp.example.com'
-  smtp_port: 587
-  smtp_use_tls: true
-  smtp_username: 'changeme'
-  smtp_password: 'changeme'
