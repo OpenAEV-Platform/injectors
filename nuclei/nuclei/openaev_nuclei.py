@@ -13,7 +13,7 @@ from pyoaev.signatures.models import ExecutionDetails
 
 from injector_common.constants import TARGET_PROPERTY_SELECTOR_KEY, TARGET_SELECTOR_KEY
 from injector_common.dump_config import intercept_dump_argument
-from injector_common.targets import TargetProperty, Targets
+from injector_common.targets import Targets
 from nuclei.configuration.config_loader import ConfigLoader
 from nuclei.helpers.nuclei_command_builder import NucleiCommandBuilder
 from nuclei.helpers.nuclei_output_parser import NucleiOutputParser
@@ -45,9 +45,6 @@ class OpenAEVNuclei:
         self.selector_property = ""
         self.expectation_types = []
 
-        self.assets = []
-        self.asset_groups = []
-
     def _extract_targets(self, data: Dict):
         # Extract Targets
         target_results = Targets.extract_targets(
@@ -59,7 +56,10 @@ class OpenAEVNuclei:
 
         # Handle empty targets as an error
         if not targets:
-            message = f"No target identified for the property {TargetProperty[self.selector_property.upper()].value}"
+            if self.selector_property:
+                message = f"No target identified for the property {self.selector_property.upper()}"
+            else:
+                message = "No target identified, empty/missing selector property"
             raise ValueError(message)
 
         return target_results, targets
@@ -123,14 +123,12 @@ class OpenAEVNuclei:
         self.selector_property = self.inject_content.get(TARGET_PROPERTY_SELECTOR_KEY)
 
         # Retrieving expectation_types
-        expectations_content = self.inject_content.get("expectations")
+        expectations_content = self.inject_content.get("expectations") or []
         self.expectation_types = [
-            item.get("expectation_type") for item in expectations_content
+            item.get("expectation_type")
+            for item in expectations_content
+            if item.get("expectation_type")
         ]
-
-        # Triggering by assets / asset_groups
-        self.assets = data.get("assets", [])
-        self.asset_groups = data.get("assetGroups", [])
 
         # Notify API of reception and expected number of operations
         reception_data = {"tracking_total_count": 1}
@@ -143,42 +141,62 @@ class OpenAEVNuclei:
 
         execution_details = ExecutionDetails()
 
-        target_results, targets = self._extract_targets(data)
-        configs = build_network_configs(targets)
+        pre_execute_fail_flag = False
+        pre_execute_fail_message = ""
 
-        # Compile pre-execution signatures
-        execution_signatures = signature_manager.build_execution_signatures(
-            config=configs
-        )
-
-        # Execute inject
         try:
-
-            execution_result = self.nuclei_execution(
-                start, data, target_results, targets
-            )
-            execution_message = execution_result.get("message")
-            execution_result_outputs = execution_result.get("outputs")
-            execution_status = "SUCCESS"
-            tool_output = {}
-
+            target_results, targets = self._extract_targets(data)
         except Exception as e:
+            pre_execute_fail_flag = True
+            pre_execute_fail_message = (
+                f"Could not extract targets: {type(e).__name__} - {e}"
+            )
+        else:
+            try:
+                configs = build_network_configs(targets)
+            except Exception as e:
+                pre_execute_fail_flag = True
+                pre_execute_fail_message = (
+                    f"Could not build network configurations: {type(e).__name__} - {e}"
+                )
+            else:
+                try:
+                    # Compile pre-execution signatures
+                    execution_signatures = signature_manager.build_execution_signatures(
+                        config=configs
+                    )
+                except Exception as e:
+                    pre_execute_fail_flag = True
+                    pre_execute_fail_message = f"Could not build execution signatures: {type(e).__name__} - {e}"
 
-            execution_result = None
-            execution_result_outputs = None
-            execution_message = str(e)
+        execution_result_outputs = None
+        tool_output = {}
+        execution_action = "complete"
+
+        if pre_execute_fail_flag:
+            execution_message = f"Pre-execution failure: {pre_execute_fail_message}"
             execution_status = "ERROR"
-            tool_output = {"error_info": {"exit_code": 1}}
+        else:
+            # Execute inject
+            try:
+                execution_result = self.nuclei_execution(
+                    start, data, target_results, targets
+                )
+                execution_message = execution_result.get("message")
+                execution_result_outputs = execution_result.get("outputs")
+                execution_status = "SUCCESS"
+            except Exception as e:
+                execution_message = str(e)
+                execution_status = "ERROR"
+                tool_output = {"error_info": {"exit_code": 1}}
 
         callback_data = {
             "execution_message": execution_message,
             "execution_status": execution_status,
             "execution_duration": int(time.time() - start),
-            "execution_action": "complete",
+            "execution_action": execution_action,
         }
 
-        if execution_result:
-            callback_data["execution_result"] = execution_result
         if execution_result_outputs:
             callback_data["execution_output_structured"] = json.dumps(
                 execution_result_outputs
@@ -187,6 +205,9 @@ class OpenAEVNuclei:
         self.helper.api.inject.execution_callback(
             inject_id=self.inject_id, data=callback_data
         )
+
+        if pre_execute_fail_flag:
+            return
 
         # Compile post-execution signatures
         signature_manager.post_execution_updates(
