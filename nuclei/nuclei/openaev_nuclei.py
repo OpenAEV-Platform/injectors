@@ -4,10 +4,16 @@ import time
 from typing import Dict
 
 from pyoaev.helpers import OpenAEVConfigHelper, OpenAEVInjectorHelper
+from pyoaev.signatures import (
+    ExtraSignatureData,
+    SignatureManager,
+    build_network_configs,
+)
+from pyoaev.signatures.models import ExecutionDetails
 
 from injector_common.constants import TARGET_PROPERTY_SELECTOR_KEY, TARGET_SELECTOR_KEY
 from injector_common.dump_config import intercept_dump_argument
-from injector_common.targets import TargetProperty, Targets
+from injector_common.targets import Targets
 from nuclei.configuration.config_loader import ConfigLoader
 from nuclei.helpers.nuclei_command_builder import NucleiCommandBuilder
 from nuclei.helpers.nuclei_output_parser import NucleiOutputParser
@@ -32,30 +38,45 @@ class OpenAEVNuclei:
             )
         self.parser = NucleiOutputParser()
 
-    def nuclei_execution(self, start: float, data: Dict) -> Dict:
-        inject_id = data["injection"]["inject_id"]
-        contract_id = data["injection"]["inject_injector_contract"]["convertedContent"][
-            "contract_id"
-        ]
-        content = data["injection"]["inject_content"]
-        selector_key = content[TARGET_SELECTOR_KEY]
-        selector_property = content[TARGET_PROPERTY_SELECTOR_KEY]
+        self.inject_id = ""
+        self.contract_id = ""
+        self.inject_content = {}
+        self.selector_key = ""
+        self.selector_property = ""
+        self.expectation_types = []
 
+    def _extract_targets(self, data: Dict):
+        # Extract Targets
         target_results = Targets.extract_targets(
-            selector_key, selector_property, data, self.helper
+            self.selector_key, self.selector_property, data, self.helper
         )
+
         # Deduplicate targets
         targets = target_results.targets
+
         # Handle empty targets as an error
         if not targets:
-            message = f"No target identified for the property {TargetProperty[selector_property.upper()].value}"
+            if self.selector_property:
+                message = f"No target identified for the property {self.selector_property.upper()}"
+            else:
+                message = "No target identified, empty/missing selector property"
             raise ValueError(message)
 
+        return target_results, targets
+
+    def _extract_targets_meta(self, data: dict):
+        return Targets.extract_target_meta(
+            self.selector_key, self.selector_property, data, self.helper
+        )
+
+    def nuclei_execution(
+        self, start: float, data: Dict, target_results, targets
+    ) -> Dict:
         # Nuclei Args Builder
         nuclei_builder = NucleiCommandBuilder(
             nuclei_configs=self.config_loader.nuclei,
-            contract_id=contract_id,
-            content=content,
+            contract_id=self.contract_id,
+            content=self.inject_content,
             targets=targets,
         )
         nuclei_args = nuclei_builder.build()
@@ -66,7 +87,7 @@ class OpenAEVNuclei:
 
         callback_data = {
             "execution_message": Targets.build_execution_message(
-                selector_key=selector_key,
+                selector_key=self.selector_key,
                 data=data,
                 command_args=nuclei_args,
             ),
@@ -76,7 +97,7 @@ class OpenAEVNuclei:
         }
 
         self.helper.api.inject.execution_callback(
-            inject_id=inject_id,
+            inject_id=self.inject_id,
             data=callback_data,
         )
 
@@ -89,37 +110,131 @@ class OpenAEVNuclei:
 
     def process_message(self, data: Dict) -> None:
         start = time.time()
-        inject_id = data["injection"]["inject_id"]
+
+        data_injection = data.get("injection", {})
+        data_injector_contract = data_injection.get("inject_injector_contract", {})
+
+        self.contract_id = data_injector_contract.get("convertedContent", {}).get(
+            "contract_id"
+        )
+        self.inject_id = data_injection.get("inject_id")
+        self.inject_content = data_injection.get("inject_content", {})
+        self.selector_key = self.inject_content.get(TARGET_SELECTOR_KEY)
+        self.selector_property = self.inject_content.get(TARGET_PROPERTY_SELECTOR_KEY)
+
+        # Retrieving expectation_types
+        expectations_content = self.inject_content.get("expectations") or []
+        self.expectation_types = [
+            item.get("expectation_type")
+            for item in expectations_content
+            if item.get("expectation_type")
+        ]
 
         # Notify API of reception and expected number of operations
         reception_data = {"tracking_total_count": 1}
         self.helper.api.inject.execution_reception(
-            inject_id=inject_id, data=reception_data
+            inject_id=self.inject_id, data=reception_data
         )
 
-        # Execute inject
+        # Injector Signature Manager
+        signature_manager = SignatureManager(self.helper.api)
+
+        execution_details = ExecutionDetails()
+
+        pre_execute_fail_flag = False
+        pre_execute_fail_message = ""
+
         try:
-            result = self.nuclei_execution(start, data)
-            callback_data = {
-                "execution_message": result["message"],
-                "execution_output_structured": json.dumps(result["outputs"]),
-                "execution_status": "SUCCESS",
-                "execution_duration": int(time.time() - start),
-                "execution_action": "complete",
-            }
-            self.helper.api.inject.execution_callback(
-                inject_id=inject_id, data=callback_data
-            )
+            target_results, targets = self._extract_targets(data)
         except Exception as e:
-            callback_data = {
-                "execution_message": str(e),
-                "execution_status": "ERROR",
-                "execution_duration": int(time.time() - start),
-                "execution_action": "complete",
-            }
-            self.helper.api.inject.execution_callback(
-                inject_id=inject_id, data=callback_data
+            pre_execute_fail_flag = True
+            pre_execute_fail_message = (
+                f"Could not extract targets: {type(e).__name__} - {e}"
             )
+        else:
+            try:
+                configs = build_network_configs(targets)
+            except Exception as e:
+                pre_execute_fail_flag = True
+                pre_execute_fail_message = (
+                    f"Could not build network configurations: {type(e).__name__} - {e}"
+                )
+            else:
+                try:
+                    # Compile pre-execution signatures
+                    execution_signatures = signature_manager.build_execution_signatures(
+                        config=configs
+                    )
+                except Exception as e:
+                    pre_execute_fail_flag = True
+                    pre_execute_fail_message = f"Could not build execution signatures: {type(e).__name__} - {e}"
+
+        execution_result_outputs = None
+        tool_output = {}
+        execution_action = "complete"
+
+        if pre_execute_fail_flag:
+            execution_message = f"Pre-execution failure: {pre_execute_fail_message}"
+            execution_status = "ERROR"
+        else:
+            # Execute inject
+            try:
+                execution_result = self.nuclei_execution(
+                    start, data, target_results, targets
+                )
+                execution_message = execution_result.get("message")
+                execution_result_outputs = execution_result.get("outputs")
+                execution_status = "SUCCESS"
+            except Exception as e:
+                execution_message = str(e)
+                execution_status = "ERROR"
+                tool_output = {"error_info": {"exit_code": 1}}
+
+        callback_data = {
+            "execution_message": execution_message,
+            "execution_status": execution_status,
+            "execution_duration": int(time.time() - start),
+            "execution_action": execution_action,
+        }
+
+        if execution_result_outputs:
+            callback_data["execution_output_structured"] = json.dumps(
+                execution_result_outputs
+            )
+
+        self.helper.api.inject.execution_callback(
+            inject_id=self.inject_id, data=callback_data
+        )
+
+        if pre_execute_fail_flag:
+            return
+
+        # Compile post-execution signatures
+        signature_manager.post_execution_updates(
+            execution_details=execution_details,
+            execution_signatures=execution_signatures,
+            tool_output=tool_output,
+        )
+
+        # Build payload with extra
+        expectation_signatures = signature_manager.build_payload(
+            execution_signatures=execution_signatures,
+            targets_meta=self._extract_targets_meta(data),
+            expectation_types=self.expectation_types,
+            extra_signatures=ExtraSignatureData(
+                vulnerability={
+                    "cves_tested": [],
+                    "cves_found_vulnerable": [],
+                }
+            ),
+        )
+
+        # Send signature to backend
+        signature_manager.send_signatures(
+            inject_id=self.inject_id,
+            execution_details=execution_details,
+            signatures=expectation_signatures,
+        )
 
     @staticmethod
     def _check_nuclei_installed():
