@@ -112,12 +112,26 @@ def build_core_fields() -> list[ContractElement]:
         cardinality=ContractCardinality.Multiple,
         predefinedExpectations=[
             Expectation(
+                expectation_type=ExpectationType.detection,
+                expectation_name="Detection",
+                expectation_description="",
+                expectation_score=100,
+                expectation_expectation_group=False,
+            ),
+            Expectation(
+                expectation_type=ExpectationType.prevention,
+                expectation_name="Prevention",
+                expectation_description="",
+                expectation_score=100,
+                expectation_expectation_group=False,
+            ),
+            Expectation(
                 expectation_type=ExpectationType.vulnerability,
                 expectation_name="Not vulnerable",
                 expectation_description="",
                 expectation_score=100,
                 expectation_expectation_group=False,
-            )
+            ),
         ],
     )
 
