@@ -22,6 +22,7 @@ class EmailClient:
         smtp_username: Optional[str],
         smtp_password: Optional[str],
         from_email: str,
+        reply_to: Optional[str],
         to_email: str,
         cc_emails: list[str],
         bcc_emails: list[str],
@@ -32,6 +33,8 @@ class EmailClient:
         try:
             msg = MIMEMultipart()
             msg["From"] = from_email
+            if reply_to:
+                msg["Reply-To"] = reply_to
             msg["To"] = to_email
             if cc_emails:
                 msg["Cc"] = ", ".join(cc_emails)

@@ -9,6 +9,7 @@ def test_email_payload_builder():
         "smtp_username": "user",
         "smtp_password": "pass",
         "from": "sender@example.com",
+        "reply_to": "reply@example.com",
         "to": "recipient@example.com",
         "cc": "cc1@example.com, cc2@example.com",
         "bcc": "bcc@example.com",
@@ -24,6 +25,7 @@ def test_email_payload_builder():
     assert payload["smtp_username"] == "user"
     assert payload["smtp_password"] == "pass"
     assert payload["from"] == "sender@example.com"
+    assert payload["reply_to"] == "reply@example.com"
     assert payload["to"] == "recipient@example.com"
     assert payload["cc"] == ["cc1@example.com", "cc2@example.com"]
     assert payload["bcc"] == ["bcc@example.com"]
@@ -48,6 +50,7 @@ def test_email_payload_builder_defaults():
     assert payload["smtp_use_tls"] is False
     assert payload["smtp_username"] is None
     assert payload["smtp_password"] is None
+    assert payload["reply_to"] is None
     assert payload["cc"] == []
     assert payload["bcc"] == []
 
