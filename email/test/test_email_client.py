@@ -14,6 +14,7 @@ def test_send_email_success():
             smtp_username="user",
             smtp_password="password",
             from_email="from@example.com",
+            mail_from="bounce@example.com",
             reply_to="reply@example.com",
             to_email="to@example.com",
             cc_emails=["cc@example.com"],
@@ -33,6 +34,9 @@ def test_send_email_success():
         sent_message = instance.send_message.call_args.args[0]
         assert sent_message["Reply-To"] == "reply@example.com"
         assert sent_message["Cc"] == "cc@example.com"
+        assert (
+            instance.send_message.call_args.kwargs["from_addr"] == "bounce@example.com"
+        )
         assert instance.send_message.call_args.kwargs["to_addrs"] == [
             "to@example.com",
             "cc@example.com",
@@ -52,6 +56,7 @@ def test_send_email_no_auth_no_tls():
             smtp_username=None,
             smtp_password=None,
             from_email="from@example.com",
+            mail_from="from@example.com",
             reply_to=None,
             to_email="to@example.com",
             cc_emails=[],
@@ -68,6 +73,7 @@ def test_send_email_no_auth_no_tls():
         instance.send_message.assert_called_once()
         sent_message = instance.send_message.call_args.args[0]
         assert sent_message["Reply-To"] is None
+        assert instance.send_message.call_args.kwargs["from_addr"] == "from@example.com"
 
 
 def test_send_email_with_attachment():
@@ -81,6 +87,7 @@ def test_send_email_with_attachment():
             smtp_username=None,
             smtp_password=None,
             from_email="from@example.com",
+            mail_from="from@example.com",
             reply_to=None,
             to_email="to@example.com",
             cc_emails=[],
@@ -111,6 +118,7 @@ def test_send_email_with_multiple_attachments():
             smtp_username=None,
             smtp_password=None,
             from_email="from@example.com",
+            mail_from="from@example.com",
             reply_to=None,
             to_email="to@example.com",
             cc_emails=[],
@@ -141,6 +149,7 @@ def test_send_email_failure():
             smtp_username=None,
             smtp_password=None,
             from_email="from@example.com",
+            mail_from="from@example.com",
             reply_to=None,
             to_email="to@example.com",
             cc_emails=[],

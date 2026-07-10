@@ -27,6 +27,7 @@ class EmailPayloadBuilder:
             "smtp_username": content.get("smtp_username"),
             "smtp_password": content.get("smtp_password"),
             "from": content["from"],
+            "mail_from": content.get("mail_from") or content["from"],
             "reply_to": content.get("reply_to"),
             "to": content["to"],
             "cc": EmailPayloadBuilder.parse_recipients(content.get("cc")),
