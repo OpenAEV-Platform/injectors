@@ -2,13 +2,10 @@ FROM python:3.13-alpine AS builder
 
 ENV PIP_VERSION=25.0.1
 
-RUN apk update && apk upgrade && apk add git curl
+RUN apk update && apk upgrade && apk add curl
 
 WORKDIR /opt/injector_common
 COPY --from=injector_common ./ ./
-
-WORKDIR /
-RUN git clone https://github.com/OpenAEV-Platform/client-python
 
 RUN curl -sS https://bootstrap.pypa.io/get-pip.py -o get-pip.py && \
     python3 get-pip.py pip==${PIP_VERSION} && \
@@ -41,8 +38,11 @@ ARG PYOAEV_GIT_BRANCH_OVERRIDE
 # SQLMap (pure Python) is cloned and exposed on PATH. The ZAP baseline is
 # expected to be reachable as `zap-baseline.py` (mount the ZAP image or add it
 # in a downstream build) for the OWASP ZAP contract.
+# Pinned to a specific release tag so image contents stay reproducible and are
+# not affected by upstream force-pushes to the default branch.
+ARG SQLMAP_VERSION=1.10.7
 RUN apk add --no-cache git && \
-    git clone --depth 1 https://github.com/sqlmapproject/sqlmap.git /opt/sqlmap && \
+    git clone --depth 1 --branch ${SQLMAP_VERSION} https://github.com/sqlmapproject/sqlmap.git /opt/sqlmap && \
     printf '#!/bin/sh\nexec python3 /opt/sqlmap/sqlmap.py "$@"\n' > /usr/local/bin/sqlmap && \
     chmod +x /usr/local/bin/sqlmap
 

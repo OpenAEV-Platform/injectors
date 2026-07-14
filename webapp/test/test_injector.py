@@ -106,6 +106,32 @@ class ExecutorTest(TestCase):
         # ZAP is mocked so no report file is produced.
         self.assertFalse(WebappExecutor().run_zap_baseline("http://t").success)
 
+    @patch("webapp_injector.helpers.webapp_executor.subprocess.run")
+    def test_run_zap_invalid_report_is_error(self, run):
+        def _write_invalid_report(cmd, **kwargs):
+            report_path = cmd[cmd.index("-J") + 1]
+            with open(report_path, "w", encoding="utf-8") as report_file:
+                report_file.write("not json")
+            return MagicMock(returncode=0, stdout="", stderr="")
+
+        run.side_effect = _write_invalid_report
+        result = WebappExecutor().run_zap_baseline("http://t")
+        self.assertFalse(result.success)
+        self.assertIn("invalid", result.message.lower())
+
+    @patch("webapp_injector.helpers.webapp_executor.subprocess.run")
+    def test_run_zap_success_parses_report(self, run):
+        def _write_report(cmd, **kwargs):
+            report_path = cmd[cmd.index("-J") + 1]
+            with open(report_path, "w", encoding="utf-8") as report_file:
+                report_file.write('{"site": [{"alerts": [{"alert": "XSS"}]}]}')
+            return MagicMock(returncode=0, stdout="", stderr="")
+
+        run.side_effect = _write_report
+        result = WebappExecutor().run_zap_baseline("http://t")
+        self.assertTrue(result.success)
+        self.assertEqual(result.outputs["vulnerabilities"], ["XSS"])
+
     @patch(
         "webapp_injector.helpers.webapp_executor.subprocess.run",
         side_effect=FileNotFoundError(),

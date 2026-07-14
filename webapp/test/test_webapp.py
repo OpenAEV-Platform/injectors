@@ -1,3 +1,4 @@
+import json
 from unittest import TestCase
 
 from webapp_injector.contracts_webapp import (
@@ -30,8 +31,9 @@ class ParsingTest(TestCase):
         alerts = WebappExecutor._parse_zap_report(raw)
         self.assertEqual(alerts, ["SQL Injection", "XSS"])
 
-    def test_parse_zap_report_invalid_json(self):
-        self.assertEqual(WebappExecutor._parse_zap_report("not json"), [])
+    def test_parse_zap_report_invalid_json_raises(self):
+        with self.assertRaises(json.JSONDecodeError):
+            WebappExecutor._parse_zap_report("not json")
 
     def test_parse_sqlmap(self):
         stdout = (
@@ -39,3 +41,22 @@ class ParsingTest(TestCase):
         )
         vulns = WebappExecutor._parse_sqlmap(stdout)
         self.assertEqual(vulns, ["Parameter: id (GET)"])
+
+
+class RedactUrlTest(TestCase):
+    def test_redacts_credentials_and_query(self):
+        redacted = WebappExecutor._redact_url(
+            "http://user:pass@example.com/app?token=secret"
+        )
+        self.assertNotIn("user", redacted)
+        self.assertNotIn("pass", redacted)
+        self.assertNotIn("secret", redacted)
+        self.assertIn("***@example.com", redacted)
+        self.assertIn("<redacted>", redacted)
+
+    def test_leaves_plain_url_and_flags_untouched(self):
+        self.assertEqual(
+            WebappExecutor._redact_url("http://example.com/app"),
+            "http://example.com/app",
+        )
+        self.assertEqual(WebappExecutor._redact_url("--batch"), "--batch")

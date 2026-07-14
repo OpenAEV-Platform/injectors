@@ -6,6 +6,7 @@ import tempfile
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Dict, List
+from urllib.parse import urlsplit, urlunsplit
 
 
 @dataclass
@@ -29,9 +30,33 @@ class WebappExecutor:
             excerpt = excerpt[-WebappExecutor.STDERR_EXCERPT_CHARS :]
         return excerpt
 
+    @staticmethod
+    def _redact_url(token: str) -> str:
+        """Strip credentials (userinfo) and query string from a URL token.
+
+        Target URLs may embed basic-auth credentials or sensitive query
+        parameters; those must never reach the injector logs.
+        """
+        if "://" not in token:
+            return token
+        try:
+            parts = urlsplit(token)
+        except ValueError:
+            return token
+        if not parts.hostname:
+            return token
+        netloc = parts.hostname
+        if parts.port:
+            netloc = f"{netloc}:{parts.port}"
+        if parts.username or parts.password:
+            netloc = f"***@{netloc}"
+        query = "<redacted>" if parts.query else ""
+        return urlunsplit((parts.scheme, netloc, parts.path, query, ""))
+
     def _run(self, cmd: List[str], timeout: int) -> subprocess.CompletedProcess:
         if self.logger:
-            self.logger.info(f"Executing: {' '.join(cmd)}")
+            sanitized = " ".join(self._redact_url(part) for part in cmd)
+            self.logger.info(f"Executing: {sanitized}")
         return subprocess.run(
             cmd,
             capture_output=True,
@@ -61,7 +86,12 @@ class WebappExecutor:
 
             if not report.exists():
                 return WebappResult(False, f"ZAP produced no report for {target_url}")
-            alerts = self._parse_zap_report(report.read_text(encoding="utf-8"))
+            try:
+                alerts = self._parse_zap_report(report.read_text(encoding="utf-8"))
+            except json.JSONDecodeError:
+                return WebappResult(
+                    False, f"ZAP produced an invalid JSON report for {target_url}"
+                )
 
         return WebappResult(
             success=True,
@@ -71,10 +101,7 @@ class WebappExecutor:
 
     @staticmethod
     def _parse_zap_report(raw: str) -> List[str]:
-        try:
-            report = json.loads(raw)
-        except json.JSONDecodeError:
-            return []
+        report = json.loads(raw)
         alerts = []
         for site in report.get("site", []):
             for alert in site.get("alerts", []):
