@@ -1,10 +1,9 @@
-from pydantic import Field
-from pyoaev.configuration import ConfigLoaderOAEV, Configuration, SettingsLoader
-
 from azure_injector.configuration.injector_config_override import (
     InjectorConfigOverride,
 )
 from azure_injector.contracts_azure import AzureContracts
+from pydantic import Field
+from pyoaev.configuration import ConfigLoaderOAEV, Configuration, SettingsLoader
 
 
 class ConfigLoader(SettingsLoader):
