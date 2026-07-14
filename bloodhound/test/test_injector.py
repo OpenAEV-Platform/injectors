@@ -94,3 +94,16 @@ class ExecutorTest(TestCase):
             "corp.local", "user", "secret", "dc01.corp.local"
         )
         self.assertFalse(result.success)
+
+    @patch("bloodhound_injector.helpers.bloodhound_executor.subprocess.run")
+    def test_run_collection_nonzero_exit_reports_error(self, run):
+        run.return_value = MagicMock(
+            returncode=1, stdout="", stderr="authentication failed for secret"
+        )
+        result = BloodhoundExecutor().run_collection(
+            "corp.local", "user", "secret", "dc01.corp.local"
+        )
+        self.assertFalse(result.success)
+        self.assertIn("exit code 1", result.message)
+        # The password must never leak into the failure message.
+        self.assertNotIn("secret", result.message)
