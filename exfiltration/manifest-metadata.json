@@ -1,0 +1,18 @@
+{
+  "title": "Data Exfiltration",
+  "slug": "openaev_exfiltration",
+  "description": "This injector exercises egress filtering and DLP controls by simulating data exfiltration over DNS tunneling, HTTPS upload and cloud storage upload using random (non-sensitive) payloads.",
+  "short_description": "Test egress filtering and DLP with simulated exfiltration",
+  "use_cases": ["Technical"],
+  "verified": false,
+  "last_verified_date": "",
+  "playbook_supported": false,
+  "max_confidence_level": 80,
+  "support_version": "",
+  "subscription_link": "",
+  "source_code": "",
+  "manager_supported": true,
+  "container_version": "rolling",
+  "container_image": "openaev/injector-exfiltration",
+  "container_type": "INJECTOR"
+}
