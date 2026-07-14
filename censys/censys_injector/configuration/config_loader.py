@@ -1,11 +1,10 @@
-from pydantic import Field
-from pyoaev.configuration import ConfigLoaderOAEV, Configuration, SettingsLoader
-
 from censys_injector.configuration.censys_config import CensysConfig
 from censys_injector.configuration.injector_config_override import (
     InjectorConfigOverride,
 )
 from censys_injector.contracts_censys import CensysContracts
+from pydantic import Field
+from pyoaev.configuration import ConfigLoaderOAEV, Configuration, SettingsLoader
 
 
 class ConfigLoader(SettingsLoader):
