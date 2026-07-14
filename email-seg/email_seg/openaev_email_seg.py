@@ -28,6 +28,15 @@ class OpenAEVEmailSeg:
             return value[0] if value else None
         return value
 
+    @classmethod
+    def _as_bool(cls, value, default: bool = True) -> bool:
+        value = cls._first(value)
+        if value is None:
+            return default
+        if isinstance(value, bool):
+            return value
+        return str(value).strip().lower() in ("true", "1", "yes", "on")
+
     def process_message(self, data: Dict) -> None:
         start = time.time()
         inject_id = DataHelpers.get_inject_id(data)
@@ -40,19 +49,19 @@ class OpenAEVEmailSeg:
             payload = self._first(content.get("payload"))
             message = self.sender.build_message(
                 payload=payload,
-                mail_from=content.get("mail_from"),
-                mail_to=content.get("mail_to"),
+                mail_from=self._first(content.get("mail_from")),
+                mail_to=self._first(content.get("mail_to")),
                 subject=self._first(content.get("subject"))
                 or "OpenAEV email gateway assessment",
-                malicious_url=content.get("malicious_url"),
+                malicious_url=self._first(content.get("malicious_url")),
             )
             result = self.sender.send(
                 message,
-                host=content.get("smtp_host"),
+                host=self._first(content.get("smtp_host")),
                 port=int(self._first(content.get("smtp_port")) or 587),
-                username=content.get("smtp_username"),
-                password=content.get("smtp_password"),
-                use_tls=bool(content.get("smtp_use_tls", True)),
+                username=self._first(content.get("smtp_username")),
+                password=self._first(content.get("smtp_password")),
+                use_tls=self._as_bool(content.get("smtp_use_tls", True)),
             )
 
             self.helper.api.inject.execution_callback(

@@ -78,10 +78,62 @@ class ProcessMessageTest(TestCase):
         )
         self.assertEqual(self._callback(injector)["execution_status"], "ERROR")
 
+    def test_exception_reports_error(self):
+        injector = make_injector()
+        injector.sender = MagicMock()
+        injector.sender.build_message.side_effect = ValueError("bad payload")
+        injector.process_message(
+            _data(
+                {
+                    "payload": ["eicar_body"],
+                    "mail_from": "a@x.com",
+                    "mail_to": "b@y.com",
+                    "smtp_host": "gw",
+                }
+            )
+        )
+        callback = self._callback(injector)
+        self.assertEqual(callback["execution_status"], "ERROR")
+        self.assertEqual(callback["execution_message"], "bad payload")
+
+    def test_disable_tls_via_string_list(self):
+        injector = make_injector()
+        injector.sender = MagicMock()
+        injector.sender.build_message.return_value = MagicMock()
+        injector.sender.send.return_value = SendResult(True, "delivered")
+        injector.process_message(
+            _data(
+                {
+                    "payload": ["eicar_body"],
+                    "mail_from": ["a@x.com"],
+                    "mail_to": ["b@y.com"],
+                    "smtp_host": ["gw"],
+                    "smtp_use_tls": ["false"],
+                }
+            )
+        )
+        self.assertFalse(injector.sender.send.call_args.kwargs["use_tls"])
+        self.assertEqual(injector.sender.send.call_args.kwargs["host"], "gw")
+
     def test_start_listens(self):
         injector = make_injector()
         injector.start()
         injector.helper.listen.assert_called_once()
+
+
+class AsBoolTest(TestCase):
+    def test_defaults_true(self):
+        self.assertTrue(mod.OpenAEVEmailSeg._as_bool(None))
+
+    def test_bool_passthrough(self):
+        self.assertTrue(mod.OpenAEVEmailSeg._as_bool(True))
+        self.assertFalse(mod.OpenAEVEmailSeg._as_bool(False))
+
+    def test_string_and_list_values(self):
+        self.assertFalse(mod.OpenAEVEmailSeg._as_bool("false"))
+        self.assertFalse(mod.OpenAEVEmailSeg._as_bool(["false"]))
+        self.assertTrue(mod.OpenAEVEmailSeg._as_bool(["true"]))
+        self.assertTrue(mod.OpenAEVEmailSeg._as_bool("on"))
 
 
 class EmailSenderSendTest(TestCase):
