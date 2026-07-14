@@ -17,9 +17,17 @@ class WebappResult:
 
 class WebappExecutor:
     DEFAULT_TIMEOUT_SECONDS = 900
+    STDERR_EXCERPT_CHARS = 500
 
     def __init__(self, logger=None):
         self.logger = logger
+
+    @staticmethod
+    def _trim_stderr(stderr: str) -> str:
+        excerpt = (stderr or "").strip()
+        if len(excerpt) > WebappExecutor.STDERR_EXCERPT_CHARS:
+            excerpt = excerpt[-WebappExecutor.STDERR_EXCERPT_CHARS :]
+        return excerpt
 
     def _run(self, cmd: List[str], timeout: int) -> subprocess.CompletedProcess:
         if self.logger:
@@ -92,6 +100,13 @@ class WebappExecutor:
             return WebappResult(False, f"SQLMap timed out for {target_url}")
         except FileNotFoundError:
             return WebappResult(False, "sqlmap not found in the image")
+
+        if result.returncode != 0:
+            excerpt = self._trim_stderr(result.stderr)
+            message = f"SQLMap failed for {target_url} (exit {result.returncode})"
+            if excerpt:
+                message = f"{message}: {excerpt}"
+            return WebappResult(False, message)
 
         vulnerabilities = self._parse_sqlmap(result.stdout or "")
         return WebappResult(

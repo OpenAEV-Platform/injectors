@@ -92,6 +92,15 @@ class ExecutorTest(TestCase):
         self.assertFalse(WebappExecutor().run_sqlmap("http://t").success)
 
     @patch("webapp_injector.helpers.webapp_executor.subprocess.run")
+    def test_run_sqlmap_non_zero_exit_is_error(self, run):
+        run.return_value = MagicMock(
+            returncode=1, stdout="", stderr="connection refused"
+        )
+        result = WebappExecutor().run_sqlmap("http://t")
+        self.assertFalse(result.success)
+        self.assertIn("connection refused", result.message)
+
+    @patch("webapp_injector.helpers.webapp_executor.subprocess.run")
     def test_run_zap_no_report(self, run):
         run.return_value = MagicMock(returncode=0, stdout="", stderr="")
         # ZAP is mocked so no report file is produced.

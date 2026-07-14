@@ -46,7 +46,7 @@ RUN apk add --no-cache git && \
     printf '#!/bin/sh\nexec python3 /opt/sqlmap/sqlmap.py "$@"\n' > /usr/local/bin/sqlmap && \
     chmod +x /usr/local/bin/sqlmap
 
-RUN if [[ ${PYOAEV_GIT_BRANCH_OVERRIDE} ]] ; then \
+RUN if [ -n "${PYOAEV_GIT_BRANCH_OVERRIDE}" ] ; then \
         echo "Forcing specific version of client-python" && \
         apk add --no-cache git curl && \
         curl -sS https://bootstrap.pypa.io/get-pip.py -o get-pip.py && \
