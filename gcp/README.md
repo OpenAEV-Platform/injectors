@@ -1,9 +1,9 @@
 # OpenAEV GCP Injector
 
 Emulates Google Cloud Platform attack techniques using
-[Stratus Red Team](https://stratus-red-team.cloud/). Shares the
-`StratusExecutor` helper (`injector_common/stratus_executor.py`) with the Azure
-and Kubernetes injectors.
+[Stratus Red Team](https://stratus-red-team.cloud/). It builds on the reusable
+`StratusExecutor` helper (`injector_common/stratus_executor.py`), which lives in
+`injector_common` so other Stratus-based cloud injectors can adopt it later.
 
 ## How it works
 
@@ -28,6 +28,7 @@ poetry run python -m unittest
 
 ## Icon
 
-`gcp_injector/img/icon-gcp.png` must follow the injector icon standard (square
-1:1, 512x512 PNG, solid opaque background, genuine Google Cloud artwork) - see
-OpenAEV-Platform/injectors#305.
+`gcp_injector/img/icon-gcp.png` currently ships a neutral placeholder. The
+genuine Google Cloud Platform artwork (square 1:1, 512x512 PNG, solid opaque
+background) is tracked in OpenAEV-Platform/injectors#330, and must land before
+the injector is marked verified.
