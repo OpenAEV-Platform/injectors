@@ -27,7 +27,9 @@ class StratusResult:
     message: str
     stdout: str = ""
     stderr: str = ""
-    outputs: Dict[str, List[str]] = field(default_factory=dict)
+    # A detonation always emits exactly one technique, so the structured output
+    # holds scalar values to match the single-cardinality contract outputs.
+    outputs: Dict[str, str] = field(default_factory=dict)
 
 
 class StratusExecutor:
@@ -105,7 +107,7 @@ class StratusExecutor:
                 message=f"Detonated {technique_id}",
                 stdout=result.stdout,
                 stderr=result.stderr,
-                outputs={"technique": [technique_id]},
+                outputs={"technique": technique_id},
             )
 
         error_detail = (result.stderr or result.stdout or "").strip()[:500]

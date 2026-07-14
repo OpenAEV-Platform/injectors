@@ -50,7 +50,7 @@ class ProcessMessageTest(TestCase):
             technique_id="t",
             status="DETONATED",
             message="done",
-            outputs={"technique": ["t"]},
+            outputs={"technique": "t"},
         )
         injector.process_message(
             _data(
@@ -65,7 +65,7 @@ class ProcessMessageTest(TestCase):
         # Structured output is forwarded so downstream findings can be built.
         self.assertEqual(
             json.loads(callback["execution_output_structured"]),
-            {"technique": ["t"]},
+            {"technique": "t"},
         )
         # The resolved technique is detonated under an isolated KUBECONFIG.
         env = injector.stratus.detonate.call_args.kwargs["env"]
@@ -133,7 +133,10 @@ class StratusExecutorTest(TestCase):
     @patch("injector_common.stratus_executor.subprocess.run")
     def test_detonate_success(self, run):
         run.return_value = MagicMock(returncode=0, stdout="ok", stderr="")
-        self.assertTrue(StratusExecutor().detonate("k8s.foo", env={"A": "B"}).success)
+        result = StratusExecutor().detonate("k8s.foo", env={"A": "B"})
+        self.assertTrue(result.success)
+        # Scalar output matches the single-cardinality contract output.
+        self.assertEqual(result.outputs, {"technique": "k8s.foo"})
 
     @patch("injector_common.stratus_executor.subprocess.run")
     def test_detonate_failure(self, run):
