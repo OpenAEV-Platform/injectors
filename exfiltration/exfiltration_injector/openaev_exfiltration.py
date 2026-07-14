@@ -2,17 +2,19 @@ import json
 import time
 from typing import Dict
 
+from injector_common.data_helpers import DataHelpers
+from injector_common.dump_config import intercept_dump_argument
+from pyoaev.helpers import OpenAEVConfigHelper, OpenAEVInjectorHelper
+
 from exfiltration_injector.configuration.config_loader import ConfigLoader
 from exfiltration_injector.contracts_exfiltration import (
     CLOUD_EXFIL_CONTRACT,
     DNS_EXFIL_CONTRACT,
     HTTPS_EXFIL_CONTRACT,
+    MAX_SIZE_KB,
+    MIN_SIZE_KB,
 )
 from exfiltration_injector.helpers.exfiltration_executor import ExfiltrationExecutor
-from pyoaev.helpers import OpenAEVConfigHelper, OpenAEVInjectorHelper
-
-from injector_common.data_helpers import DataHelpers
-from injector_common.dump_config import intercept_dump_argument
 
 ICON_PATH = "exfiltration_injector/img/icon-exfiltration.png"
 
@@ -34,9 +36,12 @@ class OpenAEVExfiltration:
         if isinstance(raw, list):
             raw = raw[0] if raw else None
         try:
-            return int(raw)
+            size_kb = int(raw)
         except (TypeError, ValueError):
-            return 64
+            size_kb = 64
+        # Clamp to the supported contract range so an out-of-range value cannot
+        # drive an oversized os.urandom allocation in the container.
+        return max(MIN_SIZE_KB, min(size_kb, MAX_SIZE_KB))
 
     @staticmethod
     def _required(content: Dict, key: str) -> str:

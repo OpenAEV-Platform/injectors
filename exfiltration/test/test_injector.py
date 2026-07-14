@@ -7,6 +7,8 @@ from exfiltration_injector.contracts_exfiltration import (
     CLOUD_EXFIL_CONTRACT,
     DNS_EXFIL_CONTRACT,
     HTTPS_EXFIL_CONTRACT,
+    MAX_SIZE_KB,
+    MIN_SIZE_KB,
 )
 from exfiltration_injector.helpers.exfiltration_executor import ExfilResult
 
@@ -91,3 +93,21 @@ class ProcessMessageTest(TestCase):
         injector = make_injector()
         injector.start()
         injector.helper.listen.assert_called_once()
+
+
+class SizeParsingTest(TestCase):
+    def test_size_clamps_above_max(self):
+        self.assertEqual(
+            mod.OpenAEVExfiltration._size({"size_kb": "9999999"}), MAX_SIZE_KB
+        )
+
+    def test_size_clamps_below_min(self):
+        self.assertEqual(mod.OpenAEVExfiltration._size({"size_kb": "0"}), MIN_SIZE_KB)
+        self.assertEqual(mod.OpenAEVExfiltration._size({"size_kb": "-5"}), MIN_SIZE_KB)
+
+    def test_size_defaults_when_invalid(self):
+        self.assertEqual(mod.OpenAEVExfiltration._size({"size_kb": "bad"}), 64)
+        self.assertEqual(mod.OpenAEVExfiltration._size({}), 64)
+
+    def test_size_accepts_valid_list_shape(self):
+        self.assertEqual(mod.OpenAEVExfiltration._size({"size_kb": ["256"]}), 256)

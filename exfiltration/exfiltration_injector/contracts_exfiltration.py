@@ -26,6 +26,12 @@ SIZE_CHOICES = {
     "1024": "1 MB",
 }
 
+# Bounds for the payload size, derived from the contract choices so the executor
+# and the form stay in sync. Values outside this range are clamped to avoid
+# excessive memory allocation in the injector container.
+MIN_SIZE_KB = min(int(kb) for kb in SIZE_CHOICES)
+MAX_SIZE_KB = max(int(kb) for kb in SIZE_CHOICES)
+
 
 def _expectations() -> ContractExpectations:
     return ContractExpectations(
