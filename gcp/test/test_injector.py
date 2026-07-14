@@ -1,3 +1,4 @@
+import json
 import os
 from unittest import TestCase
 from unittest.mock import MagicMock, mock_open, patch
@@ -49,7 +50,7 @@ class ProcessMessageTest(TestCase):
             technique_id="t",
             status="DETONATED",
             message="done",
-            outputs={"technique": ["t"]},
+            outputs={"technique": "t"},
         )
         injector.process_message(
             _data(
@@ -60,15 +61,61 @@ class ProcessMessageTest(TestCase):
                 }
             )
         )
-        self.assertEqual(self._callback(injector)["execution_status"], "SUCCESS")
+        callback = self._callback(injector)
+        self.assertEqual(callback["execution_status"], "SUCCESS")
+        # SUCCESS callbacks expose the Stratus outputs as structured JSON.
+        self.assertEqual(
+            json.loads(callback["execution_output_structured"]), {"technique": "t"}
+        )
+        # The temp service account key is materialized then removed in finally.
+        env = injector.stratus.detonate.call_args.kwargs["env"]
+        self.assertFalse(os.path.exists(env["GOOGLE_APPLICATION_CREDENTIALS"]))
+        self.assertEqual(env["GOOGLE_PROJECT"], "proj")
+
+    def test_key_file_removed_when_detonate_raises(self):
+        injector = make_injector()
+        injector.stratus = MagicMock()
+        injector.stratus.detonate.side_effect = RuntimeError("boom")
+        injector.process_message(
+            _data(
+                {
+                    "technique_id": ["gcp.exfiltration.share-compute-disk"],
+                    "gcp_project_id": "proj",
+                    "gcp_service_account_key": '{"type": "service_account"}',
+                }
+            )
+        )
+        self.assertEqual(self._callback(injector)["execution_status"], "ERROR")
+        env = injector.stratus.detonate.call_args.kwargs["env"]
+        self.assertFalse(os.path.exists(env["GOOGLE_APPLICATION_CREDENTIALS"]))
 
     def test_missing_key_reports_error(self):
         injector = make_injector()
         injector.stratus = MagicMock()
         injector.process_message(
-            _data({"technique_id": ["gcp.exfiltration.share-compute-disk"]})
+            _data(
+                {
+                    "technique_id": ["gcp.exfiltration.share-compute-disk"],
+                    "gcp_project_id": "proj",
+                }
+            )
         )
         self.assertEqual(self._callback(injector)["execution_status"], "ERROR")
+        injector.stratus.detonate.assert_not_called()
+
+    def test_missing_project_reports_error(self):
+        injector = make_injector()
+        injector.stratus = MagicMock()
+        injector.process_message(
+            _data(
+                {
+                    "technique_id": ["gcp.exfiltration.share-compute-disk"],
+                    "gcp_service_account_key": '{"type": "service_account"}',
+                }
+            )
+        )
+        self.assertEqual(self._callback(injector)["execution_status"], "ERROR")
+        injector.stratus.detonate.assert_not_called()
 
     def test_start_listens(self):
         injector = make_injector()
@@ -82,6 +129,8 @@ class StratusExecutorTest(TestCase):
         run.return_value = MagicMock(returncode=0, stdout="ok", stderr="")
         result = StratusExecutor().detonate("gcp.foo", env={"A": "B"})
         self.assertTrue(result.success)
+        # Output is a single value to match the contract (isMultiple=False).
+        self.assertEqual(result.outputs, {"technique": "gcp.foo"})
 
     @patch("injector_common.stratus_executor.subprocess.run")
     def test_detonate_failure(self, run):

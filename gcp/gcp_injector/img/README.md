@@ -1,8 +1,11 @@
-# Icon asset required
+# Icon asset
 
-Place the genuine Google Cloud Platform product icon here as `icon-gcp.png`.
+`icon-gcp.png` currently ships a neutral placeholder (solid background, generic
+cloud mark) so the injector can start and register. It must be replaced with the
+genuine Google Cloud Platform product icon before the injector is marked
+verified.
 
-Per OpenAEV-Platform/injectors#305 the icon must be:
+Per OpenAEV-Platform/injectors#305 the final icon must be:
 
 - Square 1:1, 512x512 PNG
 - Solid opaque background (no transparency)

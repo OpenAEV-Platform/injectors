@@ -49,6 +49,10 @@ class OpenAEVGcp:
             if not technique_id:
                 raise ValueError("No Stratus technique id provided")
 
+            project_id = content.get("gcp_project_id")
+            if not project_id:
+                raise ValueError("A GCP project id is required")
+
             # Stratus authenticates to GCP through Application Default
             # Credentials; materialize the service account key on disk.
             key_material = content.get("gcp_service_account_key")
@@ -59,11 +63,13 @@ class OpenAEVGcp:
             ) as key_file:
                 key_file.write(key_material)
                 key_path = key_file.name
+            # The key is a secret; restrict it to the owner before Stratus reads it.
+            os.chmod(key_path, 0o600)
 
             env = {
-                "GOOGLE_PROJECT": content.get("gcp_project_id"),
+                "GOOGLE_PROJECT": project_id,
                 "GOOGLE_APPLICATION_CREDENTIALS": key_path,
-                "CLOUDSDK_CORE_PROJECT": content.get("gcp_project_id"),
+                "CLOUDSDK_CORE_PROJECT": project_id,
             }
 
             result = self.stratus.detonate(technique_id, env=env, cleanup=True)
