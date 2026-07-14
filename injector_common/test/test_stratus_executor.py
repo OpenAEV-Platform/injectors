@@ -95,6 +95,21 @@ class StratusExecutorTest(TestCase):
         self.assertFalse(result.success)
         self.assertEqual(result.status, "TIMEOUT")
 
+    @patch("injector_common.stratus_executor.subprocess.run")
+    def test_cleanup_failure_without_output_has_fallback_message(self, run):
+        run.return_value = MagicMock(returncode=1, stdout="", stderr="")
+        result = StratusExecutor().cleanup("azure.foo")
+        self.assertFalse(result.success)
+        self.assertEqual(result.status, "ERROR")
+        self.assertIn("azure.foo", result.message)
+
+    @patch("injector_common.stratus_executor.subprocess.run")
+    def test_cleanup_success_without_output_has_fallback_message(self, run):
+        run.return_value = MagicMock(returncode=0, stdout="", stderr="")
+        result = StratusExecutor().cleanup("azure.foo")
+        self.assertTrue(result.success)
+        self.assertIn("azure.foo", result.message)
+
     def test_result_is_stratus_result(self):
         with patch("injector_common.stratus_executor.subprocess.run") as run:
             run.return_value = MagicMock(returncode=0, stdout="", stderr="")

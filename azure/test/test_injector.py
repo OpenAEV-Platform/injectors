@@ -5,7 +5,7 @@ from unittest.mock import MagicMock, mock_open, patch
 import azure_injector.openaev_azure as mod
 from azure_injector.contracts_azure import AZURE_DETONATE_CONTRACT
 
-from injector_common.stratus_executor import StratusExecutor, StratusResult
+from injector_common.stratus_executor import StratusResult
 
 BASE_ENV = {
     "OPENAEV_URL": "http://localhost:3001",
@@ -76,33 +76,3 @@ class ProcessMessageTest(TestCase):
         injector = make_injector()
         injector.start()
         injector.helper.listen.assert_called_once()
-
-
-class StratusExecutorTest(TestCase):
-    @patch("injector_common.stratus_executor.subprocess.run")
-    def test_detonate_success(self, run):
-        run.return_value = MagicMock(returncode=0, stdout="ok", stderr="")
-        result = StratusExecutor().detonate("azure.foo", env={"A": "B"})
-        self.assertTrue(result.success)
-        self.assertEqual(result.status, "DETONATED")
-
-    @patch("injector_common.stratus_executor.subprocess.run")
-    def test_detonate_failure(self, run):
-        run.return_value = MagicMock(returncode=1, stdout="", stderr="boom")
-        result = StratusExecutor().detonate("azure.foo", cleanup=False)
-        self.assertFalse(result.success)
-        self.assertIn("boom", result.message)
-
-    @patch(
-        "injector_common.stratus_executor.subprocess.run",
-        side_effect=FileNotFoundError(),
-    )
-    def test_detonate_missing_binary(self, _run):
-        result = StratusExecutor().detonate("azure.foo")
-        self.assertFalse(result.success)
-
-    @patch("injector_common.stratus_executor.subprocess.run")
-    def test_cleanup(self, run):
-        run.return_value = MagicMock(returncode=0, stdout="", stderr="")
-        result = StratusExecutor().cleanup("azure.foo")
-        self.assertTrue(result.success)

@@ -47,7 +47,7 @@ class StratusExecutor:
     def _run(
         self,
         args: List[str],
-        env: Optional[Dict[str, str]] = None,
+        env: Optional[Dict[str, Optional[str]]] = None,
         timeout: Optional[int] = None,
     ) -> subprocess.CompletedProcess:
         cmd = [self.binary, *args]
@@ -67,7 +67,7 @@ class StratusExecutor:
     def detonate(
         self,
         technique_id: str,
-        env: Optional[Dict[str, str]] = None,
+        env: Optional[Dict[str, Optional[str]]] = None,
         cleanup: bool = True,
     ) -> StratusResult:
         """Warm up and detonate a technique, cleaning up infrastructure by default.
@@ -118,7 +118,7 @@ class StratusExecutor:
         )
 
     def cleanup(
-        self, technique_id: str, env: Optional[Dict[str, str]] = None
+        self, technique_id: str, env: Optional[Dict[str, Optional[str]]] = None
     ) -> StratusResult:
         """Best-effort teardown of a technique's prerequisite infrastructure."""
         try:
@@ -137,11 +137,18 @@ class StratusExecutor:
                 status="ERROR",
                 message="stratus binary not found in the injector image",
             )
+
+        success = result.returncode == 0
+        detail = (result.stderr or result.stdout or "").strip()[:500]
+        if success:
+            message = detail or f"Cleaned up {technique_id}"
+        else:
+            message = detail or f"Stratus cleanup failed for {technique_id}"
         return StratusResult(
-            success=result.returncode == 0,
+            success=success,
             technique_id=technique_id,
-            status="CLEAN" if result.returncode == 0 else "ERROR",
-            message=(result.stderr or result.stdout or "").strip()[:500],
+            status="CLEAN" if success else "ERROR",
+            message=message,
             stdout=result.stdout,
             stderr=result.stderr,
         )
