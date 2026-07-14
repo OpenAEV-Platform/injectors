@@ -1,8 +1,7 @@
-from pydantic import Field
-from pyoaev.configuration import ConfigLoaderOAEV, Configuration, SettingsLoader
-
 from email_seg.configuration.injector_config_override import InjectorConfigOverride
 from email_seg.contracts_email_seg import EmailSegContracts
+from pydantic import Field
+from pyoaev.configuration import ConfigLoaderOAEV, Configuration, SettingsLoader
 
 
 class ConfigLoader(SettingsLoader):

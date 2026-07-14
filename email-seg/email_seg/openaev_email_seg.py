@@ -1,12 +1,12 @@
 import time
 from typing import Dict
 
-from injector_common.data_helpers import DataHelpers
-from injector_common.dump_config import intercept_dump_argument
-from pyoaev.helpers import OpenAEVConfigHelper, OpenAEVInjectorHelper
-
 from email_seg.configuration.config_loader import ConfigLoader
 from email_seg.helpers.email_sender import EmailSender
+from pyoaev.helpers import OpenAEVConfigHelper, OpenAEVInjectorHelper
+
+from injector_common.data_helpers import DataHelpers
+from injector_common.dump_config import intercept_dump_argument
 
 ICON_PATH = "email_seg/img/icon-email-seg.png"
 
