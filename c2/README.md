@@ -12,8 +12,8 @@ valid outcome.
 
 ## Contract
 
-- C2 - Emulate beaconing: fields for listener URL, beacon profile, count,
-  interval and jitter. Produces a DETECTION expectation.
+- C2 - Emulate beaconing: fields for listener URL, count, interval and jitter.
+  Produces a DETECTION expectation.
 
 ## Development
 
@@ -26,4 +26,5 @@ poetry run python -m unittest
 
 `c2_injector/img/icon-c2.png` must follow the injector icon standard (square
 1:1, 512x512 PNG, solid opaque background, genuine Sliver artwork) - see
-OpenAEV-Platform/injectors#305.
+OpenAEV-Platform/injectors#305. Until that asset is supplied, the injector
+starts without an icon.

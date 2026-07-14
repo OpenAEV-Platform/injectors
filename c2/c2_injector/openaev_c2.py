@@ -1,27 +1,38 @@
 import json
 import time
+from pathlib import Path
 from typing import Dict
-
-from c2_injector.configuration.config_loader import ConfigLoader
-from c2_injector.helpers.c2_executor import C2Executor
-from pyoaev.helpers import OpenAEVConfigHelper, OpenAEVInjectorHelper
 
 from injector_common.data_helpers import DataHelpers
 from injector_common.dump_config import intercept_dump_argument
+from pyoaev.helpers import OpenAEVConfigHelper, OpenAEVInjectorHelper
 
-ICON_PATH = "c2_injector/img/icon-c2.png"
+from c2_injector.configuration.config_loader import ConfigLoader
+from c2_injector.helpers.c2_executor import C2Executor
 
 
 class OpenAEVC2:
     def __init__(self):
+        configuration = ConfigLoader()
         self.config = OpenAEVConfigHelper.from_configuration_object(
-            ConfigLoader().to_daemon_config()
+            configuration.to_daemon_config()
         )
         intercept_dump_argument(self.config.get_config_obj())
-        with open(ICON_PATH, "rb") as icon_file:
-            icon_bytes = icon_file.read()
-        self.helper = OpenAEVInjectorHelper(self.config, icon_bytes)
+        self.helper = OpenAEVInjectorHelper(
+            self.config, self._load_icon(configuration.injector.icon_filepath)
+        )
         self.executor = C2Executor(logger=self.helper.injector_logger)
+
+    @staticmethod
+    def _load_icon(icon_filepath: str | None) -> bytes:
+        if not icon_filepath:
+            return b""
+
+        icon_path = Path(__file__).parent.parent / icon_filepath
+        try:
+            return icon_path.read_bytes()
+        except FileNotFoundError:
+            return b""
 
     @staticmethod
     def _first(value, default):
@@ -38,7 +49,7 @@ class OpenAEVC2:
 
         try:
             content = DataHelpers.get_content(data)
-            listener_url = content.get("listener_url")
+            listener_url = self._first(content.get("listener_url"), None)
             if not listener_url:
                 raise ValueError("A C2 listener URL is required")
 

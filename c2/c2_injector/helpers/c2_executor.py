@@ -16,6 +16,7 @@ import requests
 # Guard rails so a misconfigured inject cannot run unbounded.
 MAX_BEACONS = 240
 MAX_INTERVAL_SECONDS = 300
+MAX_JITTER_PERCENT = 100
 
 BEACON_USER_AGENT = (
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
@@ -39,8 +40,12 @@ class C2Executor:
 
     @staticmethod
     def _jittered(interval: float, jitter_percent: float) -> float:
-        delta = interval * (jitter_percent / 100.0)
-        return max(0.0, interval + random.uniform(-delta, delta))
+        bounded_jitter = max(0.0, min(jitter_percent, MAX_JITTER_PERCENT))
+        delta = interval * (bounded_jitter / 100.0)
+        return min(
+            MAX_INTERVAL_SECONDS,
+            max(0.0, interval + random.uniform(-delta, delta)),
+        )
 
     def beacon(
         self,

@@ -1,6 +1,6 @@
 import os
 from unittest import TestCase
-from unittest.mock import MagicMock, mock_open, patch
+from unittest.mock import MagicMock, patch
 
 import c2_injector.openaev_c2 as mod
 from c2_injector.contracts_c2 import C2_BEACON_CONTRACT
@@ -18,8 +18,6 @@ def make_injector():
         mod, "OpenAEVInjectorHelper"
     ), patch.object(mod, "OpenAEVConfigHelper"), patch.object(
         mod, "intercept_dump_argument"
-    ), patch.object(
-        mod, "open", mock_open(read_data=b"icon"), create=True
     ):
         injector = mod.OpenAEVC2()
     injector.helper = MagicMock()
@@ -40,6 +38,9 @@ class ProcessMessageTest(TestCase):
     def _callback(self, injector):
         return injector.helper.api.inject.execution_callback.call_args.kwargs["data"]
 
+    def test_missing_icon_is_optional(self):
+        self.assertEqual(mod.OpenAEVC2._load_icon("c2_injector/img/icon-c2.png"), b"")
+
     def test_success(self):
         injector = make_injector()
         injector.executor = MagicMock()
@@ -56,6 +57,29 @@ class ProcessMessageTest(TestCase):
         )
         self.assertEqual(self._callback(injector)["execution_status"], "SUCCESS")
         injector.executor.beacon.assert_called_once()
+
+    def test_listener_url_accepts_contract_list(self):
+        injector = make_injector()
+        injector.executor = MagicMock()
+        injector.executor.beacon.return_value = C2Result(True, "beaconed")
+
+        injector.process_message(
+            _data(
+                {
+                    "listener_url": ["https://c2/listen"],
+                    "beacon_count": ["5"],
+                    "interval_seconds": ["0"],
+                    "jitter_percent": ["0"],
+                }
+            )
+        )
+
+        injector.executor.beacon.assert_called_once_with(
+            listener_url="https://c2/listen",
+            beacon_count=5,
+            interval_seconds=0.0,
+            jitter_percent=0.0,
+        )
 
     def test_defaults_when_fields_missing(self):
         injector = make_injector()

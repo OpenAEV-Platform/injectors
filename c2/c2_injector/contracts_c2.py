@@ -7,7 +7,6 @@ from pyoaev.contracts.contract_config import (
     ContractConfig,
     ContractElement,
     ContractExpectations,
-    ContractSelect,
     ContractText,
     Expectation,
     ExpectationType,
@@ -19,12 +18,6 @@ from pyoaev.security_domain.types import SecurityDomains
 TYPE = "openaev_c2"
 
 C2_BEACON_CONTRACT = "f6c7d8e9-9daa-4fb7-8ec5-ab1c2d3e4f56"
-
-PROFILE_CHOICES = {
-    "sliver_http": "Sliver HTTP(S) beacon",
-    "mythic_http": "Mythic HTTP beacon",
-    "generic_https": "Generic HTTPS beacon",
-}
 
 
 class C2Contracts:
@@ -45,13 +38,6 @@ class C2Contracts:
             key="listener_url",
             label="C2 listener URL",
             mandatory=True,
-        )
-        profile = ContractSelect(
-            key="profile",
-            label="Beacon profile",
-            defaultValue=["sliver_http"],
-            mandatory=True,
-            choices=PROFILE_CHOICES,
         )
         beacon_count = ContractText(
             key="beacon_count",
@@ -93,7 +79,6 @@ class C2Contracts:
             .add_fields(
                 [
                     listener_url,
-                    profile,
                     beacon_count,
                     interval_seconds,
                     jitter_percent,

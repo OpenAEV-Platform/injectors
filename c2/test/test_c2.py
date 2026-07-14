@@ -2,7 +2,11 @@ from unittest import TestCase
 from unittest.mock import MagicMock, patch
 
 from c2_injector.contracts_c2 import C2_BEACON_CONTRACT, C2Contracts
-from c2_injector.helpers.c2_executor import MAX_BEACONS, C2Executor
+from c2_injector.helpers.c2_executor import (
+    MAX_BEACONS,
+    MAX_INTERVAL_SECONDS,
+    C2Executor,
+)
 
 
 class ContractsTest(TestCase):
@@ -47,3 +51,12 @@ class ExecutorTest(TestCase):
 
         self._executor().beacon("https://c2/listen", MAX_BEACONS + 50, 0, 0)
         self.assertEqual(mock_get.call_count, MAX_BEACONS)
+
+    @patch("c2_injector.helpers.c2_executor.random.uniform", return_value=600)
+    def test_jittered_delay_is_bounded(self, mock_uniform):
+        delay = C2Executor._jittered(MAX_INTERVAL_SECONDS, 1000)
+
+        self.assertEqual(delay, MAX_INTERVAL_SECONDS)
+        mock_uniform.assert_called_once_with(
+            -MAX_INTERVAL_SECONDS, MAX_INTERVAL_SECONDS
+        )
