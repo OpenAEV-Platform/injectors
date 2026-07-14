@@ -1,0 +1,63 @@
+[project]
+name = "openaev-phishing-injector"
+version = "2.260710.0"
+description = "A fully native phishing injector with an embedded tracking server (no external app)"
+license = "Apache-2.0"
+readme = "README.md"
+authors = [
+    { name = "Filigran", email = "contact@filigran.io" },
+]
+requires-python = ">=3.11,<4.0"
+dependencies = [
+    "pyoaev (==2.260710.0); extra != 'dev'",
+    "injector_common @ ../injector_common",
+    "pydantic (>=2.11.3,<2.14.0)",
+    "pydantic-settings (>=2.11.0,<2.15.0)",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pyoaev @ ../../client-python",
+    "black (>=26.3.1,<26.4.0)",
+    "isort (>=8.0.1,<8.1.0)",
+    "ruff~=0.14.2",
+    "mypy~=1.18.2",
+    "pip_audit~=2.9.0",
+    "pre-commit (>=4.6.0,<4.7.0)",
+    "types-PyYAML~=6.0.12",
+    "coverage>=7.13.5",
+    "pytest (>=9.0.0,<9.1.0)",
+    "polyfactory~=2.22.2",
+    "requests~=2.33",
+]
+
+[tool.poetry]
+packages = [
+    { include = "phishing_injector" },
+]
+
+[tool.poetry.dependencies]
+pyoaev = [
+    { markers = "extra != 'dev'", source = "PyPI" },
+    { markers = "extra == 'dev'", develop = true },
+]
+
+[tool.poetry.dependencies.injector_common]
+develop = true
+
+[tool.isort]
+profile = "black"
+known_local_folder = [
+    "phishing_injector",
+]
+
+[tool.cmw]
+install-command = "poetry install"
+config-dump-command = "poetry run python -m phishing_injector.openaev_phishing --dump-config-schema"
+icon-path = "phishing_injector/img/icon-phishing.png"
+
+[build-system]
+requires = [
+    "poetry-core",
+]
+build-backend = "poetry.core.masonry.api"

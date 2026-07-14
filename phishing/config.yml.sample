@@ -1,0 +1,19 @@
+openaev:
+  url: 'http://localhost:3001'
+  token: 'ChangeMe'
+# tenant_id: 'ChangeMe'
+
+injector:
+  id: 'ChangeMe'
+  name: 'Phishing'
+  log_level: 'error'
+
+phishing:
+  public_url: 'http://localhost:8080'
+  listen_host: '0.0.0.0'
+  listen_port: 8080
+  redirect_url: 'https://www.office.com/'
+  smtp_host: 'localhost'
+  smtp_port: 587
+  smtp_use_tls: true
+  mail_from: 'it-support@example.com'

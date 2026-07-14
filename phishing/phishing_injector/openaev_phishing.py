@@ -1,0 +1,154 @@
+import json
+import re
+import secrets
+import time
+from typing import Dict, List
+
+from injector_common.data_helpers import DataHelpers
+from injector_common.dump_config import intercept_dump_argument
+from pyoaev.helpers import OpenAEVConfigHelper, OpenAEVInjectorHelper
+
+from phishing_injector.configuration.config_loader import ConfigLoader
+from phishing_injector.helpers import templates
+from phishing_injector.helpers.phishing_sender import PhishingSender
+from phishing_injector.tracking.server import TrackingServer
+from phishing_injector.tracking.store import CampaignStore
+
+ICON_PATH = "phishing_injector/img/icon-phishing.png"
+
+
+class OpenAEVPhishing:
+    def __init__(self, start_server: bool = True):
+        self.config_loader = ConfigLoader()
+        self.config = OpenAEVConfigHelper.from_configuration_object(
+            self.config_loader.to_daemon_config()
+        )
+        intercept_dump_argument(self.config.get_config_obj())
+        with open(ICON_PATH, "rb") as icon_file:
+            icon_bytes = icon_file.read()
+        self.helper = OpenAEVInjectorHelper(self.config, icon_bytes)
+
+        phishing_conf = self.config_loader.phishing
+        self.public_url = phishing_conf.public_url
+        self.store = CampaignStore()
+        smtp_password = (
+            phishing_conf.smtp_password.get_secret_value()
+            if phishing_conf.smtp_password
+            else None
+        )
+        self.sender = PhishingSender(
+            host=phishing_conf.smtp_host,
+            port=phishing_conf.smtp_port,
+            mail_from=phishing_conf.mail_from,
+            username=phishing_conf.smtp_username,
+            password=smtp_password,
+            use_tls=phishing_conf.smtp_use_tls,
+            logger=self.helper.injector_logger,
+        )
+        self.server = TrackingServer(
+            self.store,
+            host=phishing_conf.listen_host,
+            port=phishing_conf.listen_port,
+            redirect_url=phishing_conf.redirect_url,
+        )
+        if start_server:
+            self.server.start()
+
+    @staticmethod
+    def parse_recipients(raw: str) -> List[str]:
+        if not raw:
+            return []
+        parts = re.split(r"[,\n;]+", raw)
+        return [p.strip() for p in parts if p.strip()]
+
+    def process_message(self, data: Dict) -> None:
+        start = time.time()
+        inject_id = DataHelpers.get_inject_id(data)
+
+        content = DataHelpers.get_content(data)
+        recipients = self.parse_recipients(content.get("recipients", ""))
+        self.helper.api.inject.execution_reception(
+            inject_id=inject_id,
+            data={"tracking_total_count": max(len(recipients), 1)},
+        )
+
+        try:
+            if not recipients:
+                raise ValueError("No recipients provided")
+
+            template_key = content.get("template")
+            if isinstance(template_key, list):
+                template_key = template_key[0] if template_key else None
+            custom_html = content.get("custom_html", "")
+            subject_override = content.get("subject")
+            if isinstance(subject_override, list):
+                subject_override = subject_override[0] if subject_override else None
+
+            sent = 0
+            errors = []
+            for email in recipients:
+                token = secrets.token_urlsafe(16)
+                self.store.register(token, inject_id, email)
+                rendered = templates.render(
+                    template_key or "password_reset",
+                    self.public_url,
+                    token,
+                    custom_html=custom_html,
+                )
+                subject = subject_override or rendered["subject"] or "Notification"
+                message = self.sender.build_message(email, subject, rendered["html"])
+                result = self.sender.send(message)
+                if result.success:
+                    sent += 1
+                else:
+                    errors.append(f"{email}: {result.message}")
+
+            stats = self.store.stats(inject_id)
+            message = (
+                f"Phishing campaign launched: {sent}/{len(recipients)} emails sent. "
+                f"Tracking at {self.public_url}"
+            )
+            status = "SUCCESS" if sent > 0 else "ERROR"
+            callback_data = {
+                "execution_message": message if sent else "; ".join(errors),
+                "execution_status": status,
+                "execution_duration": int(time.time() - start),
+                "execution_action": "complete",
+            }
+            if sent:
+                callback_data["execution_output_structured"] = json.dumps(
+                    {
+                        "sent": [str(sent)],
+                        "stats": [
+                            json.dumps(
+                                {
+                                    "total": stats.total,
+                                    "opened": stats.opened,
+                                    "clicked": stats.clicked,
+                                    "submitted": stats.submitted,
+                                }
+                            )
+                        ],
+                    }
+                )
+            self.helper.api.inject.execution_callback(
+                inject_id=inject_id, data=callback_data
+            )
+        except Exception as e:
+            self.helper.api.inject.execution_callback(
+                inject_id=inject_id,
+                data={
+                    "execution_message": str(e),
+                    "execution_status": "ERROR",
+                    "execution_duration": int(time.time() - start),
+                    "execution_action": "complete",
+                },
+            )
+
+    def start(self):
+        self.helper.injector_logger.info("Starting native Phishing injector...")
+        self.helper.listen(message_callback=self.process_message)
+
+
+if __name__ == "__main__":
+    OpenAEVPhishing().start()
