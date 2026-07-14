@@ -1,10 +1,9 @@
-from pydantic import Field
-from pyoaev.configuration import ConfigLoaderOAEV, Configuration, SettingsLoader
-
 from exfiltration_injector.configuration.injector_config_override import (
     InjectorConfigOverride,
 )
 from exfiltration_injector.contracts_exfiltration import ExfiltrationContracts
+from pydantic import Field
+from pyoaev.configuration import ConfigLoaderOAEV, Configuration, SettingsLoader
 
 
 class ConfigLoader(SettingsLoader):

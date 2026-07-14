@@ -2,10 +2,6 @@ import json
 import time
 from typing import Dict
 
-from injector_common.data_helpers import DataHelpers
-from injector_common.dump_config import intercept_dump_argument
-from pyoaev.helpers import OpenAEVConfigHelper, OpenAEVInjectorHelper
-
 from exfiltration_injector.configuration.config_loader import ConfigLoader
 from exfiltration_injector.contracts_exfiltration import (
     CLOUD_EXFIL_CONTRACT,
@@ -13,6 +9,10 @@ from exfiltration_injector.contracts_exfiltration import (
     HTTPS_EXFIL_CONTRACT,
 )
 from exfiltration_injector.helpers.exfiltration_executor import ExfiltrationExecutor
+from pyoaev.helpers import OpenAEVConfigHelper, OpenAEVInjectorHelper
+
+from injector_common.data_helpers import DataHelpers
+from injector_common.dump_config import intercept_dump_argument
 
 ICON_PATH = "exfiltration_injector/img/icon-exfiltration.png"
 
