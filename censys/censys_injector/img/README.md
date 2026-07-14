@@ -1,8 +1,10 @@
-# Icon asset required
+# Icon asset
 
-Place the genuine Censys product icon here as `icon-censys.png`.
+`icon-censys.png` in this directory is a square, opaque 512x512 placeholder so
+the injector starts cleanly. It must be replaced with the genuine Censys brand
+artwork (tracked by OpenAEV-Platform/injectors#305).
 
-Per OpenAEV-Platform/injectors#305 the icon must be:
+Per OpenAEV-Platform/injectors#305 the final icon must be:
 
 - Square 1:1, 512x512 PNG
 - Solid opaque background (no transparency)

@@ -29,6 +29,10 @@ class CensysClient:
         self.logger = logger
         self._auth = (api_id, api_secret)
 
+    def _log_error(self, message: str) -> None:
+        if self.logger:
+            self.logger.error(message)
+
     def _get(self, path: str, params: Dict) -> Dict:
         response = requests.get(
             f"{self.base_url}{path}",
@@ -46,9 +50,13 @@ class CensysClient:
                 {"q": query, "per_page": self.per_page},
             )
         except requests.HTTPError as exc:
-            return CensysResult(False, f"Censys host search failed: {exc}")
+            message = f"Censys host search failed: {exc}"
+            self._log_error(message)
+            return CensysResult(False, message)
         except requests.RequestException as exc:
-            return CensysResult(False, f"Censys request error: {exc}")
+            message = f"Censys request error: {exc}"
+            self._log_error(message)
+            return CensysResult(False, message)
 
         hits = payload.get("result", {}).get("hits", [])
         hosts = [h.get("ip") for h in hits if h.get("ip")]
@@ -73,9 +81,13 @@ class CensysClient:
                 {"q": query, "per_page": self.per_page},
             )
         except requests.HTTPError as exc:
-            return CensysResult(False, f"Censys certificate search failed: {exc}")
+            message = f"Censys certificate search failed: {exc}"
+            self._log_error(message)
+            return CensysResult(False, message)
         except requests.RequestException as exc:
-            return CensysResult(False, f"Censys request error: {exc}")
+            message = f"Censys request error: {exc}"
+            self._log_error(message)
+            return CensysResult(False, message)
 
         hits = payload.get("result", {}).get("hits", [])
         fingerprints = [
