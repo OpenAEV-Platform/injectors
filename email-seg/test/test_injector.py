@@ -115,6 +115,19 @@ class ProcessMessageTest(TestCase):
         self.assertFalse(injector.sender.send.call_args.kwargs["use_tls"])
         self.assertEqual(injector.sender.send.call_args.kwargs["host"], "gw")
 
+    def test_unsupported_contract_reports_error(self):
+        injector = make_injector()
+        injector.sender = MagicMock()
+        data = _data({"payload": ["eicar_body"]})
+        data["injection"]["inject_injector_contract"][
+            "injector_contract_id"
+        ] = "not-the-seg-contract"
+        injector.process_message(data)
+        callback = self._callback(injector)
+        self.assertEqual(callback["execution_status"], "ERROR")
+        self.assertIn("Unsupported injector contract", callback["execution_message"])
+        injector.sender.send.assert_not_called()
+
     def test_start_listens(self):
         injector = make_injector()
         injector.start()

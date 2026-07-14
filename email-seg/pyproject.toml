@@ -1,7 +1,7 @@
 [project]
 name = "openaev-email-seg-injector"
 version = "2.260710.0"
-description = "An injector for assessing Secure Email Gateways with EICAR and weaponized test payloads"
+description = "An injector for assessing Secure Email Gateways with safe EICAR and benign test-URL payloads"
 license = "Apache-2.0"
 readme = "README.md"
 authors = [

@@ -2,6 +2,7 @@ import time
 from typing import Dict
 
 from email_seg.configuration.config_loader import ConfigLoader
+from email_seg.contracts_email_seg import SEG_ASSESSMENT_CONTRACT
 from email_seg.helpers.email_sender import EmailSender
 from pyoaev.helpers import OpenAEVConfigHelper, OpenAEVInjectorHelper
 
@@ -45,6 +46,10 @@ class OpenAEVEmailSeg:
         )
 
         try:
+            contract_id = DataHelpers.get_injector_contract_id(data)
+            if contract_id != SEG_ASSESSMENT_CONTRACT:
+                raise ValueError(f"Unsupported injector contract: {contract_id}")
+
             content = DataHelpers.get_content(data)
             payload = self._first(content.get("payload"))
             message = self.sender.build_message(
