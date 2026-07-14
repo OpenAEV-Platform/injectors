@@ -1,11 +1,10 @@
-from pydantic import Field
-from pyoaev.configuration import ConfigLoaderOAEV, Configuration, SettingsLoader
-
 from gophish_injector.configuration.gophish_config import GophishConfig
 from gophish_injector.configuration.injector_config_override import (
     InjectorConfigOverride,
 )
 from gophish_injector.contracts_gophish import GophishContracts
+from pydantic import Field
+from pyoaev.configuration import ConfigLoaderOAEV, Configuration, SettingsLoader
 
 
 class ConfigLoader(SettingsLoader):
