@@ -1,0 +1,14 @@
+openaev:
+  url: 'http://localhost:3001'
+  token: 'ChangeMe'
+# tenant_id: 'ChangeMe'
+
+injector:
+  id: 'ChangeMe'
+  name: 'Gophish'
+  log_level: 'error'
+
+gophish:
+  base_url: 'https://localhost:3333'
+  api_key: 'ChangeMe'
+  verify_tls: false
