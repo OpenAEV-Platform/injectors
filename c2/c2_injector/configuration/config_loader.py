@@ -1,7 +1,8 @@
-from c2_injector.configuration.injector_config_override import InjectorConfigOverride
-from c2_injector.contracts_c2 import C2Contracts
 from pydantic import Field
 from pyoaev.configuration import ConfigLoaderOAEV, Configuration, SettingsLoader
+
+from c2_injector.configuration.injector_config_override import InjectorConfigOverride
+from c2_injector.contracts_c2 import C2Contracts
 
 
 class ConfigLoader(SettingsLoader):
