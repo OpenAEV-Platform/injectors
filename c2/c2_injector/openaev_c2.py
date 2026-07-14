@@ -3,12 +3,12 @@ import time
 from pathlib import Path
 from typing import Dict
 
-from injector_common.data_helpers import DataHelpers
-from injector_common.dump_config import intercept_dump_argument
-from pyoaev.helpers import OpenAEVConfigHelper, OpenAEVInjectorHelper
-
 from c2_injector.configuration.config_loader import ConfigLoader
 from c2_injector.helpers.c2_executor import C2Executor
+from pyoaev.helpers import OpenAEVConfigHelper, OpenAEVInjectorHelper
+
+from injector_common.data_helpers import DataHelpers
+from injector_common.dump_config import intercept_dump_argument
 
 
 class OpenAEVC2:
