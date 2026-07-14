@@ -104,13 +104,24 @@ class OpenAEVPhishing:
                 else:
                     errors.append(f"{email}: {result.message}")
 
-            message = (
+            summary = (
                 f"Phishing campaign launched: {sent}/{len(recipients)} emails sent. "
                 f"Tracking at {self.public_url}"
             )
+            # Surface per-recipient failures even on a partial success: a
+            # launched campaign stays SUCCESS (delivered recipients remain
+            # trackable), but the failed recipients are appended to the message
+            # so delivery issues are diagnosable instead of silently dropped.
+            if errors:
+                failure_detail = "Failed recipients: " + "; ".join(errors)
+                execution_message = (
+                    f"{summary}. {failure_detail}" if sent else failure_detail
+                )
+            else:
+                execution_message = summary
             status = "SUCCESS" if sent > 0 else "ERROR"
             callback_data = {
-                "execution_message": message if sent else "; ".join(errors),
+                "execution_message": execution_message,
                 "execution_status": status,
                 "execution_duration": int(time.time() - start),
                 "execution_action": "complete",

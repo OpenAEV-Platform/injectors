@@ -89,6 +89,14 @@ class TrackingServerTest(TestCase):
         self.assertEqual(self.store.stats("inject-1").submitted, 1)
 
 
+class TrackingServerLifecycleTest(TestCase):
+    def test_stop_before_start_does_not_deadlock(self):
+        server = TrackingServer(CampaignStore(), host="127.0.0.1", port=0)
+        # stop() must be safe when serve_forever() was never started: calling
+        # shutdown() first would block forever, so it must be guarded.
+        server.stop()
+
+
 class _NoRedirect(urllib.request.HTTPRedirectHandler):
     def redirect_request(self, req, fp, code, msg, headers, newurl):
         return None

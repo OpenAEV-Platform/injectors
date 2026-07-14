@@ -84,6 +84,18 @@ class ProcessMessageTest(TestCase):
         injector.process_message(_data({"recipients": "a@x.com"}))
         self.assertEqual(self._callback(injector)["execution_status"], "ERROR")
 
+    def test_partial_failure_keeps_success_and_reports_failed_recipients(self):
+        injector = make_injector()
+        injector.sender.send.side_effect = [
+            SendResult(True, "sent"),
+            SendResult(False, "mailbox full"),
+        ]
+        injector.process_message(_data({"recipients": "a@x.com, b@y.com"}))
+        callback = self._callback(injector)
+        self.assertEqual(callback["execution_status"], "SUCCESS")
+        self.assertIn("1/2 emails sent", callback["execution_message"])
+        self.assertIn("b@y.com: mailbox full", callback["execution_message"])
+
     def test_start_listens(self):
         injector = make_injector()
         injector.start()

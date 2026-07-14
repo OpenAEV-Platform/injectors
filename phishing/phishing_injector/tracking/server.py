@@ -121,8 +121,12 @@ class TrackingServer:
         self._thread.start()
 
     def stop(self) -> None:
-        self._httpd.shutdown()
-        self._httpd.server_close()
+        # shutdown() must only be called while serve_forever() is running on
+        # the background thread; calling it before start() would deadlock, so
+        # guard it behind the started-thread check. server_close() is always
+        # safe and releases the listening socket.
         if self._thread is not None:
+            self._httpd.shutdown()
             self._thread.join(timeout=5)
             self._thread = None
+        self._httpd.server_close()

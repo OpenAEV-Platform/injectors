@@ -47,7 +47,7 @@ class PhishingContracts:
         )
         recipients = ContractTextArea(
             key="recipients",
-            label="Recipient emails (comma or newline separated)",
+            label="Recipient emails (comma, semicolon or newline separated)",
             mandatory=True,
         )
         template = ContractSelect(
