@@ -1,0 +1,18 @@
+{
+  "title": "Kubernetes",
+  "slug": "openaev_kubernetes",
+  "description": "This injector emulates Kubernetes and container attack techniques using Stratus Red Team, detonating cluster TTPs so runtime detection and prevention controls can be validated.",
+  "short_description": "Detonate Kubernetes attack techniques with Stratus Red Team",
+  "use_cases": ["Technical"],
+  "verified": false,
+  "last_verified_date": "",
+  "playbook_supported": false,
+  "max_confidence_level": 80,
+  "support_version": "",
+  "subscription_link": "https://stratus-red-team.cloud/",
+  "source_code": "",
+  "manager_supported": true,
+  "container_version": "rolling",
+  "container_image": "openaev/injector-kubernetes",
+  "container_type": "INJECTOR"
+}
