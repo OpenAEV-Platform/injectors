@@ -1,7 +1,7 @@
 """Thin client over the Censys Search API v2 (hosts and certificates)."""
 
 from dataclasses import dataclass, field
-from typing import Dict, List
+from typing import Dict, List, Union
 
 import requests
 
@@ -10,7 +10,7 @@ import requests
 class CensysResult:
     success: bool
     message: str
-    outputs: Dict[str, List[str]] = field(default_factory=dict)
+    outputs: Dict[str, List[Union[str, int]]] = field(default_factory=dict)
 
 
 class CensysClient:
@@ -54,7 +54,7 @@ class CensysClient:
         hosts = [h.get("ip") for h in hits if h.get("ip")]
         ports = sorted(
             {
-                str(svc.get("port"))
+                int(svc.get("port"))
                 for h in hits
                 for svc in h.get("services", [])
                 if svc.get("port")

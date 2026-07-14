@@ -36,7 +36,7 @@ class ClientParsingTest(TestCase):
         result = self._client().search_hosts("services.port: 443")
         self.assertTrue(result.success)
         self.assertEqual(result.outputs["hosts"], ["1.2.3.4", "5.6.7.8"])
-        self.assertEqual(sorted(result.outputs["ports"]), ["443", "80"])
+        self.assertEqual(result.outputs["ports"], [80, 443])
 
     @patch("censys_injector.client.censys_client.requests.get")
     def test_search_certificates_parses_fingerprints(self, mock_get):
