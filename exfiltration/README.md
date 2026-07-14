@@ -25,7 +25,7 @@ poetry run python -m unittest
 
 ## Icon
 
-`exfiltration_injector/img/icon-exfiltration.png` must follow the injector icon
+`exfiltration_injector/img/icon-exfiltration.png` follows the injector icon
 standard (square 1:1, 512x512 PNG, solid opaque background) - see
-OpenAEV-Platform/injectors#305. This injector wraps no single vendor, so use a
-clean generic exfiltration/DLP mark confirmed with the product team.
+OpenAEV-Platform/injectors#305. This injector wraps no single vendor, so it uses
+a generic exfiltration/DLP mark to be finalized with the product team.

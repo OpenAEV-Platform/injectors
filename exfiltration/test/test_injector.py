@@ -78,6 +78,15 @@ class ProcessMessageTest(TestCase):
         injector.process_message(_data("nope", {}))
         self.assertEqual(self._callback(injector)["execution_status"], "ERROR")
 
+    def test_missing_required_field_reports_error(self):
+        injector = make_injector()
+        injector.executor = MagicMock()
+        injector.process_message(_data(HTTPS_EXFIL_CONTRACT, {"size_kb": ["64"]}))
+        injector.executor.exfiltrate_https.assert_not_called()
+        callback = self._callback(injector)
+        self.assertEqual(callback["execution_status"], "ERROR")
+        self.assertIn("https_url", callback["execution_message"])
+
     def test_start_listens(self):
         injector = make_injector()
         injector.start()

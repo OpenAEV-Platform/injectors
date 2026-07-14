@@ -17,6 +17,13 @@ import requests
 # DNS labels are capped at 63 characters; leave room for the index label.
 _MAX_LABEL = 60
 
+# DNS tunneling issues one query per label, and base32 encoding inflates the
+# payload by ~60%. A 1 MB payload would emit ~28k queries, overwhelming
+# resolvers and making the inject extremely slow. Cap the DNS payload so the
+# query volume stays reasonable while larger sizes remain usable for the
+# HTTPS / cloud paths.
+_MAX_DNS_KB = 4
+
 
 def random_payload(size_kb: int) -> bytes:
     return os.urandom(max(size_kb, 1) * 1024)
@@ -39,7 +46,10 @@ class ExfiltrationExecutor:
         return [encoded[i : i + _MAX_LABEL] for i in range(0, len(encoded), _MAX_LABEL)]
 
     def exfiltrate_dns(self, domain: str, size_kb: int) -> ExfilResult:
-        encoded = base64.b32encode(random_payload(size_kb)).decode().lower().rstrip("=")
+        capped_kb = min(size_kb, _MAX_DNS_KB)
+        encoded = (
+            base64.b32encode(random_payload(capped_kb)).decode().lower().rstrip("=")
+        )
         chunks = self._chunk(encoded)
         queries = 0
         for index, chunk in enumerate(chunks):
@@ -94,11 +104,11 @@ class ExfiltrationExecutor:
                     f"Uploaded {len(payload)} bytes to cloud storage "
                     f"(HTTP {response.status_code})"
                 ),
-                outputs={"bytes": [str(len(payload))]},
+                outputs={"bytes": [str(len(payload))], "url": [upload_url]},
             )
         except requests.RequestException as exc:
             return ExfilResult(
                 success=True,
                 message=f"Cloud upload blocked or unreachable: {exc}",
-                outputs={"bytes": ["0"]},
+                outputs={"bytes": ["0"], "url": [upload_url]},
             )

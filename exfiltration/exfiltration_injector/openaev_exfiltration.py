@@ -38,14 +38,29 @@ class OpenAEVExfiltration:
         except (TypeError, ValueError):
             return 64
 
+    @staticmethod
+    def _required(content: Dict, key: str) -> str:
+        raw = content.get(key)
+        if isinstance(raw, list):
+            raw = raw[0] if raw else None
+        if raw is None or (isinstance(raw, str) and not raw.strip()):
+            raise ValueError(f"Missing required field: {key}")
+        return raw
+
     def _dispatch(self, contract_id: str, content: Dict):
         size_kb = self._size(content)
         if contract_id == DNS_EXFIL_CONTRACT:
-            return self.executor.exfiltrate_dns(content.get("dns_domain"), size_kb)
+            return self.executor.exfiltrate_dns(
+                self._required(content, "dns_domain"), size_kb
+            )
         if contract_id == HTTPS_EXFIL_CONTRACT:
-            return self.executor.exfiltrate_https(content.get("https_url"), size_kb)
+            return self.executor.exfiltrate_https(
+                self._required(content, "https_url"), size_kb
+            )
         if contract_id == CLOUD_EXFIL_CONTRACT:
-            return self.executor.exfiltrate_cloud(content.get("cloud_url"), size_kb)
+            return self.executor.exfiltrate_cloud(
+                self._required(content, "cloud_url"), size_kb
+            )
         raise ValueError(f"Unsupported contract id: {contract_id}")
 
     def process_message(self, data: Dict) -> None:
