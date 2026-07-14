@@ -1,11 +1,10 @@
-from pydantic import Field
-from pyoaev.configuration import ConfigLoaderOAEV, Configuration, SettingsLoader
-
 from phishing_injector.configuration.injector_config_override import (
     InjectorConfigOverride,
 )
 from phishing_injector.configuration.phishing_config import PhishingConfig
 from phishing_injector.contracts_phishing import PhishingContracts
+from pydantic import Field
+from pyoaev.configuration import ConfigLoaderOAEV, Configuration, SettingsLoader
 
 
 class ConfigLoader(SettingsLoader):

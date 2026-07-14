@@ -4,15 +4,15 @@ import secrets
 import time
 from typing import Dict, List
 
-from injector_common.data_helpers import DataHelpers
-from injector_common.dump_config import intercept_dump_argument
-from pyoaev.helpers import OpenAEVConfigHelper, OpenAEVInjectorHelper
-
 from phishing_injector.configuration.config_loader import ConfigLoader
 from phishing_injector.helpers import templates
 from phishing_injector.helpers.phishing_sender import PhishingSender
 from phishing_injector.tracking.server import TrackingServer
 from phishing_injector.tracking.store import CampaignStore
+from pyoaev.helpers import OpenAEVConfigHelper, OpenAEVInjectorHelper
+
+from injector_common.data_helpers import DataHelpers
+from injector_common.dump_config import intercept_dump_argument
 
 ICON_PATH = "phishing_injector/img/icon-phishing.png"
 
