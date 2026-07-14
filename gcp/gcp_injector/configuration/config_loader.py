@@ -1,8 +1,7 @@
-from pydantic import Field
-from pyoaev.configuration import ConfigLoaderOAEV, Configuration, SettingsLoader
-
 from gcp_injector.configuration.injector_config_override import InjectorConfigOverride
 from gcp_injector.contracts_gcp import GcpContracts
+from pydantic import Field
+from pyoaev.configuration import ConfigLoaderOAEV, Configuration, SettingsLoader
 
 
 class ConfigLoader(SettingsLoader):

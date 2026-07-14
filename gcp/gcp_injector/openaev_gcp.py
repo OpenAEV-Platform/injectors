@@ -4,12 +4,12 @@ import tempfile
 import time
 from typing import Dict, Optional
 
+from gcp_injector.configuration.config_loader import ConfigLoader
+from pyoaev.helpers import OpenAEVConfigHelper, OpenAEVInjectorHelper
+
 from injector_common.data_helpers import DataHelpers
 from injector_common.dump_config import intercept_dump_argument
 from injector_common.stratus_executor import StratusExecutor
-from pyoaev.helpers import OpenAEVConfigHelper, OpenAEVInjectorHelper
-
-from gcp_injector.configuration.config_loader import ConfigLoader
 
 ICON_PATH = "gcp_injector/img/icon-gcp.png"
 
