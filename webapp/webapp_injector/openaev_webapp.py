@@ -2,13 +2,13 @@ import json
 import time
 from typing import Dict
 
-from injector_common.data_helpers import DataHelpers
-from injector_common.dump_config import intercept_dump_argument
 from pyoaev.helpers import OpenAEVConfigHelper, OpenAEVInjectorHelper
-
 from webapp_injector.configuration.config_loader import ConfigLoader
 from webapp_injector.contracts_webapp import SQLMAP_CONTRACT, ZAP_BASELINE_CONTRACT
 from webapp_injector.helpers.webapp_executor import WebappExecutor
+
+from injector_common.data_helpers import DataHelpers
+from injector_common.dump_config import intercept_dump_argument
 
 ICON_PATH = "webapp_injector/img/icon-webapp.png"
 

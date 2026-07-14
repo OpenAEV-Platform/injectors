@@ -1,6 +1,5 @@
 from pydantic import Field
 from pyoaev.configuration import ConfigLoaderOAEV, Configuration, SettingsLoader
-
 from webapp_injector.configuration.injector_config_override import (
     InjectorConfigOverride,
 )
