@@ -15,6 +15,10 @@ from phishing_injector.tracking.store import CampaignStore
 # 1x1 transparent GIF.
 PIXEL_GIF = base64.b64decode("R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7")
 
+# Cap the credential-submission body so a malicious/oversized Content-Length
+# cannot tie up a handler thread reading an unbounded request body.
+MAX_SUBMIT_BODY_BYTES = 64 * 1024
+
 DEFAULT_LANDING_HTML = (
     "<html><body><h3>Please sign in</h3>"
     '<form method="POST" action="{submit_path}">'
@@ -45,6 +49,12 @@ def build_handler(
                 store.record_open(open_token)
                 self.send_response(200)
                 self.send_header("Content-Type", "image/gif")
+                # Prevent browsers/proxies from caching the pixel, which would
+                # undercount repeated opens and shared clients.
+                self.send_header("Cache-Control", "no-store, no-cache, must-revalidate")
+                self.send_header("Pragma", "no-cache")
+                self.send_header("Expires", "0")
+                self.send_header("Content-Length", str(len(PIXEL_GIF)))
                 self.end_headers()
                 self.wfile.write(PIXEL_GIF)
                 return
@@ -67,7 +77,14 @@ def build_handler(
         def do_POST(self):  # noqa: N802
             submit_token = self._token("/s/")
             if submit_token is not None:
-                length = int(self.headers.get("Content-Length", 0))
+                try:
+                    length = int(self.headers.get("Content-Length", 0))
+                except (TypeError, ValueError):
+                    length = -1
+                if length < 0 or length > MAX_SUBMIT_BODY_BYTES:
+                    self.send_response(413)
+                    self.end_headers()
+                    return
                 if length:
                     self.rfile.read(length)  # consume body; never stored
                 store.record_submit(submit_token)
@@ -106,3 +123,6 @@ class TrackingServer:
     def stop(self) -> None:
         self._httpd.shutdown()
         self._httpd.server_close()
+        if self._thread is not None:
+            self._thread.join(timeout=5)
+            self._thread = None

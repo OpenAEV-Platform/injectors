@@ -7,7 +7,7 @@ backing store can be added later for restart safety.
 
 import threading
 from dataclasses import dataclass, field
-from typing import Dict, List, Optional
+from typing import Dict, List
 
 
 @dataclass
@@ -47,33 +47,32 @@ class CampaignStore:
             campaign = self._by_inject.setdefault(inject_id, Campaign(inject_id))
             campaign.recipients.append(recipient)
 
-    def _get(self, token: str) -> Optional[Recipient]:
-        with self._lock:
-            return self._by_token.get(token)
-
     def record_open(self, token: str) -> bool:
-        recipient = self._get(token)
-        if recipient is None:
-            return False
-        recipient.opened = True
-        return True
+        with self._lock:
+            recipient = self._by_token.get(token)
+            if recipient is None:
+                return False
+            recipient.opened = True
+            return True
 
     def record_click(self, token: str) -> bool:
-        recipient = self._get(token)
-        if recipient is None:
-            return False
-        recipient.opened = True
-        recipient.clicked = True
-        return True
+        with self._lock:
+            recipient = self._by_token.get(token)
+            if recipient is None:
+                return False
+            recipient.opened = True
+            recipient.clicked = True
+            return True
 
     def record_submit(self, token: str) -> bool:
-        recipient = self._get(token)
-        if recipient is None:
-            return False
-        recipient.opened = True
-        recipient.clicked = True
-        recipient.submitted = True
-        return True
+        with self._lock:
+            recipient = self._by_token.get(token)
+            if recipient is None:
+                return False
+            recipient.opened = True
+            recipient.clicked = True
+            recipient.submitted = True
+            return True
 
     def stats(self, inject_id: str) -> CampaignStats:
         with self._lock:

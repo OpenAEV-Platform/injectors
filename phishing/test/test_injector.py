@@ -1,4 +1,5 @@
 import os
+import smtplib
 from unittest import TestCase
 from unittest.mock import MagicMock, mock_open, patch
 
@@ -111,4 +112,16 @@ class PhishingSenderTest(TestCase):
     )
     def test_send_connection_error(self, _smtp):
         message = self._sender().build_message("b@y.com", "subj", "<b>hi</b>")
-        self.assertFalse(self._sender().send(message).success)
+        result = self._sender().send(message)
+        self.assertFalse(result.success)
+        self.assertIn("Connection error", result.message)
+
+    @patch("phishing_injector.helpers.phishing_sender.smtplib.SMTP")
+    def test_send_smtp_error(self, smtp):
+        server = MagicMock()
+        server.send_message.side_effect = smtplib.SMTPException("mailbox full")
+        smtp.return_value.__enter__.return_value = server
+        message = self._sender().build_message("b@y.com", "subj", "<b>hi</b>")
+        result = self._sender().send(message)
+        self.assertFalse(result.success)
+        self.assertIn("SMTP error", result.message)

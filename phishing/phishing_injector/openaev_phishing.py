@@ -2,6 +2,7 @@ import json
 import re
 import secrets
 import time
+from pathlib import Path
 from typing import Dict, List
 
 from phishing_injector.configuration.config_loader import ConfigLoader
@@ -14,7 +15,7 @@ from pyoaev.helpers import OpenAEVConfigHelper, OpenAEVInjectorHelper
 from injector_common.data_helpers import DataHelpers
 from injector_common.dump_config import intercept_dump_argument
 
-ICON_PATH = "phishing_injector/img/icon-phishing.png"
+ICON_PATH = Path(__file__).parent / "img" / "icon-phishing.png"
 
 
 class OpenAEVPhishing:
@@ -103,7 +104,6 @@ class OpenAEVPhishing:
                 else:
                     errors.append(f"{email}: {result.message}")
 
-            stats = self.store.stats(inject_id)
             message = (
                 f"Phishing campaign launched: {sent}/{len(recipients)} emails sent. "
                 f"Tracking at {self.public_url}"
@@ -116,19 +116,15 @@ class OpenAEVPhishing:
                 "execution_action": "complete",
             }
             if sent:
+                # The launch callback reports the send-time facts only. Open /
+                # click / submit events land later on the embedded tracking
+                # server; they are recorded in-memory per campaign and scored
+                # through the contract's manual "Human Response" expectation.
                 callback_data["execution_output_structured"] = json.dumps(
                     {
-                        "sent": [str(sent)],
-                        "stats": [
-                            json.dumps(
-                                {
-                                    "total": stats.total,
-                                    "opened": stats.opened,
-                                    "clicked": stats.clicked,
-                                    "submitted": stats.submitted,
-                                }
-                            )
-                        ],
+                        "sent": sent,
+                        "total": len(recipients),
+                        "tracking_url": self.public_url,
                     }
                 )
             self.helper.api.inject.execution_callback(

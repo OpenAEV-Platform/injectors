@@ -8,9 +8,11 @@ The single container both launches the campaign and measures the human response:
   tracking token.
 - Embedded tracking web server (stdlib `http.server`, background thread)
   exposes `GET /o/<token>` (open pixel), `GET /c/<token>` (click/landing page)
-  and `POST /s/<token>` (submission), recording each event.
-- Human-response results are aggregated per campaign and reported to the
-  platform.
+  and `POST /s/<token>` (submission), recording each event in-memory per
+  campaign.
+- The launch callback reports how many emails were sent; the human response
+  (open / click / submit) is scored through the contract's manual "Human
+  Response" expectation.
 
 For a variant that leverages an existing Gophish deployment, see the `gophish`
 injector.
