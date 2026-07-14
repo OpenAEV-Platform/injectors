@@ -139,27 +139,39 @@ class BloodhoundExecutor:
             return {}
 
     @staticmethod
+    def _entry_name(properties: Dict) -> str:
+        return properties.get("name") or properties.get("samaccountname") or "unknown"
+
+    @staticmethod
     def _names(workdir: str, pattern: str) -> List[str]:
         names: List[str] = []
-        for path in glob.glob(os.path.join(workdir, pattern)):
+        seen: set = set()
+        for path in sorted(glob.glob(os.path.join(workdir, pattern))):
             data = BloodhoundExecutor._load(path)
             for entry in data.get("data", []):
                 properties = entry.get("Properties", {})
                 name = properties.get("name") or properties.get("samaccountname")
-                if name and name not in names:
+                if name and name not in seen:
+                    seen.add(name)
                     names.append(name)
         return names
 
     @staticmethod
     def _privileged(workdir: str) -> List[str]:
         paths: List[str] = []
-        for path in glob.glob(os.path.join(workdir, "*_users.json")):
+        seen: set = set()
+        for path in sorted(glob.glob(os.path.join(workdir, "*_users.json"))):
             data = BloodhoundExecutor._load(path)
             for entry in data.get("data", []):
                 properties = entry.get("Properties", {})
-                name = properties.get("name", "unknown")
+                name = BloodhoundExecutor._entry_name(properties)
+                findings = []
                 if properties.get("hasspn"):
-                    paths.append(f"Kerberoastable: {name}")
+                    findings.append(f"Kerberoastable: {name}")
                 if properties.get("dontreqpreauth"):
-                    paths.append(f"AS-REP roastable: {name}")
+                    findings.append(f"AS-REP roastable: {name}")
+                for finding in findings:
+                    if finding not in seen:
+                        seen.add(finding)
+                        paths.append(finding)
         return paths

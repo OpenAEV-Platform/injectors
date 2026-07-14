@@ -35,10 +35,13 @@ ARG installdir=/opt/injector
 WORKDIR ${installdir}
 COPY --from=builder ${installdir} ${installdir}
 COPY --from=builder /usr/local/lib/python3.13/site-packages /usr/local/lib/python3.13/site-packages
+# Bring the console scripts (notably `bloodhound-python`) installed by the
+# builder into the runner; copying site-packages alone leaves them behind.
+COPY --from=builder /usr/local/bin /usr/local/bin
 
 ARG PYOAEV_GIT_BRANCH_OVERRIDE
 
-RUN if [[ ${PYOAEV_GIT_BRANCH_OVERRIDE} ]] ; then \
+RUN if [ -n "${PYOAEV_GIT_BRANCH_OVERRIDE}" ] ; then \
         echo "Forcing specific version of client-python" && \
         apk add --no-cache git curl && \
         curl -sS https://bootstrap.pypa.io/get-pip.py -o get-pip.py && \

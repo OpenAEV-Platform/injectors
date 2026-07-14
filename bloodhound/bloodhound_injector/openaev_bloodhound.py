@@ -18,12 +18,13 @@ class OpenAEVBloodhound:
             ConfigLoader().to_daemon_config()
         )
         intercept_dump_argument(self.config.get_config_obj())
+        icon_path = self.config.get_conf("injector_icon_filepath", default=ICON_PATH)
         try:
-            with open(ICON_PATH, "rb") as icon_file:
+            with open(icon_path, "rb") as icon_file:
                 icon_bytes = icon_file.read()
         except FileNotFoundError as error:
             raise FileNotFoundError(
-                f"Injector icon not found at '{ICON_PATH}'. Add the genuine "
+                f"Injector icon not found at '{icon_path}'. Add the genuine "
                 "BloodHound icon (square 512x512 opaque PNG) as documented in "
                 "bloodhound_injector/img/README.md (see "
                 "OpenAEV-Platform/injectors#305)."
