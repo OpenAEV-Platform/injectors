@@ -20,20 +20,27 @@ class OpenAEVKubernetes:
             ConfigLoader().to_daemon_config()
         )
         intercept_dump_argument(self.config.get_config_obj())
-        with open(ICON_PATH, "rb") as icon_file:
-            icon_bytes = icon_file.read()
+        try:
+            with open(ICON_PATH, "rb") as icon_file:
+                icon_bytes = icon_file.read()
+        except FileNotFoundError:
+            # The final icon asset is delivered separately (see #305). Start
+            # without it instead of crashing; injector_icon_filepath drives
+            # later updates once the asset lands.
+            icon_bytes = b""
         self.helper = OpenAEVInjectorHelper(self.config, icon_bytes)
         self.stratus = StratusExecutor(logger=self.helper.injector_logger)
 
     @staticmethod
     def _resolve_technique(content: Dict) -> Optional[str]:
-        custom = content.get("custom_technique_id")
+        custom = (content.get("custom_technique_id") or "").strip()
         if custom:
-            return custom.strip()
+            return custom
         selected = content.get("technique_id")
         if isinstance(selected, list):
-            return selected[0] if selected else None
-        return selected
+            selected = selected[0] if selected else None
+        selected = (selected or "").strip()
+        return selected or None
 
     def process_message(self, data: Dict) -> None:
         start = time.time()

@@ -2,9 +2,10 @@
 
 Stratus Red Team (https://stratus-red-team.cloud) is a single self-contained Go
 binary that emulates granular adversary techniques against AWS, Azure, GCP and
-Kubernetes. It is reused by the azure, gcp and kubernetes injectors: each of
-those injectors only provides the platform, the technique catalog and the
-credential wiring, while the detonation lifecycle lives here.
+Kubernetes. This helper is designed to be shared across Stratus-based injectors
+(the kubernetes injector uses it today): each injector only provides the
+platform, the technique catalog and the credential wiring, while the detonation
+lifecycle lives here.
 
 The executor never raises for an expected tool failure; it always returns a
 StratusResult so the calling injector can turn it into an execution callback.

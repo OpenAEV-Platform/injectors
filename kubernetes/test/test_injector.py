@@ -1,3 +1,4 @@
+import json
 import os
 from unittest import TestCase
 from unittest.mock import MagicMock, mock_open, patch
@@ -59,7 +60,60 @@ class ProcessMessageTest(TestCase):
                 }
             )
         )
-        self.assertEqual(self._callback(injector)["execution_status"], "SUCCESS")
+        callback = self._callback(injector)
+        self.assertEqual(callback["execution_status"], "SUCCESS")
+        # Structured output is forwarded so downstream findings can be built.
+        self.assertEqual(
+            json.loads(callback["execution_output_structured"]),
+            {"technique": ["t"]},
+        )
+        # The resolved technique is detonated under an isolated KUBECONFIG.
+        env = injector.stratus.detonate.call_args.kwargs["env"]
+        self.assertFalse(os.path.exists(env["KUBECONFIG"]))
+
+    def test_success_removes_temp_kubeconfig(self):
+        injector = make_injector()
+        injector.stratus = MagicMock()
+        injector.stratus.detonate.return_value = StratusResult(
+            success=True, technique_id="t", status="DETONATED", message="done"
+        )
+        injector.process_message(
+            _data(
+                {
+                    "technique_id": ["k8s.credential-access.dump-secrets"],
+                    "kubeconfig": "apiVersion: v1",
+                }
+            )
+        )
+        kubeconfig_path = injector.stratus.detonate.call_args.kwargs["env"][
+            "KUBECONFIG"
+        ]
+        self.assertFalse(os.path.exists(kubeconfig_path))
+
+    def test_temp_kubeconfig_removed_when_detonate_raises(self):
+        injector = make_injector()
+        injector.stratus = MagicMock()
+        injector.stratus.detonate.side_effect = RuntimeError("boom")
+        injector.process_message(
+            _data(
+                {
+                    "technique_id": ["k8s.credential-access.dump-secrets"],
+                    "kubeconfig": "apiVersion: v1",
+                }
+            )
+        )
+        kubeconfig_path = injector.stratus.detonate.call_args.kwargs["env"][
+            "KUBECONFIG"
+        ]
+        self.assertFalse(os.path.exists(kubeconfig_path))
+        self.assertEqual(self._callback(injector)["execution_status"], "ERROR")
+
+    def test_missing_technique_reports_error(self):
+        injector = make_injector()
+        injector.stratus = MagicMock()
+        injector.process_message(_data({"kubeconfig": "apiVersion: v1"}))
+        self.assertEqual(self._callback(injector)["execution_status"], "ERROR")
+        injector.stratus.detonate.assert_not_called()
 
     def test_missing_kubeconfig_reports_error(self):
         injector = make_injector()

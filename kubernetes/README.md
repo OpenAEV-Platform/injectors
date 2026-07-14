@@ -1,8 +1,9 @@
 # OpenAEV Kubernetes Injector
 
 Emulates Kubernetes and container attack techniques using
-[Stratus Red Team](https://stratus-red-team.cloud/). Shares the
-`StratusExecutor` helper with the Azure and GCP injectors.
+[Stratus Red Team](https://stratus-red-team.cloud/). Built on the shared
+`StratusExecutor` helper in `injector_common`, which is designed to be reused by
+future Stratus-based injectors.
 
 ## How it works
 
