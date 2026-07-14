@@ -1,0 +1,18 @@
+{
+  "title": "C2 Emulation",
+  "slug": "openaev_c2",
+  "description": "This injector emulates command-and-control beaconing traffic (Sliver / Mythic style) with configurable interval and jitter toward a listener, so NDR and network C2 detections can be validated.",
+  "short_description": "Emulate C2 beaconing traffic to validate NDR detection",
+  "use_cases": ["Technical"],
+  "verified": false,
+  "last_verified_date": "",
+  "playbook_supported": false,
+  "max_confidence_level": 80,
+  "support_version": "",
+  "subscription_link": "https://github.com/BishopFox/sliver",
+  "source_code": "",
+  "manager_supported": true,
+  "container_version": "rolling",
+  "container_image": "openaev/injector-c2",
+  "container_type": "INJECTOR"
+}
