@@ -123,12 +123,19 @@ class StratusExecutor:
         """Best-effort teardown of a technique's prerequisite infrastructure."""
         try:
             result = self._run(["cleanup", technique_id], env=env)
-        except (subprocess.TimeoutExpired, FileNotFoundError) as exc:
+        except subprocess.TimeoutExpired:
+            return StratusResult(
+                success=False,
+                technique_id=technique_id,
+                status="TIMEOUT",
+                message=f"Stratus cleanup for {technique_id} timed out",
+            )
+        except FileNotFoundError:
             return StratusResult(
                 success=False,
                 technique_id=technique_id,
                 status="ERROR",
-                message=str(exc),
+                message="stratus binary not found in the injector image",
             )
         return StratusResult(
             success=result.returncode == 0,

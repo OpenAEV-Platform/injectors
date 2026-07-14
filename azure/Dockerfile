@@ -47,7 +47,7 @@ RUN apk add --no-cache curl tar libc6-compat && \
     rm /tmp/stratus.tar.gz && \
     stratus version || echo "stratus installed"
 
-RUN if [[ ${PYOAEV_GIT_BRANCH_OVERRIDE} ]] ; then \
+RUN if [ -n "${PYOAEV_GIT_BRANCH_OVERRIDE}" ] ; then \
         echo "Forcing specific version of client-python" && \
         apk add --no-cache git curl && \
         curl -sS https://bootstrap.pypa.io/get-pip.py -o get-pip.py && \

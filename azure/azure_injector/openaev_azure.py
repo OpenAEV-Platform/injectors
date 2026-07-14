@@ -1,4 +1,5 @@
 import json
+import logging
 import time
 from typing import Dict, Optional
 
@@ -11,6 +12,8 @@ from injector_common.stratus_executor import StratusExecutor
 
 ICON_PATH = "azure_injector/img/icon-azure.png"
 
+logger = logging.getLogger(__name__)
+
 
 class OpenAEVAzure:
     def __init__(self):
@@ -18,10 +21,31 @@ class OpenAEVAzure:
             ConfigLoader().to_daemon_config()
         )
         intercept_dump_argument(self.config.get_config_obj())
-        with open(ICON_PATH, "rb") as icon_file:
-            icon_bytes = icon_file.read()
-        self.helper = OpenAEVInjectorHelper(self.config, icon_bytes)
+        self.helper = OpenAEVInjectorHelper(self.config, self._load_icon())
         self.stratus = StratusExecutor(logger=self.helper.injector_logger)
+
+    def _load_icon(self) -> bytes:
+        """Load the injector icon, tolerating a not-yet-provided asset.
+
+        The genuine Microsoft Azure icon is tracked as a follow-up (see the
+        injector icon standard in OpenAEV-Platform/injectors#305); until it
+        lands the injector must still start instead of crashing on a missing
+        file. The icon path is read from configuration so deployments can
+        override it.
+        """
+        icon_path = (
+            self.config.get_conf("injector_icon_filepath", default=ICON_PATH)
+            or ICON_PATH
+        )
+        try:
+            with open(icon_path, "rb") as icon_file:
+                return icon_file.read()
+        except FileNotFoundError:
+            logger.warning(
+                "Injector icon %s not found; starting without a custom icon",
+                icon_path,
+            )
+            return b""
 
     @staticmethod
     def _resolve_technique(content: Dict) -> Optional[str]:
@@ -34,12 +58,13 @@ class OpenAEVAzure:
         return selected
 
     def _build_env(self, content: Dict) -> Dict[str, str]:
-        return {
+        env = {
             "AZURE_TENANT_ID": content.get("azure_tenant_id"),
             "AZURE_SUBSCRIPTION_ID": content.get("azure_subscription_id"),
             "AZURE_CLIENT_ID": content.get("azure_client_id"),
             "AZURE_CLIENT_SECRET": content.get("azure_client_secret"),
         }
+        return {key: value for key, value in env.items() if value is not None}
 
     def process_message(self, data: Dict) -> None:
         start = time.time()
