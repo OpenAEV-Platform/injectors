@@ -2,12 +2,12 @@ import json
 import time
 from typing import Dict
 
-from injector_common.data_helpers import DataHelpers
-from injector_common.dump_config import intercept_dump_argument
-from pyoaev.helpers import OpenAEVConfigHelper, OpenAEVInjectorHelper
-
 from c2_injector.configuration.config_loader import ConfigLoader
 from c2_injector.helpers.c2_executor import C2Executor
+from pyoaev.helpers import OpenAEVConfigHelper, OpenAEVInjectorHelper
+
+from injector_common.data_helpers import DataHelpers
+from injector_common.dump_config import intercept_dump_argument
 
 ICON_PATH = "c2_injector/img/icon-c2.png"
 
