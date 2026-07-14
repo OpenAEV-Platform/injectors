@@ -1,0 +1,18 @@
+{
+  "title": "Censys",
+  "slug": "openaev_censys",
+  "description": "This injector queries the Censys Search API to discover an organization's external attack surface (exposed hosts, open ports and certificates), complementing the Shodan injector.",
+  "short_description": "Discover external attack surface with Censys",
+  "use_cases": ["Technical"],
+  "verified": false,
+  "last_verified_date": "",
+  "playbook_supported": false,
+  "max_confidence_level": 80,
+  "support_version": "",
+  "subscription_link": "https://censys.io/",
+  "source_code": "",
+  "manager_supported": true,
+  "container_version": "rolling",
+  "container_image": "openaev/injector-censys",
+  "container_type": "INJECTOR"
+}

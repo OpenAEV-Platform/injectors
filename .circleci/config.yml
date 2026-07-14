@@ -244,14 +244,14 @@ workflows:
       - test:
           matrix:
             parameters:
-              injector_name: ["ai-redteam", "http-query", "netexec", "nmap", "nuclei", "stratus"]
+              injector_name: ["ai-redteam", "censys", "http-query", "netexec", "nmap", "nuclei", "stratus"]
           filters:
             tags:
               only: /[0-9]+(\.[0-9]+)+(\.[0-9]+)*/
       - build_docker_images:
           matrix:
             parameters:
-              injector_name: [ "ai-redteam", "aws", "http-query", "netexec", "nmap", "nuclei", "shodan", "stratus", "teams" ]
+              injector_name: [ "ai-redteam", "aws", "censys", "http-query", "netexec", "nmap", "nuclei", "shodan", "stratus", "teams" ]
           requires:
             - ensure_formatting
             - linter
@@ -262,7 +262,7 @@ workflows:
       - publish_images:
           matrix:
             parameters:
-              injector_name: [ "ai-redteam", "aws", "http-query", "netexec", "nmap", "nuclei", "shodan", "stratus", "teams" ]
+              injector_name: [ "ai-redteam", "aws", "censys", "http-query", "netexec", "nmap", "nuclei", "shodan", "stratus", "teams" ]
           requires:
             - build_docker_images
           filters:
