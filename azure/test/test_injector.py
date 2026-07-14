@@ -2,10 +2,10 @@ import os
 from unittest import TestCase
 from unittest.mock import MagicMock, mock_open, patch
 
-from injector_common.stratus_executor import StratusExecutor, StratusResult
-
 import azure_injector.openaev_azure as mod
 from azure_injector.contracts_azure import AZURE_DETONATE_CONTRACT
+
+from injector_common.stratus_executor import StratusExecutor, StratusResult
 
 BASE_ENV = {
     "OPENAEV_URL": "http://localhost:3001",
