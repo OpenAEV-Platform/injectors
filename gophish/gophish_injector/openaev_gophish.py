@@ -11,6 +11,15 @@ from injector_common.dump_config import intercept_dump_argument
 
 ICON_PATH = "gophish_injector/img/icon-gophish.png"
 
+REQUIRED_CONTENT_FIELDS = (
+    "campaign_name",
+    "template_name",
+    "page_name",
+    "smtp_name",
+    "group_name",
+    "url",
+)
+
 
 class OpenAEVGophish:
     def __init__(self):
@@ -19,9 +28,13 @@ class OpenAEVGophish:
             self.config_loader.to_daemon_config()
         )
         intercept_dump_argument(self.config.get_config_obj())
-        with open(ICON_PATH, "rb") as icon_file:
-            icon_bytes = icon_file.read()
+        icon_bytes = self._load_icon()
         self.helper = OpenAEVInjectorHelper(self.config, icon_bytes)
+        if not icon_bytes:
+            self.helper.injector_logger.warning(
+                "Icon file '%s' not found; registering the injector without an "
+                "icon (pending the icon standard, see #305)." % ICON_PATH
+            )
         gophish_conf = self.config_loader.gophish
         self.client = GophishClient(
             base_url=gophish_conf.base_url,
@@ -29,6 +42,27 @@ class OpenAEVGophish:
             verify_tls=gophish_conf.verify_tls,
             logger=self.helper.injector_logger,
         )
+
+    @staticmethod
+    def _load_icon() -> bytes:
+        """Read the injector icon, tolerating a missing placeholder file.
+
+        The genuine icon is tracked separately (see #305); until it lands the
+        injector must still start instead of crashing with FileNotFoundError.
+        """
+        try:
+            with open(ICON_PATH, "rb") as icon_file:
+                return icon_file.read()
+        except FileNotFoundError:
+            return b""
+
+    @staticmethod
+    def _validate_content(content: Dict) -> None:
+        missing = [field for field in REQUIRED_CONTENT_FIELDS if not content.get(field)]
+        if missing:
+            raise ValueError(
+                "Missing required Gophish campaign fields: " + ", ".join(missing)
+            )
 
     def process_message(self, data: Dict) -> None:
         start = time.time()
@@ -39,6 +73,7 @@ class OpenAEVGophish:
 
         try:
             content = DataHelpers.get_content(data)
+            self._validate_content(content)
             result = self.client.create_campaign(
                 name=content.get("campaign_name"),
                 template_name=content.get("template_name"),
@@ -57,8 +92,8 @@ class OpenAEVGophish:
             if result.success:
                 callback_data["execution_output_structured"] = json.dumps(
                     {
-                        "campaign_id": [str(result.campaign_id)],
-                        "stats": [json.dumps(result.stats)],
+                        "campaign_id": result.campaign_id,
+                        "stats": result.stats,
                     }
                 )
             self.helper.api.inject.execution_callback(

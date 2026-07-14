@@ -1,3 +1,4 @@
+import json
 import os
 from unittest import TestCase
 from unittest.mock import MagicMock, mock_open, patch
@@ -60,7 +61,10 @@ class ProcessMessageTest(TestCase):
             True, "launched", campaign_id=7, stats={"opened": 1}
         )
         injector.process_message(_data(CONTENT))
-        self.assertEqual(self._callback(injector)["execution_status"], "SUCCESS")
+        callback = self._callback(injector)
+        self.assertEqual(callback["execution_status"], "SUCCESS")
+        structured = json.loads(callback["execution_output_structured"])
+        self.assertEqual(structured, {"campaign_id": 7, "stats": {"opened": 1}})
 
     def test_failure(self):
         injector = make_injector()
@@ -71,7 +75,27 @@ class ProcessMessageTest(TestCase):
         injector.process_message(_data(CONTENT))
         self.assertEqual(self._callback(injector)["execution_status"], "ERROR")
 
+    def test_missing_required_field(self):
+        injector = make_injector()
+        injector.client = MagicMock()
+        content = {key: value for key, value in CONTENT.items() if key != "url"}
+        injector.process_message(_data(content))
+        callback = self._callback(injector)
+        self.assertEqual(callback["execution_status"], "ERROR")
+        self.assertIn("url", callback["execution_message"])
+        injector.client.create_campaign.assert_not_called()
+
     def test_start_listens(self):
         injector = make_injector()
         injector.start()
         injector.helper.listen.assert_called_once()
+
+
+class LoadIconTest(TestCase):
+    def test_missing_icon_returns_empty_bytes(self):
+        with patch.object(mod, "open", side_effect=FileNotFoundError, create=True):
+            self.assertEqual(mod.OpenAEVGophish._load_icon(), b"")
+
+    def test_present_icon_returns_bytes(self):
+        with patch.object(mod, "open", mock_open(read_data=b"icon"), create=True):
+            self.assertEqual(mod.OpenAEVGophish._load_icon(), b"icon")
