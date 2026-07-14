@@ -1,0 +1,18 @@
+{
+  "title": "Email Gateway (SEG)",
+  "slug": "openaev_email_seg",
+  "description": "This injector assesses a Secure Email Gateway by sending EICAR test payloads (body, attachment, zipped) and test URLs to a target mailbox, measuring what the gateway blocks, strips or delivers.",
+  "short_description": "Assess a Secure Email Gateway with EICAR and test URLs",
+  "use_cases": ["Technical"],
+  "verified": false,
+  "last_verified_date": "",
+  "playbook_supported": false,
+  "max_confidence_level": 80,
+  "support_version": "",
+  "subscription_link": "",
+  "source_code": "",
+  "manager_supported": true,
+  "container_version": "rolling",
+  "container_image": "openaev/injector-email-seg",
+  "container_type": "INJECTOR"
+}
