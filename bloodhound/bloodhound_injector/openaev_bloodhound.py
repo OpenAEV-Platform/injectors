@@ -2,12 +2,12 @@ import json
 import time
 from typing import Dict
 
-from injector_common.data_helpers import DataHelpers
-from injector_common.dump_config import intercept_dump_argument
-from pyoaev.helpers import OpenAEVConfigHelper, OpenAEVInjectorHelper
-
 from bloodhound_injector.configuration.config_loader import ConfigLoader
 from bloodhound_injector.helpers.bloodhound_executor import BloodhoundExecutor
+from pyoaev.helpers import OpenAEVConfigHelper, OpenAEVInjectorHelper
+
+from injector_common.data_helpers import DataHelpers
+from injector_common.dump_config import intercept_dump_argument
 
 ICON_PATH = "bloodhound_injector/img/icon-bloodhound.png"
 

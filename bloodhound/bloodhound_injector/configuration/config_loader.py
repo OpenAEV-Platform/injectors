@@ -1,10 +1,9 @@
-from pydantic import Field
-from pyoaev.configuration import ConfigLoaderOAEV, Configuration, SettingsLoader
-
 from bloodhound_injector.configuration.injector_config_override import (
     InjectorConfigOverride,
 )
 from bloodhound_injector.contracts_bloodhound import BloodhoundContracts
+from pydantic import Field
+from pyoaev.configuration import ConfigLoaderOAEV, Configuration, SettingsLoader
 
 
 class ConfigLoader(SettingsLoader):
