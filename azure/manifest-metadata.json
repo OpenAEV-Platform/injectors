@@ -1,0 +1,18 @@
+{
+  "title": "Azure + Entra ID",
+  "slug": "openaev_azure",
+  "description": "This injector emulates Microsoft Azure and Entra ID attack techniques using Stratus Red Team, detonating cloud and identity TTPs so Microsoft Sentinel and Defender detection and prevention can be validated.",
+  "short_description": "Detonate Azure and Entra ID attack techniques with Stratus Red Team",
+  "use_cases": ["Technical"],
+  "verified": false,
+  "last_verified_date": "",
+  "playbook_supported": false,
+  "max_confidence_level": 80,
+  "support_version": "",
+  "subscription_link": "https://stratus-red-team.cloud/",
+  "source_code": "",
+  "manager_supported": true,
+  "container_version": "rolling",
+  "container_image": "openaev/injector-azure",
+  "container_type": "INJECTOR"
+}
