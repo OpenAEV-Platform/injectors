@@ -1,10 +1,9 @@
-from pydantic import Field
-from pyoaev.configuration import ConfigLoaderOAEV, Configuration, SettingsLoader
-
 from kubernetes_injector.configuration.injector_config_override import (
     InjectorConfigOverride,
 )
 from kubernetes_injector.contracts_kubernetes import KubernetesContracts
+from pydantic import Field
+from pyoaev.configuration import ConfigLoaderOAEV, Configuration, SettingsLoader
 
 
 class ConfigLoader(SettingsLoader):
