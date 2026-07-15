@@ -19,6 +19,13 @@ PIXEL_GIF = base64.b64decode("R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAA
 # cannot tie up a handler thread reading an unbounded request body.
 MAX_SUBMIT_BODY_BYTES = 64 * 1024
 
+# Socket read timeout for every request. Without it, a client can advertise a
+# small Content-Length and then slow-send (or never finish) the body, keeping a
+# handler thread blocked indefinitely (slowloris-style) and defeating the size
+# cap above. StreamRequestHandler applies this via socket.settimeout(), so a
+# stalled read raises and frees the thread.
+REQUEST_TIMEOUT_SECONDS = 10
+
 DEFAULT_LANDING_HTML = (
     "<html><body><h3>Please sign in</h3>"
     '<form method="POST" action="{submit_path}">'
@@ -34,6 +41,10 @@ def build_handler(
     redirect_url: str,
 ):
     class TrackingHandler(BaseHTTPRequestHandler):
+        # Bound every request so a stalled/slow client cannot pin a handler
+        # thread indefinitely while reading headers or the body.
+        timeout = REQUEST_TIMEOUT_SECONDS
+
         # Silence default stderr logging.
         def log_message(self, *args):  # noqa: N802
             return

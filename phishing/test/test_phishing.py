@@ -8,7 +8,11 @@ from phishing_injector.contracts_phishing import (
 )
 from phishing_injector.helpers import templates
 from phishing_injector.openaev_phishing import OpenAEVPhishing
-from phishing_injector.tracking.server import TrackingServer
+from phishing_injector.tracking.server import (
+    REQUEST_TIMEOUT_SECONDS,
+    TrackingServer,
+    build_handler,
+)
 from phishing_injector.tracking.store import CampaignStore
 
 
@@ -95,6 +99,13 @@ class TrackingServerLifecycleTest(TestCase):
         # stop() must be safe when serve_forever() was never started: calling
         # shutdown() first would block forever, so it must be guarded.
         server.stop()
+
+    def test_handler_has_request_timeout(self):
+        # A per-request socket timeout must be set so a slow/stalled client
+        # cannot pin a handler thread indefinitely (slowloris) despite the
+        # Content-Length cap.
+        handler = build_handler(CampaignStore(), "<html></html>", "http://x/")
+        self.assertEqual(handler.timeout, REQUEST_TIMEOUT_SECONDS)
 
 
 class _NoRedirect(urllib.request.HTTPRedirectHandler):
