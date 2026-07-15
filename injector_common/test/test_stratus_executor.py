@@ -12,7 +12,7 @@ class StratusExecutorTest(TestCase):
         result = StratusExecutor().detonate("azure.foo")
         self.assertTrue(result.success)
         self.assertEqual(result.status, "DETONATED")
-        self.assertEqual(result.outputs, {"technique": ["azure.foo"]})
+        self.assertEqual(result.outputs, {"technique": "azure.foo"})
 
     @patch("injector_common.stratus_executor.subprocess.run")
     def test_detonate_appends_cleanup_flag(self, run):

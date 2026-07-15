@@ -51,7 +51,7 @@ class ProcessMessageTest(TestCase):
             technique_id="t",
             status="DETONATED",
             message="done",
-            outputs={"technique": ["t"]},
+            outputs={"technique": "t"},
         )
         injector.process_message(
             _data(

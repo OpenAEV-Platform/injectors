@@ -26,7 +26,7 @@ class StratusResult:
     message: str
     stdout: str = ""
     stderr: str = ""
-    outputs: Dict[str, List[str]] = field(default_factory=dict)
+    outputs: Dict[str, str] = field(default_factory=dict)
 
 
 class StratusExecutor:
@@ -104,7 +104,7 @@ class StratusExecutor:
                 message=f"Detonated {technique_id}",
                 stdout=result.stdout,
                 stderr=result.stderr,
-                outputs={"technique": [technique_id]},
+                outputs={"technique": technique_id},
             )
 
         error_detail = (result.stderr or result.stdout or "").strip()[:500]
