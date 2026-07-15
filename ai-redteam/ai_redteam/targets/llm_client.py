@@ -157,6 +157,21 @@ def _custom_http(target, prompt, marker, timeout, logger=None):
 
 
 _SENSITIVE_HEADERS = {"authorization", "api-key", "x-api-key"}
+# Top-level body keys that may carry credentials (e.g. a CUSTOM_HTTP/AGENT_HTTP
+# ``body_template``). Redacted before the request body is written to the logs.
+_SENSITIVE_BODY_KEYS = {
+    "authorization",
+    "api_key",
+    "apikey",
+    "api-key",
+    "access_token",
+    "refresh_token",
+    "token",
+    "secret",
+    "client_secret",
+    "password",
+    "passwd",
+}
 
 
 def _redact_headers(headers):
@@ -169,13 +184,25 @@ def _redact_headers(headers):
     return redacted
 
 
+def _redact_body(body):
+    if not isinstance(body, dict):
+        return body
+    redacted = {}
+    for name, value in body.items():
+        if isinstance(name, str) and name.lower() in _SENSITIVE_BODY_KEYS and value:
+            redacted[name] = "***redacted***"
+        else:
+            redacted[name] = value
+    return redacted
+
+
 def _post(url, target, marker, body, extra, timeout, logger=None):
     headers = _headers(target, marker, extra)
     if logger:
         logger.info(
             f"[llm_client] POST {url} (provider={target.provider}, "
             f"timeout={timeout}s) headers={_redact_headers(headers)} "
-            f"body={json.dumps(body)[:2000]}"
+            f"body={json.dumps(_redact_body(body))[:2000]}"
         )
     try:
         resp = requests.post(url, headers=headers, json=body, timeout=timeout)

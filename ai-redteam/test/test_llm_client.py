@@ -166,3 +166,33 @@ class SafeJsonTest(TestCase):
         resp.json.side_effect = ValueError("not json")
         resp.text = "plain body"
         self.assertEqual(llm_client._safe_json(resp), {"_raw": "plain body"})
+
+
+class RedactBodyTest(TestCase):
+    def test_redacts_sensitive_top_level_keys(self):
+        body = {"input": "prompt", "api_key": "sk-secret", "token": "fcp-secret"}
+        redacted = llm_client._redact_body(body)
+        self.assertEqual(redacted["input"], "prompt")
+        self.assertEqual(redacted["api_key"], "***redacted***")
+        self.assertEqual(redacted["token"], "***redacted***")
+        # the original body must not be mutated
+        self.assertEqual(body["api_key"], "sk-secret")
+
+    def test_leaves_non_dict_untouched(self):
+        self.assertEqual(llm_client._redact_body("raw"), "raw")
+
+    @patch("ai_redteam.targets.llm_client.requests.post")
+    def test_custom_http_body_secret_is_redacted_in_logs(self, post):
+        resp = _response({"output": "ok"})
+        resp.elapsed.total_seconds.return_value = 0.01
+        post.return_value = resp
+        logger = MagicMock()
+        target = _target(
+            "CUSTOM_HTTP",
+            "https://agent.example.com",
+            configuration={"body_template": {"api_key": "sk-should-not-leak"}},
+        )
+        llm_client.send_prompt(target, "hi", "m", timeout=5, logger=logger)
+        logged = " ".join(str(call.args[0]) for call in logger.info.call_args_list)
+        self.assertIn("***redacted***", logged)
+        self.assertNotIn("sk-should-not-leak", logged)
