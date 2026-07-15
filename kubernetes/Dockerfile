@@ -28,6 +28,9 @@ FROM python:3.13-alpine AS runner
 
 ENV PIP_VERSION=25.0.1
 ENV STRATUS_VERSION=2.24.0
+# SHA256 of stratus-red-team_Linux_x86_64.tar.gz for STRATUS_VERSION, taken
+# from the release checksums.txt. Bump both together when upgrading Stratus.
+ENV STRATUS_SHA256=bcc307e72427e785431a89c025388141201fa82d64d2337de20d6a602b0576a0
 
 WORKDIR /opt/injector_common
 COPY --from=injector_common ./ ./
@@ -40,11 +43,12 @@ COPY --from=builder /usr/local/lib/python3.13/site-packages /usr/local/lib/pytho
 ARG PYOAEV_GIT_BRANCH_OVERRIDE
 
 RUN apk add --no-cache curl tar libc6-compat && \
-    curl -sSL "https://github.com/DataDog/stratus-red-team/releases/download/v${STRATUS_VERSION}/stratus-red-team_${STRATUS_VERSION}_linux_amd64.tar.gz" \
+    curl -fSsL "https://github.com/DataDog/stratus-red-team/releases/download/v${STRATUS_VERSION}/stratus-red-team_Linux_x86_64.tar.gz" \
         -o /tmp/stratus.tar.gz && \
+    echo "${STRATUS_SHA256}  /tmp/stratus.tar.gz" | sha256sum -c - && \
     tar -xzf /tmp/stratus.tar.gz -C /usr/local/bin stratus && \
     rm /tmp/stratus.tar.gz && \
-    stratus version || echo "stratus installed"
+    stratus --help > /dev/null
 
 RUN if [[ ${PYOAEV_GIT_BRANCH_OVERRIDE} ]] ; then \
         echo "Forcing specific version of client-python" && \

@@ -150,7 +150,26 @@ class StratusExecutorTest(TestCase):
     def test_detonate_missing_binary(self, _run):
         self.assertFalse(StratusExecutor().detonate("k8s.foo").success)
 
+    @patch(
+        "injector_common.stratus_executor.subprocess.run",
+        side_effect=PermissionError("denied"),
+    )
+    def test_detonate_os_error_never_raises(self, _run):
+        # An OS-level exec failure must be normalized, not propagated.
+        result = StratusExecutor().detonate("k8s.foo")
+        self.assertFalse(result.success)
+        self.assertEqual(result.status, "ERROR")
+
     @patch("injector_common.stratus_executor.subprocess.run")
     def test_cleanup(self, run):
         run.return_value = MagicMock(returncode=0, stdout="", stderr="")
         self.assertTrue(StratusExecutor().cleanup("k8s.foo").success)
+
+    @patch(
+        "injector_common.stratus_executor.subprocess.run",
+        side_effect=PermissionError("denied"),
+    )
+    def test_cleanup_os_error_never_raises(self, _run):
+        result = StratusExecutor().cleanup("k8s.foo")
+        self.assertFalse(result.success)
+        self.assertEqual(result.status, "ERROR")

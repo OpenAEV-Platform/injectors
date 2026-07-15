@@ -98,6 +98,15 @@ class StratusExecutor:
                 status="ERROR",
                 message="stratus binary not found in the injector image",
             )
+        except OSError as exc:
+            # Any other OS-level execution failure (permission denied, exec
+            # format error, ...). Keep the never-raises contract intact.
+            return StratusResult(
+                success=False,
+                technique_id=technique_id,
+                status="ERROR",
+                message=f"Failed to execute stratus: {exc}",
+            )
 
         if result.returncode == 0:
             return StratusResult(
@@ -126,7 +135,7 @@ class StratusExecutor:
         """Best-effort teardown of a technique's prerequisite infrastructure."""
         try:
             result = self._run(["cleanup", technique_id], env=env)
-        except (subprocess.TimeoutExpired, FileNotFoundError) as exc:
+        except (subprocess.TimeoutExpired, OSError) as exc:
             return StratusResult(
                 success=False,
                 technique_id=technique_id,
