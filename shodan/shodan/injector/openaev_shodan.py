@@ -236,30 +236,30 @@ class ShodanInjector:
                 targets["asset_ids"] = [asset.get("asset_id") for asset in assets]
 
                 targets["hostnames"] = [
-                    asset.get("endpoint_hostname")
+                    asset.get("asset_hostname")
                     for asset in assets
-                    if asset and asset.get("endpoint_hostname")
+                    if asset and asset.get("asset_hostname")
                 ]
 
                 targets["ips"] = [
                     endpoint_ip
                     for asset in assets
-                    for endpoint_ip in (asset.get("endpoint_ips") or [])
+                    for endpoint_ip in (asset.get("asset_ips") or [])
                 ]
 
                 targets["seen_ips"] = [
-                    asset.get("endpoint_seen_ip")
+                    asset.get("asset_seen_ip")
                     for asset in assets
-                    if asset and asset.get("endpoint_seen_ip")
+                    if asset and asset.get("asset_seen_ip")
                 ]
 
                 for asset in assets:
                     targets["assets"].append(
                         {
                             "asset_id": asset.get("asset_id"),
-                            "endpoint_hostname": asset.get("endpoint_hostname") or None,
-                            "endpoint_ips": asset.get("endpoint_ips") or [],
-                            "endpoint_seen_ip": asset.get("endpoint_seen_ip"),
+                            "endpoint_hostname": asset.get("asset_hostname") or None,
+                            "endpoint_ips": asset.get("asset_ips") or [],
+                            "endpoint_seen_ip": asset.get("asset_seen_ip"),
                         }
                     )
 
@@ -267,7 +267,7 @@ class ShodanInjector:
             case "hostname":
                 for asset in assets:
                     asset_id = asset.get("asset_id")
-                    endpoint_hostname = asset.get("endpoint_hostname")
+                    endpoint_hostname = asset.get("asset_hostname")
                     if endpoint_hostname:
                         targets["asset_ids"].append(asset_id)
                         targets["hostnames"].append(endpoint_hostname)
@@ -294,7 +294,7 @@ class ShodanInjector:
             case "local_ip":
                 for asset in assets:
                     asset_id = asset.get("asset_id")
-                    endpoint_ips = asset.get("endpoint_ips")
+                    endpoint_ips = asset.get("asset_ips")
                     if endpoint_ips:
                         targets["asset_ids"].append(asset_id)
                         targets["ips"].append(endpoint_ips[0])
@@ -320,7 +320,7 @@ class ShodanInjector:
             case "seen_ip":
                 for asset in assets:
                     asset_id = asset.get("asset_id")
-                    endpoint_seen_ip = asset.get("endpoint_seen_ip")
+                    endpoint_seen_ip = asset.get("asset_seen_ip")
                     if endpoint_seen_ip:
                         targets["asset_ids"].append(asset_id)
                         targets["seen_ips"].append(endpoint_seen_ip)

@@ -15,20 +15,20 @@ class CommonTargetsTest(TestCase):
     def setUp(self):
         self.asset_hostname = {
             "asset_id": "a1",
-            "endpoint_hostname": "host.local",
-            "endpoint_ips": ["10.0.0.1"],
+            "asset_hostname": "host.local",
+            "asset_ips": ["10.0.0.1"],
             "asset_agents": False,  # agentless
         }
         self.asset_local_ip = {
             "asset_id": "a2",
-            "endpoint_hostname": None,
-            "endpoint_ips": ["10.0.0.2"],
+            "asset_hostname": None,
+            "asset_ips": ["10.0.0.2"],
             "asset_agents": True,  # has agent
         }
         self.empty_asset_ips = {
             "asset_id": "a3",
-            "endpoint_hostname": None,
-            "endpoint_ips": [],  # no ips
+            "asset_hostname": None,
+            "asset_ips": [],  # no ips
             "asset_agents": True,
         }
 
