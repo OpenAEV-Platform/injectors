@@ -95,6 +95,11 @@ class EmailSender:
             with smtplib.SMTP(host, port, timeout=timeout) as server:
                 if use_tls:
                     server.starttls()
+                # SMTP AUTH requires BOTH a username and a password. The
+                # credential fields are optional in the contract, so a blank
+                # value (None or "") means "relay without authentication".
+                # Only log in when a full credential pair is present rather
+                # than erroring on a half-provided pair.
                 if username and password:
                     server.login(username, password)
                 server.send_message(message)

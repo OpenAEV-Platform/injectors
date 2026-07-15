@@ -169,6 +169,15 @@ class EmailSenderSendTest(TestCase):
         server.login.assert_called_once_with("u", "p")
 
     @patch("email_seg.helpers.email_sender.smtplib.SMTP")
+    def test_send_skips_login_when_credentials_blank(self, smtp):
+        server = MagicMock()
+        smtp.return_value.__enter__.return_value = server
+        EmailSender().send(self._message(), "gw", 587, username="u", password="")
+        server.login.assert_not_called()
+        EmailSender().send(self._message(), "gw", 587, username="", password="p")
+        server.login.assert_not_called()
+
+    @patch("email_seg.helpers.email_sender.smtplib.SMTP")
     def test_send_smtp_error(self, smtp):
         import smtplib
 
