@@ -40,7 +40,7 @@ COPY --from=builder /usr/local/lib/python3.13/site-packages /usr/local/lib/pytho
 ARG PYOAEV_GIT_BRANCH_OVERRIDE
 
 RUN apk add --no-cache curl tar libc6-compat && \
-    curl -sSL "https://github.com/DataDog/stratus-red-team/releases/download/v${STRATUS_VERSION}/stratus-red-team_${STRATUS_VERSION}_linux_amd64.tar.gz" \
+    curl -fsSL "https://github.com/DataDog/stratus-red-team/releases/download/v${STRATUS_VERSION}/stratus-red-team_Linux_x86_64.tar.gz" \
         -o /tmp/stratus.tar.gz && \
     tar -xzf /tmp/stratus.tar.gz -C /usr/local/bin stratus && \
     rm /tmp/stratus.tar.gz && \
