@@ -11,4 +11,6 @@ injector:
 gophish:
   base_url: 'https://localhost:3333'
   api_key: 'ChangeMe'
-  verify_tls: false
+  # Verify the Gophish server TLS certificate (secure by default).
+  # Set to false only for self-signed or local development servers.
+  verify_tls: true

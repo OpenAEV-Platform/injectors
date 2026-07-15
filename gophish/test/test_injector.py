@@ -85,6 +85,19 @@ class ProcessMessageTest(TestCase):
         self.assertIn("url", callback["execution_message"])
         injector.client.create_campaign.assert_not_called()
 
+    def test_unsupported_contract(self):
+        injector = make_injector()
+        injector.client = MagicMock()
+        data = _data(CONTENT)
+        data["injection"]["inject_injector_contract"][
+            "injector_contract_id"
+        ] = "00000000-0000-0000-0000-000000000000"
+        injector.process_message(data)
+        callback = self._callback(injector)
+        self.assertEqual(callback["execution_status"], "ERROR")
+        self.assertIn("Unsupported injector contract", callback["execution_message"])
+        injector.client.create_campaign.assert_not_called()
+
     def test_start_listens(self):
         injector = make_injector()
         injector.start()

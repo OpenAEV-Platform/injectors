@@ -43,6 +43,27 @@ class ClientTest(TestCase):
         self.assertTrue(result.success)
         self.assertEqual(result.campaign_id, 7)
         self.assertEqual(result.stats["opened"], 3)
+        sent_payload = mock_post.call_args.kwargs["json"]
+        self.assertIn("launch_date", sent_payload)
+        self.assertTrue(sent_payload["launch_date"])
+        self.assertEqual(sent_payload["groups"], [{"name": "g"}])
+
+    @patch("gophish_injector.client.gophish_client.requests.post")
+    def test_create_campaign_verify_tls_default(self, mock_post):
+        response = MagicMock()
+        response.json.return_value = {"id": 1, "stats": {}}
+        mock_post.return_value = response
+
+        client = GophishClient("https://gophish:3333", "key")
+        client.create_campaign(
+            name="c",
+            template_name="t",
+            page_name="p",
+            smtp_name="s",
+            group_name="g",
+            url="http://phish",
+        )
+        self.assertTrue(mock_post.call_args.kwargs["verify"])
 
     @patch("gophish_injector.client.gophish_client.requests.get")
     def test_get_stats(self, mock_get):

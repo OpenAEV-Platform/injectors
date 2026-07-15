@@ -13,6 +13,9 @@ class GophishConfig(BaseSettings):
         description="Gophish API key (Settings page).",
     )
     verify_tls: bool = Field(
-        default=False,
-        description="Verify the Gophish server TLS certificate.",
+        default=True,
+        description=(
+            "Verify the Gophish server TLS certificate. Secure by default; set "
+            "to false only for self-signed or local development servers."
+        ),
     )

@@ -1,7 +1,8 @@
 """Thin client over the Gophish REST API."""
 
 from dataclasses import dataclass, field
-from typing import Dict
+from datetime import datetime, timezone
+from typing import Dict, Optional
 
 import requests
 
@@ -19,7 +20,7 @@ class GophishClient:
         self,
         base_url: str,
         api_key: str,
-        verify_tls: bool = False,
+        verify_tls: bool = True,
         timeout: int = 60,
         logger=None,
     ):
@@ -37,11 +38,16 @@ class GophishClient:
         smtp_name: str,
         group_name: str,
         url: str,
+        launch_date: Optional[str] = None,
     ) -> CampaignResult:
         """Create and launch a campaign referencing existing Gophish objects.
 
         Gophish resolves the template, landing page, sending profile and target
         group by name, so those objects must already exist on the server.
+
+        ``launch_date`` is sent in ISO 8601 form. When omitted it defaults to
+        the current UTC time so the campaign launches immediately with an
+        explicit, unambiguous schedule instead of relying on the server clock.
         """
         payload = {
             "name": name,
@@ -50,6 +56,8 @@ class GophishClient:
             "smtp": {"name": smtp_name},
             "url": url,
             "groups": [{"name": group_name}],
+            "launch_date": launch_date
+            or datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
         }
         try:
             response = requests.post(

@@ -4,6 +4,7 @@ from typing import Dict
 
 from gophish_injector.client.gophish_client import GophishClient
 from gophish_injector.configuration.config_loader import ConfigLoader
+from gophish_injector.contracts_gophish import GOPHISH_CAMPAIGN_CONTRACT
 from pyoaev.helpers import OpenAEVConfigHelper, OpenAEVInjectorHelper
 
 from injector_common.data_helpers import DataHelpers
@@ -72,6 +73,12 @@ class OpenAEVGophish:
         )
 
         try:
+            contract_id = DataHelpers.get_injector_contract_id(data)
+            if contract_id != GOPHISH_CAMPAIGN_CONTRACT:
+                raise ValueError(
+                    "Unsupported injector contract '%s'; this injector only "
+                    "handles the Gophish campaign contract." % contract_id
+                )
             content = DataHelpers.get_content(data)
             self._validate_content(content)
             result = self.client.create_campaign(
