@@ -24,6 +24,7 @@ class PyritEngine(Engine):
         self.timeout = timeout
 
     def run(self, content, target, marker, ctx) -> EngineResult:
+        logger = (ctx or {}).get("logger")
         objective = (content.get(c.KEY_PYRIT_OBJECTIVE) or "").replace(
             "{marker}", marker
         )
@@ -37,9 +38,13 @@ class PyritEngine(Engine):
 
         # Built-in escalation fallback (always available). A real PyRIT integration can be wired
         # behind a feature flag; the fallback keeps the technique functional out of the box.
-        return self._escalation_loop(objective, strategy, max_turns, target, marker)
+        return self._escalation_loop(
+            objective, strategy, max_turns, target, marker, logger
+        )
 
-    def _escalation_loop(self, objective, strategy, max_turns, target, marker):
+    def _escalation_loop(
+        self, objective, strategy, max_turns, target, marker, logger=None
+    ):
         transcript = []
         success = False
         reason = "Target resisted across all turns"
@@ -52,7 +57,7 @@ class PyritEngine(Engine):
             )
             try:
                 response = llm_client.send_prompt(
-                    target, prompt, marker, timeout=self.timeout
+                    target, prompt, marker, timeout=self.timeout, logger=logger
                 )
             except Exception as exc:  # noqa: BLE001
                 return EngineResult(

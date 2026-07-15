@@ -2,7 +2,6 @@ from ai_redteam.contracts import constants as c
 from pyoaev.contracts import ContractBuilder
 from pyoaev.contracts.contract_config import (
     Contract,
-    ContractAiTarget,
     ContractAssetGroup,
     ContractCardinality,
     ContractConfig,
@@ -17,6 +16,24 @@ from pyoaev.contracts.contract_config import (
     SupportedLanguage,
     prepare_contracts,
 )
+
+try:
+    from pyoaev.contracts.contract_config import ContractAiTarget
+except ImportError:
+    # Fallback for a pyoaev release that predates the AI target contract field:
+    # the AI-target picker ("ai-target" field type) shipped with the asset
+    # taxonomy remodel. Emitting the same field type keeps the contract valid on
+    # the platform; once the installed pyoaev exposes ContractAiTarget natively,
+    # that class is used instead and this shim is ignored.
+    from dataclasses import dataclass
+
+    from pyoaev.contracts.contract_config import ContractCardinalityElement
+
+    @dataclass
+    class ContractAiTarget(ContractCardinalityElement):
+        @property
+        def get_type(self) -> str:
+            return "ai-target"
 
 
 def _base_config():
