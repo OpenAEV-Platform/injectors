@@ -60,6 +60,20 @@ class PyritEngine(Engine):
                     status="ERROR",
                     message=f"Error during PyRIT escalation turn {turn + 1}: {exc}",
                 )
+            # A non-2xx means the turn never reached the model (auth/endpoint/
+            # upstream failure): report an execution error instead of silently
+            # counting it as a resisted turn.
+            status_code = response.status_code
+            if status_code is not None and not (200 <= status_code < 300):
+                return EngineResult(
+                    success=False,
+                    status="ERROR",
+                    message=(
+                        f"AI target returned HTTP {status_code} on PyRIT "
+                        f"escalation turn {turn + 1} and could not be tested.\n"
+                        f"Response (truncated):\n{(response.text or '')[:1500]}"
+                    ),
+                )
             last_response = response.text
             transcript.append(
                 f"--- turn {turn + 1} ---\nUSER: {prompt}\nMODEL: {last_response[:600]}"

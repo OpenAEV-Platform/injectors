@@ -111,6 +111,45 @@ class SendPromptTest(TestCase):
         result = llm_client.send_prompt(target, "hi", "m", timeout=5)
         self.assertEqual(result.text, "fb")
 
+    @patch("ai_redteam.targets.llm_client.requests.post")
+    def test_xtm_one_posts_platform_chat_message(self, post):
+        post.return_value = _response({"content": "agent reply", "conversation_id": "c1"})
+        target = _target(
+            "XTM_ONE",
+            "https://xtm-one.example.test",
+            configuration={"xtm_one_slug": "ctem-assistant"},
+        )
+        result = llm_client.send_prompt(target, "attack", "marker-9", timeout=5)
+        self.assertEqual(result.text, "agent reply")
+        self.assertEqual(
+            post.call_args.args[0],
+            "https://xtm-one.example.test/api/v1/platform/chat/messages",
+        )
+        sent_body = post.call_args.kwargs["json"]
+        self.assertEqual(sent_body["agent_slug"], "ctem-assistant")
+        self.assertEqual(sent_body["content"], "attack")
+        self.assertFalse(sent_body["stream"])
+        self.assertEqual(
+            post.call_args.kwargs["headers"]["Authorization"], "Bearer secret-key"
+        )
+
+    @patch("ai_redteam.targets.llm_client.requests.post")
+    def test_xtm_one_derives_slug_from_model_and_strips_v1(self, post):
+        post.return_value = _response({"content": "ok"})
+        target = _target("XTM_ONE", "https://xtm-one.example.test/v1")
+        target.model = "agent:triage"
+        llm_client.send_prompt(target, "hi", "m", timeout=5)
+        self.assertEqual(
+            post.call_args.args[0],
+            "https://xtm-one.example.test/api/v1/platform/chat/messages",
+        )
+        self.assertEqual(post.call_args.kwargs["json"]["agent_slug"], "triage")
+
+    def test_xtm_one_without_endpoint_raises(self):
+        target = _target("XTM_ONE", endpoint=None)
+        with self.assertRaises(ValueError):
+            llm_client.send_prompt(target, "hi", "m", timeout=5)
+
 
 class SafeJsonTest(TestCase):
     def test_returns_raw_on_invalid_json(self):

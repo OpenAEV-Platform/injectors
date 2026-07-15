@@ -29,6 +29,7 @@ class OpenAEVAiRedTeamTest(TestCase):
         obj.helper = MagicMock()
         obj.engines = {"native": engine}
         obj.engine_by_contract = {"cid": "native"}
+        obj.engines_timeout = 120
         return obj
 
     def test_resolve_engine_defaults_to_native(self):

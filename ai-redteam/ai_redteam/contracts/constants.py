@@ -10,11 +10,12 @@ INJECTOR_TYPE = "openaev_ai_redteam"
 CONTRACT_COLOR = "#7c4dff"
 
 # Shared contract field keys (referenced by both the contracts and the engines)
+KEY_TARGET_SELECTOR = "target_selector"
 KEY_TARGET_REF = "ai_target"
 KEY_PROVIDER = "target_provider"
 KEY_ENDPOINT = "target_endpoint"
 KEY_MODEL = "target_model"
-KEY_API_KEY_VAR = "target_api_key_variable"
+KEY_TOKEN = "target_token"
 KEY_SYSTEM_PROMPT = "system_prompt"
 KEY_ATTACK_PROMPT = "attack_prompt"
 KEY_CONVERTERS = "converters"
@@ -27,6 +28,28 @@ KEY_PYRIT_MAX_TURNS = "pyrit_max_turns"
 KEY_PROMPTFOO_PLUGINS = "promptfoo_plugins"
 KEY_PROMPTFOO_STRATEGIES = "promptfoo_strategies"
 
+# "Type of targets" selector values. Mirrors the nuclei injector pattern: a single select
+# drives the conditional visibility of the other target fields. Default is a pre-configured
+# AiTarget asset; "asset-groups" runs against every AI target in the selected group(s);
+# "manual" reveals the inline provider / endpoint / model / key fields.
+TARGET_SELECTOR_AI_TARGET = "ai_target"
+TARGET_SELECTOR_ASSET_GROUPS = "asset-groups"
+TARGET_SELECTOR_MANUAL = "manual"
+TARGET_SELECTORS = {
+    TARGET_SELECTOR_AI_TARGET: "AI target",
+    TARGET_SELECTOR_ASSET_GROUPS: "Asset group",
+    TARGET_SELECTOR_MANUAL: "Manual",
+}
+
+# Contract field key for the asset group picker. Matches the platform's fixed asset-group
+# content key, so the selection is stored as an inject asset-group relation (not free content).
+KEY_ASSET_GROUPS = "asset_groups"
+
+# RabbitMQ payload key carrying the selected asset groups on the injector message.
+ASSET_GROUPS_KEY_RABBITMQ = "assetGroups"
+# Queryable filter key to fetch assets (incl. AI targets) by asset group membership.
+ASSET_GROUPS_FILTER_KEY = "assetGroups"
+
 PROVIDERS = [
     "OPENAI_COMPATIBLE",
     "ANTHROPIC",
@@ -38,6 +61,7 @@ PROVIDERS = [
     "CUSTOM_HTTP",
     "MCP_SERVER",
     "AGENT_HTTP",
+    "XTM_ONE",
 ]
 
 CONVERTERS = ["none", "base64", "rot13", "leetspeak", "unicode_escape", "reverse"]

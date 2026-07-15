@@ -1,6 +1,5 @@
-import os
 from unittest import TestCase
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
 from ai_redteam.targets import target_resolver
 from ai_redteam.targets.target_resolver import TargetConfig
@@ -19,10 +18,15 @@ class TargetConfigTest(TestCase):
         self.assertEqual(target.configuration, {})
         self.assertIsNone(target.api_key)
 
-    @patch.dict(os.environ, {"MY_SECRET_VAR": "resolved-secret"}, clear=False)
-    def test_api_key_resolved_from_environment(self):
-        target = TargetConfig(api_key_variable="MY_SECRET_VAR")
-        self.assertEqual(target.api_key, "resolved-secret")
+    def test_token_is_used_as_api_key(self):
+        target = TargetConfig(token="secret-token")
+        self.assertEqual(target.token, "secret-token")
+        self.assertEqual(target.api_key, "secret-token")
+
+    def test_empty_token_means_no_api_key(self):
+        target = TargetConfig(token="")
+        self.assertIsNone(target.token)
+        self.assertIsNone(target.api_key)
 
 
 class ResolveTargetTest(TestCase):
@@ -42,12 +46,26 @@ class ResolveTargetTest(TestCase):
             "ai_target_provider": "OLLAMA",
             "ai_target_endpoint": "http://localhost:11434",
             "ai_target_model": "llama3",
+            "ai_target_token": "asset-token",
         }
         content = {"ai_target": "asset-123"}
         target = target_resolver.resolve_target(content, api=api)
         api.http_get.assert_called_once_with("/ai_targets/asset-123")
         self.assertEqual(target.provider, "OLLAMA")
         self.assertEqual(target.model, "llama3")
+        self.assertEqual(target.token, "asset-token")
+        self.assertEqual(target.api_key, "asset-token")
+
+    def test_inline_manual_token(self):
+        content = {
+            "target_selector": "manual",
+            "target_provider": "XTM_ONE",
+            "target_endpoint": "https://xtm-one.example.test",
+            "target_token": "fcp-inline",
+        }
+        target = target_resolver.resolve_target(content, api=MagicMock())
+        self.assertEqual(target.token, "fcp-inline")
+        self.assertEqual(target.api_key, "fcp-inline")
 
     def test_inline_system_prompt_overrides_asset(self):
         api = MagicMock()
@@ -67,3 +85,102 @@ class ResolveTargetTest(TestCase):
         target = target_resolver.resolve_target(content, api=api, logger=logger)
         self.assertEqual(target.provider, "OLLAMA")
         logger.warning.assert_called_once()
+
+    def test_manual_selector_ignores_target_ref(self):
+        api = MagicMock()
+        content = {
+            "target_selector": "manual",
+            "ai_target": "asset-123",
+            "target_provider": "ANTHROPIC",
+            "target_endpoint": "https://api.anthropic.com",
+        }
+        target = target_resolver.resolve_target(content, api=api)
+        api.http_get.assert_not_called()
+        self.assertEqual(target.provider, "ANTHROPIC")
+        self.assertEqual(target.endpoint, "https://api.anthropic.com")
+
+    def test_ai_target_selector_fetches_asset(self):
+        api = MagicMock()
+        api.http_get.return_value = {
+            "ai_target_provider": "OLLAMA",
+            "ai_target_model": "llama3",
+        }
+        content = {"target_selector": "ai_target", "ai_target": "asset-123"}
+        target = target_resolver.resolve_target(content, api=api)
+        api.http_get.assert_called_once_with("/ai_targets/asset-123")
+        self.assertEqual(target.provider, "OLLAMA")
+        self.assertEqual(target.model, "llama3")
+
+
+class ResolveTargetsTest(TestCase):
+    def test_manual_returns_single_inline(self):
+        content = {"target_selector": "manual", "target_provider": "ANTHROPIC"}
+        targets = target_resolver.resolve_targets(content, data={}, api=MagicMock())
+        self.assertEqual(len(targets), 1)
+        self.assertEqual(targets[0].provider, "ANTHROPIC")
+
+    def test_ai_target_returns_single(self):
+        api = MagicMock()
+        api.http_get.return_value = {
+            "ai_target_provider": "OLLAMA",
+            "ai_target_model": "llama3",
+            "asset_name": "Local Llama",
+            "asset_id": "asset-123",
+        }
+        content = {"target_selector": "ai_target", "ai_target": "asset-123"}
+        targets = target_resolver.resolve_targets(content, data={}, api=api)
+        self.assertEqual(len(targets), 1)
+        self.assertEqual(targets[0].name, "Local Llama")
+
+    def test_asset_groups_fetches_all_members_paginated(self):
+        api = MagicMock()
+        api.http_post.side_effect = [
+            {
+                "content": [
+                    {
+                        "ai_target_provider": "OLLAMA",
+                        "asset_id": "a1",
+                        "asset_name": "T1",
+                    },
+                    {
+                        "ai_target_provider": "ANTHROPIC",
+                        "asset_id": "a2",
+                        "asset_name": "T2",
+                    },
+                ],
+                "last": False,
+            },
+            {
+                "content": [
+                    {
+                        "ai_target_provider": "OPENAI_COMPATIBLE",
+                        "asset_id": "a3",
+                        "asset_name": "T3",
+                    },
+                ],
+                "last": True,
+            },
+        ]
+        content = {"target_selector": "asset-groups"}
+        data = {
+            "assetGroups": [{"asset_group_id": "g1", "asset_group_name": "Group 1"}]
+        }
+        targets = target_resolver.resolve_targets(content, data=data, api=api)
+        self.assertEqual([t.asset_id for t in targets], ["a1", "a2", "a3"])
+        self.assertEqual(api.http_post.call_count, 2)
+        # The search must filter by the selected asset group id.
+        first_body = api.http_post.call_args_list[0].kwargs["post_data"]
+        self.assertEqual(first_body["filterGroup"]["filters"][0]["values"], ["g1"])
+
+    def test_asset_groups_without_selection_raises(self):
+        content = {"target_selector": "asset-groups"}
+        with self.assertRaises(ValueError):
+            target_resolver.resolve_targets(content, data={}, api=MagicMock())
+
+    def test_asset_groups_with_no_members_raises(self):
+        api = MagicMock()
+        api.http_post.return_value = {"content": [], "last": True}
+        content = {"target_selector": "asset-groups"}
+        data = {"assetGroups": [{"asset_group_id": "g1"}]}
+        with self.assertRaises(ValueError):
+            target_resolver.resolve_targets(content, data=data, api=api)

@@ -90,19 +90,9 @@ The injector is configured either through environment variables (recommended, re
 |-----------------|------------------------------------|-------------------------------------|---------|-----------|----------------------------------------------------------|
 | Request timeout | `injector.request_timeout_seconds` | `INJECTOR_REQUEST_TIMEOUT_SECONDS`  | 120     | No        | HTTP timeout (in seconds) for a single request to an AI target. |
 
-Provider credentials are not stored in OpenAEV and are not part of `config.yml`. The injector resolves each secret from
-its own process environment, using the variable name carried by the AI target (`api_key_variable`). Set the relevant
-variables on the injector (in `.env` / `docker-compose.yml`) and reference them by name on each target. Common examples:
-
-| Docker environment variable | Used by                                                          |
-|-----------------------------|------------------------------------------------------------------|
-| `OPENAI_API_KEY`            | OpenAI-compatible / Azure OpenAI / Bedrock / Vertex targets      |
-| `ANTHROPIC_API_KEY`         | Anthropic targets                                                |
-| `AZURE_OPENAI_API_KEY`      | Azure OpenAI targets                                             |
-| `HF_INFERENCE_TOKEN`        | Hugging Face inference targets                                   |
-
-Add as many credential variables as you need for the providers you test; any variable name can be used as long as the
-target's `API key variable` field references it.
+Provider credentials are not configured on the injector. Each AI target carries its own optional token (set on the
+target itself, manually when creating it or by a collector), which the injector uses to authenticate. Targets that
+require no authentication (e.g. a local model deployment) simply carry no token.
 
 ## Deployment
 
@@ -193,12 +183,19 @@ Every contract shares the AI target fields (see [Target selection](#target-selec
 
 ## Target selection
 
-The target of an AI Red Team inject is an AI endpoint, not an OpenAEV asset or IP. It can be provided in two ways:
+The target of an AI Red Team inject is an AI endpoint, not an OpenAEV asset or IP. A `Type of targets` selector
+(mirroring the nuclei injector) drives how it is provided, and defaults to `AI target`:
 
-- Reference an `AI Target` asset by id (field `AI Target id`). The injector fetches the target definition from the
-  platform (`/ai_targets/{id}`).
-- Provide the connection inline on the inject: `Provider`, `Endpoint URL`, `Model`, `API key variable` and an optional
-  `System prompt`. Inline values can also override the system prompt of a referenced target.
+- `AI target` (default): pick a pre-configured `AI Target` asset from the `AI target` autocomplete selector. The
+  injector fetches the target definition from the platform (`/ai_targets/{id}`).
+- `Asset group`: pick one or more asset groups. The injector runs the technique against every `AI Target` asset that
+  belongs to the selected group(s) (fetched via `/ai_targets/search` filtered by asset group membership) and reports a
+  per-target verdict. Build an asset group of `AI Target` assets (category `AI_TARGET`) to test a fleet at once.
+- `Manual`: provide the connection inline on the inject - `Provider`, `Endpoint URL`, `Model`, an optional `API token`
+  and an optional `System prompt`. These fields only appear when `Manual` is selected.
+
+The inline / AI target / asset group fields are shown conditionally based on the selector, so the form only surfaces the
+inputs relevant to the chosen mode.
 
 The supported providers are:
 
@@ -214,10 +211,10 @@ The supported providers are:
 | `CUSTOM_HTTP`       | Generic HTTP POST (request/response shape is configurable)     |
 | `AGENT_HTTP`        | Generic HTTP POST for an AI agent endpoint                     |
 | `MCP_SERVER`        | Generic HTTP POST for an MCP server endpoint                   |
+| `XTM_ONE`           | XTM One agent via the Platform Chat API (`agent:<slug>`)       |
 
-Credentials are never read from OpenAEV. The secret is resolved from the injector process environment using the
-variable name carried by the target (`API key variable`), for example `OPENAI_API_KEY`. If the variable is unset, the
-request is sent without an authorization header.
+The credential comes from the AI target's optional `API token`. If the target carries no token, the request is sent
+without an authorization header (fine for targets that require no authentication, e.g. a local deployment).
 
 ## Behavior
 
@@ -247,7 +244,7 @@ Set `INJECTOR_LOG_LEVEL=debug` to log the resolved provider, model and endpoint 
 - `No engine registered for contract ...`: an unknown contract id was received.
 - `Garak is not installed ...` / `Promptfoo is not installed ...`: build the image with `INSTALL_OSS_ENGINES=true`, or
   install the tool on the `PATH` for a manual deployment.
-- `Error calling AI target ...` or timeouts: check the endpoint URL, the resolved API key variable and
+- `Error calling AI target ...` or timeouts: check the endpoint URL, the target's API token and
   `INJECTOR_REQUEST_TIMEOUT_SECONDS`.
 
 ## Additional information

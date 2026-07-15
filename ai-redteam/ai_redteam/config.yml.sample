@@ -9,6 +9,5 @@ injector:
   log_level: 'error'
   request_timeout_seconds: 120
 
-# Provider credentials are NOT stored here or in the platform. The injector resolves them from its
-# own process environment using the variable name carried by each AI Target (api_key_variable),
-# e.g. export OPENAI_API_KEY=..., ANTHROPIC_API_KEY=..., etc.
+# AI target credentials are not configured here. Each AI target carries its own optional token,
+# set on the target itself (manually when creating the target, or by a collector).
