@@ -139,8 +139,12 @@ class BloodhoundExecutor:
             return {}
 
     @staticmethod
+    def _name_or_none(properties: Dict) -> str | None:
+        return properties.get("name") or properties.get("samaccountname")
+
+    @staticmethod
     def _entry_name(properties: Dict) -> str:
-        return properties.get("name") or properties.get("samaccountname") or "unknown"
+        return BloodhoundExecutor._name_or_none(properties) or "unknown"
 
     @staticmethod
     def _names(workdir: str, pattern: str) -> List[str]:
@@ -149,8 +153,8 @@ class BloodhoundExecutor:
         for path in sorted(glob.glob(os.path.join(workdir, pattern))):
             data = BloodhoundExecutor._load(path)
             for entry in data.get("data", []):
-                properties = entry.get("Properties", {})
-                name = properties.get("name") or properties.get("samaccountname")
+                properties = entry.get("Properties") or {}
+                name = BloodhoundExecutor._name_or_none(properties)
                 if name and name not in seen:
                     seen.add(name)
                     names.append(name)
@@ -163,7 +167,7 @@ class BloodhoundExecutor:
         for path in sorted(glob.glob(os.path.join(workdir, "*_users.json"))):
             data = BloodhoundExecutor._load(path)
             for entry in data.get("data", []):
-                properties = entry.get("Properties", {})
+                properties = entry.get("Properties") or {}
                 name = BloodhoundExecutor._entry_name(properties)
                 findings = []
                 if properties.get("hasspn"):

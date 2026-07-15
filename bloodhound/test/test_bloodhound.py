@@ -58,6 +58,24 @@ class ParsingTest(TestCase):
         with tempfile.TemporaryDirectory() as workdir:
             self.assertEqual(BloodhoundExecutor.parse_collection(workdir), {})
 
+    def test_parse_collection_tolerates_null_properties(self):
+        with tempfile.TemporaryDirectory() as workdir:
+            self._write(
+                workdir,
+                "20260714_users.json",
+                {
+                    "data": [
+                        {"Properties": None},
+                        {"Properties": {"name": "ADMIN@CORP", "hasspn": True}},
+                    ]
+                },
+            )
+
+            outputs = BloodhoundExecutor.parse_collection(workdir)
+
+        self.assertEqual(outputs["users"], ["ADMIN@CORP"])
+        self.assertEqual(outputs["attack_paths"], ["Kerberoastable: ADMIN@CORP"])
+
     def test_parse_collection_dedupes_and_falls_back_to_samaccountname(self):
         with tempfile.TemporaryDirectory() as workdir:
             self._write(
