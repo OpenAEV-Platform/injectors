@@ -39,7 +39,11 @@ class TargetConfig:
         self.modality = modality or "TEXT"
         self.system_prompt = system_prompt
         self.configuration = configuration or {}
-        # Optional credential carried by the target; empty means no authentication.
+        # Optional credential carried by the target; empty (or whitespace-only)
+        # means no authentication, so we normalise it to None to avoid sending a
+        # meaningless "Bearer  " header.
+        if isinstance(token, str):
+            token = token.strip()
         self.token = token or None
         self.api_key = self.token
         # Optional identity (set when the target comes from an AiTarget asset), used for

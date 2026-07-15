@@ -28,6 +28,16 @@ class TargetConfigTest(TestCase):
         self.assertIsNone(target.token)
         self.assertIsNone(target.api_key)
 
+    def test_whitespace_token_means_no_api_key(self):
+        target = TargetConfig(token="   ")
+        self.assertIsNone(target.token)
+        self.assertIsNone(target.api_key)
+
+    def test_token_is_stripped(self):
+        target = TargetConfig(token="  secret-token  ")
+        self.assertEqual(target.token, "secret-token")
+        self.assertEqual(target.api_key, "secret-token")
+
 
 class ResolveTargetTest(TestCase):
     def test_inline_definition_when_no_target_ref(self):

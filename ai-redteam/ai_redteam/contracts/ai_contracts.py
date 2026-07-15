@@ -1,3 +1,4 @@
+from ai_redteam.contracts import constants as c
 from pyoaev.contracts import ContractBuilder
 from pyoaev.contracts.contract_config import (
     Contract,
@@ -16,8 +17,6 @@ from pyoaev.contracts.contract_config import (
     SupportedLanguage,
     prepare_contracts,
 )
-
-from ai_redteam.contracts import constants as c
 
 
 def _base_config():

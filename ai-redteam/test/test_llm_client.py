@@ -113,7 +113,9 @@ class SendPromptTest(TestCase):
 
     @patch("ai_redteam.targets.llm_client.requests.post")
     def test_xtm_one_posts_platform_chat_message(self, post):
-        post.return_value = _response({"content": "agent reply", "conversation_id": "c1"})
+        post.return_value = _response(
+            {"content": "agent reply", "conversation_id": "c1"}
+        )
         target = _target(
             "XTM_ONE",
             "https://xtm-one.example.test",
@@ -147,6 +149,13 @@ class SendPromptTest(TestCase):
 
     def test_xtm_one_without_endpoint_raises(self):
         target = _target("XTM_ONE", endpoint=None)
+        with self.assertRaises(ValueError):
+            llm_client.send_prompt(target, "hi", "m", timeout=5)
+
+    def test_xtm_one_without_slug_raises(self):
+        # Neither a configured slug nor a model to derive one from.
+        target = _target("XTM_ONE", "https://xtm-one.example.test")
+        target.model = "   "
         with self.assertRaises(ValueError):
             llm_client.send_prompt(target, "hi", "m", timeout=5)
 

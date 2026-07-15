@@ -181,9 +181,7 @@ def _post(url, target, marker, body, extra, timeout, logger=None):
         resp = requests.post(url, headers=headers, json=body, timeout=timeout)
     except requests.exceptions.Timeout as exc:
         if logger:
-            logger.error(
-                f"[llm_client] POST {url} timed out after {timeout}s: {exc}"
-            )
+            logger.error(f"[llm_client] POST {url} timed out after {timeout}s: {exc}")
         raise
     except requests.exceptions.RequestException as exc:
         if logger:
@@ -223,10 +221,16 @@ def _xtm_one(target, prompt, marker, timeout, logger=None):
             base = base[: -len("/v1")].rstrip("/")
         url = f"{base}{path}"
 
-    slug = target.configuration.get("xtm_one_slug")
+    slug = (target.configuration.get("xtm_one_slug") or "").strip()
     if not slug:
-        model = target.model or ""
-        slug = model[len("agent:") :] if model.startswith("agent:") else model
+        model = (target.model or "").strip()
+        slug = model[len("agent:") :].strip() if model.startswith("agent:") else model
+    if not slug:
+        raise ValueError(
+            "XTM_ONE target requires an agent slug: set the target model to the "
+            "agent slug (or 'agent:<slug>'), or provide 'xtm_one_slug' in the "
+            "target configuration."
+        )
 
     extra = {}
     if target.api_key:

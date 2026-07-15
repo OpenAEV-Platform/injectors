@@ -46,7 +46,9 @@ class NativeEngineTest(TestCase):
 
     @patch("ai_redteam.engines.native.llm_client.send_prompt")
     def test_returns_error_status_on_http_error(self, send_prompt):
-        send_prompt.return_value = LLMResponse('{"detail":"Not authenticated"}', 401, {})
+        send_prompt.return_value = LLMResponse(
+            '{"detail":"Not authenticated"}', 401, {}
+        )
         result = NativeEngine().run({"attack_prompt": "x"}, _target(), "m1", ctx={})
         self.assertEqual(result.status, "ERROR")
         self.assertFalse(result.success)

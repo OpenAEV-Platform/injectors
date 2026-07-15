@@ -2,12 +2,11 @@ import json
 import time
 from typing import Dict
 
-from pyoaev.helpers import OpenAEVConfigHelper, OpenAEVInjectorHelper
-
 from ai_redteam import marker as marker_mod
 from ai_redteam.configuration.config_loader import ConfigLoader
 from ai_redteam.engines import build_registry, contract_engine_map
 from ai_redteam.targets.target_resolver import resolve_targets
+from pyoaev.helpers import OpenAEVConfigHelper, OpenAEVInjectorHelper
 
 try:
     from injector_common.dump_config import intercept_dump_argument
@@ -113,6 +112,13 @@ class OpenAEVAiRedTeam:
     def _target_label(target) -> str:
         return target.name or target.endpoint or target.model or target.provider
 
+    @staticmethod
+    def _target_key(target) -> str:
+        # Stable, collision-free identifier used to key per-target results. Two
+        # assets can share a name/endpoint/model, so prefer the asset id when the
+        # target comes from an AiTarget asset; fall back to the display label.
+        return target.asset_id or OpenAEVAiRedTeam._target_label(target)
+
     def _aggregate_results(self, targets, results) -> Dict:
         """Collapse per-target engine results into a single inject execution callback.
 
@@ -130,11 +136,16 @@ class OpenAEVAiRedTeam:
 
         vulnerabilities = []
         responses = {}
+        response_sections = []
         message_lines = []
         for target, result in zip(targets, results):
+            key = self._target_key(target)
             label = self._target_label(target)
             outputs = result.outputs or {}
-            responses[label] = outputs.get("response", "")
+            text = outputs.get("response", "")
+            responses[key] = text
+            if text:
+                response_sections.append(f"### {label}\n{text}")
             for vuln in outputs.get("vulnerability", []) or []:
                 enriched = dict(vuln)
                 enriched["target"] = label
@@ -150,9 +161,7 @@ class OpenAEVAiRedTeam:
         all_error = all(r.status == "ERROR" for r in results)
 
         outputs = {
-            "response": "\n\n".join(
-                f"### {label}\n{text}" for label, text in responses.items() if text
-            ),
+            "response": "\n\n".join(response_sections),
             "marker": (results[0].outputs or {}).get("marker", ""),
             "attack_succeeded": any_success,
             "responses_by_target": responses,
