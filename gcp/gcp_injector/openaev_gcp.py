@@ -49,14 +49,17 @@ class OpenAEVGcp:
             if not technique_id:
                 raise ValueError("No Stratus technique id provided")
 
-            project_id = content.get("gcp_project_id")
+            # Normalize before validating: values copied from the UI often
+            # carry surrounding whitespace or trailing newlines that would pass
+            # a bare truthiness check yet break Stratus/gcloud.
+            project_id = (content.get("gcp_project_id") or "").strip()
             if not project_id:
                 raise ValueError("A GCP project id is required")
 
             # Stratus authenticates to GCP through Application Default
             # Credentials; materialize the service account key on disk.
             key_material = content.get("gcp_service_account_key")
-            if not key_material:
+            if not key_material or not key_material.strip():
                 raise ValueError("A GCP service account key is required")
             with tempfile.NamedTemporaryFile(
                 mode="w", suffix=".json", delete=False

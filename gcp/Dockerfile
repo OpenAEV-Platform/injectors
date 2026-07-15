@@ -44,7 +44,7 @@ RUN apk add --no-cache curl tar libc6-compat && \
         -o /tmp/stratus.tar.gz && \
     tar -xzf /tmp/stratus.tar.gz -C /usr/local/bin stratus && \
     rm /tmp/stratus.tar.gz && \
-    stratus version || echo "stratus installed"
+    stratus version
 
 RUN if [ "${PYOAEV_GIT_BRANCH_OVERRIDE}" ] ; then \
         echo "Forcing specific version of client-python" && \

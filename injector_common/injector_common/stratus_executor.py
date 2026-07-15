@@ -96,6 +96,15 @@ class StratusExecutor:
                 status="ERROR",
                 message="stratus binary not found in the injector image",
             )
+        except OSError as exc:
+            # e.g. the binary exists but is not executable (PermissionError)
+            # or has the wrong format; still surface a normalized result.
+            return StratusResult(
+                success=False,
+                technique_id=technique_id,
+                status="ERROR",
+                message=f"Failed to execute stratus: {exc}",
+            )
 
         if result.returncode == 0:
             return StratusResult(
@@ -124,18 +133,38 @@ class StratusExecutor:
         """Best-effort teardown of a technique's prerequisite infrastructure."""
         try:
             result = self._run(["cleanup", technique_id], env=env)
-        except (subprocess.TimeoutExpired, FileNotFoundError) as exc:
+        except subprocess.TimeoutExpired:
             return StratusResult(
                 success=False,
                 technique_id=technique_id,
                 status="ERROR",
-                message=str(exc),
+                message=f"Stratus cleanup for {technique_id} timed out",
+            )
+        except OSError as exc:
+            # FileNotFoundError (missing binary) and other OSError cases such as
+            # a non-executable binary must not break the always-returns-result
+            # contract of the wrapper.
+            return StratusResult(
+                success=False,
+                technique_id=technique_id,
+                status="ERROR",
+                message=f"Failed to execute stratus cleanup: {exc}",
+            )
+        success = result.returncode == 0
+        # Stratus can exit without writing to stdout/stderr; fall back to a
+        # deterministic message so downstream callbacks stay interpretable.
+        message = (result.stderr or result.stdout or "").strip()[:500]
+        if not message:
+            message = (
+                f"Cleaned up {technique_id}"
+                if success
+                else f"Stratus cleanup failed for {technique_id}"
             )
         return StratusResult(
-            success=result.returncode == 0,
+            success=success,
             technique_id=technique_id,
-            status="CLEAN" if result.returncode == 0 else "ERROR",
-            message=(result.stderr or result.stdout or "").strip()[:500],
+            status="CLEAN" if success else "ERROR",
+            message=message,
             stdout=result.stdout,
             stderr=result.stderr,
         )

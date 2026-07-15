@@ -1,5 +1,6 @@
 import json
 import os
+import subprocess
 from unittest import TestCase
 from unittest.mock import MagicMock, mock_open, patch
 
@@ -117,6 +118,21 @@ class ProcessMessageTest(TestCase):
         self.assertEqual(self._callback(injector)["execution_status"], "ERROR")
         injector.stratus.detonate.assert_not_called()
 
+    def test_whitespace_project_reports_error(self):
+        injector = make_injector()
+        injector.stratus = MagicMock()
+        injector.process_message(
+            _data(
+                {
+                    "technique_id": ["gcp.exfiltration.share-compute-disk"],
+                    "gcp_project_id": "   \n",
+                    "gcp_service_account_key": '{"type": "service_account"}',
+                }
+            )
+        )
+        self.assertEqual(self._callback(injector)["execution_status"], "ERROR")
+        injector.stratus.detonate.assert_not_called()
+
     def test_start_listens(self):
         injector = make_injector()
         injector.start()
@@ -145,7 +161,44 @@ class StratusExecutorTest(TestCase):
     def test_detonate_missing_binary(self, _run):
         self.assertFalse(StratusExecutor().detonate("gcp.foo").success)
 
+    @patch(
+        "injector_common.stratus_executor.subprocess.run",
+        side_effect=subprocess.TimeoutExpired(cmd="stratus", timeout=900),
+    )
+    def test_detonate_timeout(self, _run):
+        result = StratusExecutor().detonate("gcp.foo")
+        self.assertFalse(result.success)
+        self.assertEqual(result.status, "TIMEOUT")
+
+    @patch(
+        "injector_common.stratus_executor.subprocess.run",
+        side_effect=PermissionError("not executable"),
+    )
+    def test_detonate_os_error(self, _run):
+        result = StratusExecutor().detonate("gcp.foo")
+        self.assertFalse(result.success)
+        self.assertEqual(result.status, "ERROR")
+
     @patch("injector_common.stratus_executor.subprocess.run")
     def test_cleanup(self, run):
         run.return_value = MagicMock(returncode=0, stdout="", stderr="")
-        self.assertTrue(StratusExecutor().cleanup("gcp.foo").success)
+        result = StratusExecutor().cleanup("gcp.foo")
+        self.assertTrue(result.success)
+        # Falls back to a deterministic message when Stratus is silent.
+        self.assertEqual(result.message, "Cleaned up gcp.foo")
+
+    @patch("injector_common.stratus_executor.subprocess.run")
+    def test_cleanup_failure_empty_output(self, run):
+        run.return_value = MagicMock(returncode=1, stdout="", stderr="")
+        result = StratusExecutor().cleanup("gcp.foo")
+        self.assertFalse(result.success)
+        self.assertEqual(result.message, "Stratus cleanup failed for gcp.foo")
+
+    @patch(
+        "injector_common.stratus_executor.subprocess.run",
+        side_effect=PermissionError("not executable"),
+    )
+    def test_cleanup_os_error(self, _run):
+        result = StratusExecutor().cleanup("gcp.foo")
+        self.assertFalse(result.success)
+        self.assertEqual(result.status, "ERROR")
