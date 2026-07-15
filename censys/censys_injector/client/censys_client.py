@@ -1,7 +1,8 @@
 """Thin client over the Censys Search API v2 (hosts and certificates)."""
 
+import ipaddress
 from dataclasses import dataclass, field
-from typing import Dict, List, Union
+from typing import Dict, List, Optional, Union
 
 import requests
 
@@ -11,6 +12,15 @@ class CensysResult:
     success: bool
     message: str
     outputs: Dict[str, List[Union[str, int]]] = field(default_factory=dict)
+
+
+def _is_ipv4(value: Optional[str]) -> bool:
+    if not isinstance(value, str):
+        return False
+    try:
+        return ipaddress.ip_address(value).version == 4
+    except ValueError:
+        return False
 
 
 class CensysClient:
@@ -59,7 +69,7 @@ class CensysClient:
             return CensysResult(False, message)
 
         hits = payload.get("result", {}).get("hits", [])
-        hosts = [h.get("ip") for h in hits if h.get("ip")]
+        hosts = [h.get("ip") for h in hits if _is_ipv4(h.get("ip"))]
         ports = sorted(
             {
                 int(svc.get("port"))

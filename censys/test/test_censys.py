@@ -40,6 +40,24 @@ class ClientParsingTest(TestCase):
         self.assertEqual(result.outputs["ports"], [80, 443])
 
     @patch("censys_injector.client.censys_client.requests.get")
+    def test_search_hosts_filters_non_ipv4(self, mock_get):
+        response = MagicMock()
+        response.json.return_value = {
+            "result": {
+                "hits": [
+                    {"ip": "1.2.3.4", "services": [{"port": 80}]},
+                    {"ip": "2001:db8::1", "services": [{"port": 8080}]},
+                    {"ip": "not-an-ip", "services": [{"port": 22}]},
+                ]
+            }
+        }
+        mock_get.return_value = response
+
+        result = self._client().search_hosts("services.port: 443")
+        self.assertTrue(result.success)
+        self.assertEqual(result.outputs["hosts"], ["1.2.3.4"])
+
+    @patch("censys_injector.client.censys_client.requests.get")
     def test_search_certificates_parses_fingerprints(self, mock_get):
         response = MagicMock()
         response.json.return_value = {
