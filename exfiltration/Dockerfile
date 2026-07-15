@@ -38,7 +38,7 @@ COPY --from=builder /usr/local/lib/python3.13/site-packages /usr/local/lib/pytho
 
 ARG PYOAEV_GIT_BRANCH_OVERRIDE
 
-RUN if [[ ${PYOAEV_GIT_BRANCH_OVERRIDE} ]] ; then \
+RUN if [ "${PYOAEV_GIT_BRANCH_OVERRIDE}" ] ; then \
         echo "Forcing specific version of client-python" && \
         apk add --no-cache git curl && \
         curl -sS https://bootstrap.pypa.io/get-pip.py -o get-pip.py && \
@@ -46,7 +46,7 @@ RUN if [[ ${PYOAEV_GIT_BRANCH_OVERRIDE} ]] ; then \
         rm get-pip.py && \
         pip install pip3-autoremove && \
         pip-autoremove pyoaev -y && \
-        pip install git+https://github.com/OpenAEV-Platform/client-python@${PYOAEV_GIT_BRANCH_OVERRIDE} ; \
+        pip install "git+https://github.com/OpenAEV-Platform/client-python@${PYOAEV_GIT_BRANCH_OVERRIDE}" ; \
     fi
 
 CMD ["python3", "-m", "exfiltration_injector.openaev_exfiltration"]
