@@ -101,10 +101,33 @@ class ExecutorTest(TestCase):
         self.assertIn("connection refused", result.message)
 
     @patch("webapp_injector.helpers.webapp_executor.subprocess.run")
+    def test_run_sqlmap_message_redacts_url_credentials(self, run):
+        run.return_value = MagicMock(returncode=1, stdout="", stderr="")
+        result = WebappExecutor().run_sqlmap(
+            "http://user:pass@example.com/app?token=secret"
+        )
+        self.assertFalse(result.success)
+        self.assertNotIn("pass", result.message)
+        self.assertNotIn("secret", result.message)
+        self.assertIn("***@example.com", result.message)
+
+    @patch("webapp_injector.helpers.webapp_executor.subprocess.run")
     def test_run_zap_no_report(self, run):
         run.return_value = MagicMock(returncode=0, stdout="", stderr="")
         # ZAP is mocked so no report file is produced.
         self.assertFalse(WebappExecutor().run_zap_baseline("http://t").success)
+
+    @patch("webapp_injector.helpers.webapp_executor.subprocess.run")
+    def test_run_zap_message_redacts_url_credentials(self, run):
+        run.return_value = MagicMock(returncode=0, stdout="", stderr="")
+        # ZAP is mocked so no report file is produced -> error message path.
+        result = WebappExecutor().run_zap_baseline(
+            "http://user:pass@example.com/app?token=secret"
+        )
+        self.assertFalse(result.success)
+        self.assertNotIn("pass", result.message)
+        self.assertNotIn("secret", result.message)
+        self.assertIn("***@example.com", result.message)
 
     @patch("webapp_injector.helpers.webapp_executor.subprocess.run")
     def test_run_zap_invalid_report_is_error(self, run):

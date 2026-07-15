@@ -67,6 +67,7 @@ class WebappExecutor:
 
     def run_zap_baseline(self, target_url: str) -> WebappResult:
         """Run the ZAP baseline scan and parse its JSON report into findings."""
+        safe_url = self._redact_url(target_url)
         with tempfile.TemporaryDirectory() as workdir:
             report = Path(workdir) / "zap.json"
             cmd = [
@@ -80,22 +81,22 @@ class WebappExecutor:
             try:
                 self._run(cmd, self.DEFAULT_TIMEOUT_SECONDS)
             except subprocess.TimeoutExpired:
-                return WebappResult(False, f"ZAP baseline timed out for {target_url}")
+                return WebappResult(False, f"ZAP baseline timed out for {safe_url}")
             except FileNotFoundError:
                 return WebappResult(False, "zap-baseline.py not found in the image")
 
             if not report.exists():
-                return WebappResult(False, f"ZAP produced no report for {target_url}")
+                return WebappResult(False, f"ZAP produced no report for {safe_url}")
             try:
                 alerts = self._parse_zap_report(report.read_text(encoding="utf-8"))
             except json.JSONDecodeError:
                 return WebappResult(
-                    False, f"ZAP produced an invalid JSON report for {target_url}"
+                    False, f"ZAP produced an invalid JSON report for {safe_url}"
                 )
 
         return WebappResult(
             success=True,
-            message=f"ZAP baseline found {len(alerts)} alert(s) on {target_url}",
+            message=f"ZAP baseline found {len(alerts)} alert(s) on {safe_url}",
             outputs={"vulnerabilities": alerts},
         )
 
@@ -112,6 +113,7 @@ class WebappExecutor:
 
     def run_sqlmap(self, target_url: str) -> WebappResult:
         """Run SQLMap against a target URL and report injectable parameters."""
+        safe_url = self._redact_url(target_url)
         cmd = [
             "sqlmap",
             "-u",
@@ -124,13 +126,13 @@ class WebappExecutor:
         try:
             result = self._run(cmd, self.DEFAULT_TIMEOUT_SECONDS)
         except subprocess.TimeoutExpired:
-            return WebappResult(False, f"SQLMap timed out for {target_url}")
+            return WebappResult(False, f"SQLMap timed out for {safe_url}")
         except FileNotFoundError:
             return WebappResult(False, "sqlmap not found in the image")
 
         if result.returncode != 0:
             excerpt = self._trim_stderr(result.stderr)
-            message = f"SQLMap failed for {target_url} (exit {result.returncode})"
+            message = f"SQLMap failed for {safe_url} (exit {result.returncode})"
             if excerpt:
                 message = f"{message}: {excerpt}"
             return WebappResult(False, message)
@@ -140,7 +142,7 @@ class WebappExecutor:
             success=True,
             message=(
                 f"SQLMap found {len(vulnerabilities)} injectable parameter(s) on "
-                f"{target_url}"
+                f"{safe_url}"
             ),
             outputs={"vulnerabilities": vulnerabilities},
         )

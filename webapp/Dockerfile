@@ -2,10 +2,15 @@ FROM python:3.13-alpine AS builder
 
 ENV PIP_VERSION=25.0.1
 
-RUN apk update && apk upgrade && apk add curl
+RUN apk update && apk upgrade && apk add git curl
 
 WORKDIR /opt/injector_common
 COPY --from=injector_common ./ ./
+
+# poetry install resolves the dev extra `pyoaev @ ../../client-python`, which
+# from the install dir points at /client-python, so the checkout must exist.
+WORKDIR /
+RUN git clone https://github.com/OpenAEV-Platform/client-python
 
 RUN curl -sS https://bootstrap.pypa.io/get-pip.py -o get-pip.py && \
     python3 get-pip.py pip==${PIP_VERSION} && \
