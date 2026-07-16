@@ -11,13 +11,13 @@ from pyoaev.signatures import (
 )
 from pyoaev.signatures.models import ExecutionDetails
 
-from injector_common.constants import TARGET_PROPERTY_SELECTOR_KEY, TARGET_SELECTOR_KEY
 from injector_common.dump_config import intercept_dump_argument
 from injector_common.targets import Targets
 from nuclei.configuration.config_loader import ConfigLoader
 from nuclei.helpers.nuclei_command_builder import NucleiCommandBuilder
 from nuclei.helpers.nuclei_output_parser import NucleiOutputParser
 from nuclei.helpers.nuclei_process import NucleiProcess
+from nuclei.models.data import MessageData
 from nuclei.nuclei_contracts.external_contracts import ExternalContractsScheduler
 
 
@@ -38,45 +38,17 @@ class OpenAEVNuclei:
             )
         self.parser = NucleiOutputParser()
 
-        self.inject_id = ""
-        self.contract_id = ""
-        self.inject_content = {}
-        self.selector_key = ""
-        self.selector_property = ""
-        self.expectation_types = []
-
-    def _extract_targets(self, data: Dict):
-        # Extract Targets
-        target_results = Targets.extract_targets(
-            self.selector_key, self.selector_property, data, self.helper
-        )
-
-        # Deduplicate targets
-        targets = target_results.targets
-
-        # Handle empty targets as an error
-        if not targets:
-            if self.selector_property:
-                message = f"No target identified for the property {self.selector_property.upper()}"
-            else:
-                message = "No target identified, empty/missing selector property"
-            raise ValueError(message)
-
-        return target_results, targets
-
-    def _extract_targets_meta(self, data: dict):
-        return Targets.extract_target_meta(
-            self.selector_key, self.selector_property, data, self.helper
-        )
-
     def nuclei_execution(
-        self, start: float, data: Dict, target_results, targets
+        self,
+        start: float,
+        msg_data: MessageData,
     ) -> Dict:
+        targets = msg_data.get_targets()
         # Nuclei Args Builder
         nuclei_builder = NucleiCommandBuilder(
             nuclei_configs=self.config_loader.nuclei,
-            contract_id=self.contract_id,
-            content=self.inject_content,
+            contract_id=msg_data.contract_id,
+            content=msg_data.inject_content,
             targets=targets,
         )
         nuclei_args = nuclei_builder.build()
@@ -87,8 +59,8 @@ class OpenAEVNuclei:
 
         callback_data = {
             "execution_message": Targets.build_execution_message(
-                selector_key=self.selector_key,
-                data=data,
+                selector_key=msg_data.selector_key,
+                data=msg_data.raw_data,
                 command_args=nuclei_args,
             ),
             "execution_status": "INFO",
@@ -97,7 +69,7 @@ class OpenAEVNuclei:
         }
 
         self.helper.api.inject.execution_callback(
-            inject_id=self.inject_id,
+            inject_id=msg_data.inject_id,
             data=callback_data,
         )
 
@@ -105,35 +77,19 @@ class OpenAEVNuclei:
         result = NucleiProcess.nuclei_execute(nuclei_args, input_data)
 
         return self.parser.parse(
-            result.stdout.decode("utf-8"), target_results.ip_to_asset_id_map
+            result.stdout.decode("utf-8"), msg_data.target_results.ip_to_asset_id_map
         )
 
     def process_message(self, data: Dict) -> None:
         start = time.time()
 
-        data_injection = data.get("injection", {})
-        data_injector_contract = data_injection.get("inject_injector_contract", {})
-
-        self.contract_id = data_injector_contract.get("convertedContent", {}).get(
-            "contract_id"
-        )
-        self.inject_id = data_injection.get("inject_id")
-        self.inject_content = data_injection.get("inject_content", {})
-        self.selector_key = self.inject_content.get(TARGET_SELECTOR_KEY)
-        self.selector_property = self.inject_content.get(TARGET_PROPERTY_SELECTOR_KEY)
-
-        # Retrieving expectation_types
-        expectations_content = self.inject_content.get("expectations") or []
-        self.expectation_types = [
-            item.get("expectation_type")
-            for item in expectations_content
-            if item.get("expectation_type")
-        ]
+        # unpacking various elements from the data
+        msg_data = MessageData(data, self.helper)
 
         # Notify API of reception and expected number of operations
         reception_data = {"tracking_total_count": 1}
         self.helper.api.inject.execution_reception(
-            inject_id=self.inject_id, data=reception_data
+            inject_id=msg_data.inject_id, data=reception_data
         )
 
         # Injector Signature Manager
@@ -145,33 +101,27 @@ class OpenAEVNuclei:
         pre_execute_fail_message = ""
 
         try:
-            target_results, targets = self._extract_targets(data)
+            configs = build_network_configs(msg_data.targets)
         except Exception as e:
             pre_execute_fail_flag = True
             pre_execute_fail_message = (
-                f"Could not extract targets: {type(e).__name__} - {e}"
+                f"Could not build network configurations: {type(e).__name__} - {e}"
             )
         else:
             try:
-                configs = build_network_configs(targets)
+                # Compile pre-execution signatures
+                execution_signatures = signature_manager.build_execution_signatures(
+                    config=configs
+                )
             except Exception as e:
                 pre_execute_fail_flag = True
                 pre_execute_fail_message = (
-                    f"Could not build network configurations: {type(e).__name__} - {e}"
+                    f"Could not build execution signatures: {type(e).__name__} - {e}"
                 )
-            else:
-                try:
-                    # Compile pre-execution signatures
-                    execution_signatures = signature_manager.build_execution_signatures(
-                        config=configs
-                    )
-                except Exception as e:
-                    pre_execute_fail_flag = True
-                    pre_execute_fail_message = f"Could not build execution signatures: {type(e).__name__} - {e}"
 
         execution_result_outputs = None
         tool_output = {}
-        execution_action = "complete"
+        execution_action = "data"
 
         if pre_execute_fail_flag:
             execution_message = f"Pre-execution failure: {pre_execute_fail_message}"
@@ -180,7 +130,7 @@ class OpenAEVNuclei:
             # Execute inject
             try:
                 execution_result = self.nuclei_execution(
-                    start, data, target_results, targets
+                    start, data, msg_data.target_results, msg_data.targets
                 )
                 execution_message = execution_result.get("message")
                 execution_result_outputs = execution_result.get("outputs")
@@ -203,7 +153,7 @@ class OpenAEVNuclei:
             )
 
         self.helper.api.inject.execution_callback(
-            inject_id=self.inject_id, data=callback_data
+            inject_id=msg_data.inject_id, data=callback_data
         )
 
         if pre_execute_fail_flag:
@@ -219,8 +169,8 @@ class OpenAEVNuclei:
         # Build payload with extra
         expectation_signatures = signature_manager.build_payload(
             execution_signatures=execution_signatures,
-            targets_meta=self._extract_targets_meta(data),
-            expectation_types=self.expectation_types,
+            targets_meta=msg_data.targets_meta,
+            expectation_types=msg_data.expectation_types,
             extra_signatures=ExtraSignatureData(
                 vulnerability={
                     "cves_tested": [],
@@ -231,7 +181,7 @@ class OpenAEVNuclei:
 
         # Send signature to backend
         signature_manager.send_signatures(
-            inject_id=self.inject_id,
+            inject_id=msg_data.inject_id,
             execution_details=execution_details,
             signatures=expectation_signatures,
         )
