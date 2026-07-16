@@ -1,99 +1,20 @@
 import unittest
-from unittest.mock import ANY, MagicMock, patch, sentinel
+from unittest.mock import ANY, MagicMock, patch
 
 import nmap.openaev_nmap as module
 
 
 @patch.object(module, "intercept_dump_argument")
+@patch.object(module, "MessageData", autospec=True)
 @patch.object(module, "OpenAEVInjectorHelper", autospec=True)
 @patch.object(module, "ConfigLoader")
 class TestOpenAEVNmap(unittest.TestCase):
-    def test_openaev_nmap_init(self, m_configloader, m_helper, _):
+    def test_openaev_nmap_init(self, m_configloader, m_helper, m_msgdata, _):
         m_helper.return_value.api = MagicMock()
         injector = module.OpenAEVNmap()
 
         self.assertIsNotNone(injector.helper)
         self.assertIsInstance(injector.signature_manager, module.SignatureManager)
-        self.assertEqual(injector.current_inject_id, "")
-        self.assertEqual(injector.current_selector_key, "")
-        self.assertEqual(injector.current_selector_property, "")
-        self.assertIsNone(injector.current_target_results)
-
-    @patch.object(module.Targets, "extract_target_meta")
-    @patch.object(module.Targets, "extract_targets")
-    def test_openaev_nmap_update_current_elements(
-        self, m_extract_targets, m_extract_target_meta, m_configloader, m_helper, _
-    ):
-        m_helper.return_value.api = MagicMock()
-        injector = module.OpenAEVNmap()
-
-        m_extract_targets.return_value = sentinel.target_results
-        m_extract_target_meta.return_value = sentinel.target_meta
-        data = {
-            "injection": {
-                "inject_id": sentinel.inject_id,
-                "inject_content": {
-                    "expectations": [
-                        {"expectation_type": "DETECTION"},
-                        {"expectation_type": "PREVENTION"},
-                    ],
-                    module.TARGET_SELECTOR_KEY: "assets",
-                    module.TARGET_PROPERTY_SELECTOR_KEY: "automatic",
-                },
-            },
-            "assets": [sentinel.asset],
-        }
-
-        injector.update_current_elements(data)
-
-        self.assertIsNotNone(injector.helper)
-        self.assertIsInstance(injector.signature_manager, module.SignatureManager)
-        self.assertEqual(injector.current_inject_id, sentinel.inject_id)
-        self.assertEqual(injector.current_selector_key, "assets")
-        self.assertEqual(injector.current_selector_property, "automatic")
-        self.assertEqual(injector.current_target_results, sentinel.target_results)
-        m_extract_targets.assert_called_with(
-            "assets",
-            "automatic",
-            data,
-            injector.helper,
-        )
-        self.assertEqual(injector.current_targets_meta, sentinel.target_meta)
-        m_extract_target_meta.assert_called_with(
-            "assets",
-            "automatic",
-            data,
-            injector.helper,
-        )
-        self.assertEqual(
-            injector.current_expectation_types, ["DETECTION", "PREVENTION"]
-        )
-
-    def test_openaev_nmap_get_targets(self, m_configloader, m_helper, _):
-        m_helper.return_value.api = MagicMock()
-        target_results = MagicMock()
-        targets = MagicMock()
-        target_results.targets = targets
-        injector = module.OpenAEVNmap()
-        injector.current_target_results = target_results
-
-        _targets = injector.get_targets()
-
-        self.assertEqual(_targets, targets)
-
-    def test_openaev_nmap_get_targets_no_targets(self, m_configloader, m_helper, _):
-        m_helper.return_value.api = MagicMock()
-        target_results = MagicMock()
-        target_results.targets = []
-        injector = module.OpenAEVNmap()
-        injector.current_target_results = target_results
-        injector.current_selector_property = "automatic"
-
-        with self.assertRaises(ValueError) as context:
-            injector.get_targets()
-        self.assertEqual(
-            str(context.exception), "No target identified for the property Automatic"
-        )
 
     @patch.object(module.NmapOutputParser, "xmlparse")
     @patch.object(module.subprocess, "run")
@@ -107,6 +28,7 @@ class TestOpenAEVNmap(unittest.TestCase):
         m_xmlparse,
         m_configloader,
         m_helper,
+        m_msgdata,
         _,
     ):
         m_helper.return_value.api = MagicMock()
@@ -114,25 +36,20 @@ class TestOpenAEVNmap(unittest.TestCase):
         injector = module.OpenAEVNmap()
 
         start = 1
-        data = {
-            "injection": {
-                "inject_injector_contract": {
-                    "injector_contract_id": "my-current-contract-id",
-                }
-            }
-        }
-        targets = [sentinel.id]
+        message_data = MagicMock()
 
-        nmap_output = injector.nmap_execution(start, data, targets)
+        nmap_output = injector.nmap_execution(start, message_data)
 
-        m_build_args.assert_called_once_with("my-current-contract-id", targets)
+        m_build_args.assert_called_once_with(
+            message_data.contract_id, message_data.get_targets.return_value
+        )
         m_build_execution_message.assert_called_once_with(
-            selector_key=injector.current_selector_key,
-            data=data,
+            selector_key=message_data.selector_key,
+            data=message_data.raw_data,
             command_args=m_build_args.return_value,
         )
         m_helper.return_value.api.inject.execution_callback.assert_called_with(
-            inject_id=injector.current_inject_id,
+            inject_id=message_data.inject_id,
             data={
                 "execution_message": m_build_execution_message.return_value,
                 "execution_status": "INFO",
@@ -145,8 +62,8 @@ class TestOpenAEVNmap(unittest.TestCase):
         )
         m_xmlparse.assert_called_once_with(
             m_subprocess_run.return_value.stdout,
-            injector.current_selector_key,
-            injector.current_target_results,
+            message_data.selector_key,
+            message_data.target_results,
         )
         self.assertEqual(nmap_output, m_xmlparse.return_value)
 
@@ -154,23 +71,24 @@ class TestOpenAEVNmap(unittest.TestCase):
     @patch.object(module, "ExecutionDetails")
     @patch.object(module, "SignatureManager")
     @patch.object(module, "build_network_configs")
-    @patch.object(module.OpenAEVNmap, "get_targets")
-    @patch.object(module.OpenAEVNmap, "update_current_elements")
     def test_openaev_nmap_process_message(
         self,
-        m_update_current_elements,
-        m_get_targets,
         m_build_network_configs,
         m_signaturemanager,
         m_executiondetails,
         m_nmap_execution,
         m_configloader,
         m_helper,
+        m_msgdata,
         _,
     ):
         m_helper.return_value.injector_logger = MagicMock()
         m_helper.return_value.api = MagicMock()
         injector = module.OpenAEVNmap()
+
+        message_data = MagicMock()
+        message_data.inject_id = "inject-id"
+        m_msgdata.return_value = message_data
 
         m_nmap_execution.return_value = {
             "message": "Ceci n'est pas une pipe",
@@ -179,9 +97,6 @@ class TestOpenAEVNmap(unittest.TestCase):
                 "scan_results": ["result0", "result1", "result2", "result3"],
             },
         }
-        injector.current_inject_id = "deadbeef"
-        target_meta = MagicMock()
-        injector.current_targets_meta = [target_meta]
         extra_data = {
             "ports_discovered": [1, 2, 3, 4],
             "services_discovered": ["result0", "result1", "result2", "result3"],
@@ -190,16 +105,18 @@ class TestOpenAEVNmap(unittest.TestCase):
 
         injector.process_message(data)
 
-        m_update_current_elements.assert_called_once_with(data)
-        m_get_targets.assert_called_once()
-        m_build_network_configs.assert_called_once_with(m_get_targets.return_value)
+        m_msgdata.assert_called_once_with(data, m_helper.return_value)
+        message_data.get_targets.assert_called_once()
+        m_build_network_configs.assert_called_once_with(
+            message_data.get_targets.return_value
+        )
         m_signaturemanager.return_value.build_execution_signatures.assert_called_once_with(
             m_build_network_configs.return_value
         )
         injector.helper.api.inject.execution_reception.assert_called_once_with(
-            inject_id=injector.current_inject_id, data={"tracking_total_count": 1}
+            inject_id=message_data.inject_id, data={"tracking_total_count": 1}
         )
-        m_nmap_execution.assert_called_once_with(ANY, data, m_get_targets.return_value)
+        m_nmap_execution.assert_called_once_with(ANY, message_data)
         m_signaturemanager.return_value.post_execution_updates.assert_called_once_with(
             m_executiondetails.return_value,
             m_signaturemanager.return_value.build_execution_signatures.return_value,
@@ -208,12 +125,12 @@ class TestOpenAEVNmap(unittest.TestCase):
             },
         )
         injector.helper.api.inject.execution_callback.assert_called_once_with(
-            inject_id=injector.current_inject_id, data=ANY
+            inject_id=message_data.inject_id, data=ANY
         )
         m_signaturemanager.return_value.build_payload.assert_called_once_with(
             execution_signatures=m_signaturemanager.return_value.build_execution_signatures.return_value,
-            targets_meta=injector.current_targets_meta,
-            expectation_types=injector.current_expectation_types,
+            targets_meta=message_data.targets_meta,
+            expectation_types=message_data.expectation_types,
             extra_signatures=module.ExtraSignatureData(
                 detection=extra_data,
                 prevention=extra_data,
@@ -221,7 +138,7 @@ class TestOpenAEVNmap(unittest.TestCase):
             ),
         )
         m_signaturemanager.return_value.send_signatures.assert_called_once_with(
-            inject_id=injector.current_inject_id,
+            inject_id=message_data.inject_id,
             execution_details=m_executiondetails.return_value,
             signatures=m_signaturemanager.return_value.build_payload.return_value,
         )
@@ -230,45 +147,45 @@ class TestOpenAEVNmap(unittest.TestCase):
     @patch.object(module, "ExecutionDetails")
     @patch.object(module, "SignatureManager")
     @patch.object(module, "build_network_configs")
-    @patch.object(module.OpenAEVNmap, "get_targets")
-    @patch.object(module.OpenAEVNmap, "update_current_elements")
     def test_openaev_nmap_process_message_failure(
         self,
-        m_update_current_elements,
-        m_get_targets,
         m_build_network_configs,
         m_signaturemanager,
         m_executiondetails,
         m_nmap_execution,
         m_configloader,
         m_helper,
+        m_msgdata,
         _,
     ):
         m_helper.return_value.injector_logger = MagicMock()
         m_helper.return_value.api = MagicMock()
         injector = module.OpenAEVNmap()
 
+        message_data = MagicMock()
+        message_data.inject_id = "inject-id"
+        m_msgdata.return_value = message_data
+
         m_nmap_execution.side_effect = module.subprocess.CalledProcessError(
             returncode=42, cmd="", stderr=b"this is an error message"
         )
 
-        injector.current_inject_id = "deadbeef"
-        target_meta = MagicMock()
-        injector.current_targets_meta = [target_meta]
         data = MagicMock()
 
         injector.process_message(data)
 
-        m_update_current_elements.assert_called_once_with(data)
-        m_get_targets.assert_called_once()
-        m_build_network_configs.assert_called_once_with(m_get_targets.return_value)
+        m_msgdata.assert_called_once_with(data, m_helper.return_value)
+        message_data.get_targets.assert_called_once()
+        m_build_network_configs.assert_called_once_with(
+            message_data.get_targets.return_value
+        )
         m_signaturemanager.return_value.build_execution_signatures.assert_called_once_with(
             m_build_network_configs.return_value
         )
         injector.helper.api.inject.execution_reception.assert_called_once_with(
-            inject_id=injector.current_inject_id, data={"tracking_total_count": 1}
+            inject_id=message_data.inject_id, data={"tracking_total_count": 1}
         )
-        m_nmap_execution.assert_called_once_with(ANY, data, m_get_targets.return_value)
+        m_nmap_execution.assert_called_once_with(ANY, message_data)
         m_signaturemanager.return_value.post_execution_updates.assert_called_once_with(
             m_executiondetails.return_value,
             m_signaturemanager.return_value.build_execution_signatures.return_value,
@@ -279,12 +196,12 @@ class TestOpenAEVNmap(unittest.TestCase):
             },
         )
         injector.helper.api.inject.execution_callback.assert_called_once_with(
-            inject_id=injector.current_inject_id, data=ANY
+            inject_id=message_data.inject_id, data=ANY
         )
         m_signaturemanager.return_value.build_payload.assert_called_once_with(
             execution_signatures=m_signaturemanager.return_value.build_execution_signatures.return_value,
-            targets_meta=injector.current_targets_meta,
-            expectation_types=injector.current_expectation_types,
+            targets_meta=message_data.targets_meta,
+            expectation_types=message_data.expectation_types,
             extra_signatures=module.ExtraSignatureData(
                 detection={},
                 prevention={},
@@ -292,12 +209,12 @@ class TestOpenAEVNmap(unittest.TestCase):
             ),
         )
         m_signaturemanager.return_value.send_signatures.assert_called_once_with(
-            inject_id=injector.current_inject_id,
+            inject_id=message_data.inject_id,
             execution_details=m_executiondetails.return_value,
             signatures=m_signaturemanager.return_value.build_payload.return_value,
         )
 
-    def test_openaev_nmap_start(self, m_configloader, m_helper, _):
+    def test_openaev_nmap_start(self, m_configloader, m_helper, m_msgdata, _):
         m_helper.return_value.api = MagicMock()
         injector = module.OpenAEVNmap()
 

@@ -10,12 +10,12 @@ from pyoaev.signatures.models import (
     build_network_configs,
 )
 
-from injector_common.constants import TARGET_PROPERTY_SELECTOR_KEY, TARGET_SELECTOR_KEY
 from injector_common.dump_config import intercept_dump_argument
-from injector_common.targets import TargetProperty, Targets
+from injector_common.targets import Targets
 from nmap.configuration.config_loader import ConfigLoader
 from nmap.helpers.nmap_command_builder import NmapCommandBuilder
 from nmap.helpers.nmap_output_parser import NmapOutputParser
+from nmap.models.data import MessageData
 
 
 class OpenAEVNmap:
@@ -29,55 +29,20 @@ class OpenAEVNmap:
         )
         self.signature_manager = SignatureManager(self.helper.api)
 
-        self.current_inject_id = ""
-        self.current_selector_key = ""
-        self.current_selector_property = ""
-        self.current_target_results = None
-        self.current_expectation_types = []
-
-    def update_current_elements(self, data: dict) -> None:
-        self.current_inject_id = data["injection"]["inject_id"]
-
-        content = data["injection"]["inject_content"]
-        self.current_selector_key = content[TARGET_SELECTOR_KEY]
-        self.current_selector_property = content[TARGET_PROPERTY_SELECTOR_KEY]
-
-        self.current_target_results = Targets.extract_targets(
-            self.current_selector_key, self.current_selector_property, data, self.helper
-        )
-        self.current_targets_meta = Targets.extract_target_meta(
-            self.current_selector_key, self.current_selector_property, data, self.helper
-        )
-
-        self.current_expectation_types = [
-            expectation.get("expectation_type")
-            for expectation in content.get("expectations", [])
-            if expectation.get("expectation_type")
-        ]
-
-    def get_targets(self) -> list:
-        targets = self.current_target_results.targets
-        # Handle empty targets as an error
-        if not targets:
-            message = f"No target identified for the property {TargetProperty[self.current_selector_property.upper()].value}"
-            raise ValueError(message)
-
-        return targets
-
-    def nmap_execution(self, start: float, data: dict, targets: list) -> dict:
-        contract_id = data["injection"]["inject_injector_contract"][
-            "injector_contract_id"
-        ]
+    def nmap_execution(self, start: float, msg_data: MessageData) -> dict:
         # Build Arguments to execute
-        nmap_args = NmapCommandBuilder.build_args(contract_id, targets)
+        nmap_args = NmapCommandBuilder.build_args(
+            msg_data.contract_id,
+            msg_data.get_targets(),
+        )
 
         self.helper.injector_logger.info(
             "Executing nmap with command: " + " ".join(nmap_args)
         )
 
         message = Targets.build_execution_message(
-            selector_key=self.current_selector_key,
-            data=data,
+            selector_key=msg_data.selector_key,
+            data=msg_data.raw_data,
             command_args=nmap_args,
         )
 
@@ -89,24 +54,22 @@ class OpenAEVNmap:
         }
 
         self.helper.api.inject.execution_callback(
-            inject_id=self.current_inject_id,
+            inject_id=msg_data.inject_id,
             data=callback_data,
         )
 
         nmap_result = subprocess.run(nmap_args, check=True, capture_output=True)
         return NmapOutputParser.xmlparse(
-            nmap_result.stdout, self.current_selector_key, self.current_target_results
+            nmap_result.stdout, msg_data.selector_key, msg_data.target_results
         )
 
     def process_message(self, data: dict) -> None:
         start = time.time()
-        # Notify API of reception and expected number of operations
-        reception_data = {"tracking_total_count": 1}
 
-        # setting the current elements
-        self.update_current_elements(data)
+        # unpacking various elements from the data
+        msg_data = MessageData(data, self.helper)
 
-        targets = self.get_targets()
+        targets = msg_data.get_targets()
 
         # create execution details object
         execution_details = ExecutionDetails()
@@ -117,16 +80,19 @@ class OpenAEVNmap:
             network_injector_configs
         )
 
+        # Notify API of reception and expected number of operations
+        reception_data = {"tracking_total_count": 1}
+
         # sending execution reception
         self.helper.api.inject.execution_reception(
-            inject_id=self.current_inject_id, data=reception_data
+            inject_id=msg_data.inject_id, data=reception_data
         )
 
         # Execute inject
         execution_result = None
         tool_error_info = None
         try:
-            execution_result = self.nmap_execution(start, data, targets)
+            execution_result = self.nmap_execution(start, msg_data)
         except subprocess.CalledProcessError as err:
             execution_message = str(err.stderr.strip().decode())
             tool_error_info = {
@@ -157,7 +123,7 @@ class OpenAEVNmap:
         # sending execution callback
         callback_data["execution_duration"] = int(time.time() - start)
         self.helper.api.inject.execution_callback(
-            inject_id=self.current_inject_id, data=callback_data
+            inject_id=msg_data.inject_id, data=callback_data
         )
 
         # update post execution
@@ -181,14 +147,14 @@ class OpenAEVNmap:
         self.helper.injector_logger.info("build payload")
         payload = self.signature_manager.build_payload(
             execution_signatures=execution_signatures,
-            targets_meta=self.current_targets_meta,
-            expectation_types=self.current_expectation_types,
+            targets_meta=msg_data.targets_meta,
+            expectation_types=msg_data.expectation_types,
             extra_signatures=extra_signatures,
         )
         self.helper.injector_logger.info(payload)
         self.helper.injector_logger.info("send signatures")
         self.signature_manager.send_signatures(
-            inject_id=self.current_inject_id,
+            inject_id=msg_data.inject_id,
             execution_details=execution_details,
             signatures=payload,
         )
