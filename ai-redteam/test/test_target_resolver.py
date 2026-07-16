@@ -144,43 +144,45 @@ class ResolveTargetsTest(TestCase):
 
     def test_asset_groups_fetches_all_members_paginated(self):
         api = MagicMock()
+        # Group-members endpoint returns MIXED asset types across two pages; only the
+        # AI targets (asset_category == AI_TARGET) are kept, endpoints are ignored.
         api.http_post.side_effect = [
             {
                 "content": [
-                    {
-                        "ai_target_provider": "OLLAMA",
-                        "asset_id": "a1",
-                        "asset_name": "T1",
-                    },
-                    {
-                        "ai_target_provider": "ANTHROPIC",
-                        "asset_id": "a2",
-                        "asset_name": "T2",
-                    },
+                    {"asset_id": "a1", "asset_name": "T1", "asset_category": "AI_TARGET"},
+                    {"asset_id": "e1", "asset_name": "Host", "asset_category": "HOST"},
                 ],
                 "last": False,
             },
             {
                 "content": [
-                    {
-                        "ai_target_provider": "OPENAI_COMPATIBLE",
-                        "asset_id": "a3",
-                        "asset_name": "T3",
-                    },
+                    {"asset_id": "a2", "asset_name": "T2", "asset_category": "AI_TARGET"},
                 ],
                 "last": True,
             },
+        ]
+        # Full connection config is loaded per AI target id.
+        api.http_get.side_effect = [
+            {"asset_id": "a1", "asset_name": "T1", "ai_target_provider": "OLLAMA"},
+            {"asset_id": "a2", "asset_name": "T2", "ai_target_provider": "ANTHROPIC"},
         ]
         content = {"target_selector": "asset-groups"}
         data = {
             "assetGroups": [{"asset_group_id": "g1", "asset_group_name": "Group 1"}]
         }
         targets = target_resolver.resolve_targets(content, data=data, api=api)
-        self.assertEqual([t.asset_id for t in targets], ["a1", "a2", "a3"])
+        self.assertEqual([t.asset_id for t in targets], ["a1", "a2"])
+        self.assertEqual([t.provider for t in targets], ["OLLAMA", "ANTHROPIC"])
         self.assertEqual(api.http_post.call_count, 2)
-        # The search must filter by the selected asset group id.
-        first_body = api.http_post.call_args_list[0].kwargs["post_data"]
-        self.assertEqual(first_body["filterGroup"]["filters"][0]["values"], ["g1"])
+        # Members come from the dynamic-aware asset-group endpoint (not a static filter).
+        self.assertEqual(
+            api.http_post.call_args_list[0].args[0], "/asset_groups/g1/assets/search"
+        )
+        # Full config is then loaded per AI target id.
+        self.assertEqual(
+            [call.args[0] for call in api.http_get.call_args_list],
+            ["/ai_targets/a1", "/ai_targets/a2"],
+        )
 
     def test_asset_groups_without_selection_raises(self):
         content = {"target_selector": "asset-groups"}

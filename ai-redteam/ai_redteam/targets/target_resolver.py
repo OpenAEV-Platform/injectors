@@ -81,37 +81,62 @@ def _asset_group_ids(data: dict) -> list:
     return [g["asset_group_id"] for g in groups if g.get("asset_group_id")]
 
 
-def _fetch_ai_targets_in_groups(group_ids: list, api, logger=None) -> list:
-    """Fetch every AI target asset belonging to the given asset group(s), with pagination."""
-    targets = []
+def _collect_ai_target_ids_in_group(group_id: str, api, logger=None) -> list:
+    """Return the ids of every AI target that is a member of one asset group.
+
+    Uses the asset-group members endpoint, which resolves BOTH static and dynamic
+    membership across all asset types (an ``All AI Targets`` group with a
+    ``Category = AI_TARGET`` dynamic rule has no static members, so a static-only
+    membership filter would wrongly return nothing). Only AI targets are kept.
+    """
+    ids = []
     page = 0
     while True:
-        body = {
-            "page": page,
-            "size": 100,
-            "filterGroup": {
-                "mode": "or",
-                "filters": [
-                    {
-                        "key": c.ASSET_GROUPS_FILTER_KEY,
-                        "mode": "or",
-                        "operator": "contains",
-                        "values": group_ids,
-                    }
-                ],
-            },
-        }
+        body = {"page": page, "size": 100, "textSearch": ""}
         try:
-            response = api.http_post("/ai_targets/search", post_data=body)
+            response = api.http_post(
+                f"/asset_groups/{group_id}/assets/search", post_data=body
+            )
         except Exception as exc:  # noqa: BLE001
             if logger:
-                logger.warning(f"Could not fetch AI targets for asset groups: {exc}")
+                logger.warning(
+                    f"Could not fetch assets for asset group {group_id}: {exc}"
+                )
             break
         content = response.get("content") or []
-        targets.extend(_from_ai_target_asset(asset) for asset in content)
+        ids.extend(
+            asset["asset_id"]
+            for asset in content
+            if asset.get("asset_category") == c.AI_TARGET_CATEGORY and asset.get("asset_id")
+        )
         if response.get("last", True) or not content:
             break
         page += 1
+    return ids
+
+
+def _fetch_ai_targets_in_groups(group_ids: list, api, logger=None) -> list:
+    """Resolve every AI target asset (static OR dynamic member) of the given group(s).
+
+    The group-members endpoint only carries a summary of each asset (no connection
+    fields), so each AI target is then loaded in full via ``/ai_targets/{id}``.
+    """
+    seen = set()
+    ordered_ids = []
+    for group_id in group_ids:
+        for asset_id in _collect_ai_target_ids_in_group(group_id, api, logger):
+            if asset_id not in seen:
+                seen.add(asset_id)
+                ordered_ids.append(asset_id)
+
+    targets = []
+    for asset_id in ordered_ids:
+        try:
+            asset = api.http_get(f"/ai_targets/{asset_id}")
+            targets.append(_from_ai_target_asset(asset))
+        except Exception as exc:  # noqa: BLE001
+            if logger:
+                logger.warning(f"Could not fetch AI target {asset_id}: {exc}")
     return targets
 
 

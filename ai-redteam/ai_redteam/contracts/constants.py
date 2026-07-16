@@ -47,8 +47,9 @@ KEY_ASSET_GROUPS = "asset_groups"
 
 # RabbitMQ payload key carrying the selected asset groups on the injector message.
 ASSET_GROUPS_KEY_RABBITMQ = "assetGroups"
-# Queryable filter key to fetch assets (incl. AI targets) by asset group membership.
-ASSET_GROUPS_FILTER_KEY = "assetGroups"
+# Category value marking an asset as an AI target (Asset.category = AI_TARGET). Used to keep
+# only AI targets when resolving the (mixed-type) members of an asset group.
+AI_TARGET_CATEGORY = "AI_TARGET"
 
 PROVIDERS = [
     "OPENAI_COMPATIBLE",
