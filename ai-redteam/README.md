@@ -188,9 +188,11 @@ The target of an AI Red Team inject is an AI endpoint, not an OpenAEV asset or I
 
 - `AI target` (default): pick a pre-configured `AI Target` asset from the `AI target` autocomplete selector. The
   injector fetches the target definition from the platform (`/ai_targets/{id}`).
-- `Asset group`: pick one or more asset groups. The injector runs the technique against every `AI Target` asset that
-  belongs to the selected group(s) (fetched via `/ai_targets/search` filtered by asset group membership) and reports a
-  per-target verdict. Build an asset group of `AI Target` assets (category `AI_TARGET`) to test a fleet at once.
+- `Asset group`: pick one or more asset groups. The injector resolves each group's members via
+  `/asset_groups/{id}/assets/search` (which returns both static and dynamic membership across all asset types), keeps
+  only the `AI Target` assets (category `AI_TARGET`), loads each one's full connection details via `/ai_targets/{id}`,
+  runs the technique against every resolved target and reports a per-target verdict. Build an asset group of
+  `AI Target` assets (category `AI_TARGET`) to test a fleet at once.
 - `Manual`: provide the connection inline on the inject - `Provider`, `Endpoint URL`, `Model`, an optional `API token`
   and an optional `System prompt`. These fields only appear when `Manual` is selected.
 
