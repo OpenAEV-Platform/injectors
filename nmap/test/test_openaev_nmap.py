@@ -1,3 +1,4 @@
+import threading
 import unittest
 from unittest.mock import ANY, MagicMock, patch
 
@@ -213,6 +214,70 @@ class TestOpenAEVNmap(unittest.TestCase):
             execution_details=m_executiondetails.return_value,
             signatures=m_signaturemanager.return_value.build_payload.return_value,
         )
+
+    @patch.object(module.OpenAEVNmap, "nmap_execution")
+    @patch.object(module, "ExecutionDetails")
+    @patch.object(module, "SignatureManager")
+    @patch.object(module, "build_network_configs")
+    def test_openaev_nmap_process_message_concurrent_no_id_mix(
+        self,
+        m_build_network_configs,
+        m_signaturemanager,
+        m_executiondetails,
+        m_nmap_execution,
+        m_configloader,
+        m_helper,
+        m_msgdata,
+        _,
+    ):
+        # Regression test for the race condition in #338: two injections
+        # processed concurrently on the SAME injector instance must each keep
+        # their own inject id. Before the fix, per-message state lived on the
+        # instance (self.current_inject_id, ...) and could be overwritten by a
+        # second message mid-processing, mixing the ids in the callbacks.
+        m_helper.return_value.injector_logger = MagicMock()
+        m_helper.return_value.api = MagicMock()
+        injector = module.OpenAEVNmap()
+
+        message_data_a = MagicMock()
+        message_data_a.inject_id = "inject-a"
+        message_data_b = MagicMock()
+        message_data_b.inject_id = "inject-b"
+        m_msgdata.side_effect = [message_data_a, message_data_b]
+
+        # Force both threads to be inside process_message at the same time so a
+        # shared-state implementation would clobber the first inject id.
+        barrier = threading.Barrier(2)
+
+        def blocking_execution(_start, msg_data):
+            barrier.wait(timeout=5)
+            return {
+                "message": "ok",
+                "outputs": {"ports": [], "scan_results": []},
+            }
+
+        m_nmap_execution.side_effect = blocking_execution
+
+        threads = [
+            threading.Thread(target=injector.process_message, args=(MagicMock(),)),
+            threading.Thread(target=injector.process_message, args=(MagicMock(),)),
+        ]
+        for thread in threads:
+            thread.start()
+        for thread in threads:
+            thread.join(timeout=5)
+
+        reception_ids = sorted(
+            call.kwargs["inject_id"]
+            for call in injector.helper.api.inject.execution_reception.call_args_list
+        )
+        self.assertEqual(reception_ids, ["inject-a", "inject-b"])
+
+        send_ids = sorted(
+            call.kwargs["inject_id"]
+            for call in m_signaturemanager.return_value.send_signatures.call_args_list
+        )
+        self.assertEqual(send_ids, ["inject-a", "inject-b"])
 
     def test_openaev_nmap_start(self, m_configloader, m_helper, m_msgdata, _):
         m_helper.return_value.api = MagicMock()

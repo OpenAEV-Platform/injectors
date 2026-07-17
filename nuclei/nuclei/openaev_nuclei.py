@@ -101,7 +101,7 @@ class OpenAEVNuclei:
         pre_execute_fail_message = ""
 
         try:
-            configs = build_network_configs(msg_data.targets)
+            configs = build_network_configs(msg_data.get_targets())
         except Exception as e:
             pre_execute_fail_flag = True
             pre_execute_fail_message = (
@@ -121,7 +121,7 @@ class OpenAEVNuclei:
 
         execution_result_outputs = None
         tool_output = {}
-        execution_action = "data"
+        execution_action = "complete"
 
         if pre_execute_fail_flag:
             execution_message = f"Pre-execution failure: {pre_execute_fail_message}"
@@ -129,9 +129,7 @@ class OpenAEVNuclei:
         else:
             # Execute inject
             try:
-                execution_result = self.nuclei_execution(
-                    start, data, msg_data.target_results, msg_data.targets
-                )
+                execution_result = self.nuclei_execution(start, msg_data)
                 execution_message = execution_result.get("message")
                 execution_result_outputs = execution_result.get("outputs")
                 execution_status = "SUCCESS"
