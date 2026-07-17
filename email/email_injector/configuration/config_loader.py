@@ -1,7 +1,8 @@
-from email_injector.configuration.injector_config_override import InjectorConfigOverride
-from email_injector.contracts_email import EmailContracts
 from pydantic import Field
 from pyoaev.configuration import ConfigLoaderOAEV, Configuration, SettingsLoader
+
+from email_injector.configuration.injector_config_override import InjectorConfigOverride
+from email_injector.contracts_email import EmailContracts
 
 
 class ConfigLoader(SettingsLoader):
@@ -13,6 +14,7 @@ class ConfigLoader(SettingsLoader):
             config_hints={
                 "openaev_url": {"data": str(self.openaev.url)},
                 "openaev_token": {"data": self.openaev.token},
+                "openaev_tenant_id": {"data": self.openaev.tenant_id},
                 "injector_id": {"data": self.injector.id},
                 "injector_name": {"data": self.injector.name},
                 "injector_type": {"data": self.injector.type},
