@@ -1,0 +1,18 @@
+{
+  "title": "Web Application Attack",
+  "slug": "openaev_webapp",
+  "description": "This injector performs active web application testing using OWASP ZAP (baseline scan) and SQLMap (SQL injection), surfacing discovered issues as findings so WAF detection and application vulnerability can be validated.",
+  "short_description": "Active web app testing with OWASP ZAP and SQLMap",
+  "use_cases": ["Technical"],
+  "verified": false,
+  "last_verified_date": "",
+  "playbook_supported": false,
+  "max_confidence_level": 80,
+  "support_version": "",
+  "subscription_link": "https://www.zaproxy.org/",
+  "source_code": "",
+  "manager_supported": true,
+  "container_version": "rolling",
+  "container_image": "openaev/injector-webapp",
+  "container_type": "INJECTOR"
+}
