@@ -89,6 +89,23 @@ class PyritEngineTest(TestCase):
         result = PyritEngine().run({"pyrit_objective": "o"}, _target(), "m1", ctx={})
         self.assertEqual(result.status, "ERROR")
 
+    @patch("ai_redteam.engines.pyrit.llm_client.send_prompt")
+    def test_non_2xx_reports_error_with_aggregation_outputs(self, send_prompt):
+        # A non-2xx escalation turn must report an execution ERROR and still carry
+        # the outputs multi-target aggregation relies on (marker, target_endpoint,
+        # http_status), matching the native engine.
+        send_prompt.return_value = LLMResponse(
+            '{"detail":"Not authenticated"}', 401, {}
+        )
+        result = PyritEngine().run({"pyrit_objective": "o"}, _target(), "m1", ctx={})
+        self.assertEqual(result.status, "ERROR")
+        self.assertFalse(result.success)
+        self.assertEqual(result.outputs["http_status"], 401)
+        self.assertEqual(result.outputs["marker"], "m1")
+        self.assertEqual(result.outputs["target_endpoint"], "https://api.example.com")
+        self.assertFalse(result.outputs["attack_succeeded"])
+        self.assertNotIn("vulnerability", result.outputs)
+
 
 class GarakEngineTest(TestCase):
     @patch("ai_redteam.engines.garak.shutil.which", return_value=None)

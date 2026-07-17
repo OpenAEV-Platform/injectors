@@ -78,6 +78,16 @@ class PyritEngine(Engine):
                         f"escalation turn {turn + 1} and could not be tested.\n"
                         f"Response (truncated):\n{(response.text or '')[:1500]}"
                     ),
+                    # Mirror the native engine's ERROR outputs so multi-target
+                    # aggregation keeps the marker and can surface the HTTP status
+                    # of the failing target in the summary.
+                    outputs={
+                        "response": (response.text or "")[:4000],
+                        "marker": marker,
+                        "target_endpoint": target.endpoint or "",
+                        "http_status": status_code,
+                        "attack_succeeded": False,
+                    },
                 )
             last_response = response.text
             transcript.append(
