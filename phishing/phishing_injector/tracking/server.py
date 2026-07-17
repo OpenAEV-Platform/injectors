@@ -93,11 +93,24 @@ def build_handler(
                 except (TypeError, ValueError):
                     length = -1
                 if length < 0 or length > MAX_SUBMIT_BODY_BYTES:
+                    # The body is not drained (it may be absent, malformed or
+                    # oversized), so unread bytes could remain on the socket.
+                    # Force the connection closed to avoid desynchronizing a
+                    # keep-alive client (leftover bytes read as the next request).
+                    self.close_connection = True
                     self.send_response(413)
                     self.end_headers()
                     return
                 if length:
-                    self.rfile.read(length)  # consume body; never stored
+                    try:
+                        self.rfile.read(length)  # consume body; never stored
+                    except (TimeoutError, OSError):
+                        # A slow/stalled client hit the per-request socket
+                        # timeout mid-body. Close the connection instead of
+                        # letting the exception bubble up to
+                        # BaseHTTPRequestHandler as a logged traceback.
+                        self.close_connection = True
+                        return
                 store.record_submit(submit_token)
                 self.send_response(302)
                 self.send_header("Location", redirect_url)
