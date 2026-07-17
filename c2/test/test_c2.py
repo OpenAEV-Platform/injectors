@@ -32,6 +32,7 @@ class ExecutorTest(TestCase):
         self.assertEqual(mock_get.call_count, 5)
         self.assertEqual(result.outputs["beacons_sent"], ["5"])
         self.assertEqual(result.outputs["beacons_reached"], ["5"])
+        self.assertFalse(mock_get.call_args.kwargs["allow_redirects"])
 
     @patch("c2_injector.helpers.c2_executor.requests.get")
     def test_beacon_counts_blocked_as_sent(self, mock_get):

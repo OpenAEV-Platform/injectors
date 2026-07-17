@@ -64,6 +64,9 @@ class C2Executor:
                     listener_url,
                     headers={"User-Agent": BEACON_USER_AGENT},
                     timeout=self.per_beacon_timeout,
+                    # Keep each beacon to a single request so a 30x from the
+                    # listener does not distort the beacon count or cadence.
+                    allow_redirects=False,
                 )
                 reached += 1 if response.status_code < 500 else 0
             except requests.RequestException:
