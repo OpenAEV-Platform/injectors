@@ -107,7 +107,8 @@ def _collect_ai_target_ids_in_group(group_id: str, api, logger=None) -> list:
         ids.extend(
             asset["asset_id"]
             for asset in content
-            if asset.get("asset_category") == c.AI_TARGET_CATEGORY and asset.get("asset_id")
+            if asset.get("asset_category") == c.AI_TARGET_CATEGORY
+            and asset.get("asset_id")
         )
         if response.get("last", True) or not content:
             break

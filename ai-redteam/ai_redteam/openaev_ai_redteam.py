@@ -124,7 +124,8 @@ class OpenAEVAiRedTeam:
 
         A single target keeps the original single-result shape. Multiple targets (asset-group
         mode) are merged: the message lists each target's verdict, the `vulnerability` outputs
-        are concatenated (tagged with the target), and per-target responses are keyed by label.
+        are concatenated (tagged with the target), and per-target responses are keyed by
+        `_target_key()` (the asset id when available, otherwise the display label).
         """
         if len(results) == 1:
             result = results[0]

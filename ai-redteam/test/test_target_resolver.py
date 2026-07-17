@@ -149,14 +149,22 @@ class ResolveTargetsTest(TestCase):
         api.http_post.side_effect = [
             {
                 "content": [
-                    {"asset_id": "a1", "asset_name": "T1", "asset_category": "AI_TARGET"},
+                    {
+                        "asset_id": "a1",
+                        "asset_name": "T1",
+                        "asset_category": "AI_TARGET",
+                    },
                     {"asset_id": "e1", "asset_name": "Host", "asset_category": "HOST"},
                 ],
                 "last": False,
             },
             {
                 "content": [
-                    {"asset_id": "a2", "asset_name": "T2", "asset_category": "AI_TARGET"},
+                    {
+                        "asset_id": "a2",
+                        "asset_name": "T2",
+                        "asset_category": "AI_TARGET",
+                    },
                 ],
                 "last": True,
             },
