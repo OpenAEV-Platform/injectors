@@ -4,7 +4,12 @@ LLM client, with heuristic success detection. No heavy third-party dependency re
 
 from ai_redteam import detectors
 from ai_redteam.contracts import constants as c
-from ai_redteam.engines.base import Engine, EngineResult, apply_converter
+from ai_redteam.engines.base import (
+    Engine,
+    EngineResult,
+    apply_converter,
+    build_vulnerability,
+)
 from ai_redteam.targets import llm_client
 
 
@@ -100,10 +105,11 @@ class NativeEngine(Engine):
         }
         if success:
             outputs["vulnerability"] = [
-                {
-                    "value": f"AI target vulnerable to {converter if converter != 'none' else 'direct'} attack",
-                    "reason": verdict["reason"],
-                }
+                build_vulnerability(
+                    f"AI target vulnerable to {converter if converter != 'none' else 'direct'} attack",
+                    verdict["reason"],
+                    target,
+                )
             ]
 
         verdict_label = "VULNERABLE" if success else "DEFENDED"

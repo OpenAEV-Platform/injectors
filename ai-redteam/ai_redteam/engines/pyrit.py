@@ -8,7 +8,7 @@ multi-turn attack) using the multi-provider LLM client, so the technique always 
 
 from ai_redteam import detectors
 from ai_redteam.contracts import constants as c
-from ai_redteam.engines.base import Engine, EngineResult
+from ai_redteam.engines.base import Engine, EngineResult, build_vulnerability
 from ai_redteam.targets import llm_client
 
 ESCALATION_TEMPLATES = [
@@ -99,10 +99,9 @@ class PyritEngine(Engine):
         }
         if success:
             outputs["vulnerability"] = [
-                {
-                    "value": f"Multi-turn ({strategy}) jailbreak succeeded",
-                    "reason": reason,
-                }
+                build_vulnerability(
+                    f"Multi-turn ({strategy}) jailbreak succeeded", reason, target
+                )
             ]
         message = (
             f"[{'VULNERABLE' if success else 'DEFENDED'}] PyRIT {strategy} campaign ({turns} turns): "

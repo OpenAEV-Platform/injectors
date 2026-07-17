@@ -155,7 +155,14 @@ class OpenAEVAiRedTeam:
                 if result.status == "ERROR"
                 else ("VULNERABLE" if result.success else "DEFENDED")
             )
-            message_lines.append(f"- [{verdict}] {label}")
+            detail = ""
+            if result.status == "ERROR":
+                http_status = outputs.get("http_status")
+                # Surface the failure reason in the summary so the execution trace explains WHY the
+                # target could not be tested (e.g. HTTP 429 = target quota exhausted) rather than a
+                # bare "error".
+                detail = f" (HTTP {http_status})" if http_status else ""
+            message_lines.append(f"- [{verdict}] {label}{detail}")
 
         any_success = any(r.success for r in results)
         all_error = all(r.status == "ERROR" for r in results)
