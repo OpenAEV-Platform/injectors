@@ -104,8 +104,14 @@ class EmailSender:
                     server.login(username, password)
                 server.send_message(message)
         except smtplib.SMTPException as exc:
+            if self.logger:
+                self.logger.error(f"SMTP error while contacting {host}:{port}: {exc}")
             return SendResult(False, f"SMTP error: {exc}")
         except OSError as exc:
+            if self.logger:
+                self.logger.error(
+                    f"Connection error while contacting {host}:{port}: {exc}"
+                )
             return SendResult(False, f"Connection error: {exc}")
 
         return SendResult(

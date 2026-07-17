@@ -192,3 +192,13 @@ class EmailSenderSendTest(TestCase):
     def test_send_connection_error(self, _smtp):
         result = EmailSender().send(self._message(), "gw", 587)
         self.assertFalse(result.success)
+
+    @patch("email_seg.helpers.email_sender.smtplib.SMTP")
+    def test_send_logs_error_on_failure(self, smtp):
+        import smtplib
+
+        logger = MagicMock()
+        smtp.return_value.__enter__.side_effect = smtplib.SMTPException("nope")
+        result = EmailSender(logger=logger).send(self._message(), "gw", 587)
+        self.assertFalse(result.success)
+        logger.error.assert_called_once()
