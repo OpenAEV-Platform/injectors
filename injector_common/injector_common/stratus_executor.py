@@ -56,11 +56,15 @@ class StratusExecutor:
         run_env = os.environ.copy()
         if env:
             run_env.update({k: v for k, v in env.items() if v is not None})
+        # Explicit None check so a caller can intentionally pass a falsy
+        # timeout (e.g. 0) without it being replaced by the default.
+        if timeout is None:
+            timeout = self.DEFAULT_TIMEOUT_SECONDS
         return subprocess.run(
             cmd,
             capture_output=True,
             text=True,
-            timeout=timeout or self.DEFAULT_TIMEOUT_SECONDS,
+            timeout=timeout,
             env=run_env,
             stdin=subprocess.DEVNULL,
         )

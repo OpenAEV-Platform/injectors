@@ -28,5 +28,25 @@ class TechniqueResolverTest(TestCase):
             "gcp.exfiltration.share-compute-disk",
         )
 
+    def test_whitespace_custom_falls_back_to_selection(self):
+        content = {
+            "custom_technique_id": "   \n",
+            "technique_id": ["gcp.exfiltration.share-compute-disk"],
+        }
+        self.assertEqual(
+            OpenAEVGcp._resolve_technique(content),
+            "gcp.exfiltration.share-compute-disk",
+        )
+
+    def test_selected_string_is_stripped(self):
+        content = {"technique_id": "  gcp.exfiltration.share-compute-disk  "}
+        self.assertEqual(
+            OpenAEVGcp._resolve_technique(content),
+            "gcp.exfiltration.share-compute-disk",
+        )
+
+    def test_whitespace_selection_returns_none(self):
+        self.assertIsNone(OpenAEVGcp._resolve_technique({"technique_id": ["   "]}))
+
     def test_none(self):
         self.assertIsNone(OpenAEVGcp._resolve_technique({}))

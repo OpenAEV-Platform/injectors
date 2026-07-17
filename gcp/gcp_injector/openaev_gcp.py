@@ -27,13 +27,18 @@ class OpenAEVGcp:
 
     @staticmethod
     def _resolve_technique(content: Dict) -> Optional[str]:
+        # Only treat the custom id as an override when it has real content;
+        # a whitespace-only value must fall back to the selected technique
+        # rather than resolving to an empty override.
         custom = content.get("custom_technique_id")
-        if custom:
+        if custom and custom.strip():
             return custom.strip()
         selected = content.get("technique_id")
         if isinstance(selected, list):
-            return selected[0] if selected else None
-        return selected
+            selected = selected[0] if selected else None
+        if isinstance(selected, str):
+            selected = selected.strip()
+        return selected or None
 
     def process_message(self, data: Dict) -> None:
         start = time.time()

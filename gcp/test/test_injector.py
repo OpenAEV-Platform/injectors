@@ -149,6 +149,14 @@ class StratusExecutorTest(TestCase):
         self.assertEqual(result.outputs, {"technique": "gcp.foo"})
 
     @patch("injector_common.stratus_executor.subprocess.run")
+    def test_run_preserves_falsy_timeout(self, run):
+        run.return_value = MagicMock(returncode=0, stdout="", stderr="")
+        # A caller-supplied falsy timeout (0) must not be replaced by the
+        # default; only None falls back to DEFAULT_TIMEOUT_SECONDS.
+        StratusExecutor()._run(["version"], timeout=0)
+        self.assertEqual(run.call_args.kwargs["timeout"], 0)
+
+    @patch("injector_common.stratus_executor.subprocess.run")
     def test_detonate_failure(self, run):
         run.return_value = MagicMock(returncode=1, stdout="", stderr="boom")
         result = StratusExecutor().detonate("gcp.foo", cleanup=False)
