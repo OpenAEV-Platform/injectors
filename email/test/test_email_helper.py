@@ -58,6 +58,22 @@ def test_email_payload_builder_defaults():
     assert payload["bcc"] == []
 
 
+def test_email_payload_builder_empty_mail_from_falls_back_to_from():
+    content = {
+        "smtp_hostname": "smtp.example.com",
+        "smtp_port": "25",
+        "from": "sender@example.com",
+        "mail_from": "",
+        "to": "recipient@example.com",
+        "subject": "Hello",
+        "body": "World",
+    }
+
+    payload = EmailPayloadBuilder.build(content)
+
+    assert payload["mail_from"] == "sender@example.com"
+
+
 def test_email_payload_builder_parse_bool_from_string():
     content = {
         "smtp_hostname": "smtp.example.com",
