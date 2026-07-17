@@ -48,7 +48,6 @@ class BloodhoundExecutor:
                 domain_controller,
                 "-c",
                 "All",
-                "--zip",
             ]
             try:
                 completed = self._run(cmd, workdir)

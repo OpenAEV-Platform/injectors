@@ -66,6 +66,7 @@ class OpenAEVBloodhound:
                 inject_id=inject_id, data=callback_data
             )
         except Exception as e:
+            self.helper.injector_logger.error(f"BloodHound inject failed: {e}")
             self.helper.api.inject.execution_callback(
                 inject_id=inject_id,
                 data={
