@@ -70,9 +70,9 @@ class GophishClient:
             response.raise_for_status()
             body = response.json()
         except requests.HTTPError as exc:
-            return CampaignResult(False, f"Gophish campaign creation failed: {exc}")
+            return self._error_result("Gophish campaign creation failed", exc)
         except requests.RequestException as exc:
-            return CampaignResult(False, f"Gophish request error: {exc}")
+            return self._error_result("Gophish request error", exc)
 
         return CampaignResult(
             success=True,
@@ -92,9 +92,9 @@ class GophishClient:
             response.raise_for_status()
             body = response.json()
         except requests.HTTPError as exc:
-            return CampaignResult(False, f"Gophish stats fetch failed: {exc}")
+            return self._error_result("Gophish stats fetch failed", exc)
         except requests.RequestException as exc:
-            return CampaignResult(False, f"Gophish request error: {exc}")
+            return self._error_result("Gophish request error", exc)
 
         return CampaignResult(
             success=True,
@@ -102,6 +102,33 @@ class GophishClient:
             campaign_id=campaign_id,
             stats=self._extract_stats(body),
         )
+
+    def _error_result(
+        self, prefix: str, exc: requests.RequestException
+    ) -> CampaignResult:
+        """Build a failure result, enriching HTTP errors with the response body.
+
+        Gophish returns the actionable reason (missing template / page / group,
+        permission or 404 details) in the response body, so it is appended -
+        trimmed - to the message and logged at error level for operators.
+        """
+        message = f"{prefix}: {exc}"
+        body = self._response_body(exc)
+        if body:
+            message = f"{message} - {body}"
+        if self.logger is not None:
+            self.logger.error(message)
+        return CampaignResult(False, message)
+
+    @staticmethod
+    def _response_body(exc: requests.RequestException, limit: int = 500) -> str:
+        response = getattr(exc, "response", None)
+        if response is None:
+            return ""
+        text = (response.text or "").strip()
+        if len(text) > limit:
+            text = text[:limit] + "..."
+        return text
 
     @staticmethod
     def _extract_stats(body: Dict) -> Dict[str, int]:

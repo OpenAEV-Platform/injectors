@@ -107,6 +107,10 @@ class OpenAEVGophish:
                 inject_id=inject_id, data=callback_data
             )
         except Exception as e:
+            self.helper.injector_logger.error(
+                "Gophish injection failed",
+                {"inject_id": inject_id, "error": str(e)},
+            )
             self.helper.api.inject.execution_callback(
                 inject_id=inject_id,
                 data={

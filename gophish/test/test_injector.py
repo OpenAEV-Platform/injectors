@@ -75,6 +75,14 @@ class ProcessMessageTest(TestCase):
         injector.process_message(_data(CONTENT))
         self.assertEqual(self._callback(injector)["execution_status"], "ERROR")
 
+    def test_exception_is_logged(self):
+        injector = make_injector()
+        injector.client = MagicMock()
+        injector.client.create_campaign.side_effect = RuntimeError("boom")
+        injector.process_message(_data(CONTENT))
+        self.assertEqual(self._callback(injector)["execution_status"], "ERROR")
+        injector.helper.injector_logger.error.assert_called_once()
+
     def test_missing_required_field(self):
         injector = make_injector()
         injector.client = MagicMock()

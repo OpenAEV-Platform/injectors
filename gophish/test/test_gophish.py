@@ -1,6 +1,7 @@
 from unittest import TestCase
 from unittest.mock import MagicMock, patch
 
+import requests
 from gophish_injector.client.gophish_client import GophishClient
 from gophish_injector.contracts_gophish import (
     GOPHISH_CAMPAIGN_CONTRACT,
@@ -75,3 +76,42 @@ class ClientTest(TestCase):
         result = client.get_campaign_stats(7)
         self.assertTrue(result.success)
         self.assertEqual(result.stats["clicked"], 5)
+
+    @patch("gophish_injector.client.gophish_client.requests.post")
+    def test_create_campaign_http_error_includes_body_and_logs(self, mock_post):
+        error_response = MagicMock()
+        error_response.text = "Template not found"
+        http_error = requests.HTTPError("400 Client Error")
+        http_error.response = error_response
+        response = MagicMock()
+        response.raise_for_status.side_effect = http_error
+        mock_post.return_value = response
+
+        logger = MagicMock()
+        client = GophishClient("https://gophish:3333", "key", logger=logger)
+        result = client.create_campaign(
+            name="c",
+            template_name="t",
+            page_name="p",
+            smtp_name="s",
+            group_name="g",
+            url="http://phish",
+        )
+        self.assertFalse(result.success)
+        self.assertIn("Template not found", result.message)
+        logger.error.assert_called_once()
+
+    @patch("gophish_injector.client.gophish_client.requests.get")
+    def test_get_stats_http_error_includes_body(self, mock_get):
+        error_response = MagicMock()
+        error_response.text = "campaign not found"
+        http_error = requests.HTTPError("404 Client Error")
+        http_error.response = error_response
+        response = MagicMock()
+        response.raise_for_status.side_effect = http_error
+        mock_get.return_value = response
+
+        client = GophishClient("https://gophish:3333", "key")
+        result = client.get_campaign_stats(7)
+        self.assertFalse(result.success)
+        self.assertIn("campaign not found", result.message)
