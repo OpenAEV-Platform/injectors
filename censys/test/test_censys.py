@@ -1,3 +1,4 @@
+import json
 from unittest import TestCase
 from unittest.mock import MagicMock, patch
 
@@ -15,6 +16,19 @@ class ContractsTest(TestCase):
         contracts = CensysContracts.build_contract()
         ids = {c["contract_id"] for c in contracts}
         self.assertEqual(ids, {HOST_SEARCH_CONTRACT, CERT_SEARCH_CONTRACT})
+
+    def test_contracts_carry_available_expectations(self):
+        contracts = CensysContracts.build_contract()
+        for contract in contracts:
+            content = json.loads(contract["contract_content"])
+            expectations_field = next(
+                f for f in content["fields"] if f["key"] == "expectations"
+            )
+            self.assertNotIn("predefinedExpectations", expectations_field)
+            available = expectations_field["availableExpectations"]
+            self.assertEqual(len(available), 1)
+            self.assertEqual(available[0]["expectation_type"], "VULNERABILITY")
+            self.assertTrue(available[0]["expectation_is_predefined"])
 
 
 class ClientParsingTest(TestCase):
@@ -150,6 +164,22 @@ class ClientErrorHandlingTest(TestCase):
         mock_get.side_effect = requests.Timeout("timed out")
 
         result = self._client().search_certificates("names: example.com")
+        self.assertFalse(result.success)
+        self.assertIn("Censys request error", result.message)
+        self.assertEqual(result.outputs, {})
+
+    @patch("censys_injector.client.censys_client.requests.get")
+    def test_search_hosts_invalid_json_body(self, mock_get):
+        # requests>=2.27 raises requests.exceptions.JSONDecodeError (a
+        # RequestException subclass) from response.json(), so a non-JSON body
+        # must surface as a failed result instead of propagating.
+        response = MagicMock()
+        response.json.side_effect = requests.exceptions.JSONDecodeError(
+            "Expecting value", "<html>not json</html>", 0
+        )
+        mock_get.return_value = response
+
+        result = self._client().search_hosts("services.port: 443")
         self.assertFalse(result.success)
         self.assertIn("Censys request error", result.message)
         self.assertEqual(result.outputs, {})

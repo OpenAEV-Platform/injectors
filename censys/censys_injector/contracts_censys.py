@@ -40,20 +40,22 @@ class CensysContracts:
             mandatory=True,
         )
 
+        expectation_items = [
+            Expectation(
+                expectation_type=ExpectationType.vulnerability,
+                expectation_name="Vulnerability",
+                expectation_description="",
+                expectation_score=100,
+                expectation_expectation_group=False,
+                expectation_is_predefined=True,
+            )
+        ]
         expectations = ContractExpectations(
             key="expectations",
             label="Expectations",
             mandatory=False,
             cardinality=ContractCardinality.Multiple,
-            predefinedExpectations=[
-                Expectation(
-                    expectation_type=ExpectationType.vulnerability,
-                    expectation_name="Vulnerability",
-                    expectation_description="",
-                    expectation_score=100,
-                    expectation_expectation_group=False,
-                )
-            ],
+            availableExpectations=expectation_items,
         )
 
         output_hosts = ContractOutputElement(

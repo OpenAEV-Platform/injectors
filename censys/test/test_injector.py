@@ -62,6 +62,7 @@ class ProcessMessageTest(TestCase):
             True, "found", {"certificates": ["abcd"]}
         )
         injector.process_message(_data(CERT_SEARCH_CONTRACT, {"query": "x"}))
+        self.assertEqual(self._callback(injector)["execution_status"], "SUCCESS")
         injector.client.search_certificates.assert_called_once()
 
     def test_missing_query_reports_error(self):
