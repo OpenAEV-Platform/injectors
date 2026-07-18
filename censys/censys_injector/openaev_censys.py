@@ -32,6 +32,7 @@ class OpenAEVCensys:
             api_secret=censys_conf.api_secret.get_secret_value(),
             base_url=censys_conf.base_url,
             per_page=censys_conf.per_page,
+            max_pages=censys_conf.max_pages,
             logger=self.helper.injector_logger,
         )
 

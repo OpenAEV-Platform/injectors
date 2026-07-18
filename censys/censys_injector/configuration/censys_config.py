@@ -17,5 +17,10 @@ class CensysConfig(BaseSettings):
     )
     per_page: int = Field(
         default=50,
-        description="Maximum number of results to request per search.",
+        description="Number of results to request per page (Censys max: 100).",
+    )
+    max_pages: int = Field(
+        default=10,
+        description="Maximum number of result pages to follow via the Censys "
+        "cursor before stopping (bounds API usage on broad queries).",
     )

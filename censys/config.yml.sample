@@ -11,3 +11,5 @@ injector:
 censys:
   api_id: 'ChangeMe'
   api_secret: 'ChangeMe'
+  # per_page: 50
+  # max_pages: 10

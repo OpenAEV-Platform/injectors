@@ -31,11 +31,13 @@ class CensysClient:
         base_url: str = "https://search.censys.io",
         per_page: int = 50,
         timeout: int = 60,
+        max_pages: int = 10,
         logger=None,
     ):
         self.base_url = base_url.rstrip("/")
         self.per_page = per_page
         self.timeout = timeout
+        self.max_pages = max(1, max_pages)
         self.logger = logger
         self._auth = (api_id, api_secret)
 
@@ -53,12 +55,33 @@ class CensysClient:
         response.raise_for_status()
         return response.json()
 
+    def _search_all_hits(self, path: str, query: str) -> List[Dict]:
+        """Fetch and aggregate hits across pages using the Censys cursor.
+
+        The Censys Search API v2 is cursor-paginated: each response exposes the
+        next-page token at ``result.links.next`` (empty when the last page is
+        reached). We follow it up to ``max_pages`` to bound API usage and avoid
+        an unbounded loop if the API ever keeps returning a cursor.
+        """
+        hits: List[Dict] = []
+        cursor: Optional[str] = None
+        for _ in range(self.max_pages):
+            params: Dict[str, Union[str, int]] = {
+                "q": query,
+                "per_page": self.per_page,
+            }
+            if cursor:
+                params["cursor"] = cursor
+            result = self._get(path, params).get("result", {})
+            hits.extend(result.get("hits", []))
+            cursor = (result.get("links") or {}).get("next")
+            if not cursor:
+                break
+        return hits
+
     def search_hosts(self, query: str) -> CensysResult:
         try:
-            payload = self._get(
-                "/api/v2/hosts/search",
-                {"q": query, "per_page": self.per_page},
-            )
+            hits = self._search_all_hits("/api/v2/hosts/search", query)
         except requests.HTTPError as exc:
             message = f"Censys host search failed: {exc}"
             self._log_error(message)
@@ -68,7 +91,6 @@ class CensysClient:
             self._log_error(message)
             return CensysResult(False, message)
 
-        hits = payload.get("result", {}).get("hits", [])
         hosts = [h.get("ip") for h in hits if _is_ipv4(h.get("ip"))]
         ports = sorted(
             {
@@ -86,10 +108,7 @@ class CensysClient:
 
     def search_certificates(self, query: str) -> CensysResult:
         try:
-            payload = self._get(
-                "/api/v2/certificates/search",
-                {"q": query, "per_page": self.per_page},
-            )
+            hits = self._search_all_hits("/api/v2/certificates/search", query)
         except requests.HTTPError as exc:
             message = f"Censys certificate search failed: {exc}"
             self._log_error(message)
@@ -99,7 +118,6 @@ class CensysClient:
             self._log_error(message)
             return CensysResult(False, message)
 
-        hits = payload.get("result", {}).get("hits", [])
         fingerprints = [
             h.get("fingerprint_sha256") for h in hits if h.get("fingerprint_sha256")
         ]

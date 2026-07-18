@@ -69,6 +69,44 @@ class ClientParsingTest(TestCase):
         self.assertTrue(result.success)
         self.assertEqual(result.outputs["certificates"], ["abcd"])
 
+    @patch("censys_injector.client.censys_client.requests.get")
+    def test_search_hosts_follows_cursor_pagination(self, mock_get):
+        def _page(hits, next_cursor):
+            response = MagicMock()
+            response.json.return_value = {
+                "result": {"hits": hits, "links": {"next": next_cursor}}
+            }
+            return response
+
+        mock_get.side_effect = [
+            _page([{"ip": "1.2.3.4", "services": [{"port": 80}]}], "CURSOR2"),
+            _page([{"ip": "5.6.7.8", "services": [{"port": 443}]}], ""),
+        ]
+
+        result = self._client().search_hosts("services.port: 80")
+        self.assertTrue(result.success)
+        self.assertEqual(result.outputs["hosts"], ["1.2.3.4", "5.6.7.8"])
+        self.assertEqual(result.outputs["ports"], [80, 443])
+        self.assertEqual(mock_get.call_count, 2)
+        second_call_params = mock_get.call_args_list[1].kwargs["params"]
+        self.assertEqual(second_call_params["cursor"], "CURSOR2")
+
+    @patch("censys_injector.client.censys_client.requests.get")
+    def test_search_certificates_stops_at_max_pages(self, mock_get):
+        response = MagicMock()
+        response.json.return_value = {
+            "result": {
+                "hits": [{"fingerprint_sha256": "abcd"}],
+                "links": {"next": "ALWAYS"},
+            }
+        }
+        mock_get.return_value = response
+
+        client = CensysClient(api_id="id", api_secret="secret", max_pages=3)
+        result = client.search_certificates("names: example.com")
+        self.assertTrue(result.success)
+        self.assertEqual(mock_get.call_count, 3)
+
 
 class ClientErrorHandlingTest(TestCase):
     def _client(self, logger=None):
