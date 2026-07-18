@@ -35,7 +35,20 @@ class MessageData:
         targets = self.target_results.targets
         # Handle empty targets as an error
         if not targets:
-            message = f"No target identified for the property {TargetProperty[self.selector_property.upper()].value}"
+            message = (
+                "No target identified for the property "
+                + self._selector_property_label()
+            )
             raise ValueError(message)
 
         return targets
+
+    def _selector_property_label(self) -> str:
+        # The selector property comes straight from the payload; resolve its
+        # human-readable label defensively so an unexpected value still yields
+        # the intended ValueError message instead of a KeyError/AttributeError
+        # exposing the raw enum key.
+        try:
+            return TargetProperty[self.selector_property.upper()].value
+        except (KeyError, AttributeError):
+            return str(self.selector_property)

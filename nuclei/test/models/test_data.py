@@ -83,3 +83,59 @@ class TestMessageData(unittest.TestCase):
 
         with self.assertRaises(ValueError):
             message_data.get_targets()
+
+    @patch.object(module.Targets, "extract_target_meta")
+    @patch.object(module.Targets, "extract_targets")
+    def test_messagedata_get_targets_unexpected_property(
+        self, m_extract_targets, m_extract_target_meta
+    ):
+        # An unexpected selector property must still surface the "no targets"
+        # condition as a ValueError (with the raw value in the message), not a
+        # KeyError/AttributeError from the TargetProperty enum lookup.
+        data = {
+            "injection": {
+                "inject_id": sentinel.inject_id,
+                "inject_injector_contract": {
+                    "injector_contract_id": sentinel.injector_contract_id,
+                },
+                "inject_content": {
+                    module.TARGET_SELECTOR_KEY: sentinel.selector_key,
+                    module.TARGET_PROPERTY_SELECTOR_KEY: "not_a_known_property",
+                    "expectations": [],
+                },
+            }
+        }
+        helper = MagicMock()
+        message_data = module.MessageData(data, helper)
+        m_extract_targets.return_value.targets = []
+
+        with self.assertRaises(ValueError) as ctx:
+            message_data.get_targets()
+        self.assertIn("not_a_known_property", str(ctx.exception))
+
+    @patch.object(module.Targets, "extract_target_meta")
+    @patch.object(module.Targets, "extract_targets")
+    def test_messagedata_get_targets_non_string_property(
+        self, m_extract_targets, m_extract_target_meta
+    ):
+        # A non-string selector property (malformed payload) must not raise an
+        # AttributeError on .upper(); the ValueError contract is preserved.
+        data = {
+            "injection": {
+                "inject_id": sentinel.inject_id,
+                "inject_injector_contract": {
+                    "injector_contract_id": sentinel.injector_contract_id,
+                },
+                "inject_content": {
+                    module.TARGET_SELECTOR_KEY: sentinel.selector_key,
+                    module.TARGET_PROPERTY_SELECTOR_KEY: None,
+                    "expectations": [],
+                },
+            }
+        }
+        helper = MagicMock()
+        message_data = module.MessageData(data, helper)
+        m_extract_targets.return_value.targets = []
+
+        with self.assertRaises(ValueError):
+            message_data.get_targets()
