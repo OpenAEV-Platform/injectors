@@ -272,7 +272,7 @@ class TestOpenAEVNmap(unittest.TestCase):
         def run(msg):
             try:
                 injector.process_message(msg)
-            except BaseException as exc:  # noqa: BLE001 - surface thread failures
+            except Exception as exc:  # noqa: BLE001 - surface thread failures
                 errors.append(exc)
 
         threads = [
