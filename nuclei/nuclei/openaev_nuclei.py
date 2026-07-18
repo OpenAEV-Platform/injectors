@@ -140,9 +140,14 @@ class OpenAEVNuclei:
         try:
             configs = build_network_configs(msg_data.get_targets())
         except Exception as e:
+            # This guards both target resolution (msg_data.get_targets, which
+            # raises a user-facing ValueError when no target is identified) and
+            # the network-config build, so keep the message generic enough to
+            # cover either source of failure.
             pre_execute_fail_flag = True
             pre_execute_fail_message = (
-                f"Could not build network configurations: {type(e).__name__} - {e}"
+                "Could not resolve targets or build network configurations: "
+                f"{type(e).__name__} - {e}"
             )
         else:
             try:

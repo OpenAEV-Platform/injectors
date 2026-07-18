@@ -246,14 +246,19 @@ class TestOpenAEVNmap(unittest.TestCase):
         m_msgdata.side_effect = [message_data_a, message_data_b]
 
         # Force both threads to be inside process_message at the same time so a
-        # shared-state implementation would clobber the first inject id.
+        # shared-state implementation would clobber the first inject id. The join
+        # timeout is deliberately larger than the barrier timeout so that, under
+        # slow CI scheduling, a thread that reaches the barrier late still has
+        # time to finish before join() gives up (otherwise the test could flake).
+        barrier_timeout = 5
+        join_timeout = barrier_timeout + 5
         barrier = threading.Barrier(2)
         # Only appended once a thread gets past the barrier: len() == 2 proves
         # both calls genuinely overlapped instead of running one after another.
         overlapped = []
 
         def blocking_execution(_start, msg_data):
-            barrier.wait(timeout=5)
+            barrier.wait(timeout=barrier_timeout)
             overlapped.append(msg_data.inject_id)
             return {
                 "message": "ok",
@@ -277,7 +282,7 @@ class TestOpenAEVNmap(unittest.TestCase):
         for thread in threads:
             thread.start()
         for thread in threads:
-            thread.join(timeout=5)
+            thread.join(timeout=join_timeout)
 
         # The threads must have actually finished (no hang / broken barrier) and
         # neither call may have raised for the assertions below to be meaningful.
