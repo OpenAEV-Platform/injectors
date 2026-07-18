@@ -248,9 +248,13 @@ class TestOpenAEVNmap(unittest.TestCase):
         # Force both threads to be inside process_message at the same time so a
         # shared-state implementation would clobber the first inject id.
         barrier = threading.Barrier(2)
+        # Only appended once a thread gets past the barrier: len() == 2 proves
+        # both calls genuinely overlapped instead of running one after another.
+        overlapped = []
 
         def blocking_execution(_start, msg_data):
             barrier.wait(timeout=5)
+            overlapped.append(msg_data.inject_id)
             return {
                 "message": "ok",
                 "outputs": {"ports": [], "scan_results": []},
@@ -258,14 +262,35 @@ class TestOpenAEVNmap(unittest.TestCase):
 
         m_nmap_execution.side_effect = blocking_execution
 
+        errors = []
+
+        def run(msg):
+            try:
+                injector.process_message(msg)
+            except BaseException as exc:  # noqa: BLE001 - surface thread failures
+                errors.append(exc)
+
         threads = [
-            threading.Thread(target=injector.process_message, args=(MagicMock(),)),
-            threading.Thread(target=injector.process_message, args=(MagicMock(),)),
+            threading.Thread(target=run, args=(MagicMock(),)),
+            threading.Thread(target=run, args=(MagicMock(),)),
         ]
         for thread in threads:
             thread.start()
         for thread in threads:
             thread.join(timeout=5)
+
+        # The threads must have actually finished (no hang / broken barrier) and
+        # neither call may have raised for the assertions below to be meaningful.
+        for thread in threads:
+            self.assertFalse(
+                thread.is_alive(), "process_message thread did not finish in time"
+            )
+        self.assertEqual(errors, [])
+        self.assertEqual(
+            len(overlapped),
+            2,
+            "both process_message calls must overlap at the barrier",
+        )
 
         reception_ids = sorted(
             call.kwargs["inject_id"]
@@ -278,6 +303,87 @@ class TestOpenAEVNmap(unittest.TestCase):
             for call in m_signaturemanager.return_value.send_signatures.call_args_list
         )
         self.assertEqual(send_ids, ["inject-a", "inject-b"])
+
+    @patch.object(module.OpenAEVNmap, "nmap_execution")
+    @patch.object(module, "SignatureManager")
+    @patch.object(module, "build_network_configs")
+    def test_openaev_nmap_process_message_message_data_failure(
+        self,
+        m_build_network_configs,
+        m_signaturemanager,
+        m_nmap_execution,
+        m_configloader,
+        m_helper,
+        m_msgdata,
+        _,
+    ):
+        # If MessageData construction raises (invalid payload, no targets, ...),
+        # process_message must not let the exception escape: it reports a
+        # terminal ERROR callback resolved from the raw payload instead.
+        m_helper.return_value.injector_logger = MagicMock()
+        m_helper.return_value.api = MagicMock()
+        injector = module.OpenAEVNmap()
+
+        m_msgdata.side_effect = ValueError("No target identified")
+        data = {"injection": {"inject_id": "inject-x"}}
+
+        injector.process_message(data)
+
+        m_nmap_execution.assert_not_called()
+        m_build_network_configs.assert_not_called()
+        injector.helper.api.inject.execution_reception.assert_called_once_with(
+            inject_id="inject-x", data={"tracking_total_count": 1}
+        )
+        injector.helper.api.inject.execution_callback.assert_called_once_with(
+            inject_id="inject-x", data=ANY
+        )
+        callback_data = injector.helper.api.inject.execution_callback.call_args.kwargs[
+            "data"
+        ]
+        self.assertEqual(callback_data["execution_status"], "ERROR")
+        self.assertEqual(callback_data["execution_action"], "complete")
+        self.assertIn("Pre-execution failure", callback_data["execution_message"])
+        m_signaturemanager.return_value.send_signatures.assert_not_called()
+
+    @patch.object(module.OpenAEVNmap, "nmap_execution")
+    @patch.object(module, "SignatureManager")
+    @patch.object(module, "build_network_configs")
+    def test_openaev_nmap_process_message_no_targets_failure(
+        self,
+        m_build_network_configs,
+        m_signaturemanager,
+        m_nmap_execution,
+        m_configloader,
+        m_helper,
+        m_msgdata,
+        _,
+    ):
+        # get_targets() raising (empty targets) is also a pre-execution failure
+        # and must produce a terminal ERROR callback without running nmap.
+        m_helper.return_value.injector_logger = MagicMock()
+        m_helper.return_value.api = MagicMock()
+        injector = module.OpenAEVNmap()
+
+        message_data = MagicMock()
+        message_data.get_targets.side_effect = ValueError(
+            "No target identified for the property Hostname"
+        )
+        m_msgdata.return_value = message_data
+        data = {"injection": {"inject_id": "inject-y"}}
+
+        injector.process_message(data)
+
+        m_nmap_execution.assert_not_called()
+        m_build_network_configs.assert_not_called()
+        injector.helper.api.inject.execution_callback.assert_called_once_with(
+            inject_id="inject-y", data=ANY
+        )
+        callback_data = injector.helper.api.inject.execution_callback.call_args.kwargs[
+            "data"
+        ]
+        self.assertEqual(callback_data["execution_status"], "ERROR")
+        self.assertIn("Pre-execution failure", callback_data["execution_message"])
+        m_signaturemanager.return_value.send_signatures.assert_not_called()
 
     def test_openaev_nmap_start(self, m_configloader, m_helper, m_msgdata, _):
         m_helper.return_value.api = MagicMock()

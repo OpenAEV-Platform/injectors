@@ -206,6 +206,50 @@ class TestOpenAEVNuclei(unittest.TestCase):
         self.assertIn("Pre-execution failure", callback_data["execution_message"])
         m_signaturemanager.return_value.send_signatures.assert_not_called()
 
+    @patch.object(module.OpenAEVNuclei, "nuclei_execution")
+    @patch.object(module, "SignatureManager")
+    @patch.object(module, "build_network_configs")
+    def test_openaev_nuclei_process_message_message_data_failure(
+        self,
+        m_build_network_configs,
+        m_signaturemanager,
+        m_nuclei_execution,
+        m_configloader,
+        m_confighelper,
+        m_helper,
+        m_nucleiprocess,
+        m_parser,
+        m_msgdata,
+        _,
+    ):
+        # If MessageData construction raises (invalid payload, no targets, ...),
+        # process_message must not let the exception escape: it reports a
+        # terminal ERROR callback resolved from the raw payload instead.
+        m_helper.return_value.injector_logger = MagicMock()
+        m_helper.return_value.api = MagicMock()
+        injector = module.OpenAEVNuclei()
+
+        m_msgdata.side_effect = ValueError("No target identified")
+        data = {"injection": {"inject_id": "inject-x"}}
+
+        injector.process_message(data)
+
+        m_nuclei_execution.assert_not_called()
+        m_build_network_configs.assert_not_called()
+        injector.helper.api.inject.execution_reception.assert_called_once_with(
+            inject_id="inject-x", data={"tracking_total_count": 1}
+        )
+        injector.helper.api.inject.execution_callback.assert_called_once_with(
+            inject_id="inject-x", data=ANY
+        )
+        callback_data = injector.helper.api.inject.execution_callback.call_args.kwargs[
+            "data"
+        ]
+        self.assertEqual(callback_data["execution_status"], "ERROR")
+        self.assertEqual(callback_data["execution_action"], "complete")
+        self.assertIn("Pre-execution failure", callback_data["execution_message"])
+        m_signaturemanager.return_value.send_signatures.assert_not_called()
+
     def test_openaev_nuclei_start(
         self,
         m_configloader,

@@ -63,22 +63,47 @@ class OpenAEVNmap:
             nmap_result.stdout, msg_data.selector_key, msg_data.target_results
         )
 
+    def _report_pre_execution_failure(
+        self, data: dict, start: float, err: Exception
+    ) -> None:
+        # Per-inject errors must never escape process_message: even when the
+        # inject fails before nmap runs, the platform must still get a terminal
+        # result. Resolve the inject id straight from the raw payload since a
+        # MessageData failure means msg_data is not available.
+        inject_id = data["injection"]["inject_id"]
+        self.helper.injector_logger.error("nmap pre-execution failure: " + str(err))
+        self.helper.api.inject.execution_reception(
+            inject_id=inject_id, data={"tracking_total_count": 1}
+        )
+        self.helper.api.inject.execution_callback(
+            inject_id=inject_id,
+            data={
+                "execution_message": "Pre-execution failure: " + str(err),
+                "execution_status": "ERROR",
+                "execution_duration": int(time.time() - start),
+                "execution_action": "complete",
+            },
+        )
+
     def process_message(self, data: dict) -> None:
         start = time.time()
 
-        # unpacking various elements from the data
-        msg_data = MessageData(data, self.helper)
-
-        targets = msg_data.get_targets()
+        # unpacking the message, resolving targets and building the pre-execution
+        # signatures can all raise (invalid payload, no targets, signature setup);
+        # guard them so a failure is reported instead of propagating out.
+        try:
+            msg_data = MessageData(data, self.helper)
+            targets = msg_data.get_targets()
+            network_injector_configs = build_network_configs(targets)
+            execution_signatures = self.signature_manager.build_execution_signatures(
+                network_injector_configs
+            )
+        except Exception as err:
+            self._report_pre_execution_failure(data, start, err)
+            return
 
         # create execution details object
         execution_details = ExecutionDetails()
-
-        # generate execution signatures
-        network_injector_configs = build_network_configs(targets)
-        execution_signatures = self.signature_manager.build_execution_signatures(
-            network_injector_configs
-        )
 
         # Notify API of reception and expected number of operations
         reception_data = {"tracking_total_count": 1}

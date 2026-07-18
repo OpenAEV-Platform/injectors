@@ -80,11 +80,38 @@ class OpenAEVNuclei:
             result.stdout.decode("utf-8"), msg_data.target_results.ip_to_asset_id_map
         )
 
+    def _report_pre_execution_failure(
+        self, data: Dict, start: float, err: Exception
+    ) -> None:
+        # Per-inject errors must never escape process_message: even when the
+        # inject fails before nuclei runs, the platform must still get a terminal
+        # result. Resolve the inject id straight from the raw payload since a
+        # MessageData failure means msg_data is not available.
+        inject_id = data["injection"]["inject_id"]
+        self.helper.injector_logger.error("nuclei pre-execution failure: " + str(err))
+        self.helper.api.inject.execution_reception(
+            inject_id=inject_id, data={"tracking_total_count": 1}
+        )
+        self.helper.api.inject.execution_callback(
+            inject_id=inject_id,
+            data={
+                "execution_message": f"Pre-execution failure: {err}",
+                "execution_status": "ERROR",
+                "execution_duration": int(time.time() - start),
+                "execution_action": "complete",
+            },
+        )
+
     def process_message(self, data: Dict) -> None:
         start = time.time()
 
-        # unpacking various elements from the data
-        msg_data = MessageData(data, self.helper)
+        # unpacking the message can raise (invalid payload, no targets); guard it
+        # so a failure is reported instead of propagating out of process_message.
+        try:
+            msg_data = MessageData(data, self.helper)
+        except Exception as err:
+            self._report_pre_execution_failure(data, start, err)
+            return
 
         # Notify API of reception and expected number of operations
         reception_data = {"tracking_total_count": 1}
