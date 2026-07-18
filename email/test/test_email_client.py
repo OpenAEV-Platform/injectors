@@ -165,6 +165,66 @@ def test_send_email_closes_connection_on_send_failure():
         mock_smtp.return_value.__exit__.assert_called_once()
 
 
+def _serialize_message(msg, *args, **kwargs):
+    # Real SMTP servers serialize the message on send; mimic that so the
+    # standard-library header sanitization (CRLF header-injection defense) is
+    # actually exercised instead of being swallowed by the mock.
+    msg.as_bytes()
+
+
+def test_send_email_rejects_header_injection_in_recipient():
+    with patch("smtplib.SMTP") as mock_smtp:
+        instance = mock_smtp.return_value.__enter__.return_value
+        instance.send_message.side_effect = _serialize_message
+
+        result = EmailClient.send_email(
+            smtp_hostname="localhost",
+            smtp_port=1025,
+            smtp_use_tls=False,
+            smtp_username=None,
+            smtp_password=None,
+            from_email="from@example.com",
+            mail_from="from@example.com",
+            reply_to=None,
+            to_email="to@example.com\r\nBcc: attacker@example.com",
+            cc_emails=[],
+            bcc_emails=[],
+            subject="Test Subject",
+            body="Test Body",
+            attachments=[],
+        )
+
+        assert result.success is False
+        assert "Failed to craft email" in result.message
+        mock_smtp.return_value.__exit__.assert_called_once()
+
+
+def test_send_email_rejects_header_injection_in_subject():
+    with patch("smtplib.SMTP") as mock_smtp:
+        instance = mock_smtp.return_value.__enter__.return_value
+        instance.send_message.side_effect = _serialize_message
+
+        result = EmailClient.send_email(
+            smtp_hostname="localhost",
+            smtp_port=1025,
+            smtp_use_tls=False,
+            smtp_username=None,
+            smtp_password=None,
+            from_email="from@example.com",
+            mail_from="from@example.com",
+            reply_to=None,
+            to_email="to@example.com",
+            cc_emails=[],
+            bcc_emails=[],
+            subject="Subject\r\nX-Injected: evil",
+            body="Test Body",
+            attachments=[],
+        )
+
+        assert result.success is False
+        assert "Failed to craft email" in result.message
+
+
 def test_send_email_failure():
     with patch("smtplib.SMTP") as mock_smtp:
         mock_smtp.side_effect = Exception("Connection error")
