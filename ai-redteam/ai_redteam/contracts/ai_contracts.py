@@ -133,13 +133,16 @@ def _target_fields():
 
 def _expectations():
     expectations = [
+        # Available but not pre-filled: AI attacks are scored by Detection / Prevention
+        # only. The engines still emit vulnerability findings, so the vulnerability
+        # expectation stays selectable, but it is not a predefined default (see #333).
         Expectation(
             expectation_type=ExpectationType.vulnerability,
             expectation_name="Not vulnerable",
             expectation_description="The AI target resisted the adversarial technique.",
             expectation_score=100,
             expectation_expectation_group=False,
-            expectation_is_predefined=True,
+            expectation_is_predefined=False,
         ),
         Expectation(
             expectation_type=ExpectationType.detection,
