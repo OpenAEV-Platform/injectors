@@ -100,10 +100,15 @@ class SlackContracts:
             mandatory=True,
         )
         # Advanced: paste a full Block Kit "blocks" array. When set (and format =
-        # Block Kit) it is sent verbatim and overrides title/message.
+        # Block Kit) it is sent verbatim and replaces the auto-built layout.
+        # Title and message remain mandatory: they still provide the plain-text
+        # fallback Slack uses for notifications and previews.
         blocks_json = ContractTextArea(
             key=KEY_BLOCKS_JSON,
-            label="Custom Block Kit blocks JSON (optional, overrides title/message)",
+            label=(
+                "Custom Block Kit blocks JSON (optional, replaces the auto-built "
+                "layout; title/message still provide the notification fallback)"
+            ),
             mandatory=False,
             visibleConditionFields=[content_type.key],
             visibleConditionValues={content_type.key: CONTENT_BLOCKS},

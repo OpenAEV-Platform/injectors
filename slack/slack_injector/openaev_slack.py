@@ -1,14 +1,14 @@
 import time
 from typing import Dict
 
-from injector_common.data_helpers import DataHelpers
-from injector_common.dump_config import intercept_dump_argument
 from pyoaev.helpers import OpenAEVConfigHelper, OpenAEVInjectorHelper
-
 from slack_injector.client.slack_client import ExecutionResult, SlackClient
 from slack_injector.configuration.config_loader import ConfigLoader
 from slack_injector.contracts_slack import CONTRACT_ID, KEY_CHANNEL
 from slack_injector.helpers.slack_helper import SlackPayloadBuilder
+
+from injector_common.data_helpers import DataHelpers
+from injector_common.dump_config import intercept_dump_argument
 
 
 class OpenAEVSlackInjector:

@@ -168,9 +168,11 @@ Fields:
 
 - **Channel or user** (`channel`): a channel ID (`C...`), a `#channel-name`, or a user ID (`U...`) for a DM. Mandatory.
 - **Message format** (`content_type`): `blocks` (Block Kit, default) or `text` (plain text / mrkdwn).
-- **Title** (`title`) and **Message** (`message`): mandatory; used as the header/section text or the plain message.
+- **Title** (`title`) and **Message** (`message`): mandatory; used as the header/section text or the plain message,
+  and always as the plain-text fallback Slack shows in notifications and previews.
 - **Custom Block Kit blocks JSON** (`blocks_json`): optional, only for the Block Kit format. When provided it is sent
-  verbatim as the `blocks` array and overrides title/message.
+  verbatim as the `blocks` array and replaces the auto-built layout (header + section). Title and message remain
+  mandatory because they still provide the `text` notification fallback sent alongside the blocks.
 
 The contract returns no structured outputs. The inject is marked `SUCCESS` when Slack replies with `ok: true`, and
 `ERROR` otherwise (with the Slack error code, e.g. `channel_not_found`, `not_in_channel`, `invalid_auth`).

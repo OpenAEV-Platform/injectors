@@ -1,6 +1,5 @@
 from pydantic import Field
 from pyoaev.configuration import ConfigLoaderOAEV, Configuration, SettingsLoader
-
 from slack_injector.configuration.injector_config_override import (
     InjectorConfigOverride,
 )
