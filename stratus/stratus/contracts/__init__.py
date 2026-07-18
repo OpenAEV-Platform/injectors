@@ -92,27 +92,28 @@ def _credential_element(cred: CredField) -> ContractElement:
 
 
 def _expectations_element() -> ContractExpectations:
+    expectation_items = [
+        Expectation(
+            expectation_type=ExpectationType.detection,
+            expectation_name="Detection",
+            expectation_description="",
+            expectation_score=100,
+            expectation_expectation_group=False,
+        ),
+        Expectation(
+            expectation_type=ExpectationType.prevention,
+            expectation_name="Prevention",
+            expectation_description="",
+            expectation_score=100,
+            expectation_expectation_group=False,
+        ),
+    ]
     return ContractExpectations(
         key="expectations",
         label="Expectations",
         mandatory=False,
         cardinality=ContractCardinality.Multiple,
-        predefinedExpectations=[
-            Expectation(
-                expectation_type=ExpectationType.detection,
-                expectation_name="Detection",
-                expectation_description="",
-                expectation_score=100,
-                expectation_expectation_group=False,
-            ),
-            Expectation(
-                expectation_type=ExpectationType.prevention,
-                expectation_name="Prevention",
-                expectation_description="",
-                expectation_score=100,
-                expectation_expectation_group=False,
-            ),
-        ],
+        availableExpectations=expectation_items,
     )
 
 
