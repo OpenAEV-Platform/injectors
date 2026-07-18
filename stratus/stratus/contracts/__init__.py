@@ -99,6 +99,7 @@ def _expectations_element() -> ContractExpectations:
             expectation_description="",
             expectation_score=100,
             expectation_expectation_group=False,
+            expectation_is_predefined=True,
         ),
         Expectation(
             expectation_type=ExpectationType.prevention,
@@ -106,6 +107,7 @@ def _expectations_element() -> ContractExpectations:
             expectation_description="",
             expectation_score=100,
             expectation_expectation_group=False,
+            expectation_is_predefined=True,
         ),
     ]
     return ContractExpectations(

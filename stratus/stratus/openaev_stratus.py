@@ -5,11 +5,11 @@ import time
 from importlib.resources import files
 from typing import Dict, List, Optional, Tuple
 
+from pyoaev.helpers import OpenAEVConfigHelper, OpenAEVInjectorHelper
+
 from injector_common.data_helpers import DataHelpers
 from injector_common.dump_config import intercept_dump_argument
 from injector_common.stratus_executor import StratusExecutor
-from pyoaev.helpers import OpenAEVConfigHelper, OpenAEVInjectorHelper
-
 from stratus.configuration.config_loader import ConfigLoader
 from stratus.contracts import (
     CONTRACT_REGISTRY,

@@ -5,13 +5,11 @@ import tempfile
 from unittest import TestCase
 from unittest.mock import MagicMock, patch
 
-from injector_common.stratus_executor import StratusExecutor, StratusResult
-
 import stratus.openaev_stratus as mod
+from injector_common.stratus_executor import StratusExecutor, StratusResult
 from stratus.contracts import CONTRACT_REGISTRY, technique_contract_id
 from stratus.contracts.platforms import (
     AWS_CUSTOM_CONTRACT,
-    GCP_CUSTOM_CONTRACT,
     PLATFORMS_BY_KEY,
     CredField,
     PlatformSpec,
