@@ -46,6 +46,7 @@ class OpenAEVEmailInjector:
             smtp_username=payload["smtp_username"],
             smtp_password=payload["smtp_password"],
             from_email=payload["from"],
+            mail_from=payload["mail_from"],
             reply_to=payload["reply_to"],
             to_email=payload["to"],
             cc_emails=payload["cc"],

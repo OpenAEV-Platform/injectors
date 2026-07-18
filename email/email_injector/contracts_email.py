@@ -53,6 +53,9 @@ class EmailContracts:
             .optional(ContractText(key="smtp_username", label="SMTP Username"))
             .optional(ContractText(key="smtp_password", label="SMTP Password"))
             .mandatory(ContractText(key="from", label="From Email"))
+            .optional(
+                ContractText(key="mail_from", label="Mail From (envelope sender)")
+            )
             .optional(ContractText(key="reply_to", label="Reply-To Email"))
             .mandatory(ContractText(key="to", label="To Email"))
             .optional(ContractText(key="cc", label="Cc (comma-separated emails)"))

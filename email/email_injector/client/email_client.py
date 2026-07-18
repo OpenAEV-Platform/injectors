@@ -22,6 +22,7 @@ class EmailClient:
         smtp_username: Optional[str],
         smtp_password: Optional[str],
         from_email: str,
+        mail_from: str,
         reply_to: Optional[str],
         to_email: str,
         cc_emails: list[str],
@@ -53,7 +54,7 @@ class EmailClient:
                 server.starttls()
             if smtp_username and smtp_password:
                 server.login(smtp_username, smtp_password)
-            server.send_message(msg, to_addrs=recipients)
+            server.send_message(msg, from_addr=mail_from, to_addrs=recipients)
             server.quit()
 
             return ExecutionResult(

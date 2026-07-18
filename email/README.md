@@ -13,9 +13,9 @@ injector:
   log_level: 'info'
 ```
 
-Injects carry the message-specific fields: `from`, optional `reply_to`, `to`,
-`subject`, `body`, optional `cc` and `bcc` (comma-separated email lists), and
-SMTP fields:
+Injects carry the message-specific fields: `from`, optional `mail_from`
+(SMTP envelope sender), optional `reply_to`, `to`, `subject`, `body`, optional
+`cc` and `bcc` (comma-separated email lists), and SMTP fields:
 `smtp_hostname`, `smtp_port`, `smtp_use_tls`, `smtp_username`,
 `smtp_password`. They can also carry optional attachments through the
 contract attachment field.
