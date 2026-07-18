@@ -385,6 +385,39 @@ class TestOpenAEVNmap(unittest.TestCase):
         self.assertIn("Pre-execution failure", callback_data["execution_message"])
         m_signaturemanager.return_value.send_signatures.assert_not_called()
 
+    @patch.object(module.OpenAEVNmap, "nmap_execution")
+    @patch.object(module, "SignatureManager")
+    @patch.object(module, "build_network_configs")
+    def test_openaev_nmap_process_message_unresolvable_inject_id(
+        self,
+        m_build_network_configs,
+        m_signaturemanager,
+        m_nmap_execution,
+        m_configloader,
+        m_helper,
+        m_msgdata,
+        _,
+    ):
+        # When MessageData construction fails AND the payload has no resolvable
+        # inject id, process_message must still not raise: there is nowhere to
+        # address a terminal callback, so it logs and returns instead of letting
+        # the exception escape (which would defeat the pre-execution guard).
+        m_helper.return_value.injector_logger = MagicMock()
+        m_helper.return_value.api = MagicMock()
+        injector = module.OpenAEVNmap()
+
+        m_msgdata.side_effect = KeyError("injection")
+        data = {}
+
+        injector.process_message(data)
+
+        m_nmap_execution.assert_not_called()
+        m_build_network_configs.assert_not_called()
+        injector.helper.api.inject.execution_reception.assert_not_called()
+        injector.helper.api.inject.execution_callback.assert_not_called()
+        m_signaturemanager.return_value.send_signatures.assert_not_called()
+        injector.helper.injector_logger.error.assert_called()
+
     def test_openaev_nmap_start(self, m_configloader, m_helper, m_msgdata, _):
         m_helper.return_value.api = MagicMock()
         injector = module.OpenAEVNmap()

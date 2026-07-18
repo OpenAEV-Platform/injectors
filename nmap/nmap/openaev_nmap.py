@@ -69,8 +69,18 @@ class OpenAEVNmap:
         # Per-inject errors must never escape process_message: even when the
         # inject fails before nmap runs, the platform must still get a terminal
         # result. Resolve the inject id straight from the raw payload since a
-        # MessageData failure means msg_data is not available.
-        inject_id = data["injection"]["inject_id"]
+        # MessageData failure means msg_data is not available. Do it defensively:
+        # this helper runs precisely when the payload could not be parsed, so the
+        # inject id may itself be missing - in that case we cannot address a
+        # terminal callback anywhere, so log and return instead of raising (which
+        # would re-raise out of process_message, the opposite of the guard).
+        injection = data.get("injection") if isinstance(data, dict) else None
+        inject_id = injection.get("inject_id") if isinstance(injection, dict) else None
+        if not inject_id:
+            self.helper.injector_logger.error(
+                "nmap pre-execution failure with unresolvable inject id: " + str(err)
+            )
+            return
         self.helper.injector_logger.error("nmap pre-execution failure: " + str(err))
         self.helper.api.inject.execution_reception(
             inject_id=inject_id, data={"tracking_total_count": 1}
