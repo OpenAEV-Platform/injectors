@@ -132,27 +132,40 @@ def _target_fields():
 
 
 def _expectations():
+    expectations = [
+        # Available but not pre-filled: the engines emit vulnerability results,
+        # while the predefined defaults stay Detected/Prevented only (see #333).
+        Expectation(
+            expectation_type=ExpectationType.vulnerability,
+            expectation_name="Not vulnerable",
+            expectation_description="The AI target resisted the adversarial technique.",
+            expectation_score=100,
+            expectation_expectation_group=False,
+            expectation_is_predefined=False,
+        ),
+        Expectation(
+            expectation_type=ExpectationType.detection,
+            expectation_name="Detected",
+            expectation_description="An AI defense (LLM firewall / guardrail) flagged the attack.",
+            expectation_score=100,
+            expectation_expectation_group=False,
+            expectation_is_predefined=True,
+        ),
+        Expectation(
+            expectation_type=ExpectationType.prevention,
+            expectation_name="Prevented",
+            expectation_description="An AI defense blocked the attack before it reached the model.",
+            expectation_score=100,
+            expectation_expectation_group=False,
+            expectation_is_predefined=True,
+        ),
+    ]
     return ContractExpectations(
         key="expectations",
         label="Expectations",
         mandatory=False,
         cardinality=ContractCardinality.Multiple,
-        predefinedExpectations=[
-            Expectation(
-                expectation_type=ExpectationType.detection,
-                expectation_name="Detected",
-                expectation_description="An AI defense (LLM firewall / guardrail) flagged the attack.",
-                expectation_score=100,
-                expectation_expectation_group=False,
-            ),
-            Expectation(
-                expectation_type=ExpectationType.prevention,
-                expectation_name="Prevented",
-                expectation_description="An AI defense blocked the attack before it reached the model.",
-                expectation_score=100,
-                expectation_expectation_group=False,
-            ),
-        ],
+        availableExpectations=expectations,
     )
 
 

@@ -8,11 +8,14 @@ from pyoaev.contracts.contract_config import (
     ContractCheckbox,
     ContractConfig,
     ContractElement,
+    ContractExpectations,
     ContractOutputElement,
     ContractOutputType,
     ContractText,
     ContractTextArea,
     ContractTuple,
+    Expectation,
+    ExpectationType,
     SupportedLanguage,
     prepare_contracts,
 )
@@ -77,6 +80,31 @@ class HttpContracts:
             visibleConditionValues={basic_auth_field.key: True},
         )
         auth_fields = [basic_auth_field, username_field, basic_password]
+        expectation_items = [
+            Expectation(
+                expectation_type=ExpectationType.detection,
+                expectation_name="Detection",
+                expectation_description="",
+                expectation_score=100,
+                expectation_expectation_group=False,
+                expectation_is_predefined=True,
+            ),
+            Expectation(
+                expectation_type=ExpectationType.prevention,
+                expectation_name="Prevention",
+                expectation_description="",
+                expectation_score=100,
+                expectation_expectation_group=False,
+                expectation_is_predefined=True,
+            ),
+        ]
+        expectations = ContractExpectations(
+            key="expectations",
+            label="Expectations",
+            mandatory=False,
+            cardinality=ContractCardinality.Multiple,
+            availableExpectations=expectation_items,
+        )
         # Post contract raw
         raw_post_fields: List[ContractElement] = (
             ContractBuilder()
@@ -84,6 +112,7 @@ class HttpContracts:
             .add_fields(auth_fields)
             .optional(ContractTuple(key="headers", label="Headers"))
             .mandatory(ContractTextArea(key="body", label="Raw request data"))
+            .optional(expectations)
             .build_fields()
         )
         outputs: List[ContractOutputElement] = (
@@ -132,6 +161,7 @@ class HttpContracts:
                 )
             )
             .optional(attachment_field)
+            .optional(expectations)
             .build_fields()
         )
         form_post_contract = Contract(
@@ -164,6 +194,7 @@ class HttpContracts:
             .mandatory(ContractText(key="uri", label="URL"))
             .add_fields(auth_fields)
             .optional(ContractTuple(key="headers", label="Headers"))
+            .optional(expectations)
             .build_fields()
         )
         get_contract = Contract(
