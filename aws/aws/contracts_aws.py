@@ -144,7 +144,15 @@ class AWSContracts:
                 expectation_score=100,
                 expectation_expectation_group=False,
                 expectation_is_predefined=True,
-            )
+            ),
+            Expectation(
+                expectation_type=ExpectationType.prevention,
+                expectation_name="Prevention",
+                expectation_description="",
+                expectation_score=100,
+                expectation_expectation_group=False,
+                expectation_is_predefined=True,
+            ),
         ]
         expectations = ContractExpectations(
             key="expectations",
