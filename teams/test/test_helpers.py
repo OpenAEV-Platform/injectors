@@ -63,6 +63,9 @@ class BuildCardBodyTest(TestCase):
         texts = [b.get("text") for b in card["body"]]
         self.assertIn("Title", texts)
         self.assertIn("Body text", texts)
+        # Optional Graph attachment fields must be omitted, not sent as null.
+        for key in ("contentUrl", "name", "thumbnailUrl"):
+            self.assertNotIn(key, attachment)
 
     def test_card_defaults_when_content_type_missing(self):
         body = TeamsPayloadBuilder.build({KEY_TITLE: "T", KEY_MESSAGE: "M"})

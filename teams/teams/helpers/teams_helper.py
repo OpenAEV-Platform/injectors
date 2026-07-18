@@ -86,14 +86,14 @@ class TeamsPayloadBuilder:
                 "contentType": "html",
                 "content": f'<attachment id="{attachment_id}"></attachment>',
             },
+            # Optional attachment fields (contentUrl, name, thumbnailUrl) are
+            # omitted on purpose: Graph accepts absent keys, but may reject
+            # explicit nulls with a 400.
             "attachments": [
                 {
                     "id": attachment_id,
                     "contentType": ADAPTIVE_CARD_CONTENT_TYPE,
-                    "contentUrl": None,
                     "content": json.dumps(card),
-                    "name": None,
-                    "thumbnailUrl": None,
                 }
             ],
         }

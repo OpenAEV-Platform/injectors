@@ -89,9 +89,11 @@ class ExecuteRoutingTest(TestCase):
         }
         result = obj.execute(_data(content=content))
         self.assertTrue(result.success)
-        obj.client.post_chat_message.assert_called_once_with(
-            "19:chat@thread.v2", obj.client.post_chat_message.call_args.args[1]
-        )
+        obj.client.post_chat_message.assert_called_once()
+        args = obj.client.post_chat_message.call_args.args
+        self.assertEqual(args[0], "19:chat@thread.v2")
+        # The second argument is the Graph message body built from the content.
+        self.assertIn("body", args[1])
 
     def test_chat_message_requires_chat_id(self):
         obj = self._injector()

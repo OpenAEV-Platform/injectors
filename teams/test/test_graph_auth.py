@@ -47,8 +47,29 @@ class GraphTokenProviderTest(TestCase):
         # A second call within the validity window must not hit the network again.
         self.assertEqual(provider.get_access_token(), "abc")
         self.assertEqual(post.call_count, 1)
-        # The rotated refresh token is used on the next refresh.
+        # The initial refresh token is the one sent in the token request.
         self.assertEqual(post.call_args.kwargs["data"]["refresh_token"], "refresh-1")
+
+    @patch("teams.client.graph_auth.requests.post")
+    def test_rotated_refresh_token_is_used_on_next_refresh(self, post):
+        post.side_effect = [
+            _response(
+                payload={
+                    "access_token": "abc",
+                    "expires_in": 3600,
+                    "refresh_token": "refresh-2",
+                }
+            ),
+            _response(payload={"access_token": "def", "expires_in": 3600}),
+        ]
+        provider = _provider()
+        provider.get_access_token()
+        provider._expires_at = time.time() - 1  # force expiry
+        self.assertEqual(provider.get_access_token(), "def")
+        self.assertEqual(post.call_count, 2)
+        # The second refresh must use the refresh token rotated by the first one.
+        second_call_data = post.call_args_list[1].kwargs["data"]
+        self.assertEqual(second_call_data["refresh_token"], "refresh-2")
 
     @patch("teams.client.graph_auth.requests.post")
     def test_refreshes_when_token_expired(self, post):
