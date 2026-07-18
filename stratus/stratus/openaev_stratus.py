@@ -5,11 +5,11 @@ import time
 from importlib.resources import files
 from typing import Dict, List, Optional, Tuple
 
+from pyoaev.helpers import OpenAEVConfigHelper, OpenAEVInjectorHelper
+
 from injector_common.data_helpers import DataHelpers
 from injector_common.dump_config import intercept_dump_argument
 from injector_common.stratus_executor import StratusExecutor
-from pyoaev.helpers import OpenAEVConfigHelper, OpenAEVInjectorHelper
-
 from stratus.configuration.config_loader import ConfigLoader
 from stratus.contracts import (
     CUSTOM_TECHNIQUE_FIELD_KEY,
@@ -70,30 +70,39 @@ class OpenAEVStratus:
         """
         env: Dict[str, str] = {}
         temp_files: List[str] = []
-        for cred in platform.cred_fields:
-            raw = content.get(cred.key)
-            value = raw.strip() if isinstance(raw, str) else raw
-            if not value:
-                if cred.mandatory:
-                    raise ValueError(f"'{cred.label}' is required")
-                if cred.default is not None:
-                    value = cred.default
-                else:
-                    continue
+        try:
+            for cred in platform.cred_fields:
+                raw = content.get(cred.key)
+                value = raw.strip() if isinstance(raw, str) else raw
+                if not value:
+                    if cred.mandatory:
+                        raise ValueError(f"'{cred.label}' is required")
+                    if cred.default is not None:
+                        value = cred.default
+                    else:
+                        continue
 
-            if cred.as_file_env:
-                with tempfile.NamedTemporaryFile(
-                    mode="w", suffix=cred.file_suffix, delete=False
-                ) as handle:
-                    handle.write(value)
-                    path = handle.name
-                temp_files.append(path)
-                if cred.file_mode is not None:
-                    os.chmod(path, cred.file_mode)
-                env[cred.as_file_env] = path
-            else:
-                for env_var in cred.env_vars:
-                    env[env_var] = value
+                if cred.as_file_env:
+                    with tempfile.NamedTemporaryFile(
+                        mode="w", suffix=cred.file_suffix, delete=False
+                    ) as handle:
+                        handle.write(value)
+                        path = handle.name
+                    temp_files.append(path)
+                    if cred.file_mode is not None:
+                        os.chmod(path, cred.file_mode)
+                    env[cred.as_file_env] = path
+                else:
+                    for env_var in cred.env_vars:
+                        env[env_var] = value
+        except Exception:
+            # Never leave a secret temp file behind if wiring fails partway
+            # (e.g. a later mandatory field is missing after an earlier secret
+            # was already materialized to disk).
+            for path in temp_files:
+                if os.path.exists(path):
+                    os.remove(path)
+            raise
         return env, temp_files
 
     def process_message(self, data: Dict) -> None:

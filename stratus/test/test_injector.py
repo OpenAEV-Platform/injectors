@@ -1,18 +1,20 @@
 import json
 import os
 import subprocess
+import tempfile
 from unittest import TestCase
 from unittest.mock import MagicMock, patch
 
-from injector_common.stratus_executor import StratusExecutor, StratusResult
-
 import stratus.openaev_stratus as mod
+from injector_common.stratus_executor import StratusExecutor, StratusResult
 from stratus.contracts.platforms import (
     AWS_CONTRACT,
     EKS_CONTRACT,
     GCP_CONTRACT,
     K8S_CONTRACT,
     PLATFORMS_BY_CONTRACT,
+    CredField,
+    PlatformSpec,
 )
 
 BASE_ENV = {
@@ -166,6 +168,41 @@ class BuildEnvTest(TestCase):
         )
         self.assertEqual(env["AWS_ACCESS_KEY_ID"], "AKIA")
 
+    def test_temp_file_removed_when_later_field_raises(self):
+        # A secret materialized to disk must not leak if a subsequent mandatory
+        # field is missing and _build_env raises before returning.
+        captured = {}
+
+        real_named_tmp = tempfile.NamedTemporaryFile
+
+        def _spy(*args, **kwargs):
+            handle = real_named_tmp(*args, **kwargs)
+            captured["path"] = handle.name
+            return handle
+
+        platform = PlatformSpec(
+            key="probe",
+            contract_id="probe",
+            label_en="Probe",
+            label_fr="Probe",
+            cred_fields=[
+                CredField(
+                    key="secret_file",
+                    label="Secret file",
+                    textarea=True,
+                    as_file_env="SECRET_FILE",
+                    file_suffix=".txt",
+                    file_mode=0o600,
+                ),
+                CredField(key="required_after", label="Required after"),
+            ],
+        )
+        with patch.object(mod.tempfile, "NamedTemporaryFile", _spy):
+            with self.assertRaises(ValueError):
+                mod.OpenAEVStratus._build_env(platform, {"secret_file": "topsecret"})
+        self.assertIn("path", captured)
+        self.assertFalse(os.path.exists(captured["path"]))
+
 
 class ProcessMessageTest(TestCase):
     def _callback(self, injector):
@@ -313,13 +350,43 @@ class StratusExecutorTest(TestCase):
     @patch("injector_common.stratus_executor.subprocess.run")
     def test_cleanup_success(self, run):
         run.return_value = MagicMock(returncode=0, stdout="", stderr="")
-        self.assertTrue(StratusExecutor().cleanup("aws.foo").success)
+        result = StratusExecutor().cleanup("aws.foo")
+        self.assertTrue(result.success)
+        self.assertEqual(result.status, "CLEAN")
+        # A successful cleanup always has an actionable message, even when the
+        # tool prints nothing.
+        self.assertTrue(result.message)
+
+    @patch("injector_common.stratus_executor.subprocess.run")
+    def test_cleanup_failure_falls_back_to_message(self, run):
+        run.return_value = MagicMock(returncode=1, stdout="", stderr="")
+        result = StratusExecutor().cleanup("aws.foo")
+        self.assertFalse(result.success)
+        self.assertEqual(result.status, "ERROR")
+        self.assertTrue(result.message)
 
     @patch(
         "injector_common.stratus_executor.subprocess.run",
         side_effect=PermissionError("not executable"),
     )
     def test_cleanup_os_error(self, _run):
+        result = StratusExecutor().cleanup("aws.foo")
+        self.assertFalse(result.success)
+        self.assertEqual(result.status, "ERROR")
+
+    @patch(
+        "injector_common.stratus_executor.subprocess.run",
+        side_effect=subprocess.TimeoutExpired(cmd="stratus", timeout=900),
+    )
+    def test_cleanup_timeout(self, _run):
+        result = StratusExecutor().cleanup("aws.foo")
+        self.assertEqual(result.status, "TIMEOUT")
+
+    @patch(
+        "injector_common.stratus_executor.subprocess.run",
+        side_effect=FileNotFoundError(),
+    )
+    def test_cleanup_missing_binary(self, _run):
         result = StratusExecutor().cleanup("aws.foo")
         self.assertFalse(result.success)
         self.assertEqual(result.status, "ERROR")

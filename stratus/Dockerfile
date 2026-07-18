@@ -50,7 +50,7 @@ RUN apk add --no-cache curl tar libc6-compat && \
     rm /tmp/stratus.tar.gz && \
     stratus --help > /dev/null
 
-RUN if [[ ${PYOAEV_GIT_BRANCH_OVERRIDE} ]] ; then \
+RUN if [ -n "${PYOAEV_GIT_BRANCH_OVERRIDE}" ] ; then \
         echo "Forcing specific version of client-python" && \
         apk add --no-cache git curl && \
         curl -sS https://bootstrap.pypa.io/get-pip.py -o get-pip.py && \
@@ -58,7 +58,7 @@ RUN if [[ ${PYOAEV_GIT_BRANCH_OVERRIDE} ]] ; then \
         rm get-pip.py && \
         pip install pip3-autoremove && \
         pip-autoremove pyoaev -y && \
-        pip install git+https://github.com/OpenAEV-Platform/client-python@${PYOAEV_GIT_BRANCH_OVERRIDE} ; \
+        pip install "git+https://github.com/OpenAEV-Platform/client-python@${PYOAEV_GIT_BRANCH_OVERRIDE}" ; \
     fi
 
 CMD ["python3", "-m", "stratus.openaev_stratus"]
