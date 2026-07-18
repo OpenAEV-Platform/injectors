@@ -5,6 +5,8 @@ from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from typing import Optional
 
+SMTP_TIMEOUT_SECONDS = 30
+
 
 @dataclass
 class ExecutionResult:
@@ -49,13 +51,14 @@ class EmailClient:
                 msg.attach(attachment_part)
             recipients = [to_email, *cc_emails, *bcc_emails]
 
-            server = smtplib.SMTP(smtp_hostname, smtp_port)
-            if smtp_use_tls:
-                server.starttls()
-            if smtp_username and smtp_password:
-                server.login(smtp_username, smtp_password)
-            server.send_message(msg, from_addr=mail_from, to_addrs=recipients)
-            server.quit()
+            with smtplib.SMTP(
+                smtp_hostname, smtp_port, timeout=SMTP_TIMEOUT_SECONDS
+            ) as server:
+                if smtp_use_tls:
+                    server.starttls()
+                if smtp_username and smtp_password:
+                    server.login(smtp_username, smtp_password)
+                server.send_message(msg, from_addr=mail_from, to_addrs=recipients)
 
             return ExecutionResult(
                 success=True,

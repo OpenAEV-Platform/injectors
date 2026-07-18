@@ -13,6 +13,7 @@ class ConfigLoader(SettingsLoader):
             config_hints={
                 "openaev_url": {"data": str(self.openaev.url)},
                 "openaev_token": {"data": self.openaev.token},
+                "openaev_tenant_id": {"data": self.openaev.tenant_id},
                 "injector_id": {"data": self.injector.id},
                 "injector_name": {"data": self.injector.name},
                 "injector_type": {"data": self.injector.type},

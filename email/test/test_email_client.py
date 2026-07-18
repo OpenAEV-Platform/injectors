@@ -1,11 +1,11 @@
 from unittest.mock import patch
 
-from email_injector.client.email_client import EmailClient
+from email_injector.client.email_client import SMTP_TIMEOUT_SECONDS, EmailClient
 
 
 def test_send_email_success():
     with patch("smtplib.SMTP") as mock_smtp:
-        instance = mock_smtp.return_value
+        instance = mock_smtp.return_value.__enter__.return_value
 
         result = EmailClient.send_email(
             smtp_hostname="localhost",
@@ -27,7 +27,7 @@ def test_send_email_success():
         assert result.success is True
         assert "Email crafted successfully" in result.message
 
-        mock_smtp.assert_called_with("localhost", 1025)
+        mock_smtp.assert_called_with("localhost", 1025, timeout=SMTP_TIMEOUT_SECONDS)
         instance.starttls.assert_called_once()
         instance.login.assert_called_with("user", "password")
         instance.send_message.assert_called_once()
@@ -42,12 +42,12 @@ def test_send_email_success():
             "cc@example.com",
             "bcc@example.com",
         ]
-        instance.quit.assert_called_once()
+        mock_smtp.return_value.__exit__.assert_called_once()
 
 
 def test_send_email_no_auth_no_tls():
     with patch("smtplib.SMTP") as mock_smtp:
-        instance = mock_smtp.return_value
+        instance = mock_smtp.return_value.__enter__.return_value
 
         result = EmailClient.send_email(
             smtp_hostname="localhost",
@@ -67,7 +67,7 @@ def test_send_email_no_auth_no_tls():
         )
 
         assert result.success is True
-        mock_smtp.assert_called_with("localhost", 1025)
+        mock_smtp.assert_called_with("localhost", 1025, timeout=SMTP_TIMEOUT_SECONDS)
         instance.starttls.assert_not_called()
         instance.login.assert_not_called()
         instance.send_message.assert_called_once()
@@ -78,7 +78,7 @@ def test_send_email_no_auth_no_tls():
 
 def test_send_email_with_attachment():
     with patch("smtplib.SMTP") as mock_smtp:
-        instance = mock_smtp.return_value
+        instance = mock_smtp.return_value.__enter__.return_value
 
         result = EmailClient.send_email(
             smtp_hostname="localhost",
@@ -109,7 +109,7 @@ def test_send_email_with_attachment():
 
 def test_send_email_with_multiple_attachments():
     with patch("smtplib.SMTP") as mock_smtp:
-        instance = mock_smtp.return_value
+        instance = mock_smtp.return_value.__enter__.return_value
 
         result = EmailClient.send_email(
             smtp_hostname="localhost",
@@ -136,6 +136,33 @@ def test_send_email_with_multiple_attachments():
             if part.get_filename() is not None
         ]
         assert attachment_parts == ["a.txt", "b.txt"]
+
+
+def test_send_email_closes_connection_on_send_failure():
+    with patch("smtplib.SMTP") as mock_smtp:
+        instance = mock_smtp.return_value.__enter__.return_value
+        instance.send_message.side_effect = Exception("Send error")
+
+        result = EmailClient.send_email(
+            smtp_hostname="localhost",
+            smtp_port=1025,
+            smtp_use_tls=False,
+            smtp_username=None,
+            smtp_password=None,
+            from_email="from@example.com",
+            mail_from="from@example.com",
+            reply_to=None,
+            to_email="to@example.com",
+            cc_emails=[],
+            bcc_emails=[],
+            subject="Test Subject",
+            body="Test Body",
+            attachments=[],
+        )
+
+        assert result.success is False
+        assert "Failed to craft email: Send error" in result.message
+        mock_smtp.return_value.__exit__.assert_called_once()
 
 
 def test_send_email_failure():
