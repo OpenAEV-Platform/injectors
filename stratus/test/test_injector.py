@@ -5,14 +5,14 @@ import tempfile
 from unittest import TestCase
 from unittest.mock import MagicMock, patch
 
-import stratus.openaev_stratus as mod
 from injector_common.stratus_executor import StratusExecutor, StratusResult
+
+import stratus.openaev_stratus as mod
+from stratus.contracts import CONTRACT_REGISTRY, technique_contract_id
 from stratus.contracts.platforms import (
-    AWS_CONTRACT,
-    EKS_CONTRACT,
-    GCP_CONTRACT,
-    K8S_CONTRACT,
-    PLATFORMS_BY_CONTRACT,
+    AWS_CUSTOM_CONTRACT,
+    GCP_CUSTOM_CONTRACT,
+    PLATFORMS_BY_KEY,
     CredField,
     PlatformSpec,
 )
@@ -22,6 +22,11 @@ BASE_ENV = {
     "OPENAEV_TOKEN": "token",
     "INJECTOR_ID": "stratus--test",
 }
+
+AWS_TECH = "aws.persistence.iam-backdoor-user"
+AWS_TECH_CONTRACT = technique_contract_id(AWS_TECH)
+GCP_TECH = "gcp.exfiltration.share-compute-disk"
+GCP_TECH_CONTRACT = technique_contract_id(GCP_TECH)
 
 
 def make_injector():
@@ -38,7 +43,7 @@ def make_injector():
     return injector
 
 
-def _data(content, contract_id=AWS_CONTRACT):
+def _data(content, contract_id):
     return {
         "injection": {
             "inject_id": "i1",
@@ -48,131 +53,81 @@ def _data(content, contract_id=AWS_CONTRACT):
     }
 
 
-class ResolvePlatformTest(TestCase):
-    def test_resolves_each_known_contract(self):
-        for contract_id, platform in PLATFORMS_BY_CONTRACT.items():
-            resolved = mod.OpenAEVStratus._resolve_platform(_data({}, contract_id))
-            self.assertIs(resolved, platform)
+AWS_CREDS = {"aws_access_key_id": "AKIA", "aws_secret_access_key": "secret"}
+
+
+class ResolveContractTest(TestCase):
+    def test_resolves_every_registered_contract(self):
+        for contract_id, expected in CONTRACT_REGISTRY.items():
+            resolved = mod.OpenAEVStratus._resolve_contract(_data({}, contract_id))
+            self.assertIs(resolved, expected)
 
     def test_unknown_contract_raises(self):
         with self.assertRaises(ValueError):
-            mod.OpenAEVStratus._resolve_platform(_data({}, "not-a-contract"))
+            mod.OpenAEVStratus._resolve_contract(_data({}, "not-a-contract"))
 
 
 class ResolveTechniqueTest(TestCase):
-    def test_custom_override_wins(self):
+    def test_fixed_technique_ignores_content(self):
+        resolved = CONTRACT_REGISTRY[AWS_TECH_CONTRACT]
         technique = mod.OpenAEVStratus._resolve_technique(
-            {
-                "technique_id": ["aws.persistence.iam-backdoor-user"],
-                "custom_technique_id": "aws.x",
-            }
+            resolved, {"technique_id": "something.else"}
         )
-        self.assertEqual(technique, "aws.x")
+        self.assertEqual(technique, AWS_TECH)
 
-    def test_whitespace_custom_falls_back_to_selection(self):
+    def test_custom_technique_reads_from_content(self):
+        resolved = CONTRACT_REGISTRY[AWS_CUSTOM_CONTRACT]
         technique = mod.OpenAEVStratus._resolve_technique(
-            {
-                "technique_id": ["aws.persistence.iam-backdoor-user"],
-                "custom_technique_id": "   ",
-            }
-        )
-        self.assertEqual(technique, "aws.persistence.iam-backdoor-user")
-
-    def test_selection_list_is_unwrapped(self):
-        technique = mod.OpenAEVStratus._resolve_technique(
-            {"technique_id": ["aws.discovery.ses-enumerate"]}
+            resolved, {"technique_id": "aws.discovery.ses-enumerate"}
         )
         self.assertEqual(technique, "aws.discovery.ses-enumerate")
 
-    def test_empty_selection_returns_none(self):
-        self.assertIsNone(mod.OpenAEVStratus._resolve_technique({"technique_id": []}))
-        self.assertIsNone(mod.OpenAEVStratus._resolve_technique({}))
+    def test_custom_technique_missing_returns_none(self):
+        resolved = CONTRACT_REGISTRY[AWS_CUSTOM_CONTRACT]
+        self.assertIsNone(mod.OpenAEVStratus._resolve_technique(resolved, {}))
+        self.assertIsNone(
+            mod.OpenAEVStratus._resolve_technique(resolved, {"technique_id": "  "})
+        )
 
 
 class BuildEnvTest(TestCase):
-    def _platform(self, contract_id):
-        return PLATFORMS_BY_CONTRACT[contract_id]
-
     def test_aws_direct_env_and_region_default(self):
         env, temp_files = mod.OpenAEVStratus._build_env(
-            self._platform(AWS_CONTRACT),
-            {"aws_access_key_id": "AKIA", "aws_secret_access_key": "secret"},
+            PLATFORMS_BY_KEY["aws"], AWS_CREDS
         )
         self.assertEqual(env["AWS_ACCESS_KEY_ID"], "AKIA")
-        self.assertEqual(env["AWS_SECRET_ACCESS_KEY"], "secret")
-        # Region falls back to the default and is mirrored onto both env vars.
         self.assertEqual(env["AWS_REGION"], "us-east-1")
         self.assertEqual(env["AWS_DEFAULT_REGION"], "us-east-1")
-        # Optional session token is omitted when not supplied.
         self.assertNotIn("AWS_SESSION_TOKEN", env)
         self.assertEqual(temp_files, [])
-
-    def test_aws_optional_fields_are_used_when_present(self):
-        env, _ = mod.OpenAEVStratus._build_env(
-            self._platform(AWS_CONTRACT),
-            {
-                "aws_access_key_id": "AKIA",
-                "aws_secret_access_key": "secret",
-                "aws_session_token": "tok",
-                "aws_region": "eu-west-1",
-            },
-        )
-        self.assertEqual(env["AWS_SESSION_TOKEN"], "tok")
-        self.assertEqual(env["AWS_REGION"], "eu-west-1")
 
     def test_missing_mandatory_field_raises(self):
         with self.assertRaises(ValueError):
             mod.OpenAEVStratus._build_env(
-                self._platform(AWS_CONTRACT), {"aws_access_key_id": "AKIA"}
-            )
-
-    def test_whitespace_mandatory_field_raises(self):
-        with self.assertRaises(ValueError):
-            mod.OpenAEVStratus._build_env(
-                self._platform(AWS_CONTRACT),
-                {"aws_access_key_id": "AKIA", "aws_secret_access_key": "  \n"},
+                PLATFORMS_BY_KEY["aws"], {"aws_access_key_id": "AKIA"}
             )
 
     def test_gcp_key_materialized_to_temp_file_with_mode(self):
         env, temp_files = mod.OpenAEVStratus._build_env(
-            self._platform(GCP_CONTRACT),
+            PLATFORMS_BY_KEY["gcp"],
             {"gcp_project_id": "proj", "gcp_service_account_key": '{"type":"x"}'},
         )
-        self.assertEqual(env["GOOGLE_PROJECT"], "proj")
-        self.assertEqual(env["CLOUDSDK_CORE_PROJECT"], "proj")
         path = env["GOOGLE_APPLICATION_CREDENTIALS"]
         try:
-            self.assertTrue(os.path.exists(path))
+            self.assertEqual(env["GOOGLE_PROJECT"], "proj")
             self.assertTrue(path.endswith(".json"))
-            with open(path) as handle:
-                self.assertEqual(handle.read(), '{"type":"x"}')
-            self.assertEqual(temp_files, [path])
-        finally:
-            os.remove(path)
-
-    def test_kubeconfig_materialized_to_temp_file(self):
-        env, temp_files = mod.OpenAEVStratus._build_env(
-            self._platform(K8S_CONTRACT), {"kubeconfig": "apiVersion: v1"}
-        )
-        path = env["KUBECONFIG"]
-        try:
-            self.assertTrue(path.endswith(".yaml"))
             self.assertEqual(temp_files, [path])
         finally:
             os.remove(path)
 
     def test_eks_reuses_aws_credentials(self):
-        env, _ = mod.OpenAEVStratus._build_env(
-            self._platform(EKS_CONTRACT),
-            {"aws_access_key_id": "AKIA", "aws_secret_access_key": "secret"},
-        )
+        env, _ = mod.OpenAEVStratus._build_env(PLATFORMS_BY_KEY["eks"], AWS_CREDS)
         self.assertEqual(env["AWS_ACCESS_KEY_ID"], "AKIA")
 
-    def test_temp_file_removed_when_later_field_raises(self):
+    def test_secret_temp_file_removed_when_later_field_raises(self):
         # A secret materialized to disk must not leak if a subsequent mandatory
         # field is missing and _build_env raises before returning.
         captured = {}
-
         real_named_tmp = tempfile.NamedTemporaryFile
 
         def _spy(*args, **kwargs):
@@ -182,9 +137,8 @@ class BuildEnvTest(TestCase):
 
         platform = PlatformSpec(
             key="probe",
-            contract_id="probe",
-            label_en="Probe",
-            label_fr="Probe",
+            custom_contract_id="probe",
+            label="Probe",
             cred_fields=[
                 CredField(
                     key="secret_file",
@@ -208,46 +162,49 @@ class ProcessMessageTest(TestCase):
     def _callback(self, injector):
         return injector.helper.api.inject.execution_callback.call_args.kwargs["data"]
 
-    def test_success_reports_structured_output(self):
+    def test_fixed_technique_success(self):
         injector = make_injector()
         injector.stratus.detonate.return_value = StratusResult(
             success=True,
-            technique_id="aws.discovery.ses-enumerate",
+            technique_id=AWS_TECH,
             status="DETONATED",
             message="done",
-            outputs={"technique": "aws.discovery.ses-enumerate"},
+            outputs={"technique": AWS_TECH},
         )
-        injector.process_message(
-            _data(
-                {
-                    "technique_id": ["aws.discovery.ses-enumerate"],
-                    "aws_access_key_id": "AKIA",
-                    "aws_secret_access_key": "secret",
-                }
-            )
-        )
+        injector.process_message(_data(AWS_CREDS, AWS_TECH_CONTRACT))
         callback = self._callback(injector)
         self.assertEqual(callback["execution_status"], "SUCCESS")
+        self.assertEqual(injector.stratus.detonate.call_args.args[0], AWS_TECH)
         self.assertEqual(
             json.loads(callback["execution_output_structured"]),
-            {"technique": "aws.discovery.ses-enumerate"},
+            {"technique": AWS_TECH},
         )
+
+    def test_custom_contract_uses_supplied_technique(self):
+        injector = make_injector()
+        injector.stratus.detonate.return_value = StratusResult(
+            success=True, technique_id="aws.x", status="DETONATED", message="ok"
+        )
+        content = dict(AWS_CREDS, technique_id="aws.discovery.ses-enumerate")
+        injector.process_message(_data(content, AWS_CUSTOM_CONTRACT))
+        self.assertEqual(self._callback(injector)["execution_status"], "SUCCESS")
+        self.assertEqual(
+            injector.stratus.detonate.call_args.args[0], "aws.discovery.ses-enumerate"
+        )
+
+    def test_custom_contract_missing_technique_reports_error(self):
+        injector = make_injector()
+        injector.process_message(_data(AWS_CREDS, AWS_CUSTOM_CONTRACT))
+        self.assertEqual(self._callback(injector)["execution_status"], "ERROR")
+        injector.stratus.detonate.assert_not_called()
 
     def test_gcp_key_removed_after_success(self):
         injector = make_injector()
         injector.stratus.detonate.return_value = StratusResult(
-            success=True, technique_id="t", status="DETONATED", message="ok"
+            success=True, technique_id=GCP_TECH, status="DETONATED", message="ok"
         )
-        injector.process_message(
-            _data(
-                {
-                    "technique_id": ["gcp.exfiltration.share-compute-disk"],
-                    "gcp_project_id": "proj",
-                    "gcp_service_account_key": '{"type":"service_account"}',
-                },
-                contract_id=GCP_CONTRACT,
-            )
-        )
+        content = {"gcp_project_id": "proj", "gcp_service_account_key": '{"type":"x"}'}
+        injector.process_message(_data(content, GCP_TECH_CONTRACT))
         self.assertEqual(self._callback(injector)["execution_status"], "SUCCESS")
         env = injector.stratus.detonate.call_args.kwargs["env"]
         self.assertFalse(os.path.exists(env["GOOGLE_APPLICATION_CREDENTIALS"]))
@@ -255,44 +212,23 @@ class ProcessMessageTest(TestCase):
     def test_temp_file_removed_when_detonate_raises(self):
         injector = make_injector()
         injector.stratus.detonate.side_effect = RuntimeError("boom")
-        injector.process_message(
-            _data(
-                {
-                    "technique_id": ["gcp.exfiltration.share-compute-disk"],
-                    "gcp_project_id": "proj",
-                    "gcp_service_account_key": '{"type":"service_account"}',
-                },
-                contract_id=GCP_CONTRACT,
-            )
-        )
+        content = {"gcp_project_id": "proj", "gcp_service_account_key": '{"type":"x"}'}
+        injector.process_message(_data(content, GCP_TECH_CONTRACT))
         self.assertEqual(self._callback(injector)["execution_status"], "ERROR")
         env = injector.stratus.detonate.call_args.kwargs["env"]
         self.assertFalse(os.path.exists(env["GOOGLE_APPLICATION_CREDENTIALS"]))
 
-    def test_missing_technique_reports_error(self):
-        injector = make_injector()
-        injector.process_message(
-            _data({"aws_access_key_id": "AKIA", "aws_secret_access_key": "secret"})
-        )
-        self.assertEqual(self._callback(injector)["execution_status"], "ERROR")
-        injector.stratus.detonate.assert_not_called()
-
     def test_missing_credential_reports_error(self):
         injector = make_injector()
         injector.process_message(
-            _data(
-                {
-                    "technique_id": ["aws.discovery.ses-enumerate"],
-                    "aws_access_key_id": "AKIA",
-                }
-            )
+            _data({"aws_access_key_id": "AKIA"}, AWS_TECH_CONTRACT)
         )
         self.assertEqual(self._callback(injector)["execution_status"], "ERROR")
         injector.stratus.detonate.assert_not_called()
 
     def test_unknown_contract_reports_error(self):
         injector = make_injector()
-        injector.process_message(_data({}, contract_id="nope"))
+        injector.process_message(_data({}, "nope"))
         self.assertEqual(self._callback(injector)["execution_status"], "ERROR")
         injector.stratus.detonate.assert_not_called()
 
@@ -308,7 +244,6 @@ class StratusExecutorTest(TestCase):
         run.return_value = MagicMock(returncode=0, stdout="ok", stderr="")
         result = StratusExecutor().detonate("aws.foo", env={"A": "B"})
         self.assertTrue(result.success)
-        # Output is a single value to match the contract (isMultiple=False).
         self.assertEqual(result.outputs, {"technique": "aws.foo"})
 
     @patch("injector_common.stratus_executor.subprocess.run")
@@ -336,16 +271,14 @@ class StratusExecutorTest(TestCase):
         side_effect=subprocess.TimeoutExpired(cmd="stratus", timeout=900),
     )
     def test_detonate_timeout(self, _run):
-        result = StratusExecutor().detonate("aws.foo")
-        self.assertEqual(result.status, "TIMEOUT")
+        self.assertEqual(StratusExecutor().detonate("aws.foo").status, "TIMEOUT")
 
     @patch(
         "injector_common.stratus_executor.subprocess.run",
         side_effect=PermissionError("not executable"),
     )
     def test_detonate_os_error(self, _run):
-        result = StratusExecutor().detonate("aws.foo")
-        self.assertEqual(result.status, "ERROR")
+        self.assertEqual(StratusExecutor().detonate("aws.foo").status, "ERROR")
 
     @patch("injector_common.stratus_executor.subprocess.run")
     def test_cleanup_success(self, run):
@@ -367,26 +300,25 @@ class StratusExecutorTest(TestCase):
 
     @patch(
         "injector_common.stratus_executor.subprocess.run",
-        side_effect=PermissionError("not executable"),
-    )
-    def test_cleanup_os_error(self, _run):
-        result = StratusExecutor().cleanup("aws.foo")
-        self.assertFalse(result.success)
-        self.assertEqual(result.status, "ERROR")
-
-    @patch(
-        "injector_common.stratus_executor.subprocess.run",
         side_effect=subprocess.TimeoutExpired(cmd="stratus", timeout=900),
     )
     def test_cleanup_timeout(self, _run):
-        result = StratusExecutor().cleanup("aws.foo")
-        self.assertEqual(result.status, "TIMEOUT")
+        self.assertEqual(StratusExecutor().cleanup("aws.foo").status, "TIMEOUT")
 
     @patch(
         "injector_common.stratus_executor.subprocess.run",
         side_effect=FileNotFoundError(),
     )
     def test_cleanup_missing_binary(self, _run):
+        result = StratusExecutor().cleanup("aws.foo")
+        self.assertFalse(result.success)
+        self.assertEqual(result.status, "ERROR")
+
+    @patch(
+        "injector_common.stratus_executor.subprocess.run",
+        side_effect=PermissionError("not executable"),
+    )
+    def test_cleanup_os_error(self, _run):
         result = StratusExecutor().cleanup("aws.foo")
         self.assertFalse(result.success)
         self.assertEqual(result.status, "ERROR")

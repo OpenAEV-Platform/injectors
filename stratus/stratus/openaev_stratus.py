@@ -5,17 +5,17 @@ import time
 from importlib.resources import files
 from typing import Dict, List, Optional, Tuple
 
-from pyoaev.helpers import OpenAEVConfigHelper, OpenAEVInjectorHelper
-
 from injector_common.data_helpers import DataHelpers
 from injector_common.dump_config import intercept_dump_argument
 from injector_common.stratus_executor import StratusExecutor
+from pyoaev.helpers import OpenAEVConfigHelper, OpenAEVInjectorHelper
+
 from stratus.configuration.config_loader import ConfigLoader
 from stratus.contracts import (
+    CONTRACT_REGISTRY,
     CUSTOM_TECHNIQUE_FIELD_KEY,
-    PLATFORMS_BY_CONTRACT,
-    TECHNIQUE_FIELD_KEY,
     PlatformSpec,
+    ResolvedContract,
 )
 
 ICON_PATH = "img/icon-stratus.png"
@@ -36,28 +36,27 @@ class OpenAEVStratus:
             return icon_file.read()
 
     @staticmethod
-    def _resolve_platform(data: Dict) -> PlatformSpec:
+    def _resolve_contract(data: Dict) -> ResolvedContract:
         contract_id = DataHelpers.get_injector_contract_id(data)
-        platform = PLATFORMS_BY_CONTRACT.get(contract_id)
-        if platform is None:
+        resolved = CONTRACT_REGISTRY.get(contract_id)
+        if resolved is None:
             raise ValueError(
                 f"Unsupported contract '{contract_id}' for the Stratus injector"
             )
-        return platform
+        return resolved
 
     @staticmethod
-    def _resolve_technique(content: Dict) -> Optional[str]:
-        # Only treat the custom id as an override when it has real content;
-        # a whitespace-only value must fall back to the selected technique.
-        custom = content.get(CUSTOM_TECHNIQUE_FIELD_KEY)
-        if custom and custom.strip():
-            return custom.strip()
-        selected = content.get(TECHNIQUE_FIELD_KEY)
-        if isinstance(selected, list):
-            selected = selected[0] if selected else None
-        if isinstance(selected, str):
-            selected = selected.strip()
-        return selected or None
+    def _resolve_technique(resolved: ResolvedContract, content: Dict) -> Optional[str]:
+        # Per-technique contracts carry a fixed technique; custom contracts read
+        # the free-form technique id from the inject content.
+        if resolved.technique_id is not None:
+            return resolved.technique_id
+        supplied = content.get(CUSTOM_TECHNIQUE_FIELD_KEY)
+        if isinstance(supplied, list):
+            supplied = supplied[0] if supplied else None
+        if isinstance(supplied, str):
+            supplied = supplied.strip()
+        return supplied or None
 
     @staticmethod
     def _build_env(
@@ -114,13 +113,13 @@ class OpenAEVStratus:
 
         temp_files: List[str] = []
         try:
-            platform = self._resolve_platform(data)
+            resolved = self._resolve_contract(data)
             content = DataHelpers.get_content(data)
-            technique_id = self._resolve_technique(content)
+            technique_id = self._resolve_technique(resolved, content)
             if not technique_id:
                 raise ValueError("No Stratus technique id provided")
 
-            env, temp_files = self._build_env(platform, content)
+            env, temp_files = self._build_env(resolved.platform, content)
             result = self.stratus.detonate(technique_id, env=env, cleanup=True)
 
             callback_data = {

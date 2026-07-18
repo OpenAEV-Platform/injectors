@@ -1,14 +1,20 @@
 """Stratus Red Team contracts package.
 
+The injector exposes one contract per Stratus technique (fixed technique, tagged
+with its MITRE ATT&CK patterns) plus one "custom technique" contract per
+platform for detonating any technique id in the pinned Stratus release.
+
 Public API:
-- ``build_all_contracts()``: returns one detonation contract per Stratus
-  platform (AWS, Azure, Entra ID, GCP, Kubernetes, EKS) for injector
-  registration.
-- ``PLATFORMS_BY_CONTRACT``: maps a contract id back to its platform spec so the
-  injector can resolve credentials and technique wiring at detonation time.
+- ``build_all_contracts()``: every contract, ready for injector registration.
+- ``CONTRACT_REGISTRY``: maps a contract id to its :class:`ResolvedContract`
+  (platform + fixed technique id, or ``None`` for the custom contracts) so the
+  injector can resolve credentials and the technique at detonation time.
+- ``technique_contract_id()``: deterministic, stable id for a technique contract.
 """
 
-from typing import List
+import uuid
+from dataclasses import dataclass
+from typing import Dict, List, Optional
 
 from pyoaev.contracts import ContractBuilder
 from pyoaev.contracts.contract_config import (
@@ -19,7 +25,6 @@ from pyoaev.contracts.contract_config import (
     ContractExpectations,
     ContractOutputElement,
     ContractOutputType,
-    ContractSelect,
     ContractText,
     ContractTextArea,
     Expectation,
@@ -31,20 +36,38 @@ from pyoaev.security_domain.types import SecurityDomains
 
 from stratus.contracts.platforms import (  # noqa: F401 (re-exported)
     PLATFORMS,
-    PLATFORMS_BY_CONTRACT,
+    PLATFORMS_BY_KEY,
     CredField,
     PlatformSpec,
 )
+from stratus.contracts.techniques import TECHNIQUES, Technique
 
 CONTRACT_TYPE = "openaev_stratus"
 
-# Field keys shared by every platform contract.
-TECHNIQUE_FIELD_KEY = "technique_id"
-CUSTOM_TECHNIQUE_FIELD_KEY = "custom_technique_id"
+# Free-form technique id field used only by the per-platform custom contracts.
+CUSTOM_TECHNIQUE_FIELD_KEY = "technique_id"
 
 # Stratus Red Team brand colors (navy badge / red mark).
 _COLOR_DARK = "#c8102e"
 _COLOR_LIGHT = "#c8102e"
+
+# Fixed namespace so a technique id always maps to the same contract id.
+_CONTRACT_NAMESPACE = uuid.uuid5(uuid.NAMESPACE_URL, "openaev-stratus")
+
+
+def technique_contract_id(technique_id: str) -> str:
+    """Deterministic, stable contract id for a fixed-technique contract."""
+    return str(uuid.uuid5(_CONTRACT_NAMESPACE, technique_id))
+
+
+@dataclass(frozen=True)
+class ResolvedContract:
+    """How a contract id maps back to a platform and (optional) fixed technique."""
+
+    platform: PlatformSpec
+    # None for the per-platform custom contracts, where the technique id is read
+    # from the inject content instead.
+    technique_id: Optional[str]
 
 
 def _build_config() -> ContractConfig:
@@ -63,15 +86,9 @@ def _build_config() -> ContractConfig:
 def _credential_element(cred: CredField) -> ContractElement:
     if cred.textarea:
         return ContractTextArea(
-            key=cred.key,
-            label=cred.label,
-            mandatory=cred.mandatory,
+            key=cred.key, label=cred.label, mandatory=cred.mandatory
         )
-    return ContractText(
-        key=cred.key,
-        label=cred.label,
-        mandatory=cred.mandatory,
-    )
+    return ContractText(key=cred.key, label=cred.label, mandatory=cred.mandatory)
 
 
 def _expectations_element() -> ContractExpectations:
@@ -109,47 +126,87 @@ def _output_element(platform_key: str) -> ContractOutputElement:
     )
 
 
-def _build_platform_contract(
-    platform: PlatformSpec, config: ContractConfig
+def _make_contract(
+    contract_id: str,
+    label_en: str,
+    label_fr: str,
+    platform: PlatformSpec,
+    extra_fields: List[ContractElement],
+    attack_patterns: List[str],
 ) -> Contract:
-    technique = ContractSelect(
-        key=TECHNIQUE_FIELD_KEY,
-        label="Stratus technique",
-        defaultValue=[next(iter(platform.techniques))],
-        mandatory=True,
-        choices=platform.techniques,
-    )
-    custom_technique = ContractText(
-        key=CUSTOM_TECHNIQUE_FIELD_KEY,
-        label="Custom Stratus technique id (overrides the selection above)",
-        mandatory=False,
-    )
-
     elements: List[ContractElement] = [
         _credential_element(cred) for cred in platform.cred_fields
     ]
-    elements.extend([technique, custom_technique, _expectations_element()])
-
-    fields = ContractBuilder().add_fields(elements).build_fields()
+    elements.extend(extra_fields)
+    elements.append(_expectations_element())
 
     return Contract(
-        contract_id=platform.contract_id,
-        config=config,
-        label={
-            SupportedLanguage.en: f"{platform.label_en} - Detonate Stratus technique",
-            SupportedLanguage.fr: f"{platform.label_fr} - Detoner une technique Stratus",
-        },
-        fields=fields,
+        contract_id=contract_id,
+        config=_CONFIG,
+        label={SupportedLanguage.en: label_en, SupportedLanguage.fr: label_fr},
+        fields=ContractBuilder().add_fields(elements).build_fields(),
         outputs=ContractBuilder()
         .add_outputs([_output_element(platform.key)])
         .build_outputs(),
         manual=False,
+        contract_attack_patterns_external_ids=list(attack_patterns),
         domains=[SecurityDomains.CLOUD.value],
     )
 
 
+def _technique_contract(technique: Technique) -> Contract:
+    platform = PLATFORMS_BY_KEY[technique.platform]
+    label = f"{platform.label} - {technique.name}"
+    return _make_contract(
+        contract_id=technique_contract_id(technique.id),
+        label_en=label,
+        label_fr=label,
+        platform=platform,
+        extra_fields=[],
+        attack_patterns=list(technique.attack_patterns),
+    )
+
+
+def _custom_contract(platform: PlatformSpec) -> Contract:
+    technique_field = ContractText(
+        key=CUSTOM_TECHNIQUE_FIELD_KEY,
+        label="Stratus technique id (e.g. aws.persistence.iam-backdoor-user)",
+        mandatory=True,
+    )
+    label = f"{platform.label} - Detonate a custom Stratus technique"
+    return _make_contract(
+        contract_id=platform.custom_contract_id,
+        label_en=label,
+        label_fr=label,
+        platform=platform,
+        extra_fields=[technique_field],
+        attack_patterns=[],
+    )
+
+
+# Single shared contract config instance across every contract.
+_CONFIG = _build_config()
+
+
+def _build_registry() -> Dict[str, ResolvedContract]:
+    registry: Dict[str, ResolvedContract] = {}
+    for technique in TECHNIQUES:
+        platform = PLATFORMS_BY_KEY[technique.platform]
+        registry[technique_contract_id(technique.id)] = ResolvedContract(
+            platform=platform, technique_id=technique.id
+        )
+    for platform in PLATFORMS:
+        registry[platform.custom_contract_id] = ResolvedContract(
+            platform=platform, technique_id=None
+        )
+    return registry
+
+
+CONTRACT_REGISTRY: Dict[str, ResolvedContract] = _build_registry()
+
+
 def build_all_contracts():
-    """Build the detonation contract for every supported Stratus platform."""
-    config = _build_config()
-    contracts = [_build_platform_contract(p, config) for p in PLATFORMS]
+    """Build every Stratus contract: one per technique plus per-platform custom."""
+    contracts: List[Contract] = [_technique_contract(t) for t in TECHNIQUES]
+    contracts.extend(_custom_contract(p) for p in PLATFORMS)
     return prepare_contracts(contracts)
