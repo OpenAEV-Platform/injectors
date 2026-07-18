@@ -113,8 +113,9 @@ injector:
   log_level: 'info'
 ```
 
-Injects carry the message-specific fields: `from`, `to`, `subject`, `body`,
-optional `cc` and `bcc` (comma-separated email lists), and SMTP fields:
+Injects carry the message-specific fields: `from`, optional `mail_from`
+(SMTP envelope sender), optional `reply_to`, `to`, `subject`, `body`, optional
+`cc` and `bcc` (comma-separated email lists), and SMTP fields:
 `smtp_hostname`, `smtp_port`, `smtp_use_tls`, `smtp_username`,
 `smtp_password`. They can also carry optional attachments through the
 contract attachment field.
@@ -131,6 +132,8 @@ The injector registers a single contract labelled "Email - Craft email" in the `
 | SMTP Username | `smtp_username` | No        | SMTP authentication username (used together with the password).|
 | SMTP Password | `smtp_password` | No        | SMTP authentication password.                                  |
 | From Email    | `from`          | Yes       | Sender address of the email.                                   |
+| Mail From     | `mail_from`     | No        | SMTP envelope sender (MAIL FROM); defaults to `from`.          |
+| Reply-To      | `reply_to`      | No        | Reply-To header address; omitted when not provided.            |
 | To Email      | `to`            | Yes       | Primary recipient address.                                     |
 | Cc            | `cc`            | No        | Comma-separated list of Cc recipients.                         |
 | Bcc           | `bcc`           | No        | Comma-separated list of Bcc recipients.                        |
