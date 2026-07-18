@@ -172,7 +172,7 @@ class Targets:
                 else:
                     helper.injector_logger.warning(
                         f"No valid target found for asset_id={asset.get('asset_id')} "
-                        f"(hostname={asset.get('endpoint_hostname')}, ips={asset.get('endpoint_ips')})"
+                        f"(hostname={asset.get('asset_hostname')}, ips={asset.get('asset_ips')})"
                     )
 
             except Exception as e:
@@ -191,23 +191,23 @@ class Targets:
                 return result
 
         elif selector == "seen_ip":
-            seen_ip = asset.get("endpoint_seen_ip")
+            seen_ip = asset.get("asset_seen_ip")
             if Targets.is_valid_ip(seen_ip):
                 return seen_ip, asset_id
             else:
                 return None
 
         elif selector == "local_ip":
-            endpoint_ips = asset.get("endpoint_ips") or []
+            asset_ips = asset.get("asset_ips") or []
             # Validate each IP
-            for ip in endpoint_ips:
+            for ip in asset_ips:
                 if Targets.is_valid_ip(ip):
                     return ip, asset_id
             # No valid IPs found
             return None
 
         elif selector == "hostname":
-            hostname = asset.get("endpoint_hostname")
+            hostname = asset.get("asset_hostname")
             if hostname:
                 return hostname, asset_id
 
@@ -234,15 +234,15 @@ class Targets:
         """
         asset_id = asset.get("asset_id")
         agents = asset.get("asset_agents", [])
-        hostname = asset.get("endpoint_hostname")
-        endpoint_ips = asset.get("endpoint_ips", [])
+        hostname = asset.get("asset_hostname")
+        asset_ips = asset.get("asset_ips", [])
 
         # Case 1: Agentless + hostname
         if not agents and hostname:
             return hostname, asset_id
 
         # Case 2: Agent present => try IPs
-        for ip in endpoint_ips:
+        for ip in asset_ips:
             if Targets.is_valid_ip(ip):
                 return ip, asset_id
 

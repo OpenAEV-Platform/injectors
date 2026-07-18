@@ -44,6 +44,26 @@ class NativeEngineTest(TestCase):
         self.assertEqual(result.status, "ERROR")
         self.assertFalse(result.success)
 
+    @patch("ai_redteam.engines.native.llm_client.send_prompt")
+    def test_returns_error_status_on_http_error(self, send_prompt):
+        send_prompt.return_value = LLMResponse(
+            '{"detail":"Not authenticated"}', 401, {}
+        )
+        result = NativeEngine().run({"attack_prompt": "x"}, _target(), "m1", ctx={})
+        self.assertEqual(result.status, "ERROR")
+        self.assertFalse(result.success)
+        self.assertNotIn("vulnerability", result.outputs)
+        self.assertEqual(result.outputs["http_status"], 401)
+        self.assertIn("HTTP 401", result.message)
+
+    @patch("ai_redteam.engines.native.llm_client.send_prompt")
+    def test_canary_leak_with_non_2xx_is_not_vulnerable(self, send_prompt):
+        # Even if the body echoes the canary, a non-2xx must not be a vulnerability
+        send_prompt.return_value = LLMResponse("OAEV_PWNED_m1", 500, {})
+        result = NativeEngine().run({"attack_prompt": "x"}, _target(), "m1", ctx={})
+        self.assertEqual(result.status, "ERROR")
+        self.assertFalse(result.success)
+
 
 class PyritEngineTest(TestCase):
     @patch("ai_redteam.engines.pyrit.llm_client.send_prompt")
@@ -68,6 +88,23 @@ class PyritEngineTest(TestCase):
     def test_error_on_exception(self, _send_prompt):
         result = PyritEngine().run({"pyrit_objective": "o"}, _target(), "m1", ctx={})
         self.assertEqual(result.status, "ERROR")
+
+    @patch("ai_redteam.engines.pyrit.llm_client.send_prompt")
+    def test_non_2xx_reports_error_with_aggregation_outputs(self, send_prompt):
+        # A non-2xx escalation turn must report an execution ERROR and still carry
+        # the outputs multi-target aggregation relies on (marker, target_endpoint,
+        # http_status), matching the native engine.
+        send_prompt.return_value = LLMResponse(
+            '{"detail":"Not authenticated"}', 401, {}
+        )
+        result = PyritEngine().run({"pyrit_objective": "o"}, _target(), "m1", ctx={})
+        self.assertEqual(result.status, "ERROR")
+        self.assertFalse(result.success)
+        self.assertEqual(result.outputs["http_status"], 401)
+        self.assertEqual(result.outputs["marker"], "m1")
+        self.assertEqual(result.outputs["target_endpoint"], "https://api.example.com")
+        self.assertFalse(result.outputs["attack_succeeded"])
+        self.assertNotIn("vulnerability", result.outputs)
 
 
 class GarakEngineTest(TestCase):

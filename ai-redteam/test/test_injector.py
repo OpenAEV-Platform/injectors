@@ -29,6 +29,7 @@ class OpenAEVAiRedTeamTest(TestCase):
         obj.helper = MagicMock()
         obj.engines = {"native": engine}
         obj.engine_by_contract = {"cid": "native"}
+        obj.engines_timeout = 120
         return obj
 
     def test_resolve_engine_defaults_to_native(self):
@@ -77,3 +78,33 @@ class OpenAEVAiRedTeamTest(TestCase):
         obj.process_message(_data())
         final = obj.helper.api.inject.execution_callback.call_args
         self.assertEqual(final.kwargs["data"]["execution_status"], "ERROR")
+
+    def test_aggregate_keys_results_by_asset_id_to_avoid_collision(self):
+        from ai_redteam.targets.target_resolver import TargetConfig
+
+        obj = OpenAEVAiRedTeam.__new__(OpenAEVAiRedTeam)
+        # Two distinct assets that happen to share the same display name: keying by
+        # label alone would drop one of the two per-target responses.
+        targets = [
+            TargetConfig(name="Shared Name", asset_id="asset-1"),
+            TargetConfig(name="Shared Name", asset_id="asset-2"),
+        ]
+        results = [
+            EngineResult(
+                success=False,
+                message="a",
+                outputs={"response": "reply-1"},
+                status="SUCCESS",
+            ),
+            EngineResult(
+                success=True,
+                message="b",
+                outputs={"response": "reply-2"},
+                status="SUCCESS",
+            ),
+        ]
+        aggregated = obj._aggregate_results(targets, results)
+        responses = aggregated["outputs"]["responses_by_target"]
+        self.assertEqual(responses, {"asset-1": "reply-1", "asset-2": "reply-2"})
+        self.assertEqual(aggregated["status"], "SUCCESS")
+        self.assertTrue(aggregated["outputs"]["attack_succeeded"])

@@ -9,10 +9,4 @@ services:
       - INJECTOR_NAME=${INJECTOR_NAME:-"AI Red Team"}
       - INJECTOR_LOG_LEVEL=${INJECTOR_LOG_LEVEL:-warn}
       - INJECTOR_REQUEST_TIMEOUT_SECONDS=${INJECTOR_REQUEST_TIMEOUT_SECONDS:-120}
-      # AI target credentials, resolved by name from each AI Target's api_key_variable.
-      # Add as many as needed for the providers you test.
-      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
-      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
-      - AZURE_OPENAI_API_KEY=${AZURE_OPENAI_API_KEY:-}
-      - HF_INFERENCE_TOKEN=${HF_INFERENCE_TOKEN:-}
     restart: unless-stopped

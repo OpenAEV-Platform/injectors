@@ -5,7 +5,7 @@ from typing import Dict
 from ai_redteam import marker as marker_mod
 from ai_redteam.configuration.config_loader import ConfigLoader
 from ai_redteam.engines import build_registry, contract_engine_map
-from ai_redteam.targets.target_resolver import resolve_target
+from ai_redteam.targets.target_resolver import resolve_targets
 from pyoaev.helpers import OpenAEVConfigHelper, OpenAEVInjectorHelper
 
 try:
@@ -26,6 +26,7 @@ class OpenAEVAiRedTeam:
             self.config, open("ai_redteam/img/icon-ai-redteam.png", "rb")
         )
         timeout = int(self.config.get_conf("injector_request_timeout_seconds") or 120)
+        self.engines_timeout = timeout
         self.engines = build_registry(timeout=timeout)
         self.engine_by_contract = contract_engine_map()
 
@@ -41,47 +42,167 @@ class OpenAEVAiRedTeam:
         ]
         content = injection.get("inject_content") or {}
 
+        logger = self.helper.injector_logger
+
+        logger.info(
+            f"Received inject {inject_id} for contract {contract_id}; "
+            f"content keys: {sorted(content.keys())}"
+        )
+
         engine, engine_key = self._resolve_engine(contract_id)
         if engine is None:
             raise ValueError(f"No engine registered for contract {contract_id}")
 
         marker = marker_mod.build_marker(inject_id)
-        target = resolve_target(content, self.helper.api, self.helper.injector_logger)
+        targets = resolve_targets(content, data, self.helper.api, logger)
 
-        self.helper.injector_logger.info(
-            f"Running AI red-team engine '{engine_key}' against provider "
-            f"'{target.provider}' (model={target.model}) for inject {inject_id}"
+        logger.info(
+            f"Resolved {len(targets)} AI target(s) for inject {inject_id}: "
+            + ", ".join(
+                f"[{self._target_label(t)}] provider='{t.provider}' "
+                f"model='{t.model}' endpoint='{t.endpoint or '(default)'}'"
+                for t in targets
+            )
+        )
+
+        logger.info(
+            f"Running AI red-team engine '{engine_key}' against {len(targets)} "
+            f"target(s) for inject {inject_id} with marker {marker} "
+            f"(timeout={self.engines_timeout}s)"
         )
 
         # Intermediate trace so the timeline shows the action with the correlation marker
-        self.helper.api.inject.execution_callback(
-            inject_id=inject_id,
-            data={
-                "execution_message": (
-                    f"AI red-team engine '{engine_key}' targeting {target.provider} "
-                    f"endpoint '{target.endpoint or 'default'}' (marker {marker})"
-                ),
-                "execution_status": "INFO",
-                "execution_duration": int(time.time() - start),
-                "execution_action": "command_execution",
-            },
-        )
+        try:
+            self.helper.api.inject.execution_callback(
+                inject_id=inject_id,
+                data={
+                    "execution_message": (
+                        f"AI red-team engine '{engine_key}' targeting {len(targets)} "
+                        f"AI target(s) (marker {marker})"
+                    ),
+                    "execution_status": "INFO",
+                    "execution_duration": int(time.time() - start),
+                    "execution_action": "command_execution",
+                },
+            )
+            logger.info(f"Intermediate execution trace sent for inject {inject_id}")
+        except Exception as exc:  # noqa: BLE001
+            logger.error(
+                f"Failed to send intermediate execution trace for inject "
+                f"{inject_id}: {exc}"
+            )
 
-        result = engine.run(content, target, marker, ctx={"inject_id": inject_id})
-        return {
-            "message": result.message,
-            "status": result.status,
-            "outputs": result.outputs,
+        logger.info(f"Invoking engine '{engine_key}' run() for inject {inject_id}...")
+        results = []
+        for target in targets:
+            result = engine.run(
+                content, target, marker, ctx={"inject_id": inject_id, "logger": logger}
+            )
+            logger.info(
+                f"Engine '{engine_key}' finished for target "
+                f"'{self._target_label(target)}' (inject {inject_id}): "
+                f"status={result.status}, success={result.success}, "
+                f"output_keys={sorted((result.outputs or {}).keys())}"
+            )
+            results.append(result)
+
+        return self._aggregate_results(targets, results)
+
+    @staticmethod
+    def _target_label(target) -> str:
+        return target.name or target.endpoint or target.model or target.provider
+
+    @staticmethod
+    def _target_key(target) -> str:
+        # Stable, collision-free identifier used to key per-target results. Two
+        # assets can share a name/endpoint/model, so prefer the asset id when the
+        # target comes from an AiTarget asset; fall back to the display label.
+        return target.asset_id or OpenAEVAiRedTeam._target_label(target)
+
+    def _aggregate_results(self, targets, results) -> Dict:
+        """Collapse per-target engine results into a single inject execution callback.
+
+        A single target keeps the original single-result shape. Multiple targets (asset-group
+        mode) are merged: the message lists each target's verdict, the `vulnerability` outputs
+        are concatenated (tagged with the target), and per-target responses are keyed by
+        `_target_key()` (the asset id when available, otherwise the display label).
+        """
+        if len(results) == 1:
+            result = results[0]
+            return {
+                "message": result.message,
+                "status": result.status,
+                "outputs": result.outputs,
+            }
+
+        vulnerabilities = []
+        responses = {}
+        response_sections = []
+        message_lines = []
+        for target, result in zip(targets, results):
+            key = self._target_key(target)
+            label = self._target_label(target)
+            outputs = result.outputs or {}
+            text = outputs.get("response", "")
+            responses[key] = text
+            if text:
+                response_sections.append(f"### {label}\n{text}")
+            for vuln in outputs.get("vulnerability", []) or []:
+                enriched = dict(vuln)
+                enriched["target"] = label
+                vulnerabilities.append(enriched)
+            verdict = (
+                "ERROR"
+                if result.status == "ERROR"
+                else ("VULNERABLE" if result.success else "DEFENDED")
+            )
+            detail = ""
+            if result.status == "ERROR":
+                http_status = outputs.get("http_status")
+                # Surface the failure reason in the summary so the execution trace explains WHY the
+                # target could not be tested (e.g. HTTP 429 = target quota exhausted) rather than a
+                # bare "error".
+                detail = f" (HTTP {http_status})" if http_status else ""
+            message_lines.append(f"- [{verdict}] {label}{detail}")
+
+        any_success = any(r.success for r in results)
+        all_error = all(r.status == "ERROR" for r in results)
+
+        outputs = {
+            "response": "\n\n".join(response_sections),
+            "marker": (results[0].outputs or {}).get("marker", ""),
+            "attack_succeeded": any_success,
+            "responses_by_target": responses,
         }
+        if vulnerabilities:
+            outputs["vulnerability"] = vulnerabilities
+
+        summary = (
+            f"Tested {len(targets)} AI target(s): "
+            f"{sum(1 for r in results if r.success)} vulnerable, "
+            f"{sum(1 for r in results if not r.success and r.status != 'ERROR')} defended, "
+            f"{sum(1 for r in results if r.status == 'ERROR')} error(s).\n\n"
+            + "\n".join(message_lines)
+        )
+        # ERROR only when every target failed to execute; otherwise the inject ran.
+        status = "ERROR" if all_error else "SUCCESS"
+        return {"message": summary, "status": status, "outputs": outputs}
 
     def process_message(self, data: Dict) -> None:
         start = time.time()
         inject_id = data["injection"]["inject_id"]
+        logger = self.helper.injector_logger
+        logger.info(f"Message received from queue for inject {inject_id}")
         self.helper.api.inject.execution_reception(
             inject_id=inject_id, data={"tracking_total_count": 1}
         )
+        logger.info(f"Execution reception acknowledged for inject {inject_id}")
         try:
             result = self.ai_execution(start, data)
+            logger.info(
+                f"Sending completion callback for inject {inject_id} "
+                f"(status={result['status']}, duration={int(time.time() - start)}s)"
+            )
             self.helper.api.inject.execution_callback(
                 inject_id=inject_id,
                 data={
@@ -92,7 +213,9 @@ class OpenAEVAiRedTeam:
                     "execution_action": "complete",
                 },
             )
+            logger.info(f"Completion callback sent for inject {inject_id}")
         except Exception as e:  # noqa: BLE001
+            logger.error(f"Execution failed for inject {inject_id}: {e}")
             self.helper.api.inject.execution_callback(
                 inject_id=inject_id,
                 data={
@@ -102,6 +225,7 @@ class OpenAEVAiRedTeam:
                     "execution_action": "complete",
                 },
             )
+            logger.info(f"Error callback sent for inject {inject_id}")
 
     def start(self):
         self.helper.listen(message_callback=self.process_message)
