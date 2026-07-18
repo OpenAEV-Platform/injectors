@@ -3,10 +3,14 @@ from typing import List
 from pyoaev.contracts import ContractBuilder
 from pyoaev.contracts.contract_config import (
     Contract,
+    ContractCardinality,
     ContractConfig,
     ContractElement,
+    ContractExpectations,
     ContractText,
     ContractTextArea,
+    Expectation,
+    ExpectationType,
     SupportedLanguage,
     prepare_contracts,
 )
@@ -31,12 +35,38 @@ class TeamsContracts:
             color_light="#00bcd4",
             expose=True,
         )
+        expectation_items = [
+            Expectation(
+                expectation_type=ExpectationType.detection,
+                expectation_name="Detection",
+                expectation_description="",
+                expectation_score=100,
+                expectation_expectation_group=False,
+                expectation_is_predefined=True,
+            ),
+            Expectation(
+                expectation_type=ExpectationType.prevention,
+                expectation_name="Prevention",
+                expectation_description="",
+                expectation_score=100,
+                expectation_expectation_group=False,
+                expectation_is_predefined=True,
+            ),
+        ]
+        expectations = ContractExpectations(
+            key="expectations",
+            label="Expectations",
+            mandatory=False,
+            cardinality=ContractCardinality.Multiple,
+            availableExpectations=expectation_items,
+        )
         # Fields
         teams_fields: List[ContractElement] = (
             ContractBuilder()
             .mandatory(ContractText(key="uri", label="Power Automate URL"))
             .mandatory(ContractText(key="title", label="Title"))
             .mandatory(ContractTextArea(key="message", label="Message"))
+            .optional(expectations)
             .build_fields()
         )
         teams_contract = Contract(
