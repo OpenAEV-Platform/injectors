@@ -1,8 +1,8 @@
 {
   "title": "Microsoft Teams",
   "slug": "openaev_teams",
-  "description": "Send messages through Microsoft Teams webhooks",
-  "short_description": "Send messages through Microsoft Teams webhooks",
+  "description": "Send messages and Adaptive Cards to Microsoft Teams channels and chats via the Microsoft Graph API",
+  "short_description": "Send messages and Adaptive Cards to Microsoft Teams via Microsoft Graph",
   "use_cases": ["Technical"],
   "verified": true,
   "last_verified_date": "",

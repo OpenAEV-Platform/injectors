@@ -2,12 +2,14 @@ from pydantic import Field
 from pyoaev.configuration import ConfigLoaderOAEV, Configuration, SettingsLoader
 
 from teams.configuration.injector_config_override import InjectorConfigOverride
+from teams.configuration.teams_config import _ConfigLoaderTeams
 from teams.contracts_teams import TeamsContracts
 
 
 class ConfigLoader(SettingsLoader):
     openaev: ConfigLoaderOAEV = Field(default_factory=ConfigLoaderOAEV)
     injector: InjectorConfigOverride = Field(default_factory=InjectorConfigOverride)
+    teams: _ConfigLoaderTeams = Field(default_factory=_ConfigLoaderTeams)
 
     def to_daemon_config(self) -> Configuration:
         return Configuration(
