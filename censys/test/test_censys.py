@@ -28,6 +28,7 @@ class ContractsTest(TestCase):
             available = expectations_field["availableExpectations"]
             self.assertEqual(len(available), 1)
             self.assertEqual(available[0]["expectation_type"], "VULNERABILITY")
+            self.assertEqual(available[0]["expectation_name"], "Not vulnerable")
             self.assertTrue(available[0]["expectation_is_predefined"])
 
 

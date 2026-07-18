@@ -25,6 +25,7 @@ poetry run python -m unittest
 
 ## Icon
 
-`censys_injector/img/icon-censys.png` must follow the injector icon standard
-(square 1:1, 512x512 PNG, solid opaque background, genuine Censys artwork) - see
-OpenAEV-Platform/injectors#305.
+`censys_injector/img/icon-censys.png` currently ships as a square opaque
+512x512 placeholder; it must be replaced with genuine Censys brand artwork
+following the injector icon standard (square 1:1, 512x512 PNG, solid opaque
+background) - tracked by OpenAEV-Platform/injectors#305.

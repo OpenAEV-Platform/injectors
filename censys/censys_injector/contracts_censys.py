@@ -43,7 +43,7 @@ class CensysContracts:
         expectation_items = [
             Expectation(
                 expectation_type=ExpectationType.vulnerability,
-                expectation_name="Vulnerability",
+                expectation_name="Not vulnerable",
                 expectation_description="",
                 expectation_score=100,
                 expectation_expectation_group=False,
