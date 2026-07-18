@@ -1,7 +1,7 @@
 [project]
 name = "openaev-teams-injector"
 version = "2.260717.0"
-description = "An injector for Microsoft Teams"
+description = "An injector for Microsoft Teams (Microsoft Graph API, Adaptive Cards)"
 readme = "README.md"
 authors = [
     { name = "Filigran", email = "contact@filigran.io" },

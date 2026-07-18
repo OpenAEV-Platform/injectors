@@ -9,7 +9,7 @@ class InjectorConfigOverride(ConfigLoaderCollector):
     )
     name: str = Field(
         description="Name of the injector.",
-        default="Teams",
+        default="Microsoft Teams",
     )
     icon_filepath: str | None = Field(
         description="Path to the icon file",
