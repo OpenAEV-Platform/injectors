@@ -1,0 +1,11 @@
+services:
+  injector-slack:
+    image: openaev/injector-slack:latest
+    environment:
+      - OPENAEV_URL=${OPENAEV_URL}
+      - OPENAEV_TOKEN=${OPENAEV_TOKEN}
+      - INJECTOR_ID=${INJECTOR_ID}
+      - INJECTOR_NAME=${INJECTOR_NAME}
+      - INJECTOR_LOG_LEVEL=${INJECTOR_LOG_LEVEL}
+      - SLACK_BOT_TOKEN=${SLACK_BOT_TOKEN}
+    restart: always
