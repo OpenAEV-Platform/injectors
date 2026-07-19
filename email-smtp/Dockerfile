@@ -39,4 +39,4 @@ RUN if [[ ${PYOAEV_GIT_BRANCH_OVERRIDE} ]] ; then \
         pip install git+https://github.com/OpenAEV-Platform/client-python@${PYOAEV_GIT_BRANCH_OVERRIDE} ; \
     fi
 
-CMD ["python3", "-m", "email_injector.openaev_email"]
+CMD ["python3", "-m", "email_smtp_injector.openaev_email_smtp"]

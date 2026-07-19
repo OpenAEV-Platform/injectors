@@ -1,6 +1,6 @@
 services:
-  injector-email:
-    image: openaev/injector-email:latest
+  injector-email-smtp:
+    image: openaev/injector-email-smtp:latest
     environment:
       - OPENAEV_URL=${OPENAEV_URL}
       - OPENAEV_TOKEN=${OPENAEV_TOKEN}

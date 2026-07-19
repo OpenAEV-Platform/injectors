@@ -1,4 +1,4 @@
-from email_injector.helpers.email_helper import EmailPayloadBuilder
+from email_smtp_injector.helpers.email_helper import EmailPayloadBuilder
 
 
 def test_email_payload_builder():
