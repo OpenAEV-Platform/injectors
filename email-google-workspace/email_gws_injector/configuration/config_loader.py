@@ -1,11 +1,10 @@
-from pydantic import Field
-from pyoaev.configuration import ConfigLoaderOAEV, Configuration, SettingsLoader
-
 from email_gws_injector.configuration.gws_config import _ConfigLoaderGWS
 from email_gws_injector.configuration.injector_config_override import (
     InjectorConfigOverride,
 )
 from email_gws_injector.contracts_email_gws import EmailGWSContracts
+from pydantic import Field
+from pyoaev.configuration import ConfigLoaderOAEV, Configuration, SettingsLoader
 
 
 class ConfigLoader(SettingsLoader):
