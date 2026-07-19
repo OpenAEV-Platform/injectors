@@ -2,14 +2,14 @@ import time
 from pathlib import Path
 from typing import Dict, List, Tuple
 
+from injector_common.data_helpers import DataHelpers
+from injector_common.dump_config import intercept_dump_argument
+from pyoaev.helpers import OpenAEVConfigHelper, OpenAEVInjectorHelper
+
 from email_m365_injector.client.m365_client import ExecutionResult, M365Client
 from email_m365_injector.configuration.config_loader import ConfigLoader
 from email_m365_injector.contracts_email_m365 import CONTRACT_ID
 from email_m365_injector.helpers.email_helper import EmailMessageBuilder
-from pyoaev.helpers import OpenAEVConfigHelper, OpenAEVInjectorHelper
-
-from injector_common.data_helpers import DataHelpers
-from injector_common.dump_config import intercept_dump_argument
 
 
 class OpenAEVEmailM365Injector:
