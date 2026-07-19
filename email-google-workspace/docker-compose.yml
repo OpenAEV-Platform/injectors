@@ -1,0 +1,14 @@
+services:
+  injector-email-google-workspace:
+    image: openaev/injector-email-google-workspace:latest
+    environment:
+      - OPENAEV_URL=${OPENAEV_URL}
+      - OPENAEV_TOKEN=${OPENAEV_TOKEN}
+      - OPENAEV_TENANT_ID=${OPENAEV_TENANT_ID}
+      - INJECTOR_ID=${INJECTOR_ID}
+      - INJECTOR_NAME=${INJECTOR_NAME}
+      - INJECTOR_LOG_LEVEL=${INJECTOR_LOG_LEVEL}
+      - GWS_SERVICE_ACCOUNT_JSON=${GWS_SERVICE_ACCOUNT_JSON}
+      - GWS_GMAIL_BASE_URL=${GWS_GMAIL_BASE_URL:-https://gmail.googleapis.com/gmail/v1}
+      - GWS_REQUEST_TIMEOUT_SECONDS=${GWS_REQUEST_TIMEOUT_SECONDS:-30}
+    restart: always
