@@ -48,7 +48,7 @@ class OpenAEVEmailGWSInjector:
         )
 
     def _extract_attachments(self, data: Dict) -> List[Tuple[str, bytes]]:
-        documents = data.get("injection", {}).get("inject_documents", [])
+        documents = data.get("injection", {}).get("inject_documents") or []
         attachments = [doc for doc in documents if doc.get("document_attached") is True]
         if not attachments:
             return []
@@ -58,7 +58,12 @@ class OpenAEVEmailGWSInjector:
             attachment_name = attachment.get("document_name")
             if not attachment_name:
                 raise ValueError("Attachment is missing a document_name")
-            response = self.helper.api.document.download(attachment["document_id"])
+            document_id = attachment.get("document_id")
+            if not document_id:
+                raise ValueError(
+                    f"Attachment {attachment_name} is missing a document_id"
+                )
+            response = self.helper.api.document.download(document_id)
             status_code = (
                 response.get("status_code")
                 if isinstance(response, dict)

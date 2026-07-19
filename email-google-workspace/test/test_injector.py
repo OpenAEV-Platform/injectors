@@ -67,6 +67,53 @@ class ExecuteTest(TestCase):
         with self.assertRaises(ValueError):
             obj.execute(_data(content=content))
 
+    def test_downloads_attached_documents(self):
+        obj = self._injector()
+        obj.helper.api.document.download.return_value = {
+            "status_code": 200,
+            "content": b"file-bytes",
+        }
+        documents = [
+            {
+                "document_id": "doc-1",
+                "document_name": "report.pdf",
+                "document_attached": True,
+            },
+            {
+                "document_id": "doc-2",
+                "document_name": "ignored.txt",
+                "document_attached": False,
+            },
+        ]
+        extracted = obj._extract_attachments(_data(documents=documents))
+        self.assertEqual(extracted, [("report.pdf", b"file-bytes")])
+        obj.helper.api.document.download.assert_called_once_with("doc-1")
+
+    def test_attachment_without_document_id_is_rejected(self):
+        obj = self._injector()
+        documents = [{"document_name": "report.pdf", "document_attached": True}]
+        with self.assertRaises(ValueError):
+            obj._extract_attachments(_data(documents=documents))
+
+    def test_attachment_download_failure_is_rejected(self):
+        obj = self._injector()
+        obj.helper.api.document.download.return_value = {"status_code": 404}
+        documents = [
+            {
+                "document_id": "doc-1",
+                "document_name": "report.pdf",
+                "document_attached": True,
+            }
+        ]
+        with self.assertRaises(ValueError):
+            obj._extract_attachments(_data(documents=documents))
+
+    def test_no_attachments_when_documents_are_none(self):
+        obj = self._injector()
+        data = _data()
+        data["injection"]["inject_documents"] = None
+        self.assertEqual(obj._extract_attachments(data), [])
+
 
 @skipUnless(_HAS_PYOAEV, "pyoaev is required to import the injector entrypoint")
 class ProcessMessageTest(TestCase):
