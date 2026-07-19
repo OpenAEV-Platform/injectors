@@ -1,14 +1,14 @@
 import time
 from typing import Dict, List, Tuple
 
+from injector_common.data_helpers import DataHelpers
+from injector_common.dump_config import intercept_dump_argument
+from pyoaev.helpers import OpenAEVConfigHelper, OpenAEVInjectorHelper
+
 from email_gws_injector.client.gmail_client import ExecutionResult, GmailClient
 from email_gws_injector.configuration.config_loader import ConfigLoader
 from email_gws_injector.contracts_email_gws import CONTRACT_ID
 from email_gws_injector.helpers.email_helper import EmailMessageBuilder
-from pyoaev.helpers import OpenAEVConfigHelper, OpenAEVInjectorHelper
-
-from injector_common.data_helpers import DataHelpers
-from injector_common.dump_config import intercept_dump_argument
 
 
 class OpenAEVEmailGWSInjector:
