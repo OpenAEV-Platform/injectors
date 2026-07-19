@@ -50,7 +50,7 @@ class OpenAEVEmailM365Injector:
         )
 
     def _extract_attachments(self, data: Dict) -> List[Tuple[str, bytes]]:
-        documents = data.get("injection", {}).get("inject_documents", [])
+        documents = data.get("injection", {}).get("inject_documents") or []
         attachments = [doc for doc in documents if doc.get("document_attached") is True]
         if not attachments:
             return []
@@ -72,7 +72,10 @@ class OpenAEVEmailM365Injector:
                 else getattr(response, "status_code", None)
             )
             if status_code != 200:
-                raise ValueError(f"Attachment download failed for {attachment_name}")
+                raise ValueError(
+                    f"Attachment download failed for {attachment_name} "
+                    f"(HTTP {status_code if status_code is not None else 'unknown'})"
+                )
             file_content = (
                 response.get("content")
                 if isinstance(response, dict)
