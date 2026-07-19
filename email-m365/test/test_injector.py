@@ -64,6 +64,13 @@ class ExecuteTest(TestCase):
         with self.assertRaises(ValueError):
             obj.execute(_data(content=content))
 
+    def test_rejects_attachment_without_document_id(self):
+        obj = self._injector()
+        with self.assertRaisesRegex(ValueError, "document_id"):
+            obj._extract_attachments(
+                _data(documents=[{"document_attached": True, "document_name": "a.txt"}])
+            )
+
 
 @skipUnless(_HAS_PYOAEV, "pyoaev is required to import the injector entrypoint")
 class ProcessMessageTest(TestCase):

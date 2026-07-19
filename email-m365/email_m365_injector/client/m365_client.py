@@ -44,15 +44,15 @@ class M365Client:
         self._graph_base_url = graph_base_url.rstrip("/")
         self._authority = f"{authority_base_url.rstrip('/')}/{tenant_id}"
         self._timeout = timeout
-
-    def _acquire_token(self) -> str:
-        app = msal.ConfidentialClientApplication(
+        self._app = msal.ConfidentialClientApplication(
             client_id=self._client_id,
             authority=self._authority,
             client_credential=self._client_secret,
         )
+
+    def _acquire_token(self) -> str:
         # A cached token is returned when still valid; otherwise a new one is minted.
-        result = app.acquire_token_for_client(scopes=[GRAPH_SCOPE])
+        result = self._app.acquire_token_for_client(scopes=[GRAPH_SCOPE])
         token = result.get("access_token") if isinstance(result, dict) else None
         if not token:
             error = "unknown_error"
@@ -71,7 +71,7 @@ class M365Client:
         except RuntimeError as exc:
             return ExecutionResult.failure(str(exc))
 
-        url = f"{self._graph_base_url}/users/{quote(sender)}/sendMail"
+        url = f"{self._graph_base_url}/users/{quote(sender, safe='')}/sendMail"
         headers = {
             "Authorization": f"Bearer {token}",
             "Content-Type": "application/json",

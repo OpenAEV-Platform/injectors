@@ -54,6 +54,25 @@ class SendMailTest(TestCase):
 
     @patch("email_m365_injector.client.m365_client.requests.post")
     @patch("email_m365_injector.client.m365_client.msal.ConfidentialClientApplication")
+    def test_reuses_msal_application_and_encodes_sender_path(self, msal_app, post):
+        msal_app.return_value.acquire_token_for_client.return_value = {
+            "access_token": "token-abc"
+        }
+        post.return_value = _response(status_code=202)
+        client = _client()
+
+        client.send_mail(sender="alerts/example@contoso.com", message={})
+        client.send_mail(sender="alerts@example.com", message={})
+
+        msal_app.assert_called_once()
+        self.assertEqual(
+            post.call_args_list[0].args[0],
+            "https://graph.microsoft.com/v1.0/users/"
+            "alerts%2Fexample%40contoso.com/sendMail",
+        )
+
+    @patch("email_m365_injector.client.m365_client.requests.post")
+    @patch("email_m365_injector.client.m365_client.msal.ConfidentialClientApplication")
     def test_graph_error_is_surfaced(self, msal_app, post):
         msal_app.return_value.acquire_token_for_client.return_value = {
             "access_token": "token-abc"

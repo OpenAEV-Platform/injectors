@@ -136,6 +136,6 @@ class EmailM365Contracts:
             manual=False,
             domains=[
                 SecurityDomains.TABLE_TOP.value
-            ],  # ty:ignore[invalid-argument-type]
+            ],  # type: ignore[invalid-argument-type]
         )
         return prepare_contracts([email_contract])

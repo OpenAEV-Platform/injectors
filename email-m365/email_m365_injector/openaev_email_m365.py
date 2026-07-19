@@ -1,14 +1,15 @@
 import time
+from pathlib import Path
 from typing import Dict, List, Tuple
+
+from injector_common.data_helpers import DataHelpers
+from injector_common.dump_config import intercept_dump_argument
+from pyoaev.helpers import OpenAEVConfigHelper, OpenAEVInjectorHelper
 
 from email_m365_injector.client.m365_client import ExecutionResult, M365Client
 from email_m365_injector.configuration.config_loader import ConfigLoader
 from email_m365_injector.contracts_email_m365 import CONTRACT_ID
 from email_m365_injector.helpers.email_helper import EmailMessageBuilder
-from pyoaev.helpers import OpenAEVConfigHelper, OpenAEVInjectorHelper
-
-from injector_common.data_helpers import DataHelpers
-from injector_common.dump_config import intercept_dump_argument
 
 
 class OpenAEVEmailM365Injector:
@@ -19,7 +20,8 @@ class OpenAEVEmailM365Injector:
             self.raw_config.to_daemon_config()
         )
         intercept_dump_argument(self.config.get_config_obj())
-        with open("email_m365_injector/img/icon-email-m365.png", "rb") as icon_file:
+        icon_path = Path(__file__).parent / "img" / "icon-email-m365.png"
+        with icon_path.open("rb") as icon_file:
             icon_bytes = icon_file.read()
         self.helper = OpenAEVInjectorHelper(self.config, icon_bytes)
 
@@ -58,7 +60,12 @@ class OpenAEVEmailM365Injector:
             attachment_name = attachment.get("document_name")
             if not attachment_name:
                 raise ValueError("Attachment is missing a document_name")
-            response = self.helper.api.document.download(attachment["document_id"])
+            document_id = attachment.get("document_id")
+            if not document_id:
+                raise ValueError(
+                    f"Attachment is missing a document_id for {attachment_name}"
+                )
+            response = self.helper.api.document.download(document_id)
             status_code = (
                 response.get("status_code")
                 if isinstance(response, dict)
