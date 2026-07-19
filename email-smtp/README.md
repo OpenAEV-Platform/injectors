@@ -125,7 +125,7 @@ contract attachment field.
 
 ## Inject contracts
 
-The injector registers a single contract labelled "Email - Craft email" in the `TABLE_TOP` security domain.
+The injector registers a single contract labelled "Email (SMTP) - Craft email" in the `TABLE_TOP` security domain.
 
 | Field         | Content key     | Mandatory | Description                                                    |
 |---------------|-----------------|-----------|----------------------------------------------------------------|
