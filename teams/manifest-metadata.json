@@ -1,8 +1,8 @@
 {
   "title": "Microsoft Teams",
   "slug": "openaev_teams",
-  "description": "Send messages and Adaptive Cards to Microsoft Teams channels and chats via the Microsoft Graph API",
-  "short_description": "Send messages and Adaptive Cards to Microsoft Teams via Microsoft Graph",
+  "description": "Send messages and Adaptive Cards to Microsoft Teams channels and chats via the Microsoft Graph API, for table-top exercises and crisis communication injects.",
+  "short_description": "Send messages and Adaptive Cards to Microsoft Teams",
   "use_cases": ["Technical"],
   "verified": true,
   "last_verified_date": "",

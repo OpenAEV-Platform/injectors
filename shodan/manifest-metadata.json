@@ -1,8 +1,8 @@
 {
   "title": "Shodan",
   "slug": "openaev_shodan",
-  "description": "Scan for intel in Shodan",
-  "short_description": "Scan for intel in Shodan",
+  "description": "Query Shodan from OpenAEV to gather internet-exposure intelligence on your external assets, including open ports, service banners and known vulnerabilities.",
+  "short_description": "Gather external exposure intelligence from Shodan",
   "use_cases": ["Technical"],
   "verified": true,
   "last_verified_date": "",

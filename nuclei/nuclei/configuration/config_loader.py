@@ -36,6 +36,8 @@ class ConfigLoader(SettingsLoader):
                 "injector_contracts": {
                     "data": NucleiContracts.build_static_contracts()
                 },
+                # Source-declared publisher of this injector's contracts.
+                "injector_author": {"data": "Filigran"},
                 "injector_external_contracts_maintenance_schedule_seconds": {
                     "data": self.injector.external_contracts_maintenance_schedule_seconds
                 },
