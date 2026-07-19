@@ -124,7 +124,7 @@ This injector depends on the shared `injector_common` package, so the image must
 exposes it:
 
 ```shell
-docker build --build-context injector_common=../injector_common . -t openaev/injector-email-google-workspace:latest
+docker build --build-context injector_common=../injector_common -t openaev/injector-email-google-workspace:latest .
 ```
 
 Create a `.env` file from `.env.sample` and fill in your values, then start the injector with the provided

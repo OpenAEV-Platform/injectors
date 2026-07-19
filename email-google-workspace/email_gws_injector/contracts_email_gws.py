@@ -83,7 +83,7 @@ class EmailGWSContracts:
         )
         attachment_field = ContractAttachment(
             key=KEY_ATTACHMENTS,
-            label="Attachment",
+            label="Attachments",
             cardinality=ContractCardinality.Multiple,
         )
 
