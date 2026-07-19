@@ -91,6 +91,30 @@ class EmailClientTest(TestCase):
                 "from@example.com",
             )
 
+    def test_send_email_rejects_incomplete_credentials(self):
+        with patch("smtplib.SMTP") as mock_smtp:
+            result = EmailClient.send_email(
+                smtp_hostname="localhost",
+                smtp_port=1025,
+                smtp_use_tls=False,
+                smtp_username="user",
+                smtp_password=None,
+                from_email="from@example.com",
+                mail_from="from@example.com",
+                reply_to=None,
+                to_email="to@example.com",
+                cc_emails=[],
+                bcc_emails=[],
+                subject="Test Subject",
+                body="Test Body",
+            )
+
+            self.assertFalse(result.success)
+            self.assertEqual(
+                result.message, "SMTP username and password must both be provided"
+            )
+            mock_smtp.assert_not_called()
+
     def test_send_email_with_attachment(self):
         with patch("smtplib.SMTP") as mock_smtp:
             instance = mock_smtp.return_value.__enter__.return_value
