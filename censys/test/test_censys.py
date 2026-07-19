@@ -3,7 +3,6 @@ from unittest import TestCase
 from unittest.mock import MagicMock, patch
 
 import requests
-
 from censys_injector.client.censys_client import CensysClient
 from censys_injector.contracts_censys import (
     CERT_SEARCH_CONTRACT,
