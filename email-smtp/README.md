@@ -1,12 +1,12 @@
-# OpenAEV Email Injector
+# OpenAEV Email (SMTP) Injector
 
-The Email injector lets OpenAEV craft and send emails over SMTP as part of attack scenarios. It exposes a single
+The Email (SMTP) injector lets OpenAEV craft and send emails over SMTP as part of attack scenarios. It exposes a single
 inject contract carrying the SMTP connection settings and the message fields (from, to, cc, bcc, subject, body,
 attachments), sends the email with the Python standard library (`smtplib`), and reports the result back to OpenAEV.
 
 ## Table of Contents
 
-- [OpenAEV Email Injector](#openaev-email-injector)
+- [OpenAEV Email (SMTP) Injector](#openaev-email-smtp-injector)
   - [Table of Contents](#table-of-contents)
   - [Introduction](#introduction)
   - [How it works](#how-it-works)
@@ -29,6 +29,9 @@ OpenAEV (Breach and Attack Simulation) drives injectors to execute the technical
 injector registers an email contract with the OpenAEV platform; when an inject using this contract is played, OpenAEV
 dispatches a job to the injector, which sends the corresponding email through the SMTP server defined in the inject
 and returns the result.
+
+> This is the SMTP variant of the OpenAEV email injectors. To send through a managed provider API instead, see the
+> Email (Microsoft 365) injector (Microsoft Graph API) and the Email (Google Workspace) injector (Gmail API).
 
 ## How it works
 
@@ -65,7 +68,7 @@ The injector is configured either through environment variables (recommended, re
 | Parameter     | config.yml           | Docker environment variable | Default | Mandatory | Description                                                     |
 |---------------|----------------------|-----------------------------|---------|-----------|-----------------------------------------------------------------|
 | Injector ID   | `injector.id`        | `INJECTOR_ID`               | /       | Yes       | A unique `UUIDv4` identifier for this injector instance.        |
-| Injector Name | `injector.name`      | `INJECTOR_NAME`             | Email   | No        | The name of the injector as shown in OpenAEV.                   |
+| Injector Name | `injector.name`      | `INJECTOR_NAME`             | Email (SMTP) | No   | The name of the injector as shown in OpenAEV.                   |
 | Log Level     | `injector.log_level` | `INJECTOR_LOG_LEVEL`        | info    | No        | Verbosity of the logs. One of `debug`, `info`, `warn`, `error`. |
 
 ## Deployment
@@ -76,7 +79,7 @@ This injector depends on the shared `injector_common` package, so the image must
 exposes it:
 
 ```shell
-docker build --build-context injector_common=../injector_common . -t openaev/injector-email:latest
+docker build --build-context injector_common=../injector_common . -t openaev/injector-email-smtp:latest
 ```
 
 Create a `.env` file from `.env.sample` and fill in your values, then start the injector with the provided
@@ -96,7 +99,7 @@ Create a `config.yml` from `config.yml.sample`, then install and run the injecto
 
 ```shell
 poetry install
-poetry run python -m email_injector.openaev_email
+poetry run python -m email_smtp_injector.openaev_email_smtp
 ```
 
 > For local development against a checkout of [client-python](https://github.com/OpenAEV-Platform/client-python)
@@ -109,7 +112,7 @@ poetry run python -m email_injector.openaev_email
 ```yaml
 injector:
   id: 'changeme'
-  name: 'Email'
+  name: 'Email (SMTP)'
   log_level: 'info'
 ```
 

@@ -8,15 +8,15 @@ class InjectorConfigOverride(ConfigLoaderCollector):
     )
     name: str = Field(
         description="Name of the injector.",
-        default="Email",
+        default="Email (SMTP)",
     )
     icon_filepath: str | None = Field(
         description="Path to the icon file",
-        default="email_injector/img/icon-email.png",
+        default="email_smtp_injector/img/icon-email.png",
     )
     type: str = Field(
         description="Type of the injector.",
-        default="openaev_email",
+        default="openaev_email_smtp",
     )
     log_level: str = Field(
         description="Determines the verbosity of the logs. Options: debug, info, warn, or error.",

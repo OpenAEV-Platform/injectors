@@ -15,7 +15,7 @@ from pyoaev.contracts.contract_config import (
 )
 from pyoaev.security_domain.types import SecurityDomains
 
-CONTRACT_TYPE = "openaev_email"
+CONTRACT_TYPE = "openaev_email_smtp"
 CONTRACT_ID = "d3b4e5f6-a7b8-4c9d-8e0f-1a2b3c4d5e6f"
 
 
@@ -26,8 +26,8 @@ class EmailContracts:
         contract_config = ContractConfig(
             type=CONTRACT_TYPE,
             label={
-                SupportedLanguage.en: "Email",
-                SupportedLanguage.fr: "Email",
+                SupportedLanguage.en: "Email (SMTP)",
+                SupportedLanguage.fr: "Email (SMTP)",
             },
             color_dark="#4caf50",
             color_light="#4caf50",
@@ -69,8 +69,8 @@ class EmailContracts:
             contract_id=CONTRACT_ID,
             config=contract_config,
             label={
-                SupportedLanguage.en: "Email - Craft email",
-                SupportedLanguage.fr: "Email - Rédiger un email",
+                SupportedLanguage.en: "Email (SMTP) - Craft email",
+                SupportedLanguage.fr: "Email (SMTP) - Rédiger un email",
             },
             fields=email_fields,
             outputs=[],

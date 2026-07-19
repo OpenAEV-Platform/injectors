@@ -1,5 +1,5 @@
 [project]
-name = "openaev-email-injector"
+name = "openaev-email-smtp-injector"
 version = "2.260707.0"
 description = "An injector for crafting emails"
 readme = "README.md"
@@ -24,7 +24,7 @@ dev = [
 
 [tool.poetry]
 packages = [
-    { include = "email_injector" }
+    { include = "email_smtp_injector" }
 ]
 
 [tool.poetry.dependencies]
@@ -40,9 +40,9 @@ build-backend = "poetry.core.masonry.api"
 
 [tool.isort]
 profile = "black"
-known_local_folder = ["email_injector"]
+known_local_folder = ["email_smtp_injector"]
 
 [tool.cmw]
 install-command = "poetry install"
-config-dump-command = "poetry run python -m email_injector.openaev_email --dump-config-schema"
-icon-path = "email_injector/img/icon-email.png"
+config-dump-command = "poetry run python -m email_smtp_injector.openaev_email_smtp --dump-config-schema"
+icon-path = "email_smtp_injector/img/icon-email.png"

@@ -1,5 +1,7 @@
-from email_injector.configuration.injector_config_override import InjectorConfigOverride
-from email_injector.contracts_email import EmailContracts
+from email_smtp_injector.configuration.injector_config_override import (
+    InjectorConfigOverride,
+)
+from email_smtp_injector.contracts_email import EmailContracts
 from pydantic import Field
 from pyoaev.configuration import ConfigLoaderOAEV, Configuration, SettingsLoader
 

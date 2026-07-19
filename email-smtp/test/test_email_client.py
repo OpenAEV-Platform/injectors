@@ -1,6 +1,6 @@
 from unittest.mock import patch
 
-from email_injector.client.email_client import SMTP_TIMEOUT_SECONDS, EmailClient
+from email_smtp_injector.client.email_client import SMTP_TIMEOUT_SECONDS, EmailClient
 
 
 def test_send_email_success():

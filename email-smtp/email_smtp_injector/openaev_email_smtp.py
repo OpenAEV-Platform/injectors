@@ -1,10 +1,10 @@
 import time
 from typing import Dict
 
-from email_injector.client.email_client import EmailClient, ExecutionResult
-from email_injector.configuration.config_loader import ConfigLoader
-from email_injector.contracts_email import CONTRACT_ID
-from email_injector.helpers.email_helper import EmailPayloadBuilder
+from email_smtp_injector.client.email_client import EmailClient, ExecutionResult
+from email_smtp_injector.configuration.config_loader import ConfigLoader
+from email_smtp_injector.contracts_email import CONTRACT_ID
+from email_smtp_injector.helpers.email_helper import EmailPayloadBuilder
 from pyoaev.helpers import OpenAEVConfigHelper, OpenAEVInjectorHelper
 
 from injector_common.data_helpers import DataHelpers
@@ -19,7 +19,7 @@ class OpenAEVEmailInjector:
         )
         intercept_dump_argument(self.config.get_config_obj())
         try:
-            with open("email_injector/img/icon-email.png", "rb") as icon_file:
+            with open("email_smtp_injector/img/icon-email.png", "rb") as icon_file:
                 icon_bytes = icon_file.read()
         except FileNotFoundError:
             icon_bytes = b""

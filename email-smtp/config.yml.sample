@@ -5,5 +5,5 @@ openaev:
 
 injector:
   id: 'changeme'
-  name: 'Email'
+  name: 'Email (SMTP)'
   log_level: 'info'
