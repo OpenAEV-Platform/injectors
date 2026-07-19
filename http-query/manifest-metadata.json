@@ -1,8 +1,8 @@
 {
   "title": "HTTP query",
   "slug": "openaev_http_query",
-  "description": "Allow OAEV to perform HTTP queries",
-  "short_description": "Allow OAEV to perform HTTP queries",
+  "description": "Send arbitrary HTTP requests from OpenAEV to interact with web services and APIs - useful for custom checks, webhooks and lightweight attack simulation.",
+  "short_description": "Send custom HTTP requests to web services and APIs",
   "use_cases": ["Technical"],
   "verified": true,
   "last_verified_date": "",

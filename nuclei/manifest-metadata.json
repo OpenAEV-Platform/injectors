@@ -1,8 +1,8 @@
 {
   "title": "Nuclei",
   "slug": "openaev_nuclei",
-  "description": "Allow to perform CVE scan based on Nuclei",
-  "short_description": "Allow to perform CVE scan based on Nuclei",
+  "description": "Run ProjectDiscovery Nuclei templates from OpenAEV to detect known CVEs and misconfigurations on your targets, turning findings into actionable exposure results.",
+  "short_description": "Run CVE and misconfiguration scans with Nuclei",
   "use_cases": ["Technical"],
   "verified": true,
   "last_verified_date": "",

@@ -1,8 +1,8 @@
 {
   "title": "Amazon Web Service",
   "slug": "openaev_aws",
-  "description": "This Injector use the credentials provided to enumerate through contract the AWS ressources like S3, IAM, Lambda, CloudTrail, Route53, etc. ",
-  "short_description": "Use OpenAEV to perform AWS assessment through credentials sets",
+  "description": "Use the provided AWS credentials to enumerate and assess AWS resources - S3, IAM, Lambda, CloudTrail, Route 53 and more - to surface cloud misconfigurations and exposure.",
+  "short_description": "Assess AWS resources with a set of credentials",
   "use_cases": ["Technical"],
   "verified": true,
   "last_verified_date": "",
