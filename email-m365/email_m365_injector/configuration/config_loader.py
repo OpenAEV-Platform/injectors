@@ -1,11 +1,10 @@
-from pydantic import Field
-from pyoaev.configuration import ConfigLoaderOAEV, Configuration, SettingsLoader
-
 from email_m365_injector.configuration.injector_config_override import (
     InjectorConfigOverride,
 )
 from email_m365_injector.configuration.m365_config import _ConfigLoaderM365
 from email_m365_injector.contracts_email_m365 import EmailM365Contracts
+from pydantic import Field
+from pyoaev.configuration import ConfigLoaderOAEV, Configuration, SettingsLoader
 
 
 class ConfigLoader(SettingsLoader):
