@@ -47,7 +47,6 @@ class EmailContracts:
                     key="smtp_use_tls",
                     label="Use TLS (STARTTLS)",
                     defaultValue=False,
-                    mandatory=False,
                 )
             )
             .optional(ContractText(key="smtp_username", label="SMTP Username"))
