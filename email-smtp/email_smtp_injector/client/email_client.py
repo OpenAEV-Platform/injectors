@@ -34,6 +34,12 @@ class EmailClient:
         attachments: list[tuple[str, bytes]] | None = None,
     ) -> ExecutionResult:
         try:
+            if bool(smtp_username) != bool(smtp_password):
+                return ExecutionResult(
+                    success=False,
+                    message="SMTP username and password must both be provided",
+                )
+
             msg = MIMEMultipart()
             msg["From"] = from_email
             if reply_to:

@@ -76,7 +76,12 @@ class OpenAEVEmailInjector:
             attachment_name = attachment.get("document_name")
             if not attachment_name:
                 raise ValueError("Attachment is missing a document_name")
-            response = self.helper.api.document.download(attachment["document_id"])
+            document_id = attachment.get("document_id")
+            if not document_id:
+                raise ValueError(
+                    f"Attachment is missing a document_id: {attachment_name}"
+                )
+            response = self.helper.api.document.download(document_id)
             status_code = (
                 response.get("status_code")
                 if isinstance(response, dict)

@@ -74,8 +74,6 @@ class EmailContracts:
             fields=email_fields,
             outputs=[],
             manual=False,
-            domains=[
-                SecurityDomains.TABLE_TOP.value
-            ],  # ty:ignore[invalid-argument-type]
+            domains=[SecurityDomains.TABLE_TOP.value],
         )
         return prepare_contracts([email_contract])
