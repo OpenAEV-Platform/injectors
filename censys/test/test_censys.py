@@ -3,6 +3,7 @@ from unittest import TestCase
 from unittest.mock import MagicMock, patch
 
 import requests
+
 from censys_injector.client.censys_client import CensysClient
 from censys_injector.contracts_censys import (
     CERT_SEARCH_CONTRACT,
@@ -24,12 +25,15 @@ class ContractsTest(TestCase):
             expectations_field = next(
                 f for f in content["fields"] if f["key"] == "expectations"
             )
-            self.assertNotIn("predefinedExpectations", expectations_field)
             available = expectations_field["availableExpectations"]
             self.assertEqual(len(available), 1)
             self.assertEqual(available[0]["expectation_type"], "VULNERABILITY")
             self.assertEqual(available[0]["expectation_name"], "Not vulnerable")
             self.assertTrue(available[0]["expectation_is_predefined"])
+            # The platform pre-fills expectations from the field-level
+            # predefinedExpectations array, derived by pyoaev from the
+            # expectation_is_predefined flags (client-python #309).
+            self.assertEqual(expectations_field["predefinedExpectations"], available)
 
 
 class ClientParsingTest(TestCase):
