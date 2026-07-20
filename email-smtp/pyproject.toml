@@ -9,7 +9,18 @@ requires-python = ">=3.11,<4.0"
 dependencies = [
     "pyoaev (==2.260717.0); extra != 'dev'",
     "injector_common @ ../injector_common",
+    "pydantic (>=2.11.3,<2.14.0)",
+    "pydantic-settings (>=2.11.0,<2.15.0)",
 ]
+
+[project.urls]
+Homepage = "https://filigran.io/"
+Repository = "https://github.com/OpenAEV-Platform/injectors/tree/main/email-smtp"
+Documentation = "https://github.com/OpenAEV-Platform/injectors/tree/main/email-smtp/README.md"
+Issues = "https://github.com/OpenAEV-Platform/injectors/issues"
+
+[project.scripts]
+EmailSmtpInjector = "email_smtp.__main__:main"
 
 [project.optional-dependencies]
 dev = [
@@ -24,7 +35,7 @@ dev = [
 
 [tool.poetry]
 packages = [
-    { include = "email_smtp_injector" }
+    { include = "email_smtp" }
 ]
 
 [tool.poetry.dependencies]
@@ -40,9 +51,12 @@ build-backend = "poetry.core.masonry.api"
 
 [tool.isort]
 profile = "black"
-known_local_folder = ["email_smtp_injector"]
+src_paths = ["email_smtp", "tests"]
+
+[tool.pytest.ini_options]
+testpaths = ["./tests"]
 
 [tool.cmw]
 install-command = "poetry install"
-config-dump-command = "poetry run python -m email_smtp_injector.openaev_email_smtp --dump-config-schema"
-icon-path = "email_smtp_injector/img/icon-email.png"
+config-dump-command = "poetry run python -m email_smtp --dump-config-schema"
+icon-path = "email_smtp/img/icon-email.png"

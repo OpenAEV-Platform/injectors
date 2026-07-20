@@ -8,37 +8,24 @@ from pyoaev.contracts.contract_config import (
     ContractCheckbox,
     ContractConfig,
     ContractElement,
+    ContractOutputElement,
     ContractText,
     ContractTextArea,
     SupportedLanguage,
-    prepare_contracts,
 )
 from pyoaev.security_domain.types import SecurityDomains
 
-CONTRACT_TYPE = "openaev_email_smtp"
-CONTRACT_ID = "d3b4e5f6-a7b8-4c9d-8e0f-1a2b3c4d5e6f"
 
+class CraftEmail:
 
-class EmailContracts:
-
-    @staticmethod
-    def build() -> List[Contract]:
-        contract_config = ContractConfig(
-            type=CONTRACT_TYPE,
-            label={
-                SupportedLanguage.en: "Email (SMTP)",
-                SupportedLanguage.fr: "Email (SMTP)",
-            },
-            color_dark="#4caf50",
-            color_light="#4caf50",
-            expose=True,
-        )
+    @classmethod
+    def contract_with_specific_fields(cls) -> List[ContractElement]:
         attachment_field = ContractAttachment(
             key="attachments",
             label="Attachment",
             cardinality=ContractCardinality.Multiple,
         )
-        email_fields: List[ContractElement] = (
+        return (
             ContractBuilder()
             .mandatory(ContractText(key="smtp_hostname", label="SMTP Hostname"))
             .mandatory(ContractText(key="smtp_port", label="SMTP Port"))
@@ -64,16 +51,34 @@ class EmailContracts:
             .optional(attachment_field)
             .build_fields()
         )
-        email_contract = Contract(
-            contract_id=CONTRACT_ID,
+
+    @staticmethod
+    def contract_with_specific_outputs(
+        base_outputs: List[ContractOutputElement],
+    ) -> List[ContractOutputElement]:
+        specific_outputs: List[ContractOutputElement] = []
+        return (
+            ContractBuilder()
+            .add_outputs(base_outputs + specific_outputs)
+            .build_outputs()
+        )
+
+    @staticmethod
+    def contract(
+        contract_id: str,
+        contract_config: ContractConfig,
+        contract_with_specific_fields: List[ContractElement],
+        contract_with_specific_outputs: List[ContractOutputElement],
+    ) -> Contract:
+        return Contract(
+            contract_id=contract_id,
             config=contract_config,
             label={
                 SupportedLanguage.en: "Email (SMTP) - Craft email",
                 SupportedLanguage.fr: "Email (SMTP) - Rédiger un email",
             },
-            fields=email_fields,
-            outputs=[],
+            fields=contract_with_specific_fields,
+            outputs=contract_with_specific_outputs,
             manual=False,
             domains=[SecurityDomains.TABLE_TOP.value],
         )
-        return prepare_contracts([email_contract])
