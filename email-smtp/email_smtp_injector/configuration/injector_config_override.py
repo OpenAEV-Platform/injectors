@@ -1,3 +1,5 @@
+from typing import Literal
+
 from pydantic import Field
 from pyoaev.configuration import ConfigLoaderCollector
 
@@ -18,7 +20,10 @@ class InjectorConfigOverride(ConfigLoaderCollector):
         description="Type of the injector.",
         default="openaev_email_smtp",
     )
-    log_level: str = Field(
-        description="Determines the verbosity of the logs. Options: debug, info, warn, or error.",
+    log_level: Literal["debug", "info", "warning", "error", "critical"] = Field(
+        description=(
+            "Determines the verbosity of the logs. "
+            "Options: debug, info, warning, error, or critical."
+        ),
         default="info",
     )

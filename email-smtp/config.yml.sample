@@ -6,4 +6,4 @@ openaev:
 injector:
   id: 'changeme'
   name: 'Email (SMTP)'
-  log_level: 'info'
+  log_level: 'error'

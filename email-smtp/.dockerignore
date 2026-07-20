@@ -2,3 +2,4 @@ config.yml
 .env
 email_smtp_injector/__pycache__
 __pycache__
+.venv
