@@ -1,0 +1,18 @@
+openaev:
+  url: 'http://localhost:3001'
+  token: 'ChangeMe'
+  # tenant_id: 'ChangeMe'
+
+injector:
+  id: 'ChangeMe'   # unique UUIDv4
+  name: 'Email (Microsoft 365)'
+  log_level: 'error'
+
+m365:
+  # Entra ID (Azure AD) app registration with the Mail.Send application permission - see the README.
+  tenant_id: 'ChangeMe'
+  client_id: 'ChangeMe'
+  client_secret: 'ChangeMe'
+#  graph_base_url: 'https://graph.microsoft.com/v1.0'
+#  authority_base_url: 'https://login.microsoftonline.com'
+#  request_timeout_seconds: 30

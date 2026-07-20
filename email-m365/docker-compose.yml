@@ -1,0 +1,17 @@
+services:
+  injector-email-m365:
+    image: openaev/injector-email-m365:latest
+    environment:
+      - OPENAEV_URL=${OPENAEV_URL}
+      - OPENAEV_TOKEN=${OPENAEV_TOKEN}
+      - OPENAEV_TENANT_ID=${OPENAEV_TENANT_ID}
+      - INJECTOR_ID=${INJECTOR_ID}
+      - INJECTOR_NAME=${INJECTOR_NAME}
+      - INJECTOR_LOG_LEVEL=${INJECTOR_LOG_LEVEL}
+      - M365_TENANT_ID=${M365_TENANT_ID}
+      - M365_CLIENT_ID=${M365_CLIENT_ID}
+      - M365_CLIENT_SECRET=${M365_CLIENT_SECRET}
+      - M365_GRAPH_BASE_URL=${M365_GRAPH_BASE_URL:-https://graph.microsoft.com/v1.0}
+      - M365_AUTHORITY_BASE_URL=${M365_AUTHORITY_BASE_URL:-https://login.microsoftonline.com}
+      - M365_REQUEST_TIMEOUT_SECONDS=${M365_REQUEST_TIMEOUT_SECONDS:-30}
+    restart: always
