@@ -135,6 +135,7 @@ class NucleiContracts:
             mandatory=False,
             cardinality=ContractCardinality.Multiple,
             availableExpectations=expectation_items,
+            predefinedExpectations=expectation_items,
         )
 
         return [
