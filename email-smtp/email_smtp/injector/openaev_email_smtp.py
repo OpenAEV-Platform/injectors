@@ -1,42 +1,48 @@
 import time
-from typing import Dict
+from typing import Dict, List, Tuple
 
-from email_smtp_injector.client.email_client import EmailClient, ExecutionResult
-from email_smtp_injector.configuration.config_loader import ConfigLoader
-from email_smtp_injector.contracts_email import CONTRACT_ID
-from email_smtp_injector.helpers.email_helper import EmailPayloadBuilder
-from pyoaev.helpers import OpenAEVConfigHelper, OpenAEVInjectorHelper
+from email_smtp.contracts import EmailContractId
+from email_smtp.models import ConfigLoader
+from email_smtp.models.exceptions import (
+    AttachmentDownloadError,
+    InvalidContractError,
+    MissingRequiredFieldError,
+)
+from email_smtp.services import EmailClient, EmailPayloadBuilder, ExecutionResult
+from pyoaev.helpers import OpenAEVInjectorHelper
 
 from injector_common.data_helpers import DataHelpers
-from injector_common.dump_config import intercept_dump_argument
+
+LOG_PREFIX = "[EMAIL_SMTP_INJECTOR]"
 
 
-class OpenAEVEmailInjector:
-
-    def __init__(self):
-        self.config = OpenAEVConfigHelper.from_configuration_object(
-            ConfigLoader().to_daemon_config()
-        )
-        intercept_dump_argument(self.config.get_config_obj())
-        try:
-            with open("email_smtp_injector/img/icon-email.png", "rb") as icon_file:
-                icon_bytes = icon_file.read()
-        except FileNotFoundError:
-            icon_bytes = b""
-
-        self.helper = OpenAEVInjectorHelper(self.config, icon_bytes)
-        self.helper.injector_logger.info("Email injector initialized")
+class EmailSmtpInjector:
+    def __init__(self, config: ConfigLoader, helper: OpenAEVInjectorHelper):
+        """Initialize the Injector with necessary configurations."""
+        self.config = config
+        self.helper = helper
+        self.helper.injector_logger.info(f"{LOG_PREFIX} - Email injector initialized")
 
     def execute(self, data: Dict) -> ExecutionResult:
         inject_contract = DataHelpers.get_injector_contract_id(data)
-        if inject_contract != CONTRACT_ID:
-            raise ValueError("Unsupported contract for Email injector")
+        if inject_contract != EmailContractId.CRAFT_EMAIL:
+            raise InvalidContractError("Unsupported contract for Email injector")
 
         content = DataHelpers.get_content(data)
         payload = EmailPayloadBuilder.build(content)
         attachments = self._extract_attachments(data)
         self.helper.injector_logger.info(
-            f"Crafting email (to={payload['to']}, cc_count={len(payload['cc'])}, bcc_count={len(payload['bcc'])}, attachments_count={len(attachments)}, subject={payload['subject']}, smtp_host={payload['smtp_hostname']}, smtp_port={payload['smtp_port']}, tls={payload['smtp_use_tls']})"
+            f"{LOG_PREFIX} - Crafting email",
+            {
+                "to": payload["to"],
+                "cc_count": len(payload["cc"]),
+                "bcc_count": len(payload["bcc"]),
+                "attachments_count": len(attachments),
+                "subject": payload["subject"],
+                "smtp_host": payload["smtp_hostname"],
+                "smtp_port": payload["smtp_port"],
+                "tls": payload["smtp_use_tls"],
+            },
         )
 
         result = EmailClient.send_email(
@@ -57,28 +63,30 @@ class OpenAEVEmailInjector:
         )
         if result.success:
             self.helper.injector_logger.info(
-                f"Email crafted successfully (to={payload['to']})"
+                f"{LOG_PREFIX} - Email crafted successfully",
+                {"to": payload["to"]},
             )
         else:
             self.helper.injector_logger.error(
-                f"Email crafting failed: {result.message}"
+                f"{LOG_PREFIX} - Email crafting failed",
+                {"error": result.message},
             )
         return result
 
-    def _extract_attachments(self, data: Dict) -> list[tuple[str, bytes]]:
+    def _extract_attachments(self, data: Dict) -> List[Tuple[str, bytes]]:
         documents = data.get("injection", {}).get("inject_documents", [])
         attachments = [doc for doc in documents if doc.get("document_attached") is True]
         if not attachments:
             return []
 
-        extracted_attachments: list[tuple[str, bytes]] = []
+        extracted_attachments: List[Tuple[str, bytes]] = []
         for attachment in attachments:
             attachment_name = attachment.get("document_name")
             if not attachment_name:
-                raise ValueError("Attachment is missing a document_name")
+                raise MissingRequiredFieldError("Attachment is missing a document_name")
             document_id = attachment.get("document_id")
             if not document_id:
-                raise ValueError(
+                raise MissingRequiredFieldError(
                     f"Attachment is missing a document_id: {attachment_name}"
                 )
             response = self.helper.api.document.download(document_id)
@@ -88,18 +96,22 @@ class OpenAEVEmailInjector:
                 else getattr(response, "status_code", None)
             )
             if status_code != 200:
-                raise ValueError(f"Attachment download failed for {attachment_name}")
+                raise AttachmentDownloadError(
+                    f"Attachment download failed for {attachment_name}"
+                )
             content = (
                 response.get("content")
                 if isinstance(response, dict)
                 else getattr(response, "content", None)
             )
             if content is None:
-                raise ValueError(f"Attachment content missing for {attachment_name}")
+                raise AttachmentDownloadError(
+                    f"Attachment content missing for {attachment_name}"
+                )
             if isinstance(content, str):
                 content = content.encode()
             if not isinstance(content, (bytes, bytearray)):
-                raise ValueError(
+                raise AttachmentDownloadError(
                     f"Attachment content is not binary for {attachment_name}"
                 )
             extracted_attachments.append((attachment_name, bytes(content)))
@@ -110,7 +122,8 @@ class OpenAEVEmailInjector:
         start = time.time()
         inject_id = DataHelpers.get_inject_id(data)
         self.helper.injector_logger.info(
-            f"Received email inject message (inject_id={inject_id})"
+            f"{LOG_PREFIX} - Received email inject message",
+            {"inject_id": inject_id},
         )
 
         self.helper.api.inject.execution_reception(
@@ -132,16 +145,18 @@ class OpenAEVEmailInjector:
             )
             if result.success:
                 self.helper.injector_logger.info(
-                    f"Inject completed successfully (inject_id={inject_id})"
+                    f"{LOG_PREFIX} - Inject completed successfully",
+                    {"inject_id": inject_id},
                 )
             else:
                 self.helper.injector_logger.error(
-                    f"Inject completed with error (inject_id={inject_id}): {result.message}"
+                    f"{LOG_PREFIX} - Inject completed with error",
+                    {"inject_id": inject_id, "error": result.message},
                 )
 
-        except Exception as e:
+        except Exception as err:
             callback_data = {
-                "execution_message": str(e),
+                "execution_message": str(err),
                 "execution_status": "ERROR",
                 "execution_duration": int(time.time() - start),
                 "execution_action": "complete",
@@ -150,14 +165,12 @@ class OpenAEVEmailInjector:
                 inject_id=inject_id, data=callback_data
             )
             self.helper.injector_logger.error(
-                f"Unexpected error while processing inject (inject_id={inject_id}): {str(e)}"
+                f"{LOG_PREFIX} - Unexpected error while processing inject",
+                {"inject_id": inject_id, "error": str(err)},
             )
 
-    def start(self):
-        self.helper.injector_logger.info("Starting email injector listener")
+    def start(self) -> None:
+        self.helper.injector_logger.info(
+            f"{LOG_PREFIX} - Starting email injector listener"
+        )
         self.helper.listen(message_callback=self.process_message)
-
-
-if __name__ == "__main__":
-    injector = OpenAEVEmailInjector()
-    injector.start()

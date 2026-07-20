@@ -99,7 +99,7 @@ Create a `config.yml` from `config.yml.sample`, then install and run the injecto
 
 ```shell
 poetry install
-poetry run python -m email_smtp_injector.openaev_email_smtp
+poetry run python -m email_smtp
 ```
 
 > For local development against a checkout of [client-python](https://github.com/OpenAEV-Platform/client-python)

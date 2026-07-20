@@ -1,7 +1,7 @@
 from typing import Literal
 
 from pydantic import Field
-from pyoaev.configuration import ConfigLoaderCollector
+from pyoaev.configuration import ConfigLoaderCollector, Configuration
 
 
 class InjectorConfigOverride(ConfigLoaderCollector):
@@ -9,21 +9,26 @@ class InjectorConfigOverride(ConfigLoaderCollector):
         description="A unique UUIDv4 identifier for this injector instance.",
     )
     name: str = Field(
-        description="Name of the injector.",
         default="Email (SMTP)",
+        description="Name of the injector.",
     )
     icon_filepath: str | None = Field(
+        default="email_smtp/img/icon-email.png",
         description="Path to the icon file",
-        default="email_smtp_injector/img/icon-email.png",
     )
     type: str = Field(
-        description="Type of the injector.",
         default="openaev_email_smtp",
+        description="Type of the injector.",
     )
     log_level: Literal["debug", "info", "warning", "error", "critical"] = Field(
+        default="info",
         description=(
             "Determines the verbosity of the logs. "
             "Options: debug, info, warning, error, or critical."
         ),
-        default="info",
     )
+
+    def to_daemon_config(self) -> Configuration:
+        return Configuration(
+            config_base_model=self,
+        )
