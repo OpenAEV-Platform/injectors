@@ -1,12 +1,5 @@
 """Factory functions for building shared contract fields across all families."""
 
-from injector_common.constants import (
-    TARGET_PROPERTY_SELECTOR_KEY,
-    TARGET_SELECTOR_KEY,
-    TARGETS_KEY,
-)
-from injector_common.targets import TargetProperty, target_property_choices_dict
-from netexec.contracts.protocol_config import PROTOCOL_CONFIGS
 from pyoaev.contracts.contract_config import (
     ContractAsset,
     ContractAssetGroup,
@@ -19,6 +12,14 @@ from pyoaev.contracts.contract_config import (
     SecurityPlatformType,
 )
 from pyoaev.contracts.contract_utils import ContractCardinality
+
+from injector_common.constants import (
+    TARGET_PROPERTY_SELECTOR_KEY,
+    TARGET_SELECTOR_KEY,
+    TARGETS_KEY,
+)
+from injector_common.targets import TargetProperty, target_property_choices_dict
+from netexec.contracts.protocol_config import PROTOCOL_CONFIGS
 
 # Credential field definitions keyed by their field name.
 _CREDENTIAL_DEFS = {

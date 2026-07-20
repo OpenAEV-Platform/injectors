@@ -1,17 +1,5 @@
 from typing import List
 
-from injector_common.constants import (
-    TARGET_PROPERTY_SELECTOR_KEY,
-    TARGET_SELECTOR_KEY,
-    TARGETS_KEY,
-)
-from injector_common.targets import TargetProperty, target_property_choices_dict
-from nmap.contracts.nmap_constants import (
-    FIN_SCAN_CONTRACT,
-    TCP_CONNECT_SCAN_CONTRACT,
-    TCP_SYN_SCAN_CONTRACT,
-    TYPE,
-)
 from pyoaev.contracts import ContractBuilder
 from pyoaev.contracts.contract_config import (
     Contract,
@@ -32,6 +20,19 @@ from pyoaev.contracts.contract_config import (
     prepare_contracts,
 )
 from pyoaev.security_domain.types import SecurityDomains
+
+from injector_common.constants import (
+    TARGET_PROPERTY_SELECTOR_KEY,
+    TARGET_SELECTOR_KEY,
+    TARGETS_KEY,
+)
+from injector_common.targets import TargetProperty, target_property_choices_dict
+from nmap.contracts.nmap_constants import (
+    FIN_SCAN_CONTRACT,
+    TCP_CONNECT_SCAN_CONTRACT,
+    TCP_SYN_SCAN_CONTRACT,
+    TYPE,
+)
 
 
 class NmapContracts:
