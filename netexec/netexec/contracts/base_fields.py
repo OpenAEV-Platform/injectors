@@ -1,5 +1,12 @@
 """Factory functions for building shared contract fields across all families."""
 
+from injector_common.constants import (
+    TARGET_PROPERTY_SELECTOR_KEY,
+    TARGET_SELECTOR_KEY,
+    TARGETS_KEY,
+)
+from injector_common.targets import TargetProperty, target_property_choices_dict
+from netexec.contracts.protocol_config import PROTOCOL_CONFIGS
 from pyoaev.contracts.contract_config import (
     ContractAsset,
     ContractAssetGroup,
@@ -9,16 +16,9 @@ from pyoaev.contracts.contract_config import (
     ContractText,
     Expectation,
     ExpectationType,
+    SecurityPlatformType,
 )
 from pyoaev.contracts.contract_utils import ContractCardinality
-
-from injector_common.constants import (
-    TARGET_PROPERTY_SELECTOR_KEY,
-    TARGET_SELECTOR_KEY,
-    TARGETS_KEY,
-)
-from injector_common.targets import TargetProperty, target_property_choices_dict
-from netexec.contracts.protocol_config import PROTOCOL_CONFIGS
 
 # Credential field definitions keyed by their field name.
 _CREDENTIAL_DEFS = {
@@ -113,6 +113,11 @@ def build_core_fields() -> list[ContractElement]:
             expectation_score=100,
             expectation_expectation_group=False,
             expectation_is_predefined=True,
+            expectation_expected_security_platform_types=[
+                SecurityPlatformType.EDR,
+                SecurityPlatformType.XDR,
+                SecurityPlatformType.SIEM,
+            ],
         ),
         Expectation(
             expectation_type=ExpectationType.prevention,
@@ -121,6 +126,10 @@ def build_core_fields() -> list[ContractElement]:
             expectation_score=100,
             expectation_expectation_group=False,
             expectation_is_predefined=True,
+            expectation_expected_security_platform_types=[
+                SecurityPlatformType.EDR,
+                SecurityPlatformType.XDR,
+            ],
         ),
         Expectation(
             expectation_type=ExpectationType.vulnerability,

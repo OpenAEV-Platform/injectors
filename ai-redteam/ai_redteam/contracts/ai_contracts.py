@@ -1,4 +1,3 @@
-from ai_redteam.contracts import constants as c
 from pyoaev.contracts import ContractBuilder
 from pyoaev.contracts.contract_config import (
     Contract,
@@ -13,9 +12,12 @@ from pyoaev.contracts.contract_config import (
     ContractTextArea,
     Expectation,
     ExpectationType,
+    SecurityPlatformType,
     SupportedLanguage,
     prepare_contracts,
 )
+
+from ai_redteam.contracts import constants as c
 
 try:
     from pyoaev.contracts.contract_config import ContractAiTarget
@@ -151,6 +153,10 @@ def _expectations():
             expectation_score=100,
             expectation_expectation_group=False,
             expectation_is_predefined=True,
+            expectation_expected_security_platform_types=[
+                SecurityPlatformType.LLM_FIREWALL,
+                SecurityPlatformType.AI_GATEWAY,
+            ],
         ),
         Expectation(
             expectation_type=ExpectationType.prevention,
@@ -159,6 +165,10 @@ def _expectations():
             expectation_score=100,
             expectation_expectation_group=False,
             expectation_is_predefined=True,
+            expectation_expected_security_platform_types=[
+                SecurityPlatformType.LLM_FIREWALL,
+                SecurityPlatformType.AI_GATEWAY,
+            ],
         ),
     ]
     return ContractExpectations(
