@@ -217,7 +217,7 @@ def test_process_message_sends_signatures_on_exception(
 def test_process_message_sends_empty_extra_signatures(
     mock_send_email, email_smtp_injector
 ):
-    """Base implementation sends no extra signature indicators (explicit empty)."""
+    """Email indicators go via output_structured, not extra signature data."""
     mock_send_email.return_value = ExecutionResult(success=True, message="sent")
 
     email_smtp_injector.process_message(_data())
@@ -257,10 +257,10 @@ def test_process_message_signature_send_failure_does_not_crash(
 
 
 @patch("email_smtp.injector.openaev_email_smtp.EmailClient.send_email")
-def test_process_message_includes_to_address_in_output_structured(
+def test_process_message_output_structured_contains_email_signatures(
     mock_send_email, email_smtp_injector
 ):
-    """Execution callback includes the 'to' address in output_structured."""
+    """Execution callback includes all email address signatures in output_structured."""
     mock_send_email.return_value = ExecutionResult(success=True, message="sent")
 
     email_smtp_injector.process_message(_data())
@@ -273,19 +273,60 @@ def test_process_message_includes_to_address_in_output_structured(
     import json
 
     output = json.loads(callback_data["execution_output_structured"])
-    assert output == {"expectation_signatures": ["recipient@example.com"]}
+    sigs = output["expectation_signatures"]
+    assert sigs["sender_email"] == ["sender@example.com"]
+    assert sigs["recipient_email"] == ["recipient@example.com"]
 
 
 @patch("email_smtp.injector.openaev_email_smtp.EmailClient.send_email")
-def test_process_message_output_structured_empty_when_no_to(
+def test_process_message_output_structured_includes_all_address_fields(
     mock_send_email, email_smtp_injector
 ):
-    """When 'to' is empty, output_structured is explicitly empty."""
+    """All email address fields are captured in output_structured."""
     mock_send_email.return_value = ExecutionResult(success=True, message="sent")
     content = {
         "smtp_hostname": "smtp.example.com",
         "smtp_port": "25",
         "from": "sender@example.com",
+        "mail_from": "bounce@example.com",
+        "to": "victim@example.com",
+        "cc": "copy@example.com",
+        "bcc": "hidden@example.com",
+        "reply_to": "reply@example.com",
+        "subject": "Subject",
+        "body": "Body",
+    }
+
+    email_smtp_injector.process_message(_data(content=content))
+
+    callback_data = (
+        email_smtp_injector.helper.api.inject.execution_callback.call_args.kwargs[
+            "data"
+        ]
+    )
+    import json
+
+    output = json.loads(callback_data["execution_output_structured"])
+    sigs = output["expectation_signatures"]
+    assert sigs["sender_email"] == ["sender@example.com", "bounce@example.com"]
+    assert sigs["recipient_email"] == [
+        "victim@example.com",
+        "copy@example.com",
+        "hidden@example.com",
+    ]
+    assert sigs["reply_to_email"] == ["reply@example.com"]
+
+
+@patch("email_smtp.injector.openaev_email_smtp.EmailClient.send_email")
+def test_process_message_output_structured_empty_when_no_addresses(
+    mock_send_email, email_smtp_injector
+):
+    """When all address fields are empty, output_structured is explicitly empty."""
+    mock_send_email.return_value = ExecutionResult(success=True, message="sent")
+    content = {
+        "smtp_hostname": "smtp.example.com",
+        "smtp_port": "25",
+        "from": "",
         "to": "",
         "subject": "Subject",
         "body": "Body",

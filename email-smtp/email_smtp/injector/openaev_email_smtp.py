@@ -143,7 +143,10 @@ class EmailSmtpInjector:
         try:
             result = self.execute(data)
 
-            output_structured = self._build_output_structured(data)
+            content = DataHelpers.get_content(data)
+            email_payload = EmailPayloadBuilder.build(content)
+            output_structured = self._build_output_structured(email_payload)
+
             callback_data = {
                 "execution_message": result.message,
                 "execution_output_structured": json.dumps(output_structured),
@@ -192,11 +195,14 @@ class EmailSmtpInjector:
         self._send_signatures(inject_id, execution_details, execution_signature)
 
     @staticmethod
-    def _build_output_structured(data: Dict) -> Dict:
-        """Build the contract output structure with the recipient email address."""
-        content = DataHelpers.get_content(data)
-        to_address = content.get("to", "")
-        return {"expectation_signatures": [to_address]} if to_address else {}
+    def _build_output_structured(email_payload: Dict) -> Dict:
+        """Build the contract output with email address signatures."""
+        from email_smtp.services.signature_service import EmailSignatureService
+
+        signatures = EmailSignatureService.build_email_signatures(email_payload)
+        if not signatures:
+            return {}
+        return {"expectation_signatures": signatures}
 
     def _send_signatures(
         self,

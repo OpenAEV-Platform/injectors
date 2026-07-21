@@ -16,14 +16,20 @@ from injector_common.targets import TargetMeta
 
 logger = logging.getLogger(__name__)
 
+# Signature type constants for email indicators
+SENDER_EMAIL = "sender_email"
+RECIPIENT_EMAIL = "recipient_email"
+REPLY_TO_EMAIL = "reply_to_email"
+
 
 class EmailSignatureService:
     """Wraps the pyoaev SignatureManager for the email-smtp injector.
 
     Email is not a network/cloud scanner — there are no target IPs or cloud
-    accounts.  The service therefore builds minimal execution signatures
-    (start/end timing only) and leaves extra-signature slots empty until
-    concrete indicator types (address hashes, URL hashes, …) are wired in.
+    accounts.  The service builds minimal execution signatures (start/end
+    timing only).  Email address indicators are delivered via the contract
+    output (``execution_output_structured``) rather than through the
+    signature payload.
     """
 
     def __init__(self, signature_manager: SignatureManager) -> None:
@@ -60,6 +66,54 @@ class EmailSignatureService:
             execution_details, execution_signature, tool_output
         )
 
+    # -- output structured ---------------------------------------------------
+
+    @staticmethod
+    def build_email_signatures(payload: dict) -> dict[str, list[str]]:
+        """Extract email address indicators from the payload.
+
+        Returns a dict of signature-type → list-of-values suitable for
+        inclusion in ``execution_output_structured["expectation_signatures"]``.
+
+        Signature types produced:
+        - ``sender_email``: from address + mail_from (envelope sender) if different
+        - ``recipient_email``: to + cc + bcc addresses
+        - ``reply_to_email``: reply-to address (only when present)
+        """
+        signatures: dict[str, list[str]] = {}
+
+        # Sender signatures
+        sender_emails: list[str] = []
+        from_addr = payload.get("from", "")
+        if from_addr:
+            sender_emails.append(from_addr)
+        mail_from = payload.get("mail_from", "")
+        if mail_from and mail_from != from_addr:
+            sender_emails.append(mail_from)
+        if sender_emails:
+            signatures[SENDER_EMAIL] = sender_emails
+
+        # Recipient signatures
+        recipient_emails: list[str] = []
+        to_addr = payload.get("to", "")
+        if to_addr:
+            recipient_emails.append(to_addr)
+        for cc in payload.get("cc", []):
+            if cc:
+                recipient_emails.append(cc)
+        for bcc in payload.get("bcc", []):
+            if bcc:
+                recipient_emails.append(bcc)
+        if recipient_emails:
+            signatures[RECIPIENT_EMAIL] = recipient_emails
+
+        # Reply-To signature
+        reply_to = payload.get("reply_to")
+        if reply_to:
+            signatures[REPLY_TO_EMAIL] = [reply_to]
+
+        return signatures
+
     # -- payload & send ------------------------------------------------------
 
     def send_signatures(
@@ -68,14 +122,14 @@ class EmailSignatureService:
         execution_details: ExecutionDetails,
         execution_signature: ExecutionSignature,
     ) -> None:
-        """Build payload with empty extra signatures and ship it."""
+        """Build payload and ship it. Email indicators go via output_structured."""
         target_meta = TargetMeta()
         extra = ExtraSignatureData()
 
-        payload = self._sm.build_payload(
+        sig_payload = self._sm.build_payload(
             execution_signatures=[execution_signature],
             targets_meta=[target_meta],
             expectation_types=["DETECTION"],
             extra_signatures=extra,
         )
-        self._sm.send_signatures(inject_id, execution_details, signatures=payload)
+        self._sm.send_signatures(inject_id, execution_details, signatures=sig_payload)
