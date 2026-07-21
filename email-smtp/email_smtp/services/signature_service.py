@@ -24,6 +24,7 @@ RECIPIENT_EMAIL = "recipient_email"
 REPLY_TO_EMAIL = "reply_to_email"
 URL_HASH = "url_hash"
 ATTACHMENT_HASH = "attachment_hash"
+CUSTOM_HEADER = "custom_header"
 
 DEFAULT_HASH_ALGORITHM = "sha256"
 
@@ -101,6 +102,7 @@ class EmailSignatureService:
         - ``reply_to_email``: reply-to address (only when present)
         - ``url_hash``: hashes of URLs found in the body
         - ``attachment_hash``: hashes of attachment file contents
+        - ``custom_header``: custom header name:value pairs (plain text)
         """
         signatures: dict[str, list[str]] = {}
 
@@ -147,6 +149,13 @@ class EmailSignatureService:
                 _hash_bytes(content, hash_algorithm) for _, content in attachments
             ]
             signatures[ATTACHMENT_HASH] = attachment_hashes
+
+        # Custom header signatures (stored as plain "name: value" strings)
+        custom_headers = payload.get("custom_headers", [])
+        if custom_headers:
+            signatures[CUSTOM_HEADER] = [
+                f"{name}: {value}" for name, value in custom_headers
+            ]
 
         return signatures
 

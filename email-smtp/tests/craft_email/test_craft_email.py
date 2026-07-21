@@ -417,3 +417,33 @@ def test_process_message_output_structured_includes_attachment_hashes(
     sigs = output["expectation_signatures"]
     expected_hash = hashlib.sha256(attachment_content).hexdigest()
     assert sigs["attachment_hash"] == [expected_hash]
+
+
+@patch("email_smtp.injector.openaev_email_smtp.EmailClient.send_email")
+def test_process_message_output_structured_includes_custom_header_hashes(
+    mock_send_email, email_smtp_injector
+):
+    """Custom header hashes are included in output_structured."""
+    mock_send_email.return_value = ExecutionResult(success=True, message="sent")
+    content = {
+        "smtp_hostname": "smtp.example.com",
+        "smtp_port": "25",
+        "from": "sender@example.com",
+        "to": "victim@example.com",
+        "subject": "Subject",
+        "body": "Body",
+        "custom_headers": "X-Track: abc123\nX-Campaign: summer",
+    }
+
+    email_smtp_injector.process_message(_data(content=content))
+
+    callback_data = (
+        email_smtp_injector.helper.api.inject.execution_callback.call_args.kwargs[
+            "data"
+        ]
+    )
+    import json
+
+    output = json.loads(callback_data["execution_output_structured"])
+    sigs = output["expectation_signatures"]
+    assert sigs["custom_header"] == ["X-Track: abc123", "X-Campaign: summer"]
