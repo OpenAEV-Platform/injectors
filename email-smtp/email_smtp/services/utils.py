@@ -1,4 +1,9 @@
+import re
 from typing import Dict, List, Optional
+
+from email_smtp.models.exceptions import CustomHeaderValidationError
+
+HEADER_NAME_PATTERN = re.compile(r"^[A-Za-z0-9!#$%&'*+\-.^_`|~]+$")
 
 
 class EmailPayloadBuilder:
@@ -26,6 +31,46 @@ class EmailPayloadBuilder:
         return False
 
     @staticmethod
+    def parse_custom_headers(value: str | None) -> List[tuple[str, str]]:
+        if not value:
+            return []
+
+        headers: List[tuple[str, str]] = []
+        for line_number, raw_line in enumerate(value.splitlines(), start=1):
+            line = raw_line.strip()
+            if not line:
+                continue
+            if ":" not in line:
+                raise CustomHeaderValidationError(
+                    f"Invalid custom header at line {line_number}: expected 'name: value'"
+                )
+
+            header_name, header_value = line.split(":", 1)
+            header_name = header_name.strip()
+            header_value = header_value.strip()
+
+            if not header_name:
+                raise CustomHeaderValidationError(
+                    f"Invalid custom header at line {line_number}: header name is required"
+                )
+            if not HEADER_NAME_PATTERN.fullmatch(header_name):
+                raise CustomHeaderValidationError(
+                    f"Invalid custom header at line {line_number}: unsafe header name"
+                )
+            if not header_value:
+                raise CustomHeaderValidationError(
+                    f"Invalid custom header at line {line_number}: header value is required"
+                )
+            if any(ord(char) < 32 or ord(char) == 127 for char in header_value):
+                raise CustomHeaderValidationError(
+                    f"Invalid custom header at line {line_number}: unsafe header value"
+                )
+
+            headers.append((header_name, header_value))
+
+        return headers
+
+    @staticmethod
     def build(content: Dict) -> Dict:
         return {
             "smtp_hostname": content["smtp_hostname"],
@@ -46,4 +91,7 @@ class EmailPayloadBuilder:
             "bcc": EmailPayloadBuilder.parse_recipients(content.get("bcc")),
             "subject": content["subject"],
             "body": content["body"],
+            "custom_headers": EmailPayloadBuilder.parse_custom_headers(
+                content.get("custom_headers")
+            ),
         }

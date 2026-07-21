@@ -31,6 +31,7 @@ class EmailClient:
         bcc_emails: list[str],
         subject: str,
         body: str,
+        custom_headers: list[tuple[str, str]] | None = None,
         attachments: list[tuple[str, bytes]] | None = None,
     ) -> ExecutionResult:
         try:
@@ -48,6 +49,8 @@ class EmailClient:
             if cc_emails:
                 msg["Cc"] = ", ".join(cc_emails)
             msg["Subject"] = subject
+            for header_name, header_value in custom_headers or []:
+                msg[header_name] = header_value
             msg.attach(MIMEText(body, "plain"))
             for attachment_filename, attachment_content in attachments or []:
                 attachment_part = MIMEApplication(attachment_content)

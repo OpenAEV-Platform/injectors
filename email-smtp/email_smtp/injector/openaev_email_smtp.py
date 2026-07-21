@@ -59,6 +59,7 @@ class EmailSmtpInjector:
             bcc_emails=payload["bcc"],
             subject=payload["subject"],
             body=payload["body"],
+            custom_headers=payload["custom_headers"],
             attachments=attachments,
         )
         if result.success:

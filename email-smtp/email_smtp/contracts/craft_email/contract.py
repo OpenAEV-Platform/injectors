@@ -48,6 +48,12 @@ class CraftEmail:
             .optional(ContractText(key="bcc", label="Bcc (comma-separated emails)"))
             .mandatory(ContractText(key="subject", label="Subject"))
             .mandatory(ContractTextArea(key="body", label="Body"))
+            .optional(
+                ContractTextArea(
+                    key="custom_headers",
+                    label="Custom Headers (one per line: name: value)",
+                )
+            )
             .optional(attachment_field)
             .build_fields()
         )

@@ -1,3 +1,5 @@
+import pytest
+from email_smtp.models.exceptions import CustomHeaderValidationError
 from email_smtp.services.utils import EmailPayloadBuilder
 
 
@@ -33,6 +35,7 @@ def test_email_payload_builder():
     assert payload["bcc"] == ["bcc@example.com"]
     assert payload["subject"] == "Hello"
     assert payload["body"] == "World"
+    assert payload["custom_headers"] == []
 
 
 def test_email_payload_builder_defaults():
@@ -56,6 +59,7 @@ def test_email_payload_builder_defaults():
     assert payload["reply_to"] is None
     assert payload["cc"] == []
     assert payload["bcc"] == []
+    assert payload["custom_headers"] == []
 
 
 def test_email_payload_builder_empty_mail_from_falls_back_to_from():
@@ -140,3 +144,48 @@ def test_email_payload_builder_parse_bool_from_empty_string():
     payload = EmailPayloadBuilder.build(content)
 
     assert not payload["smtp_use_tls"]
+
+
+def test_email_payload_builder_parse_custom_headers():
+    content = {
+        "smtp_hostname": "smtp.example.com",
+        "smtp_port": "25",
+        "from": "sender@example.com",
+        "to": "recipient@example.com",
+        "subject": "Hello",
+        "body": "World",
+        "custom_headers": "X-OpenAEV-Test: true\nX-Trace-ID: 123",
+    }
+
+    payload = EmailPayloadBuilder.build(content)
+
+    assert payload["custom_headers"] == [
+        ("X-OpenAEV-Test", "true"),
+        ("X-Trace-ID", "123"),
+    ]
+
+
+@pytest.mark.parametrize(
+    "custom_headers,expected_message",
+    [
+        (" : true", "header name is required"),
+        ("unsafe header: true", "unsafe header name"),
+        ("X-OpenAEV-Test:", "header value is required"),
+        ("X-OpenAEV-Test: value\x00", "unsafe header value"),
+    ],
+)
+def test_email_payload_builder_rejects_unsafe_custom_headers(
+    custom_headers, expected_message
+):
+    content = {
+        "smtp_hostname": "smtp.example.com",
+        "smtp_port": "25",
+        "from": "sender@example.com",
+        "to": "recipient@example.com",
+        "subject": "Hello",
+        "body": "World",
+        "custom_headers": custom_headers,
+    }
+
+    with pytest.raises(CustomHeaderValidationError, match=expected_message):
+        EmailPayloadBuilder.build(content)

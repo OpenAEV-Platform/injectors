@@ -118,7 +118,8 @@ injector:
 
 Injects carry the message-specific fields: `from`, optional `mail_from`
 (SMTP envelope sender), optional `reply_to`, `to`, `subject`, `body`, optional
-`cc` and `bcc` (comma-separated email lists), and SMTP fields:
+`cc` and `bcc` (comma-separated email lists), optional `custom_headers` (one
+`name: value` header per line), and SMTP fields:
 `smtp_hostname`, `smtp_port`, `smtp_use_tls`, `smtp_username`,
 `smtp_password`. They can also carry optional attachments through the
 contract attachment field.
@@ -142,6 +143,7 @@ The injector registers a single contract labelled "Email (SMTP) - Craft email" i
 | Bcc           | `bcc`           | No        | Comma-separated list of Bcc recipients.                         |
 | Subject       | `subject`       | Yes       | Subject of the email.                                           |
 | Body          | `body`          | Yes       | Plain-text body of the email.                                   |
+| Custom Headers| `custom_headers`| No        | One custom header per line (`name: value`); unsafe headers are rejected. |
 | Attachments   | `attachments`   | No        | Inject documents sent as email attachments.                     |
 
 ## Target selection
@@ -159,7 +161,7 @@ flowchart LR
     I -->|status + message| O
 ```
 
-On each job the injector acknowledges reception, builds the MIME message (adding Cc, Bcc and any attached inject
+On each job the injector acknowledges reception, validates optional custom headers, builds the MIME message (adding Cc, Bcc, custom headers and any attached inject
 documents), connects to the SMTP server defined in the inject (with STARTTLS and authentication when configured),
 sends the email, and returns a success or error status to OpenAEV.
 

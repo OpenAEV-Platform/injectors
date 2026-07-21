@@ -2,7 +2,11 @@ from unittest.mock import patch
 
 import pytest
 from email_smtp.contracts import EmailContractId
-from email_smtp.models.exceptions import InvalidContractError, MissingRequiredFieldError
+from email_smtp.models.exceptions import (
+    CustomHeaderValidationError,
+    InvalidContractError,
+    MissingRequiredFieldError,
+)
 from email_smtp.services.email_client import ExecutionResult
 
 CONTRACT_ID = EmailContractId.CRAFT_EMAIL
@@ -63,6 +67,30 @@ def test_execute_sends_email_with_downloaded_attachments(
     ]
 
 
+@patch("email_smtp.injector.openaev_email_smtp.EmailClient.send_email")
+def test_execute_parses_and_forwards_custom_headers(
+    mock_send_email, email_smtp_injector
+):
+    mock_send_email.return_value = ExecutionResult(success=True, message="sent")
+    content = {
+        "smtp_hostname": "smtp.example.com",
+        "smtp_port": "25",
+        "from": "sender@example.com",
+        "to": "recipient@example.com",
+        "subject": "Subject",
+        "body": "Body",
+        "custom_headers": "X-OpenAEV-Test: true\nX-Trace-ID: abc-123",
+    }
+
+    result = email_smtp_injector.execute(_data(content=content))
+
+    assert result.success
+    assert mock_send_email.call_args.kwargs["custom_headers"] == [
+        ("X-OpenAEV-Test", "true"),
+        ("X-Trace-ID", "abc-123"),
+    ]
+
+
 def test_extract_attachments_requires_document_id(email_smtp_injector):
     with pytest.raises(MissingRequiredFieldError, match="missing a document_id"):
         email_smtp_injector._extract_attachments(
@@ -75,6 +103,33 @@ def test_extract_attachments_requires_document_id(email_smtp_injector):
                 ]
             )
         )
+
+
+@pytest.mark.parametrize(
+    "custom_headers,expected_message",
+    [
+        ("bad header: true", "unsafe header name"),
+        ("X-OpenAEV-Test:", "header value is required"),
+    ],
+)
+@patch("email_smtp.injector.openaev_email_smtp.EmailClient.send_email")
+def test_execute_rejects_unsafe_custom_headers(
+    mock_send_email, email_smtp_injector, custom_headers, expected_message
+):
+    content = {
+        "smtp_hostname": "smtp.example.com",
+        "smtp_port": "25",
+        "from": "sender@example.com",
+        "to": "recipient@example.com",
+        "subject": "Subject",
+        "body": "Body",
+        "custom_headers": custom_headers,
+    }
+
+    with pytest.raises(CustomHeaderValidationError, match=expected_message):
+        email_smtp_injector.execute(_data(content=content))
+
+    mock_send_email.assert_not_called()
 
 
 @patch("email_smtp.injector.openaev_email_smtp.EmailClient.send_email")
