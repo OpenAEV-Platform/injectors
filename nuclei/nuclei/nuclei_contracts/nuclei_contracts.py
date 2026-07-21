@@ -12,6 +12,7 @@ from pyoaev.contracts.contract_config import (
     ContractText,
     Expectation,
     ExpectationType,
+    SecurityPlatformType,
     SupportedLanguage,
     prepare_contracts,
 )
@@ -101,6 +102,11 @@ class NucleiContracts:
                 expectation_score=100,
                 expectation_expectation_group=False,
                 expectation_is_predefined=True,
+                expectation_expected_security_platform_types=[
+                    SecurityPlatformType.XDR,
+                    SecurityPlatformType.SIEM,
+                    SecurityPlatformType.NDR,
+                ],
             ),
             Expectation(
                 expectation_type=ExpectationType.prevention,
@@ -109,6 +115,10 @@ class NucleiContracts:
                 expectation_score=100,
                 expectation_expectation_group=False,
                 expectation_is_predefined=True,
+                expectation_expected_security_platform_types=[
+                    SecurityPlatformType.XDR,
+                    SecurityPlatformType.NDR,
+                ],
             ),
             Expectation(
                 expectation_type=ExpectationType.vulnerability,

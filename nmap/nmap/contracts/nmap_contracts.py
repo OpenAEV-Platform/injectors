@@ -15,6 +15,7 @@ from pyoaev.contracts.contract_config import (
     ContractText,
     Expectation,
     ExpectationType,
+    SecurityPlatformType,
     SupportedLanguage,
     prepare_contracts,
 )
@@ -109,6 +110,11 @@ class NmapContracts:
                 expectation_score=100,
                 expectation_expectation_group=False,
                 expectation_is_predefined=True,
+                expectation_expected_security_platform_types=[
+                    SecurityPlatformType.NDR,
+                    SecurityPlatformType.SIEM,
+                    SecurityPlatformType.XDR,
+                ],
             ),
             Expectation(
                 expectation_type=ExpectationType.prevention,
@@ -117,6 +123,10 @@ class NmapContracts:
                 expectation_score=100,
                 expectation_expectation_group=False,
                 expectation_is_predefined=True,
+                expectation_expected_security_platform_types=[
+                    SecurityPlatformType.NDR,
+                    SecurityPlatformType.XDR,
+                ],
             ),
         ]
         expectations = ContractExpectations(

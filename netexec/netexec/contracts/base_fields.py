@@ -9,6 +9,7 @@ from pyoaev.contracts.contract_config import (
     ContractText,
     Expectation,
     ExpectationType,
+    SecurityPlatformType,
 )
 from pyoaev.contracts.contract_utils import ContractCardinality
 
@@ -113,6 +114,11 @@ def build_core_fields() -> list[ContractElement]:
             expectation_score=100,
             expectation_expectation_group=False,
             expectation_is_predefined=True,
+            expectation_expected_security_platform_types=[
+                SecurityPlatformType.EDR,
+                SecurityPlatformType.XDR,
+                SecurityPlatformType.SIEM,
+            ],
         ),
         Expectation(
             expectation_type=ExpectationType.prevention,
@@ -121,6 +127,10 @@ def build_core_fields() -> list[ContractElement]:
             expectation_score=100,
             expectation_expectation_group=False,
             expectation_is_predefined=True,
+            expectation_expected_security_platform_types=[
+                SecurityPlatformType.EDR,
+                SecurityPlatformType.XDR,
+            ],
         ),
         Expectation(
             expectation_type=ExpectationType.vulnerability,

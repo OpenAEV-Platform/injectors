@@ -13,6 +13,7 @@ from pyoaev.contracts.contract_config import (
     ContractText,
     Expectation,
     ExpectationType,
+    SecurityPlatformType,
     SupportedLanguage,
     prepare_contracts,
 )
@@ -144,6 +145,10 @@ class AWSContracts:
                 expectation_score=100,
                 expectation_expectation_group=False,
                 expectation_is_predefined=True,
+                expectation_expected_security_platform_types=[
+                    SecurityPlatformType.SIEM,
+                    SecurityPlatformType.XDR,
+                ],
             )
         ]
         expectations = ContractExpectations(

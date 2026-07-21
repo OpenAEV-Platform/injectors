@@ -16,6 +16,7 @@ from pyoaev.contracts.contract_config import (
     ContractTuple,
     Expectation,
     ExpectationType,
+    SecurityPlatformType,
     SupportedLanguage,
     prepare_contracts,
 )
@@ -88,6 +89,11 @@ class HttpContracts:
                 expectation_score=100,
                 expectation_expectation_group=False,
                 expectation_is_predefined=True,
+                expectation_expected_security_platform_types=[
+                    SecurityPlatformType.XDR,
+                    SecurityPlatformType.SIEM,
+                    SecurityPlatformType.NDR,
+                ],
             ),
             Expectation(
                 expectation_type=ExpectationType.prevention,
@@ -96,6 +102,10 @@ class HttpContracts:
                 expectation_score=100,
                 expectation_expectation_group=False,
                 expectation_is_predefined=True,
+                expectation_expected_security_platform_types=[
+                    SecurityPlatformType.XDR,
+                    SecurityPlatformType.NDR,
+                ],
             ),
         ]
         expectations = ContractExpectations(
