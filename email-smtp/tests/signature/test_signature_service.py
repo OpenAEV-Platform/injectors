@@ -1,11 +1,13 @@
 """Unit tests for EmailSignatureService."""
 
+import hashlib
 from unittest.mock import Mock
 
 from email_smtp.services.signature_service import (
     RECIPIENT_EMAIL,
     REPLY_TO_EMAIL,
     SENDER_EMAIL,
+    URL_HASH,
     EmailSignatureService,
 )
 from pyoaev.signatures import ExtraSignatureData
@@ -171,6 +173,72 @@ class TestBuildEmailSignatures:
             "hidden@example.test",
         ]
         assert signatures[REPLY_TO_EMAIL] == ["reply@example.test"]
+
+
+def _sha256(url: str) -> str:
+    return hashlib.sha256(url.encode()).hexdigest()
+
+
+class TestUrlHashSignatures:
+    def test_text_body_with_url(self):
+        payload = {"from": "", "to": "", "body": "Visit https://example.com/path"}
+        signatures = EmailSignatureService.build_email_signatures(payload)
+        assert signatures[URL_HASH] == [_sha256("https://example.com/path")]
+
+    def test_html_body_with_url(self):
+        payload = {
+            "from": "",
+            "to": "",
+            "body": '<a href="https://evil.com/phish">Click here</a>',
+        }
+        signatures = EmailSignatureService.build_email_signatures(payload)
+        assert signatures[URL_HASH] == [_sha256("https://evil.com/phish")]
+
+    def test_multiple_urls_in_body(self):
+        payload = {
+            "from": "",
+            "to": "",
+            "body": "Links: https://first.com and http://second.org/page",
+        }
+        signatures = EmailSignatureService.build_email_signatures(payload)
+        assert len(signatures[URL_HASH]) == 2
+        assert _sha256("https://first.com") in signatures[URL_HASH]
+        assert _sha256("http://second.org/page") in signatures[URL_HASH]
+
+    def test_no_url_in_body(self):
+        payload = {"from": "", "to": "", "body": "No links here, just plain text."}
+        signatures = EmailSignatureService.build_email_signatures(payload)
+        assert URL_HASH not in signatures
+
+    def test_empty_body(self):
+        payload = {"from": "", "to": "", "body": ""}
+        signatures = EmailSignatureService.build_email_signatures(payload)
+        assert URL_HASH not in signatures
+
+    def test_no_body_key(self):
+        payload = {"from": "", "to": ""}
+        signatures = EmailSignatureService.build_email_signatures(payload)
+        assert URL_HASH not in signatures
+
+    def test_duplicate_urls_deduplicated(self):
+        payload = {
+            "from": "",
+            "to": "",
+            "body": "https://dup.com https://dup.com",
+        }
+        signatures = EmailSignatureService.build_email_signatures(payload)
+        assert signatures[URL_HASH] == [_sha256("https://dup.com")]
+
+    def test_url_hashes_combined_with_email_signatures(self):
+        payload = {
+            "from": "sender@test.com",
+            "to": "victim@test.com",
+            "body": "Click https://evil.com",
+        }
+        signatures = EmailSignatureService.build_email_signatures(payload)
+        assert signatures[SENDER_EMAIL] == ["sender@test.com"]
+        assert signatures[RECIPIENT_EMAIL] == ["victim@test.com"]
+        assert signatures[URL_HASH] == [_sha256("https://evil.com")]
 
 
 class TestSendSignatures:
