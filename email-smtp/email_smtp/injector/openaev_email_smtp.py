@@ -1,3 +1,4 @@
+import json
 import time
 from typing import Dict, List, Tuple
 
@@ -9,7 +10,9 @@ from email_smtp.models.exceptions import (
     MissingRequiredFieldError,
 )
 from email_smtp.services import EmailClient, EmailPayloadBuilder, ExecutionResult
+from email_smtp.services.signature_service import EmailSignatureService
 from pyoaev.helpers import OpenAEVInjectorHelper
+from pyoaev.signatures import SignatureManager
 
 from injector_common.data_helpers import DataHelpers
 
@@ -21,6 +24,9 @@ class EmailSmtpInjector:
         """Initialize the Injector with necessary configurations."""
         self.config = config
         self.helper = helper
+        self.signature_service = EmailSignatureService(
+            SignatureManager(self.helper.api)
+        )
         self.helper.injector_logger.info(f"{LOG_PREFIX} - Email injector initialized")
 
     def execute(self, data: Dict) -> ExecutionResult:
@@ -131,11 +137,16 @@ class EmailSmtpInjector:
             inject_id=inject_id, data={"tracking_total_count": 1}
         )
 
+        execution_details = self.signature_service.build_execution_details()
+        execution_signature = self.signature_service.build_execution_signature()
+
         try:
             result = self.execute(data)
 
+            output_structured = self._build_output_structured(data)
             callback_data = {
                 "execution_message": result.message,
+                "execution_output_structured": json.dumps(output_structured),
                 "execution_status": "SUCCESS" if result.success else "ERROR",
                 "execution_duration": int(time.time() - start),
                 "execution_action": "complete",
@@ -155,6 +166,10 @@ class EmailSmtpInjector:
                     {"inject_id": inject_id, "error": result.message},
                 )
 
+            self.signature_service.post_execution_updates(
+                execution_details, execution_signature, success=result.success
+            )
+
         except Exception as err:
             callback_data = {
                 "execution_message": str(err),
@@ -167,6 +182,40 @@ class EmailSmtpInjector:
             )
             self.helper.injector_logger.error(
                 f"{LOG_PREFIX} - Unexpected error while processing inject",
+                {"inject_id": inject_id, "error": str(err)},
+            )
+
+            self.signature_service.post_execution_updates(
+                execution_details, execution_signature, success=False
+            )
+
+        self._send_signatures(inject_id, execution_details, execution_signature)
+
+    @staticmethod
+    def _build_output_structured(data: Dict) -> Dict:
+        """Build the contract output structure with the recipient email address."""
+        content = DataHelpers.get_content(data)
+        to_address = content.get("to", "")
+        return {"expectation_signatures": [to_address]} if to_address else {}
+
+    def _send_signatures(
+        self,
+        inject_id: str,
+        execution_details,
+        execution_signature,
+    ) -> None:
+        """Send signature data to the platform. Errors are logged, never raised."""
+        try:
+            self.signature_service.send_signatures(
+                inject_id, execution_details, execution_signature
+            )
+            self.helper.injector_logger.info(
+                f"{LOG_PREFIX} - Signatures sent",
+                {"inject_id": inject_id},
+            )
+        except Exception as err:
+            self.helper.injector_logger.error(
+                f"{LOG_PREFIX} - Failed to send signatures",
                 {"inject_id": inject_id, "error": str(err)},
             )
 

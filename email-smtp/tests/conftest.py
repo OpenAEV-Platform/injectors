@@ -3,6 +3,7 @@
 from unittest.mock import Mock, patch
 
 from email_smtp.injector.openaev_email_smtp import EmailSmtpInjector
+from email_smtp.services.signature_service import EmailSignatureService
 from pytest import fixture
 
 
@@ -40,8 +41,18 @@ def disable_config_yml():
 
 @fixture
 def email_smtp_injector() -> EmailSmtpInjector:
-    """Provide an EmailSmtpInjector with mocked config and helper."""
+    """Provide an EmailSmtpInjector with mocked config, helper, and signature service."""
     mock_config = Mock()
     mock_helper = Mock()
 
-    return EmailSmtpInjector(config=mock_config, helper=mock_helper)
+    with patch(
+        "email_smtp.injector.openaev_email_smtp.SignatureManager"
+    ) as mock_sm_cls:
+        mock_sm = mock_sm_cls.return_value
+        injector = EmailSmtpInjector(config=mock_config, helper=mock_helper)
+
+    # The signature service wraps the mocked SignatureManager
+    assert isinstance(injector.signature_service, EmailSignatureService)
+    assert injector.signature_service._sm is mock_sm
+
+    return injector

@@ -148,3 +148,157 @@ def test_process_message_reports_execution_status(mock_send_email, email_smtp_in
     )
     assert callback_data["execution_status"] == "ERROR"
     assert callback_data["execution_message"] == "failed"
+
+
+# ---------------------------------------------------------------------------
+# SignatureExpectation integration tests
+# ---------------------------------------------------------------------------
+
+
+@patch("email_smtp.injector.openaev_email_smtp.EmailClient.send_email")
+def test_process_message_sends_signatures_on_success(
+    mock_send_email, email_smtp_injector
+):
+    """Successful execution sends SignatureExpectation data to the platform."""
+    mock_send_email.return_value = ExecutionResult(
+        success=True, message="Email crafted successfully for recipient@example.com"
+    )
+
+    email_smtp_injector.process_message(_data())
+
+    sig_service = email_smtp_injector.signature_service
+    sig_service._sm.post_execution_updates.assert_called_once()
+    sig_service._sm.build_payload.assert_called_once()
+    sig_service._sm.send_signatures.assert_called_once()
+
+    # Verify build_payload was called with DETECTION expectation type
+    build_call = sig_service._sm.build_payload.call_args
+    assert build_call.kwargs["expectation_types"] == ["DETECTION"]
+
+
+@patch("email_smtp.injector.openaev_email_smtp.EmailClient.send_email")
+def test_process_message_sends_signatures_on_email_failure(
+    mock_send_email, email_smtp_injector
+):
+    """Failed email send still reports signatures (with error info)."""
+    mock_send_email.return_value = ExecutionResult(
+        success=False, message="Connection refused"
+    )
+
+    email_smtp_injector.process_message(_data())
+
+    sig_service = email_smtp_injector.signature_service
+    sig_service._sm.send_signatures.assert_called_once()
+
+    # post_execution_updates should have been called with error tool_output
+    post_call = sig_service._sm.post_execution_updates.call_args
+    tool_output = post_call[0][2]
+    assert tool_output["error_info"]["exit_code"] == 1
+
+
+@patch("email_smtp.injector.openaev_email_smtp.EmailClient.send_email")
+def test_process_message_sends_signatures_on_exception(
+    mock_send_email, email_smtp_injector
+):
+    """Unhandled exception still sends signatures with error info."""
+    mock_send_email.side_effect = RuntimeError("unexpected")
+
+    email_smtp_injector.process_message(_data())
+
+    sig_service = email_smtp_injector.signature_service
+    sig_service._sm.send_signatures.assert_called_once()
+
+    post_call = sig_service._sm.post_execution_updates.call_args
+    tool_output = post_call[0][2]
+    assert tool_output["error_info"]["exit_code"] == 1
+
+
+@patch("email_smtp.injector.openaev_email_smtp.EmailClient.send_email")
+def test_process_message_sends_empty_extra_signatures(
+    mock_send_email, email_smtp_injector
+):
+    """Base implementation sends no extra signature indicators (explicit empty)."""
+    mock_send_email.return_value = ExecutionResult(success=True, message="sent")
+
+    email_smtp_injector.process_message(_data())
+
+    sig_service = email_smtp_injector.signature_service
+    build_call = sig_service._sm.build_payload.call_args
+    extra = build_call.kwargs["extra_signatures"]
+    assert extra.detection == {}
+    assert extra.prevention == {}
+    assert extra.vulnerability == {}
+
+
+@patch("email_smtp.injector.openaev_email_smtp.EmailClient.send_email")
+def test_process_message_signature_send_failure_does_not_crash(
+    mock_send_email, email_smtp_injector
+):
+    """Signature transmission failure is logged but does not raise."""
+    mock_send_email.return_value = ExecutionResult(success=True, message="sent")
+    sig_service = email_smtp_injector.signature_service
+    sig_service._sm.send_signatures.side_effect = Exception("network error")
+
+    # Should not raise
+    email_smtp_injector.process_message(_data())
+
+    # Execution callback was still sent successfully
+    callback_data = (
+        email_smtp_injector.helper.api.inject.execution_callback.call_args.kwargs[
+            "data"
+        ]
+    )
+    assert callback_data["execution_status"] == "SUCCESS"
+
+
+# ---------------------------------------------------------------------------
+# Contract output tests
+# ---------------------------------------------------------------------------
+
+
+@patch("email_smtp.injector.openaev_email_smtp.EmailClient.send_email")
+def test_process_message_includes_to_address_in_output_structured(
+    mock_send_email, email_smtp_injector
+):
+    """Execution callback includes the 'to' address in output_structured."""
+    mock_send_email.return_value = ExecutionResult(success=True, message="sent")
+
+    email_smtp_injector.process_message(_data())
+
+    callback_data = (
+        email_smtp_injector.helper.api.inject.execution_callback.call_args.kwargs[
+            "data"
+        ]
+    )
+    import json
+
+    output = json.loads(callback_data["execution_output_structured"])
+    assert output == {"expectation_signatures": ["recipient@example.com"]}
+
+
+@patch("email_smtp.injector.openaev_email_smtp.EmailClient.send_email")
+def test_process_message_output_structured_empty_when_no_to(
+    mock_send_email, email_smtp_injector
+):
+    """When 'to' is empty, output_structured is explicitly empty."""
+    mock_send_email.return_value = ExecutionResult(success=True, message="sent")
+    content = {
+        "smtp_hostname": "smtp.example.com",
+        "smtp_port": "25",
+        "from": "sender@example.com",
+        "to": "",
+        "subject": "Subject",
+        "body": "Body",
+    }
+
+    email_smtp_injector.process_message(_data(content=content))
+
+    callback_data = (
+        email_smtp_injector.helper.api.inject.execution_callback.call_args.kwargs[
+            "data"
+        ]
+    )
+    import json
+
+    output = json.loads(callback_data["execution_output_structured"])
+    assert output == {}
