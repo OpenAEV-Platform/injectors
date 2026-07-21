@@ -43,6 +43,7 @@ def disable_config_yml():
 def email_smtp_injector() -> EmailSmtpInjector:
     """Provide an EmailSmtpInjector with mocked config, helper, and signature service."""
     mock_config = Mock()
+    mock_config.injector.hash_algorithm = "sha256"
     mock_helper = Mock()
 
     with patch(

@@ -27,6 +27,13 @@ class InjectorConfigOverride(ConfigLoaderCollector):
             "Options: debug, info, warning, error, or critical."
         ),
     )
+    hash_algorithm: Literal["sha256", "sha1", "md5"] = Field(
+        default="sha256",
+        description=(
+            "Hash algorithm used for signature generation "
+            "(URL hashes, attachment hashes). Options: sha256, sha1, md5."
+        ),
+    )
 
     def to_daemon_config(self) -> Configuration:
         return Configuration(

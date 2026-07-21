@@ -7,3 +7,4 @@ injector:
   id: 'changeme'
   name: 'Email (SMTP)'
   log_level: 'error'
+  # hash_algorithm: 'sha256'  # Hash algorithm for signatures (sha256, sha1, md5)
