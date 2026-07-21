@@ -170,9 +170,15 @@ class Targets:
                     targets.append(target)
                     ip_to_asset_id_map[target] = asset_id
                 else:
+                    hostname_value = asset.get("asset_hostname") or asset.get(
+                        "endpoint_hostname"
+                    )
+                    ips_value = (
+                        asset.get("asset_ips") or asset.get("endpoint_ips") or []
+                    )
                     helper.injector_logger.warning(
                         f"No valid target found for asset_id={asset.get('asset_id')} "
-                        f"(hostname={asset.get('asset_hostname')}, ips={asset.get('asset_ips')})"
+                        f"(hostname={hostname_value}, ips={ips_value})"
                     )
 
             except Exception as e:
@@ -191,14 +197,14 @@ class Targets:
                 return result
 
         elif selector == "seen_ip":
-            seen_ip = asset.get("asset_seen_ip")
+            seen_ip = asset.get("asset_seen_ip") or asset.get("endpoint_seen_ip")
             if Targets.is_valid_ip(seen_ip):
                 return seen_ip, asset_id
             else:
                 return None
 
         elif selector == "local_ip":
-            asset_ips = asset.get("asset_ips") or []
+            asset_ips = asset.get("asset_ips") or asset.get("endpoint_ips") or []
             # Validate each IP
             for ip in asset_ips:
                 if Targets.is_valid_ip(ip):
@@ -207,7 +213,7 @@ class Targets:
             return None
 
         elif selector == "hostname":
-            hostname = asset.get("asset_hostname")
+            hostname = asset.get("asset_hostname") or asset.get("endpoint_hostname")
             if hostname:
                 return hostname, asset_id
 
@@ -233,9 +239,9 @@ class Targets:
         - Otherwise => first valid IP
         """
         asset_id = asset.get("asset_id")
-        agents = asset.get("asset_agents", [])
-        hostname = asset.get("asset_hostname")
-        asset_ips = asset.get("asset_ips", [])
+        agents = asset.get("asset_agents") or []
+        hostname = asset.get("asset_hostname") or asset.get("endpoint_hostname")
+        asset_ips = asset.get("asset_ips") or asset.get("endpoint_ips") or []
 
         # Case 1: Agentless + hostname
         if not agents and hostname:
