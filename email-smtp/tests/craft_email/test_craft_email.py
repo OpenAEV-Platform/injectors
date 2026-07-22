@@ -133,9 +133,7 @@ def test_execute_rejects_unsafe_custom_headers(
 
 
 @patch("email_smtp.injector.openaev_email_smtp.EmailClient.send_email")
-def test_process_message_reports_execution_status(
-    mock_send_email, email_smtp_injector
-):
+def test_process_message_reports_execution_status(mock_send_email, email_smtp_injector):
     mock_send_email.return_value = ExecutionResult(success=False, message="failed")
 
     email_smtp_injector.process_message(_data())
