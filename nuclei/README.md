@@ -183,9 +183,9 @@ Targets are resolved through the shared selection logic of `injector_common`:
 | Target property   | Asset field used                                   |
 |-------------------|----------------------------------------------------|
 | Automatic         | Hostname for agentless assets, else first valid IP |
-| Seen IP           | `endpoint_seen_ip`                                 |
-| Local IP (first)  | First valid entry in `endpoint_ips`                |
-| Hostname          | `endpoint_hostname`                                |
+| Seen IP           | `asset_seen_ip`                                    |
+| Local IP (first)  | First valid entry in `asset_ips`                   |
+| Hostname          | `asset_hostname`                                   |
 
 For manual targets, provide hostnames or IP addresses as comma-separated values. Invalid, loopback, unspecified and
 link-local addresses are filtered out.

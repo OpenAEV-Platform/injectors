@@ -40,9 +40,9 @@ class TestShodanInjector(unittest.TestCase):
         }
         asset_one = {
             "asset_id": "asset-one-id",
-            "endpoint_hostname": "endpoint.hostname.local",
-            "endpoint_ips": ["5.6.7.8"],
-            "endpoint_seen_ip": "5.6.7.8",
+            "asset_hostname": "endpoint.hostname.local",
+            "asset_ips": ["5.6.7.8"],
+            "asset_seen_ip": "5.6.7.8",
         }
         assets = [asset_zero, asset_one]
 
@@ -92,7 +92,7 @@ class TestShodanInjector(unittest.TestCase):
         }
         asset_one = {
             "asset_id": "asset-one-id",
-            "endpoint_hostname": "endpoint.hostname.local",
+            "asset_hostname": "endpoint.hostname.local",
         }
         assets = [asset_zero, asset_one]
 
@@ -140,7 +140,7 @@ class TestShodanInjector(unittest.TestCase):
         }
         asset_one = {
             "asset_id": "asset-one-id",
-            "endpoint_ips": ["5.6.7.8"],
+            "asset_ips": ["5.6.7.8"],
         }
         assets = [asset_zero, asset_one]
 
@@ -186,7 +186,7 @@ class TestShodanInjector(unittest.TestCase):
         }
         asset_one = {
             "asset_id": "asset-one-id",
-            "endpoint_seen_ip": "5.6.7.8",
+            "asset_seen_ip": "5.6.7.8",
         }
         assets = [asset_zero, asset_one]
 
