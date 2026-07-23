@@ -112,9 +112,9 @@ class ContractType(str, Enum):
 
 class AssetsType(BaseModel):
     asset_id: str
-    endpoint_hostname: str | None
-    endpoint_ips: list[str]
-    endpoint_seen_ip: str | None
+    asset_hostname: str | None
+    asset_ips: list[str]
+    asset_seen_ip: str | None
 
 
 class TargetsType(BaseModel):
