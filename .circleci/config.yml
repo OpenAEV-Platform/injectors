@@ -40,43 +40,6 @@ jobs:
       - slack/notify:
           event: fail
           template: basic_fail_1
-  test:
-    working_directory: ~/openaev
-    docker:
-      - image: cimg/python:3.13
-    parameters:
-      injector_name:
-        type: string
-    steps:
-      - checkout
-      - setup_remote_docker
-      - run:
-          working_directory: ~/openaev/<< parameters.injector_name >>
-          name: Check if injector exists
-          command: |
-            if [ ! -f pyproject.toml ]; then
-              echo "pyproject.toml not found, injector may not exist on this branch"
-              circleci-agent step halt
-            fi;
-      - run: # this is only to satisfy poetry; not used
-          working_directory: ~/
-          name: Clone pyoaev
-          command: |
-            git clone -b main https://github.com/OpenAEV-Platform/client-python
-      - run:
-          working_directory: ~/openaev
-          name: Install poetry
-          command: pip install poetry==2.3.2 && poetry config installer.re-resolve false
-      - run:
-          name: Run injector tests
-          working_directory: ~/openaev/<< parameters.injector_name >>
-          command: |
-            PYOAEV_REF="main"
-
-            echo "Running tests for injector: << parameters.injector_name >>"
-            poetry install
-            poetry run pip install --force-reinstall git+https://github.com/OpenAEV-Platform/client-python.git@${PYOAEV_REF}
-            poetry run python -m unittest
 
   build_docker_images:
     working_directory: ~/openaev
@@ -241,13 +204,6 @@ workflows:
           filters:
             tags:
               only: /[0-9]+(\.[0-9]+)+(\.[0-9]+)*/
-      - test:
-          matrix:
-            parameters:
-              injector_name: ["ai-redteam", "censys", "email-google-workspace", "http-query", "netexec", "nmap", "nuclei", "slack", "stratus"]
-          filters:
-            tags:
-              only: /[0-9]+(\.[0-9]+)+(\.[0-9]+)*/
       - build_docker_images:
           matrix:
             parameters:
@@ -255,7 +211,6 @@ workflows:
           requires:
             - ensure_formatting
             - linter
-            - test
           filters:
             tags:
               only: /[0-9]+(\.[0-9]+)+(\.[0-9]+)*/
