@@ -36,6 +36,6 @@ class InjectorConfigOverride(ConfigLoaderCollector):
     )
 
     def to_daemon_config(self) -> Configuration:
-        return Configuration(
-            config_base_model=self,
+        return Configuration(  # ty: ignore[missing-argument]
+            config_base_model=self,  # ty: ignore[invalid-argument-type]
         )

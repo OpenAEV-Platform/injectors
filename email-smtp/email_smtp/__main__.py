@@ -25,9 +25,10 @@ def main() -> None:
         intercept_dump_argument(config.to_daemon_config())
 
         # Load the injector icon for the helper
+        icon_path = config.injector.icon_filepath
         icon_bytes = (
-            Path(__file__).parents[1] / config.injector.icon_filepath
-        ).read_bytes()
+            (Path(__file__).parents[1] / icon_path).read_bytes() if icon_path else None
+        )
 
         # Instantiate the OpenAEV injector helper
         helper = OpenAEVInjectorHelper(

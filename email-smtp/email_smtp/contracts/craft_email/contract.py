@@ -86,5 +86,7 @@ class CraftEmail:
             fields=contract_with_specific_fields,
             outputs=contract_with_specific_outputs,
             manual=False,
-            domains=[SecurityDomains.TABLE_TOP.value],
+            domains=[
+                SecurityDomains.TABLE_TOP.value
+            ],  # ty: ignore[invalid-argument-type]
         )

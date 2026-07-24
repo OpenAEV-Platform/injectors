@@ -5,6 +5,7 @@ from unittest.mock import Mock
 
 from email_smtp.services.signature_service import (
     ATTACHMENT_HASH,
+    CUSTOM_HEADER,
     RECIPIENT_EMAIL,
     REPLY_TO_EMAIL,
     SENDER_EMAIL,
@@ -341,6 +342,57 @@ class TestHashAlgorithmConfig:
         )
         assert signatures[URL_HASH] == [_sha256("https://example.com")]
         assert signatures[ATTACHMENT_HASH] == [_hash_bytes(b"bin", "sha256")]
+
+
+class TestCustomHeaderSignatures:
+    def test_single_custom_header(self):
+        payload = {"from": "", "to": "", "custom_headers": [("X-Track", "abc123")]}
+        signatures = EmailSignatureService.build_email_signatures(payload)
+        assert signatures[CUSTOM_HEADER] == ["X-Track: abc123"]
+
+    def test_multiple_custom_headers(self):
+        payload = {
+            "from": "",
+            "to": "",
+            "custom_headers": [
+                ("X-Track", "abc123"),
+                ("X-Campaign", "summer"),
+                ("X-Mailer", "openaev"),
+            ],
+        }
+        signatures = EmailSignatureService.build_email_signatures(payload)
+        assert signatures[CUSTOM_HEADER] == [
+            "X-Track: abc123",
+            "X-Campaign: summer",
+            "X-Mailer: openaev",
+        ]
+
+    def test_no_custom_headers(self):
+        payload = {"from": "", "to": "", "custom_headers": []}
+        signatures = EmailSignatureService.build_email_signatures(payload)
+        assert CUSTOM_HEADER not in signatures
+
+    def test_no_custom_headers_key(self):
+        payload = {"from": "", "to": ""}
+        signatures = EmailSignatureService.build_email_signatures(payload)
+        assert CUSTOM_HEADER not in signatures
+
+    def test_combined_with_other_signatures(self):
+        payload = {
+            "from": "sender@test.com",
+            "to": "victim@test.com",
+            "body": "Visit https://evil.com",
+            "custom_headers": [("X-Track", "id1")],
+        }
+        attachments = [("doc.pdf", b"content")]
+        signatures = EmailSignatureService.build_email_signatures(
+            payload, attachments=attachments
+        )
+        assert SENDER_EMAIL in signatures
+        assert RECIPIENT_EMAIL in signatures
+        assert URL_HASH in signatures
+        assert ATTACHMENT_HASH in signatures
+        assert signatures[CUSTOM_HEADER] == ["X-Track: id1"]
 
 
 class TestSendSignatures:
