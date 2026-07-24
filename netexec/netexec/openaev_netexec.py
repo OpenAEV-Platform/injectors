@@ -15,6 +15,7 @@ from injector_common.constants import TARGET_PROPERTY_SELECTOR_KEY, TARGET_SELEC
 from injector_common.data_helpers import DataHelpers
 from injector_common.dump_config import intercept_dump_argument
 from injector_common.targets import TargetProperty, Targets
+from injector_common.traces import send_per_target_traces
 from netexec.configuration.config_loader import ConfigLoader
 from netexec.contracts import parse_contract_id
 from netexec.helpers.netexec_command_builder import (
@@ -157,6 +158,16 @@ class OpenAEVNetExecInjector:
         self.helper.api.inject.execution_callback(
             inject_id=inject_id,
             data=callback_data,
+        )
+
+        # Per-target traces so each asset-backed endpoint's result view shows the
+        # run reached it; the batched run only sends a global callback otherwise.
+        send_per_target_traces(
+            self.helper,
+            inject_id,
+            target_results.ip_to_asset_id_map,
+            label="NetExec",
+            start=start,
         )
 
         output_file = parsed_data.get("output_file") if parsed_data else None
