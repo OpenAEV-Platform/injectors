@@ -22,8 +22,6 @@ class ConfigLoader(SettingsLoader):
                 "injector_name": {"data": self.injector.name},
                 "injector_type": {"data": "openaev_censys"},
                 "injector_contracts": {"data": CensysContracts.build_contract()},
-                # Source-declared publisher of this injector's contracts.
-                "injector_author": {"data": "Filigran"},
                 "injector_log_level": {"data": self.injector.log_level},
                 "injector_icon_filepath": {"data": self.injector.icon_filepath},
             },
