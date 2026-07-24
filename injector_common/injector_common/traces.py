@@ -7,7 +7,7 @@ from pyoaev.helpers import OpenAEVInjectorHelper
 def send_per_target_traces(
     helper: OpenAEVInjectorHelper,
     inject_id: str,
-    ip_to_asset_id_map: Optional[Dict[str, str]],
+    ip_to_asset_id_map: Optional[Dict[str, Optional[str]]],
     *,
     label: str,
     start: float,
@@ -22,17 +22,18 @@ def send_per_target_traces(
     ``execution_context_identifiers`` so the platform lists it under that target's
     execution timeline.
 
-    Manual/inline targets have no asset id (they are absent from
-    ``ip_to_asset_id_map``) and are therefore skipped - their output already
-    appears in the global completion trace. The ``command_execution`` action keeps
-    these traces intermediate so they never trigger the terminal-completion
-    handling reserved for the final aggregated ``complete`` callback, which the
-    caller still sends globally.
+    Targets without an asset id are skipped - either because they are absent from
+    ``ip_to_asset_id_map`` (manual/inline targets) or because their mapped asset id
+    is missing/empty; their output already appears in the global completion trace.
+    The ``command_execution`` action keeps these traces intermediate so they never
+    trigger the terminal-completion handling reserved for the final aggregated
+    ``complete`` callback, which the caller still sends globally.
     """
     if not ip_to_asset_id_map:
         return
     logger = helper.injector_logger
     duration = int(time.time() - start)
+    sent = 0
     for target, asset_id in ip_to_asset_id_map.items():
         if not asset_id:
             continue
@@ -47,7 +48,10 @@ def send_per_target_traces(
                     "execution_context_identifiers": [asset_id],
                 },
             )
-            logger.info(
+            sent += 1
+            # Per-target detail stays at DEBUG: an asset group can resolve to
+            # hundreds of targets, so one INFO line each would flood the logs.
+            logger.debug(
                 f"Per-target execution trace sent for inject {inject_id} "
                 f"(target '{target}', asset {asset_id})"
             )
@@ -56,3 +60,5 @@ def send_per_target_traces(
                 f"Failed to send per-target execution trace for inject {inject_id} "
                 f"(target '{target}', asset {asset_id}): {exc}"
             )
+    if sent:
+        logger.info(f"Sent {sent} per-target execution trace(s) for inject {inject_id}")

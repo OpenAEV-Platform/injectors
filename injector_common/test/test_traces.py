@@ -34,6 +34,15 @@ class SendPerTargetTracesTest(TestCase):
                 "nmap scan executed against target", data["execution_message"]
             )
 
+        # Per-target detail is logged at DEBUG (one line per asset); only a single
+        # INFO summary line is emitted so large batched scans do not flood the logs.
+        self.assertEqual(self.helper.injector_logger.debug.call_count, 2)
+        self.helper.injector_logger.info.assert_called_once()
+        self.assertIn(
+            "Sent 2 per-target execution trace(s) for inject inject-1",
+            self.helper.injector_logger.info.call_args.args[0],
+        )
+
     def test_skips_targets_without_asset_id(self):
         send_per_target_traces(
             self.helper,
@@ -57,6 +66,8 @@ class SendPerTargetTracesTest(TestCase):
             self.helper, "inject-1", None, label="nmap scan", start=0.0
         )
         self.helper.api.inject.execution_callback.assert_not_called()
+        # Nothing sent -> no summary line either.
+        self.helper.injector_logger.info.assert_not_called()
 
     def test_one_target_failure_does_not_stop_the_others(self):
         # A callback failure for one target must be logged but must not prevent
