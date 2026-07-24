@@ -4,6 +4,7 @@ import hashlib
 from unittest.mock import Mock
 
 from email_smtp.services.signature_service import (
+    ATTACHMENT_HASH,
     RECIPIENT_EMAIL,
     REPLY_TO_EMAIL,
     SENDER_EMAIL,
@@ -239,6 +240,107 @@ class TestUrlHashSignatures:
         assert signatures[SENDER_EMAIL] == ["sender@test.com"]
         assert signatures[RECIPIENT_EMAIL] == ["victim@test.com"]
         assert signatures[URL_HASH] == [_sha256("https://evil.com")]
+
+
+def _hash_bytes(data: bytes, algorithm: str = "sha256") -> str:
+    return hashlib.new(algorithm, data).hexdigest()
+
+
+class TestAttachmentHashSignatures:
+    def test_single_attachment(self):
+        payload = {"from": "", "to": ""}
+        attachments = [("file.pdf", b"pdf-content")]
+        signatures = EmailSignatureService.build_email_signatures(
+            payload, attachments=attachments
+        )
+        assert signatures[ATTACHMENT_HASH] == [_hash_bytes(b"pdf-content")]
+
+    def test_multiple_attachments(self):
+        payload = {"from": "", "to": ""}
+        attachments = [
+            ("a.txt", b"content-a"),
+            ("b.txt", b"content-b"),
+            ("c.txt", b"content-c"),
+        ]
+        signatures = EmailSignatureService.build_email_signatures(
+            payload, attachments=attachments
+        )
+        assert len(signatures[ATTACHMENT_HASH]) == 3
+        assert signatures[ATTACHMENT_HASH][0] == _hash_bytes(b"content-a")
+        assert signatures[ATTACHMENT_HASH][1] == _hash_bytes(b"content-b")
+        assert signatures[ATTACHMENT_HASH][2] == _hash_bytes(b"content-c")
+
+    def test_no_attachments(self):
+        payload = {"from": "", "to": ""}
+        signatures = EmailSignatureService.build_email_signatures(payload)
+        assert ATTACHMENT_HASH not in signatures
+
+    def test_empty_attachment_list(self):
+        payload = {"from": "", "to": ""}
+        signatures = EmailSignatureService.build_email_signatures(
+            payload, attachments=[]
+        )
+        assert ATTACHMENT_HASH not in signatures
+
+    def test_combined_with_email_and_url_signatures(self):
+        payload = {
+            "from": "sender@test.com",
+            "to": "victim@test.com",
+            "body": "Click https://evil.com",
+        }
+        attachments = [("malware.exe", b"malicious")]
+        signatures = EmailSignatureService.build_email_signatures(
+            payload, attachments=attachments
+        )
+        assert SENDER_EMAIL in signatures
+        assert RECIPIENT_EMAIL in signatures
+        assert URL_HASH in signatures
+        assert signatures[ATTACHMENT_HASH] == [_hash_bytes(b"malicious")]
+
+
+class TestHashAlgorithmConfig:
+    def test_url_hash_with_sha1(self):
+        payload = {"from": "", "to": "", "body": "Visit https://example.com"}
+        signatures = EmailSignatureService.build_email_signatures(
+            payload, hash_algorithm="sha1"
+        )
+        expected = hashlib.sha1("https://example.com".encode()).hexdigest()
+        assert signatures[URL_HASH] == [expected]
+
+    def test_url_hash_with_md5(self):
+        payload = {"from": "", "to": "", "body": "Visit https://example.com"}
+        signatures = EmailSignatureService.build_email_signatures(
+            payload, hash_algorithm="md5"
+        )
+        expected = hashlib.md5("https://example.com".encode()).hexdigest()
+        assert signatures[URL_HASH] == [expected]
+
+    def test_attachment_hash_with_sha1(self):
+        payload = {"from": "", "to": ""}
+        attachments = [("file.txt", b"data")]
+        signatures = EmailSignatureService.build_email_signatures(
+            payload, attachments=attachments, hash_algorithm="sha1"
+        )
+        expected = hashlib.sha1(b"data").hexdigest()
+        assert signatures[ATTACHMENT_HASH] == [expected]
+
+    def test_attachment_hash_with_md5(self):
+        payload = {"from": "", "to": ""}
+        attachments = [("file.txt", b"data")]
+        signatures = EmailSignatureService.build_email_signatures(
+            payload, attachments=attachments, hash_algorithm="md5"
+        )
+        expected = hashlib.md5(b"data").hexdigest()
+        assert signatures[ATTACHMENT_HASH] == [expected]
+
+    def test_default_algorithm_is_sha256(self):
+        payload = {"from": "", "to": "", "body": "https://example.com"}
+        attachments = [("f.bin", b"bin")]
+        signatures = EmailSignatureService.build_email_signatures(
+            payload, attachments=attachments
+        )
+        assert signatures[URL_HASH] == [_sha256("https://example.com")]
+        assert signatures[ATTACHMENT_HASH] == [_hash_bytes(b"bin", "sha256")]
 
 
 class TestSendSignatures:
