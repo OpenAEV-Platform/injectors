@@ -15,3 +15,8 @@ class InjectorConfigOverride(ConfigLoaderCollector):
         default="aws/img/icon-aws.png",
         description="Path to the icon file",
     )
+    author: str | None = Field(
+        default=None,
+        description="Optional author override for this injector's contracts. "
+        "When absent, the platform attributes them to the injector's name.",
+    )

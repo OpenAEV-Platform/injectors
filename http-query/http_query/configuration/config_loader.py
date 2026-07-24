@@ -20,8 +20,9 @@ class ConfigLoader(SettingsLoader):
                 "injector_name": {"data": self.injector.name},
                 "injector_type": {"data": "openaev_http_query"},
                 "injector_contracts": {"data": HttpContracts.build_contract()},
-                # Source-declared publisher of this injector's contracts.
-                "injector_author": {"data": "Filigran"},
+                # Optional author override; None lets the platform attribute
+                # the contracts to the injector's name.
+                "injector_author": {"data": self.injector.author},
                 "injector_log_level": {"data": self.injector.log_level},
                 "injector_icon_filepath": {"data": self.injector.icon_filepath},
             },
