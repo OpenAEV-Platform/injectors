@@ -168,6 +168,61 @@ def test_send_email_with_multiple_attachments():
         assert attachment_parts == ["a.txt", "b.txt"]
 
 
+def test_send_email_with_one_custom_header():
+    with patch("smtplib.SMTP") as mock_smtp:
+        instance = mock_smtp.return_value.__enter__.return_value
+
+        result = EmailClient.send_email(
+            smtp_hostname="localhost",
+            smtp_port=1025,
+            smtp_use_tls=False,
+            smtp_username=None,
+            smtp_password=None,
+            from_email="from@example.com",
+            mail_from="from@example.com",
+            reply_to=None,
+            to_email="to@example.com",
+            cc_emails=[],
+            bcc_emails=[],
+            subject="Header Subject",
+            body="Header Body",
+            custom_headers=[("X-OpenAEV-Test", "true")],
+            attachments=[],
+        )
+
+        assert result.success
+        sent_message = instance.send_message.call_args.args[0]
+        assert sent_message["X-OpenAEV-Test"] == "true"
+
+
+def test_send_email_with_multiple_custom_headers():
+    with patch("smtplib.SMTP") as mock_smtp:
+        instance = mock_smtp.return_value.__enter__.return_value
+
+        result = EmailClient.send_email(
+            smtp_hostname="localhost",
+            smtp_port=1025,
+            smtp_use_tls=False,
+            smtp_username=None,
+            smtp_password=None,
+            from_email="from@example.com",
+            mail_from="from@example.com",
+            reply_to=None,
+            to_email="to@example.com",
+            cc_emails=[],
+            bcc_emails=[],
+            subject="Header Subject",
+            body="Header Body",
+            custom_headers=[("X-First", "one"), ("X-Second", "two")],
+            attachments=[],
+        )
+
+        assert result.success
+        sent_message = instance.send_message.call_args.args[0]
+        assert sent_message["X-First"] == "one"
+        assert sent_message["X-Second"] == "two"
+
+
 def test_send_email_closes_connection_on_send_failure():
     with patch("smtplib.SMTP") as mock_smtp:
         instance = mock_smtp.return_value.__enter__.return_value
