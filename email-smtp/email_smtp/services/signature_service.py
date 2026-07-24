@@ -2,10 +2,12 @@
 
 from __future__ import annotations
 
+import hashlib
 import logging
 from datetime import datetime, timezone
 from typing import Any
 
+from ioc_finder import find_iocs
 from pyoaev.signatures import (
     ExtraSignatureData,
     SignatureManager,
@@ -20,6 +22,7 @@ logger = logging.getLogger(__name__)
 SENDER_EMAIL = "sender_email"
 RECIPIENT_EMAIL = "recipient_email"
 REPLY_TO_EMAIL = "reply_to_email"
+URL_HASH = "url_hash"
 
 
 class EmailSignatureService:
@@ -27,8 +30,8 @@ class EmailSignatureService:
 
     Email is not a network/cloud scanner — there are no target IPs or cloud
     accounts.  The service builds minimal execution signatures (start/end
-    timing only).  Email address indicators are delivered via the contract
-    output (``execution_output_structured``) rather than through the
+    timing only).  Email address and URL hash indicators are delivered via the
+    contract output (``execution_output_structured``) rather than through the
     signature payload.
     """
 
@@ -70,7 +73,7 @@ class EmailSignatureService:
 
     @staticmethod
     def build_email_signatures(payload: dict) -> dict[str, list[str]]:
-        """Extract email address indicators from the payload.
+        """Extract email address and URL hash indicators from the payload.
 
         Returns a dict of signature-type → list-of-values suitable for
         inclusion in ``execution_output_structured["expectation_signatures"]``.
@@ -79,6 +82,7 @@ class EmailSignatureService:
         - ``sender_email``: from address + mail_from (envelope sender) if different
         - ``recipient_email``: to + cc + bcc addresses
         - ``reply_to_email``: reply-to address (only when present)
+        - ``url_hash``: SHA-256 hashes of URLs found in the body
         """
         signatures: dict[str, list[str]] = {}
 
@@ -112,7 +116,20 @@ class EmailSignatureService:
         if reply_to:
             signatures[REPLY_TO_EMAIL] = [reply_to]
 
+        # URL hash signatures from body
+        url_hashes = EmailSignatureService._extract_url_hashes(payload.get("body", ""))
+        if url_hashes:
+            signatures[URL_HASH] = url_hashes
+
         return signatures
+
+    @staticmethod
+    def _extract_url_hashes(body: str) -> list[str]:
+        """Extract URLs from text or HTML body and return their SHA-256 hashes."""
+        if not body:
+            return []
+        urls = find_iocs(body).get("urls", [])
+        return [hashlib.sha256(url.encode()).hexdigest() for url in urls]
 
     # -- payload & send ------------------------------------------------------
 

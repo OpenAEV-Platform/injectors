@@ -343,3 +343,34 @@ def test_process_message_output_structured_empty_when_no_addresses(
 
     output = json.loads(callback_data["execution_output_structured"])
     assert output == {}
+
+
+@patch("email_smtp.injector.openaev_email_smtp.EmailClient.send_email")
+def test_process_message_output_structured_includes_url_hashes(
+    mock_send_email, email_smtp_injector
+):
+    """URL hashes from body content are included in output_structured."""
+    mock_send_email.return_value = ExecutionResult(success=True, message="sent")
+    content = {
+        "smtp_hostname": "smtp.example.com",
+        "smtp_port": "25",
+        "from": "sender@example.com",
+        "to": "victim@example.com",
+        "subject": "Subject",
+        "body": "Click here: https://evil.com/phish",
+    }
+
+    email_smtp_injector.process_message(_data(content=content))
+
+    callback_data = (
+        email_smtp_injector.helper.api.inject.execution_callback.call_args.kwargs[
+            "data"
+        ]
+    )
+    import hashlib
+    import json
+
+    output = json.loads(callback_data["execution_output_structured"])
+    sigs = output["expectation_signatures"]
+    expected_hash = hashlib.sha256(b"https://evil.com/phish").hexdigest()
+    assert sigs["url_hash"] == [expected_hash]
