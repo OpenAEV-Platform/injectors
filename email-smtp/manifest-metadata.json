@@ -1,0 +1,18 @@
+{
+  "title": "Email (SMTP)",
+  "slug": "openaev_email_smtp",
+  "description": "Craft and send emails over SMTP",
+  "short_description": "Craft and send emails over SMTP",
+  "use_cases": ["Technical"],
+  "verified": true,
+  "last_verified_date": "",
+  "playbook_supported": false,
+  "max_confidence_level": 80,
+  "support_version": "",
+  "subscription_link": "",
+  "source_code": "",
+  "manager_supported": true,
+  "container_version": "rolling",
+  "container_image": "openaev/injector-email-smtp",
+  "container_type": "INJECTOR"
+}
