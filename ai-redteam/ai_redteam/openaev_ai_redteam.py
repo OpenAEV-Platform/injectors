@@ -95,11 +95,14 @@ class OpenAEVAiRedTeam:
         logger.info(f"Invoking engine '{engine_key}' run() for inject {inject_id}...")
         results = []
         for target in targets:
-            target_start = time.time()
+            # Monotonic clock: this is a self-contained elapsed measurement, so it must not
+            # be affected by a wall-clock adjustment (e.g. NTP correction) mid-run, which could
+            # otherwise yield a negative or inconsistent per-target duration.
+            target_start = time.monotonic()
             result = engine.run(
                 content, target, marker, ctx={"inject_id": inject_id, "logger": logger}
             )
-            target_duration = int(time.time() - target_start)
+            target_duration = int(time.monotonic() - target_start)
             logger.info(
                 f"Engine '{engine_key}' finished for target "
                 f"'{self._target_label(target)}' (inject {inject_id}): "
