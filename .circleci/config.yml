@@ -153,7 +153,7 @@ jobs:
     steps:
       - checkout
       - kubernetes/install-kubectl
-      - run: kubectl --server=https://api.staging.eu-west.filigran.io --token=$K8S_TOKEN -n testing-xtm-one-oaev rollout restart deployment -l app=openaev-colljector
+      - run: kubectl --server=https://api.staging.eu-west.filigran.io --token=$K8S_TOKEN_PRE_RELEASE -n testing-xtm-one-oaev rollout restart deployment -l app=openaev-colljector
   notify_rolling:
     docker:
       - image: cimg/base:current-24.04
