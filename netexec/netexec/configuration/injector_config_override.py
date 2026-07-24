@@ -20,3 +20,8 @@ class InjectorConfigOverride(ConfigLoaderCollector):
         description="Determines the verbosity of the logs. Options: debug, info, warn, or error.",
         default="info",
     )
+    author: str | None = Field(
+        default=None,
+        description="Optional author override for this injector's contracts. "
+        "When absent, the platform attributes them to the injector's name.",
+    )
