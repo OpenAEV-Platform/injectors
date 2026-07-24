@@ -2,7 +2,12 @@
 
 from unittest.mock import Mock
 
-from email_smtp.services.signature_service import EmailSignatureService
+from email_smtp.services.signature_service import (
+    RECIPIENT_EMAIL,
+    REPLY_TO_EMAIL,
+    SENDER_EMAIL,
+    EmailSignatureService,
+)
 from pyoaev.signatures import ExtraSignatureData
 from pyoaev.signatures.models import ExecutionDetails, ExecutionSignature
 
@@ -61,8 +66,115 @@ class TestPostExecutionUpdates:
         assert tool_output["error_info"]["exit_code"] == 1
 
 
+class TestBuildEmailSignatures:
+    def test_from_field_generates_sender_email(self):
+        payload = {"from": "sender@example.test", "to": ""}
+        signatures = EmailSignatureService.build_email_signatures(payload)
+        assert signatures[SENDER_EMAIL] == ["sender@example.test"]
+
+    def test_mail_from_generates_sender_email(self):
+        payload = {"from": "", "mail_from": "bounce@example.test", "to": ""}
+        signatures = EmailSignatureService.build_email_signatures(payload)
+        assert signatures[SENDER_EMAIL] == ["bounce@example.test"]
+
+    def test_mail_from_different_from_both_included(self):
+        payload = {
+            "from": "sender@example.test",
+            "mail_from": "bounce@example.test",
+            "to": "",
+        }
+        signatures = EmailSignatureService.build_email_signatures(payload)
+        assert signatures[SENDER_EMAIL] == [
+            "sender@example.test",
+            "bounce@example.test",
+        ]
+
+    def test_mail_from_same_as_from_not_duplicated(self):
+        payload = {
+            "from": "sender@example.test",
+            "mail_from": "sender@example.test",
+            "to": "",
+        }
+        signatures = EmailSignatureService.build_email_signatures(payload)
+        assert signatures[SENDER_EMAIL] == ["sender@example.test"]
+
+    def test_to_field_generates_recipient_email(self):
+        payload = {"from": "", "to": "victim@example.test"}
+        signatures = EmailSignatureService.build_email_signatures(payload)
+        assert signatures[RECIPIENT_EMAIL] == ["victim@example.test"]
+
+    def test_cc_generates_recipient_email(self):
+        payload = {"from": "", "to": "", "cc": ["copy@example.test"]}
+        signatures = EmailSignatureService.build_email_signatures(payload)
+        assert signatures[RECIPIENT_EMAIL] == ["copy@example.test"]
+
+    def test_bcc_generates_recipient_email(self):
+        payload = {"from": "", "to": "", "bcc": ["hidden@example.test"]}
+        signatures = EmailSignatureService.build_email_signatures(payload)
+        assert signatures[RECIPIENT_EMAIL] == ["hidden@example.test"]
+
+    def test_to_cc_bcc_all_combined(self):
+        payload = {
+            "from": "",
+            "to": "victim@example.test",
+            "cc": ["copy@example.test"],
+            "bcc": ["hidden@example.test"],
+        }
+        signatures = EmailSignatureService.build_email_signatures(payload)
+        assert signatures[RECIPIENT_EMAIL] == [
+            "victim@example.test",
+            "copy@example.test",
+            "hidden@example.test",
+        ]
+
+    def test_reply_to_generates_reply_to_email(self):
+        payload = {"from": "", "to": "", "reply_to": "reply@example.test"}
+        signatures = EmailSignatureService.build_email_signatures(payload)
+        assert signatures[REPLY_TO_EMAIL] == ["reply@example.test"]
+
+    def test_no_reply_to_when_absent(self):
+        payload = {"from": "sender@example.test", "to": "victim@example.test"}
+        signatures = EmailSignatureService.build_email_signatures(payload)
+        assert REPLY_TO_EMAIL not in signatures
+
+    def test_no_reply_to_when_none(self):
+        payload = {
+            "from": "sender@example.test",
+            "to": "victim@example.test",
+            "reply_to": None,
+        }
+        signatures = EmailSignatureService.build_email_signatures(payload)
+        assert REPLY_TO_EMAIL not in signatures
+
+    def test_empty_payload_returns_empty_signatures(self):
+        payload = {"from": "", "to": "", "cc": [], "bcc": []}
+        signatures = EmailSignatureService.build_email_signatures(payload)
+        assert signatures == {}
+
+    def test_all_fields_combined(self):
+        payload = {
+            "from": "sender@example.test",
+            "mail_from": "bounce@example.test",
+            "to": "victim@example.test",
+            "cc": ["copy@example.test"],
+            "bcc": ["hidden@example.test"],
+            "reply_to": "reply@example.test",
+        }
+        signatures = EmailSignatureService.build_email_signatures(payload)
+        assert signatures[SENDER_EMAIL] == [
+            "sender@example.test",
+            "bounce@example.test",
+        ]
+        assert signatures[RECIPIENT_EMAIL] == [
+            "victim@example.test",
+            "copy@example.test",
+            "hidden@example.test",
+        ]
+        assert signatures[REPLY_TO_EMAIL] == ["reply@example.test"]
+
+
 class TestSendSignatures:
-    def test_builds_and_sends_payload(self):
+    def test_builds_and_sends_with_empty_extra_signatures(self):
         mock_sm = Mock()
         mock_sm.build_payload.return_value = {"targets": []}
         service = EmailSignatureService(mock_sm)
@@ -74,8 +186,9 @@ class TestSendSignatures:
         mock_sm.build_payload.assert_called_once()
         build_kwargs = mock_sm.build_payload.call_args.kwargs
         assert build_kwargs["expectation_types"] == ["DETECTION"]
-        assert isinstance(build_kwargs["extra_signatures"], ExtraSignatureData)
-        assert build_kwargs["extra_signatures"].detection == {}
+        extra = build_kwargs["extra_signatures"]
+        assert isinstance(extra, ExtraSignatureData)
+        assert extra.detection == {}
 
         mock_sm.send_signatures.assert_called_once_with(
             "inject-1", details, signatures={"targets": []}
