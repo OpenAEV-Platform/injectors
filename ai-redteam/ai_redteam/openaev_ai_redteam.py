@@ -95,9 +95,11 @@ class OpenAEVAiRedTeam:
         logger.info(f"Invoking engine '{engine_key}' run() for inject {inject_id}...")
         results = []
         for target in targets:
+            target_start = time.time()
             result = engine.run(
                 content, target, marker, ctx={"inject_id": inject_id, "logger": logger}
             )
+            target_duration = int(time.time() - target_start)
             logger.info(
                 f"Engine '{engine_key}' finished for target "
                 f"'{self._target_label(target)}' (inject {inject_id}): "
@@ -109,18 +111,19 @@ class OpenAEVAiRedTeam:
             # completion callback stays global (aggregated summary in "Execution details"); this
             # target-scoped trace carries the AI target asset id so the platform shows it under
             # that target's execution timeline.
-            self._send_target_trace(inject_id, target, result, start)
+            self._send_target_trace(inject_id, target, result, target_duration)
 
         return self._aggregate_results(targets, results)
 
-    def _send_target_trace(self, inject_id, target, result, start: float) -> None:
+    def _send_target_trace(self, inject_id, target, result, duration: int) -> None:
         """Emit a target-scoped execution trace for one AI target.
 
         Only asset-backed targets (ai_target / asset-group modes) have a per-target result view,
         so inline/manual targets (no ``asset_id``) are skipped - their output already appears in the
         global completion trace. Uses the ``command_execution`` action (an intermediate EXECUTION
         trace) so it never triggers the terminal-completion handling reserved for the final
-        aggregated callback.
+        aggregated callback. ``duration`` is this target's own engine-run time (not the cumulative
+        inject elapsed time) so the per-target timeline entry reflects that target's run.
         """
         asset_id = getattr(target, "asset_id", None)
         if not asset_id:
@@ -132,7 +135,7 @@ class OpenAEVAiRedTeam:
                 data={
                     "execution_message": result.message,
                     "execution_status": result.status,
-                    "execution_duration": int(time.time() - start),
+                    "execution_duration": duration,
                     "execution_action": "command_execution",
                     "execution_context_identifiers": [asset_id],
                 },

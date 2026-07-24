@@ -106,6 +106,10 @@ class OpenAEVAiRedTeamTest(TestCase):
         self.assertEqual(data["execution_action"], "command_execution")
         self.assertEqual(data["execution_status"], "SUCCESS")
         self.assertEqual(data["execution_message"], "[VULNERABLE] leaked marker")
+        # Duration is this target's own engine-run time, measured per target
+        # rather than derived from the inject-level start timestamp.
+        self.assertIsInstance(data["execution_duration"], int)
+        self.assertGreaterEqual(data["execution_duration"], 0)
 
     def test_ai_execution_skips_per_target_trace_for_manual_target(self):
         from ai_redteam.targets.target_resolver import TargetConfig
