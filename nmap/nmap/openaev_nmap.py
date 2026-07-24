@@ -12,6 +12,7 @@ from pyoaev.signatures.models import (
 
 from injector_common.dump_config import intercept_dump_argument
 from injector_common.targets import Targets
+from injector_common.traces import send_per_target_traces
 from nmap.configuration.config_loader import ConfigLoader
 from nmap.helpers.nmap_command_builder import NmapCommandBuilder
 from nmap.helpers.nmap_output_parser import NmapOutputParser
@@ -56,6 +57,16 @@ class OpenAEVNmap:
         self.helper.api.inject.execution_callback(
             inject_id=msg_data.inject_id,
             data=callback_data,
+        )
+
+        # Per-target traces so each asset-backed endpoint's result view shows the
+        # scan reached it; the batched scan only sends a global callback otherwise.
+        send_per_target_traces(
+            self.helper,
+            msg_data.inject_id,
+            msg_data.target_results.ip_to_asset_id_map,
+            label="nmap scan",
+            start=start,
         )
 
         nmap_result = subprocess.run(nmap_args, check=True, capture_output=True)

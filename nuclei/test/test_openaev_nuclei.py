@@ -51,6 +51,9 @@ class TestOpenAEVNuclei(unittest.TestCase):
         start = 1
         message_data = MagicMock()
         message_data.get_targets.return_value = ["1.1.1.1"]
+        # No asset-backed targets -> the per-target trace helper is a no-op, so the
+        # single execution_callback stays the global command_execution trace below.
+        message_data.target_results.ip_to_asset_id_map = {}
         m_builder.return_value.build.return_value = ["nuclei", "-jsonl"]
 
         nuclei_output = injector.nuclei_execution(start, message_data)
@@ -83,6 +86,47 @@ class TestOpenAEVNuclei(unittest.TestCase):
             message_data.target_results.ip_to_asset_id_map,
         )
         self.assertEqual(nuclei_output, m_parser.return_value.parse.return_value)
+
+    @patch.object(module.Targets, "build_execution_message")
+    @patch.object(module, "NucleiCommandBuilder")
+    def test_openaev_nuclei_execution_emits_per_target_traces(
+        self,
+        m_builder,
+        m_build_execution_message,
+        m_configloader,
+        m_confighelper,
+        m_helper,
+        m_nucleiprocess,
+        m_parser,
+        m_msgdata,
+        _,
+    ):
+        m_helper.return_value.api = MagicMock()
+        m_helper.return_value.injector_logger = MagicMock()
+        injector = module.OpenAEVNuclei()
+
+        message_data = MagicMock()
+        message_data.inject_id = "inject-id"
+        message_data.get_targets.return_value = ["10.0.0.1", "10.0.0.2"]
+        message_data.target_results.ip_to_asset_id_map = {
+            "10.0.0.1": "asset-1",
+            "10.0.0.2": "asset-2",
+        }
+        m_builder.return_value.build.return_value = ["nuclei", "-jsonl"]
+
+        injector.nuclei_execution(1, message_data)
+
+        calls = m_helper.return_value.api.inject.execution_callback.call_args_list
+        target_calls = [
+            c for c in calls if c.kwargs["data"].get("execution_context_identifiers")
+        ]
+        self.assertEqual(len(target_calls), 2)
+        identifiers = sorted(
+            c.kwargs["data"]["execution_context_identifiers"][0] for c in target_calls
+        )
+        self.assertEqual(identifiers, ["asset-1", "asset-2"])
+        for c in target_calls:
+            self.assertEqual(c.kwargs["data"]["execution_action"], "command_execution")
 
     @patch.object(module.OpenAEVNuclei, "nuclei_execution")
     @patch.object(module, "ExecutionDetails")

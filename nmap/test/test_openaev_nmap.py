@@ -38,6 +38,9 @@ class TestOpenAEVNmap(unittest.TestCase):
 
         start = 1
         message_data = MagicMock()
+        # No asset-backed targets -> the per-target trace helper is a no-op, so the
+        # last execution_callback stays the global command_execution trace below.
+        message_data.target_results.ip_to_asset_id_map = {}
 
         nmap_output = injector.nmap_execution(start, message_data)
 
@@ -67,6 +70,49 @@ class TestOpenAEVNmap(unittest.TestCase):
             message_data.target_results,
         )
         self.assertEqual(nmap_output, m_xmlparse.return_value)
+
+    @patch.object(module.NmapOutputParser, "xmlparse")
+    @patch.object(module.subprocess, "run")
+    @patch.object(module.Targets, "build_execution_message")
+    @patch.object(module.NmapCommandBuilder, "build_args")
+    def test_openaev_nmap_execution_emits_per_target_traces(
+        self,
+        m_build_args,
+        m_build_execution_message,
+        m_subprocess_run,
+        m_xmlparse,
+        m_configloader,
+        m_helper,
+        m_msgdata,
+        _,
+    ):
+        m_helper.return_value.api = MagicMock()
+        m_helper.return_value.injector_logger = MagicMock()
+        injector = module.OpenAEVNmap()
+
+        message_data = MagicMock()
+        message_data.inject_id = "inject-id"
+        # Two asset-backed targets and one manual target (no asset id): only the
+        # asset-backed ones must get a target-scoped trace.
+        message_data.target_results.ip_to_asset_id_map = {
+            "10.0.0.1": "asset-1",
+            "10.0.0.2": "asset-2",
+        }
+
+        injector.nmap_execution(1, message_data)
+
+        calls = m_helper.return_value.api.inject.execution_callback.call_args_list
+        target_calls = [
+            c for c in calls if c.kwargs["data"].get("execution_context_identifiers")
+        ]
+        self.assertEqual(len(target_calls), 2)
+        identifiers = sorted(
+            c.kwargs["data"]["execution_context_identifiers"][0] for c in target_calls
+        )
+        self.assertEqual(identifiers, ["asset-1", "asset-2"])
+        for c in target_calls:
+            self.assertEqual(c.kwargs["data"]["execution_action"], "command_execution")
+            self.assertEqual(c.kwargs["data"]["execution_status"], "INFO")
 
     @patch.object(module.OpenAEVNmap, "nmap_execution")
     @patch.object(module, "ExecutionDetails")
