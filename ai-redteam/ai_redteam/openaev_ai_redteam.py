@@ -95,9 +95,14 @@ class OpenAEVAiRedTeam:
         logger.info(f"Invoking engine '{engine_key}' run() for inject {inject_id}...")
         results = []
         for target in targets:
+            # Monotonic clock: this is a self-contained elapsed measurement, so it must not
+            # be affected by a wall-clock adjustment (e.g. NTP correction) mid-run, which could
+            # otherwise yield a negative or inconsistent per-target duration.
+            target_start = time.monotonic()
             result = engine.run(
                 content, target, marker, ctx={"inject_id": inject_id, "logger": logger}
             )
+            target_duration = int(time.monotonic() - target_start)
             logger.info(
                 f"Engine '{engine_key}' finished for target "
                 f"'{self._target_label(target)}' (inject {inject_id}): "
@@ -105,8 +110,48 @@ class OpenAEVAiRedTeam:
                 f"output_keys={sorted((result.outputs or {}).keys())}"
             )
             results.append(result)
+            # Per-target execution trace so the target's result view is not empty. The final
+            # completion callback stays global (aggregated summary in "Execution details"); this
+            # target-scoped trace carries the AI target asset id so the platform shows it under
+            # that target's execution timeline.
+            self._send_target_trace(inject_id, target, result, target_duration)
 
         return self._aggregate_results(targets, results)
+
+    def _send_target_trace(self, inject_id, target, result, duration: int) -> None:
+        """Emit a target-scoped execution trace for one AI target.
+
+        Only asset-backed targets (ai_target / asset-group modes) have a per-target result view,
+        so inline/manual targets (no ``asset_id``) are skipped - their output already appears in the
+        global completion trace. Uses the ``command_execution`` action (an intermediate EXECUTION
+        trace) so it never triggers the terminal-completion handling reserved for the final
+        aggregated callback. ``duration`` is this target's own engine-run time (not the cumulative
+        inject elapsed time) so the per-target timeline entry reflects that target's run.
+        """
+        asset_id = getattr(target, "asset_id", None)
+        if not asset_id:
+            return
+        logger = self.helper.injector_logger
+        try:
+            self.helper.api.inject.execution_callback(
+                inject_id=inject_id,
+                data={
+                    "execution_message": result.message,
+                    "execution_status": result.status,
+                    "execution_duration": duration,
+                    "execution_action": "command_execution",
+                    "execution_context_identifiers": [asset_id],
+                },
+            )
+            logger.info(
+                f"Per-target execution trace sent for inject {inject_id} "
+                f"(target '{self._target_label(target)}', asset {asset_id})"
+            )
+        except Exception as exc:  # noqa: BLE001
+            logger.error(
+                f"Failed to send per-target execution trace for inject {inject_id} "
+                f"(target '{self._target_label(target)}', asset {asset_id}): {exc}"
+            )
 
     @staticmethod
     def _target_label(target) -> str:
