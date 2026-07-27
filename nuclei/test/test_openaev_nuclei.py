@@ -351,6 +351,68 @@ class TestOpenAEVNuclei(unittest.TestCase):
             message_callback=injector.process_message
         )
 
+    def test_openaev_nuclei_start_registers_security_platform(
+        self,
+        m_configloader,
+        m_confighelper,
+        m_helper,
+        m_nucleiprocess,
+        m_parser,
+        m_msgdata,
+        _,
+    ):
+        m_helper.return_value.api = MagicMock()
+        m_helper.return_value.injector_logger = MagicMock()
+        m_confighelper.from_configuration_object.return_value.get_conf.return_value = (
+            "openaev_nuclei"
+        )
+        injector = module.OpenAEVNuclei()
+        injector.helper.api.document.upsert.return_value = {"document_id": "doc-1"}
+
+        with patch.object(module, "ExternalContractsScheduler"):
+            injector.start()
+
+        injector.helper.api.document.upsert.assert_called_once_with(
+            document={}, file=("nuclei.jpg", ANY, "image/jpeg")
+        )
+        injector.helper.api.security_platform.upsert.assert_called_once_with(
+            {
+                "asset_name": "Nuclei",
+                "asset_external_reference": "openaev_nuclei",
+                "asset_description": module.SECURITY_PLATFORM_DESCRIPTION,
+                "security_platform_type": "VULNERABILITY_SCANNER",
+                "security_platform_logo_light": "doc-1",
+                "security_platform_logo_dark": "doc-1",
+            }
+        )
+
+    def test_openaev_nuclei_security_platform_registration_is_best_effort(
+        self,
+        m_configloader,
+        m_confighelper,
+        m_helper,
+        m_nucleiprocess,
+        m_parser,
+        m_msgdata,
+        _,
+    ):
+        # A backend without VULNERABILITY_SCANNER support rejects the upsert:
+        # the injector must log a warning and keep starting normally.
+        m_helper.return_value.api = MagicMock()
+        m_helper.return_value.injector_logger = MagicMock()
+        injector = module.OpenAEVNuclei()
+        injector.helper.api.security_platform.upsert.side_effect = ValueError(
+            "unknown security_platform_type"
+        )
+
+        with patch.object(module, "ExternalContractsScheduler"):
+            injector.start()
+
+        injector.helper.injector_logger.warning.assert_called()
+        injector.helper.listen.assert_called_with(
+            message_callback=injector.process_message
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

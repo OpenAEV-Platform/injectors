@@ -21,6 +21,20 @@ from nuclei.helpers.nuclei_process import NucleiProcess
 from nuclei.models.data import MessageData
 from nuclei.nuclei_contracts.external_contracts import ExternalContractsScheduler
 
+# Security platform identity declared by this injector. Nuclei performs the
+# vulnerability assessment itself, so the platform can attribute VULNERABILITY
+# expectation verdicts to a real "Nuclei" security platform entry (logo and
+# all), the same way detection/prevention verdicts are attributed to EDR/SIEM
+# platforms instead of a generic manager.
+SECURITY_PLATFORM_NAME = "Nuclei"
+SECURITY_PLATFORM_TYPE = "VULNERABILITY_SCANNER"
+SECURITY_PLATFORM_DESCRIPTION = (
+    "Nuclei is a fast, template-based vulnerability scanner. This platform "
+    "entry is managed by the Nuclei injector and receives the vulnerability "
+    "verdicts of its scans."
+)
+SECURITY_PLATFORM_LOGO_PATH = "nuclei/img/nuclei.jpg"
+
 
 class OpenAEVNuclei:
     def __init__(self):
@@ -245,7 +259,45 @@ class OpenAEVNuclei:
         except (FileNotFoundError, subprocess.CalledProcessError):
             return False
 
+    def _register_security_platform(self) -> None:
+        """Declare Nuclei as a security platform (best-effort).
+
+        The upsert is keyed on the injector type (``asset_external_reference``)
+        so every Nuclei injector deployment shares one platform entry, and so
+        the backend can attribute vulnerability verdicts to it by resolving the
+        inject's injector type. Registration is best-effort: backends that do
+        not support the VULNERABILITY_SCANNER platform type yet reject the
+        call, and the injector must keep working exactly as before.
+        """
+        try:
+            with open(SECURITY_PLATFORM_LOGO_PATH, "rb") as logo:
+                document = self.helper.api.document.upsert(
+                    document={}, file=("nuclei.jpg", logo, "image/jpeg")
+                )
+            self.helper.api.security_platform.upsert(
+                {
+                    "asset_name": SECURITY_PLATFORM_NAME,
+                    "asset_external_reference": self.config.get_conf(
+                        "injector_type", default="openaev_nuclei"
+                    ),
+                    "asset_description": SECURITY_PLATFORM_DESCRIPTION,
+                    "security_platform_type": SECURITY_PLATFORM_TYPE,
+                    "security_platform_logo_light": document.get("document_id"),
+                    "security_platform_logo_dark": document.get("document_id"),
+                }
+            )
+            self.helper.injector_logger.info(
+                "Registered Nuclei as a security platform (vulnerability scanner)"
+            )
+        except Exception as err:
+            self.helper.injector_logger.warning(
+                "Could not register Nuclei as a security platform (requires an "
+                "OpenAEV version supporting the VULNERABILITY_SCANNER platform "
+                "type): " + str(err)
+            )
+
     def start(self):
+        self._register_security_platform()
         self.helper.listen(message_callback=self.process_message)
         ExternalContractsScheduler(
             self.helper.api,
