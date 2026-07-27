@@ -57,7 +57,7 @@ class Targets:
                 g["asset_group_id"] for g in data[ASSET_GROUPS_KEY_RABBITMQ]
             ]
             for asset_group_id in asset_group_ids:
-                assets = Pagination.fetch_all_targets(helper, asset_group_id)
+                assets = Pagination.fetch_all_targets(helper, [asset_group_id])
                 helper.injector_logger.info(
                     f"Fetched {len(assets)} assets from groups."
                 )
