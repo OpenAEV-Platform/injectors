@@ -1,7 +1,8 @@
 from unittest import TestCase
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 from injector_common.constants import (
+    ASSET_GROUPS_KEY_RABBITMQ,
     ASSETS_KEY_RABBITMQ,
     TARGET_PROPERTY_SELECTOR_KEY,
     TARGET_SELECTOR_KEY,
@@ -135,3 +136,40 @@ class CommonTargetsTest(TestCase):
         data = {"injection": {"inject_content": {TARGET_SELECTOR_KEY: "unknown"}}}
         with self.assertRaises(ValueError):
             Targets.extract_targets("unknown", None, data, helper=self.mock_helper)
+
+    # ---------- extract_target_meta ----------
+
+    @patch("injector_common.targets.Pagination.fetch_all_targets")
+    def test_extract_target_meta_asset_groups_passes_list(self, m_fetch_all_targets):
+        # Regression: each asset group id must be forwarded to
+        # fetch_all_targets wrapped in a list. Passing a bare string builds a
+        # pyoaev Filter whose "values" is a string instead of an array, which
+        # the backend rejects with 400 "Malformed or unreadable request body".
+        m_fetch_all_targets.return_value = [
+            {"asset_id": "a1", "asset_agents": [{"agent_id": "ag1"}]},
+        ]
+        data = {
+            ASSET_GROUPS_KEY_RABBITMQ: [
+                {"asset_group_id": "grp-1"},
+                {"asset_group_id": "grp-2"},
+            ],
+        }
+
+        result = Targets.extract_target_meta(
+            "asset-groups", "automatic", data, self.mock_helper
+        )
+
+        for call in m_fetch_all_targets.call_args_list:
+            forwarded = call.args[1]
+            self.assertIsInstance(forwarded, list)
+        self.assertEqual(
+            [call.args[1] for call in m_fetch_all_targets.call_args_list],
+            [["grp-1"], ["grp-2"]],
+        )
+        self.assertEqual(len(result), 2)
+        for meta in result:
+            self.assertEqual(meta.asset_id, "a1")
+            self.assertEqual(meta.agent_id, "ag1")
+        self.assertCountEqual(
+            [meta.asset_group_id for meta in result], ["grp-1", "grp-2"]
+        )
