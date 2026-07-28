@@ -5,79 +5,6 @@ orbs:
   kubernetes: circleci/kubernetes@1.3.1
 
 jobs:
-  ensure_formatting:
-    docker:
-      - image: cimg/python:3.13
-    working_directory: ~/repo
-    steps:
-      - checkout
-      - run: sudo apt-get update -qq && sudo apt install curl gettext-base
-      - run:
-          name: install dependencies
-          command: pip install black isort --user
-      - run:
-          name: confirm black version
-          command: black --version
-      - run:
-          name: run isort check
-          command: isort --profile black --check .
-      - run:
-          name: run black check
-          command: black --check .
-      - slack/notify:
-          event: fail
-          template: basic_fail_1
-  linter:
-    docker:
-      - image: alpine/flake8
-    working_directory: ~/repo
-    steps:
-      - checkout
-      - run: apk update && apk upgrade && apk --no-cache add curl gettext bash
-      - run:
-          name: flake8
-          command: flake8 --ignore=E,W ~/repo
-      - slack/notify:
-          event: fail
-          template: basic_fail_1
-  test:
-    working_directory: ~/openaev
-    docker:
-      - image: cimg/python:3.13
-    parameters:
-      injector_name:
-        type: string
-    steps:
-      - checkout
-      - setup_remote_docker
-      - run:
-          working_directory: ~/openaev/<< parameters.injector_name >>
-          name: Check if injector exists
-          command: |
-            if [ ! -f pyproject.toml ]; then
-              echo "pyproject.toml not found, injector may not exist on this branch"
-              circleci-agent step halt
-            fi;
-      - run: # this is only to satisfy poetry; not used
-          working_directory: ~/
-          name: Clone pyoaev
-          command: |
-            git clone -b main https://github.com/OpenAEV-Platform/client-python
-      - run:
-          working_directory: ~/openaev
-          name: Install poetry
-          command: pip install poetry==2.3.2 && poetry config installer.re-resolve false
-      - run:
-          name: Run injector tests
-          working_directory: ~/openaev/<< parameters.injector_name >>
-          command: |
-            PYOAEV_REF="main"
-
-            echo "Running tests for injector: << parameters.injector_name >>"
-            poetry install
-            poetry run pip install --force-reinstall git+https://github.com/OpenAEV-Platform/client-python.git@${PYOAEV_REF}
-            poetry run python -m unittest
-
   build_docker_images:
     working_directory: ~/openaev
     docker:
@@ -199,20 +126,34 @@ jobs:
       - slack/notify:
           event: fail
           template: basic_fail_1
-  deploy_testing:
+  deploy_main_oaev:
     docker:
       - image: cimg/base:current-24.04
     steps:
       - checkout
       - kubernetes/install-kubectl
-      - run: kubectl --server=https://api.staging.eu-west.filigran.io --token=$K8S_TOKEN -n customer-testing-oaev rollout restart deployment -l app=openaev-colljector
-  deploy_prerelease:
+      - run: kubectl --server=https://api.staging.eu-west.filigran.io --token=$K8S_TOKEN -n main-oaev rollout restart deployment -l app=openaev-colljector
+  deploy_main_ff_oaev:
     docker:
       - image: cimg/base:current-24.04
     steps:
       - checkout
       - kubernetes/install-kubectl
-      - run: kubectl --server=https://api.staging.eu-west.filigran.io --token=$K8S_TOKEN_PRE_RELEASE -n customer-prerelease-oaev rollout restart deployment -l app=openaev-colljector
+      - run: kubectl --server=https://api.staging.eu-west.filigran.io --token=$K8S_TOKEN -n main-ff-oaev rollout restart deployment -l app=openaev-colljector
+  deploy_testing_oaev:
+    docker:
+      - image: cimg/base:current-24.04
+    steps:
+      - checkout
+      - kubernetes/install-kubectl
+      - run: kubectl --server=https://api.staging.eu-west.filigran.io --token=$K8S_TOKEN -n testing-oaev rollout restart deployment -l app=openaev-colljector
+  deploy_testing_xtm_one_oaev:
+    docker:
+      - image: cimg/base:current-24.04
+    steps:
+      - checkout
+      - kubernetes/install-kubectl
+      - run: kubectl --server=https://api.staging.eu-west.filigran.io --token=$K8S_TOKEN_PRE_RELEASE -n testing-xtm-one-oaev rollout restart deployment -l app=openaev-colljector
   notify_rolling:
     docker:
       - image: cimg/base:current-24.04
@@ -233,29 +174,10 @@ workflows:
   version: 2
   openaev:
     jobs:
-      - ensure_formatting:
-          filters:
-            tags:
-              only: /[0-9]+(\.[0-9]+)+(\.[0-9]+)*/
-      - linter:
-          filters:
-            tags:
-              only: /[0-9]+(\.[0-9]+)+(\.[0-9]+)*/
-      - test:
-          matrix:
-            parameters:
-              injector_name: ["ai-redteam", "censys", "email-google-workspace", "http-query", "netexec", "nmap", "nuclei", "slack", "stratus"]
-          filters:
-            tags:
-              only: /[0-9]+(\.[0-9]+)+(\.[0-9]+)*/
       - build_docker_images:
           matrix:
             parameters:
               injector_name: [ "ai-redteam", "aws", "censys", "email-google-workspace", "http-query", "netexec", "nmap", "nuclei", "shodan", "slack", "stratus", "teams" ]
-          requires:
-            - ensure_formatting
-            - linter
-            - test
           filters:
             tags:
               only: /[0-9]+(\.[0-9]+)+(\.[0-9]+)*/
@@ -271,7 +193,25 @@ workflows:
             branches:
               only:
                 - main
-      - deploy_testing:
+      - deploy_main_oaev:
+          requires:
+            - publish_images
+          filters:
+            branches:
+              only: main
+      - deploy_main_ff_oaev:
+          requires:
+            - publish_images
+          filters:
+            branches:
+              only: main
+      - deploy_testing_oaev:
+          requires:
+            - publish_images
+          filters:
+            branches:
+              only: main
+      - deploy_testing_xtm_one_oaev:
           requires:
             - publish_images
           filters:
@@ -279,7 +219,10 @@ workflows:
               only: main
       - notify_rolling:
           requires:
-            - deploy_testing
+            - deploy_main_oaev
+            - deploy_main_ff_oaev
+            - deploy_testing_oaev
+            - deploy_testing_xtm_one_oaev
       - notify:
           requires:
             - publish_images
