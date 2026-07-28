@@ -10,6 +10,7 @@ from netexec.contracts.output_registry import (
     COMPUTER,
     CREDENTIALS,
     DELEGATION,
+    FILE,
     GROUP,
     KERBEROASTABLE,
     PASSWORD_POLICY,
@@ -51,6 +52,14 @@ _USERNAME_OUTPUT = ContractOutputElement(
 _SHARE_OUTPUT = ContractOutputElement(
     type=ContractOutputType.Share,
     field="shares",
+    isMultiple=True,
+    isFindingCompatible=True,
+    labels=["netexec"],
+)
+
+_FILE_OUTPUT = ContractOutputElement(
+    type=ContractOutputType.File,
+    field="files",
     isMultiple=True,
     isFindingCompatible=True,
     labels=["netexec"],
@@ -149,6 +158,7 @@ _TYPE_TO_ELEMENT = {
     CREDENTIALS: _CREDENTIALS_OUTPUT,
     USERNAME: _USERNAME_OUTPUT,
     SHARE: _SHARE_OUTPUT,
+    FILE: _FILE_OUTPUT,
     ADMIN_USERNAME: _ADMIN_USERNAME_OUTPUT,
     GROUP: _GROUP_OUTPUT,
     COMPUTER: _COMPUTER_OUTPUT,

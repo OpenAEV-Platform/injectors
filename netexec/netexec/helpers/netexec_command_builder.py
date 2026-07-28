@@ -9,6 +9,11 @@ from netexec.modules_registry import get_module_by_safe_key
 # The command builder auto-generates a temp file path for these.
 OPTIONS_REQUIRING_OUTPUT_FILE = {"asreproast", "kerberoasting"}
 
+# Modules whose per-target findings are written to a JSON metadata folder rather
+# than to stdout. The builder forces a controlled output folder so the injector
+# knows where to read the metadata back from.
+SPIDER_PLUS_MODULE = "spider_plus"
+
 
 def build_command(
     protocol: str,
@@ -167,6 +172,17 @@ def extract_data_module(content: dict, protocol: str, safe_key: str) -> dict | N
     module_options_extra = content.get("module_options")
     if module_options_extra:
         module_opts.append(str(module_options_extra))
+
+    # spider_plus writes the file list to a JSON metadata folder, not stdout.
+    # Force a unique output folder we control (overriding any user-supplied one)
+    # so the injector can read the metadata back and emit `file` findings.
+    if module_name == SPIDER_PLUS_MODULE:
+        module_opts = [
+            opt for opt in module_opts if not opt.startswith("OUTPUT_FOLDER=")
+        ]
+        output_dir = f"/tmp/nxc_spider_plus_{uuid.uuid4().hex[:8]}"
+        module_opts.append(f"OUTPUT_FOLDER={output_dir}")
+        data["spider_output_dir"] = output_dir
 
     if module_opts:
         extra_args.extend(["-o"] + module_opts)
