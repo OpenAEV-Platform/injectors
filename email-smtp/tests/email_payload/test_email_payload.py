@@ -154,14 +154,14 @@ def test_email_payload_builder_parse_custom_headers():
         "to": "recipient@example.com",
         "subject": "Hello",
         "body": "World",
-        "custom_headers": "X-OpenAEV-Test: true\nX-Trace-ID: 123",
+        "custom_headers": "X-OpenAEV-Test: true\nX-OpenAEV-Trace-ID: 123",
     }
 
     payload = EmailPayloadBuilder.build(content)
 
     assert payload["custom_headers"] == [
         ("X-OpenAEV-Test", "true"),
-        ("X-Trace-ID", "123"),
+        ("X-OpenAEV-Trace-ID", "123"),
     ]
 
 
@@ -170,6 +170,7 @@ def test_email_payload_builder_parse_custom_headers():
     [
         (" : true", "header name is required"),
         ("unsafe header: true", "unsafe header name"),
+        ("X-Trace-ID: 123", "header name must start with 'X-OpenAEV-'"),
         ("X-OpenAEV-Test:", "header value is required"),
         ("X-OpenAEV-Test: value\x00", "unsafe header value"),
     ],
