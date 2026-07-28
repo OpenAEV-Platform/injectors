@@ -210,7 +210,7 @@ class EmailSmtpInjector:
         signatures = EmailSignatureService.build_email_signatures(
             email_payload,
             attachments=attachments or [],
-            hash_algorithm=self.config.injector.hash_algorithm,
+            hash_algorithm=self.config.email_smtp.hash_algorithm,
         )
         if not signatures:
             return {}
