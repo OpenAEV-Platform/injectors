@@ -31,6 +31,7 @@ class EmailClient:
         bcc_emails: list[str],
         subject: str,
         body: str,
+        body_html: Optional[str] = None,
         custom_headers: list[tuple[str, str]] | None = None,
         attachments: list[tuple[str, bytes]] | None = None,
     ) -> ExecutionResult:
@@ -51,7 +52,13 @@ class EmailClient:
             msg["Subject"] = subject
             for header_name, header_value in custom_headers or []:
                 msg[header_name] = header_value
-            msg.attach(MIMEText(body, "plain"))
+            if body_html:
+                alternative = MIMEMultipart("alternative")
+                alternative.attach(MIMEText(body, "plain"))
+                alternative.attach(MIMEText(body_html, "html"))
+                msg.attach(alternative)
+            else:
+                msg.attach(MIMEText(body, "plain"))
             for attachment_filename, attachment_content in attachments or []:
                 attachment_part = MIMEApplication(attachment_content)
                 attachment_part.add_header(
