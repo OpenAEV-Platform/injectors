@@ -4,11 +4,6 @@ import shutil
 import time
 from importlib.resources import files
 
-from injector_common.constants import TARGET_PROPERTY_SELECTOR_KEY, TARGET_SELECTOR_KEY
-from injector_common.data_helpers import DataHelpers
-from injector_common.dump_config import intercept_dump_argument
-from injector_common.targets import TargetProperty, Targets
-from injector_common.traces import send_per_target_traces
 from pyoaev.helpers import OpenAEVConfigHelper, OpenAEVInjectorHelper
 from pyoaev.signatures import SignatureManager
 from pyoaev.signatures.models import (
@@ -17,6 +12,11 @@ from pyoaev.signatures.models import (
     build_network_configs,
 )
 
+from injector_common.constants import TARGET_PROPERTY_SELECTOR_KEY, TARGET_SELECTOR_KEY
+from injector_common.data_helpers import DataHelpers
+from injector_common.dump_config import intercept_dump_argument
+from injector_common.targets import TargetProperty, Targets
+from injector_common.traces import send_per_target_traces
 from netexec.configuration.config_loader import ConfigLoader
 from netexec.contracts import parse_contract_id
 from netexec.helpers.netexec_command_builder import (
