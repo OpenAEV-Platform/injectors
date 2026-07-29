@@ -74,7 +74,7 @@ jobs:
             PYOAEV_REF="main"
 
             echo "Running tests for injector: << parameters.injector_name >>"
-            poetry install
+            poetry install --extras dev
             poetry run pip install --force-reinstall git+https://github.com/OpenAEV-Platform/client-python.git@${PYOAEV_REF}
             poetry run python -m unittest
 
