@@ -96,7 +96,7 @@ class EmailPayloadBuilder:
             "cc": EmailPayloadBuilder.parse_recipients(content.get("cc")),
             "bcc": EmailPayloadBuilder.parse_recipients(content.get("bcc")),
             "subject": content["subject"],
-            "body": content["body"],
+            "body": EmailPayloadBuilder.parse_optional_body(content.get("body")),
             "body_html": EmailPayloadBuilder.parse_optional_body(
                 content.get("body_html")
             ),

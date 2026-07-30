@@ -117,9 +117,9 @@ injector:
 ```
 
 Injects carry the message-specific fields: `from`, optional `mail_from`
-(SMTP envelope sender), optional `reply_to`, `to`, `subject`, `body`, optional
-`body_html` (HTML body sent as an `alternative` MIME part alongside the plain
-text), optional `cc` and `bcc` (comma-separated email lists), optional
+(SMTP envelope sender), optional `reply_to`, `to`, `subject`, optional `body`,
+optional `body_html` (HTML body sent as an `alternative` MIME part alongside the
+plain text), optional `cc` and `bcc` (comma-separated email lists), optional
 `custom_headers` (one `name: value` header per line), and SMTP fields:
 `smtp_hostname`, `smtp_port`, `smtp_use_tls`, `smtp_username`,
 `smtp_password`. They can also carry optional attachments through the
@@ -129,24 +129,24 @@ contract attachment field.
 
 The injector registers a single contract labelled "Email (SMTP) - Craft email" in the `TABLE_TOP` security domain.
 
-| Field         | Content key     | Mandatory | Description                                                     |
-|---------------|-----------------|-----------|-----------------------------------------------------------------|
-| SMTP Hostname | `smtp_hostname` | Yes       | Hostname of the SMTP server used to send the email.             |
-| SMTP Port     | `smtp_port`     | Yes       | Port of the SMTP server.                                        |
-| Use TLS       | `smtp_use_tls`  | No        | Enables STARTTLS on the SMTP connection.                        |
-| SMTP Username | `smtp_username` | No        | SMTP authentication username (used together with the password). |
-| SMTP Password | `smtp_password` | No        | SMTP authentication password.                                   |
-| From Email    | `from`          | Yes       | Sender address of the email.                                    |
-| Mail From     | `mail_from`     | No        | SMTP envelope sender (MAIL FROM); defaults to `from`.           |
-| Reply-To      | `reply_to`      | No        | Reply-To header address; omitted when not provided.             |
-| To Email      | `to`            | Yes       | Primary recipient address.                                      |
-| Cc            | `cc`            | No        | Comma-separated list of Cc recipients.                          |
-| Bcc           | `bcc`           | No        | Comma-separated list of Bcc recipients.                         |
-| Subject       | `subject`       | Yes       | Subject of the email.                                           |
-| Body          | `body`          | Yes       | Plain-text body of the email.                                   |
-| Body (HTML)   | `body_html`     | No        | Optional HTML body; sent as an `alternative` part alongside the plain text. |
-| Custom Headers| `custom_headers`| No        | One custom header per line (`name: value`); unsafe headers are rejected. |
-| Attachments   | `attachments`   | No        | Inject documents sent as email attachments.                     |
+| Field          | Content key      | Mandatory | Description                                                                 |
+|----------------|------------------|-----------|-----------------------------------------------------------------------------|
+| SMTP Hostname  | `smtp_hostname`  | Yes       | Hostname of the SMTP server used to send the email.                         |
+| SMTP Port      | `smtp_port`      | Yes       | Port of the SMTP server.                                                    |
+| Use TLS        | `smtp_use_tls`   | No        | Enables STARTTLS on the SMTP connection.                                    |
+| SMTP Username  | `smtp_username`  | No        | SMTP authentication username (used together with the password).             |
+| SMTP Password  | `smtp_password`  | No        | SMTP authentication password.                                               |
+| From Email     | `from`           | Yes       | Sender address of the email.                                                |
+| Mail From      | `mail_from`      | No        | SMTP envelope sender (MAIL FROM); defaults to `from`.                       |
+| Reply-To       | `reply_to`       | No        | Reply-To header address; omitted when not provided.                         |
+| To Email       | `to`             | Yes       | Primary recipient address.                                                  |
+| Cc             | `cc`             | No        | Comma-separated list of Cc recipients.                                      |
+| Bcc            | `bcc`            | No        | Comma-separated list of Bcc recipients.                                     |
+| Subject        | `subject`        | Yes       | Subject of the email.                                                       |
+| Body           | `body`           | No        | Plain-text body of the email.                                               |
+| Body (HTML)    | `body_html`      | No        | Optional HTML body; sent as an `alternative` part alongside the plain text. |
+| Custom Headers | `custom_headers` | No        | One custom header per line (`name: value`); unsafe headers are rejected.    |
+| Attachments    | `attachments`    | No        | Inject documents sent as email attachments.                                 |
 
 ## Target selection
 

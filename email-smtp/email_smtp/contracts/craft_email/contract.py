@@ -47,7 +47,7 @@ class CraftEmail:
             .optional(ContractText(key="cc", label="Cc (comma-separated emails)"))
             .optional(ContractText(key="bcc", label="Bcc (comma-separated emails)"))
             .mandatory(ContractText(key="subject", label="Subject"))
-            .mandatory(ContractTextArea(key="body", label="Body (plain text)"))
+            .optional(ContractTextArea(key="body", label="Body (plain text)"))
             .optional(
                 ContractTextArea(
                     key="body_html",
