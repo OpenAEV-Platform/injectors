@@ -17,6 +17,7 @@ TEXT = "text"
 CREDENTIALS = "credentials"
 USERNAME = "username"
 SHARE = "share"
+FILE = "file"
 ADMIN_USERNAME = "admin_username"
 GROUP = "group"
 COMPUTER = "computer"
@@ -155,8 +156,9 @@ _MODULE_OUTPUTS = {
     "uac": {TEXT},
     "wcc": {TEXT},
     "recent_files": {TEXT},
-    # File spider
-    "spider_plus": {TEXT},
+    # File spider: stdout only carries stats; the per-file list is written to a
+    # JSON metadata file, parsed separately into `file` findings.
+    "spider_plus": {TEXT, FILE},
     # Actions (execute something, limited stdout findings)
     "add_computer": {TEXT},
     "empire_exec": {TEXT},
