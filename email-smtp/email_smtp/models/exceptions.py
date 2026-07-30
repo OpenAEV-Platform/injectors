@@ -20,3 +20,9 @@ class AttachmentDownloadError(EmailInjectorError):
     """Raised when an inject attachment cannot be downloaded."""
 
     pass
+
+
+class CustomHeaderValidationError(EmailInjectorError, ValueError):
+    """Raised when a custom email header is malformed or unsafe."""
+
+    pass

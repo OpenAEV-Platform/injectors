@@ -30,7 +30,9 @@ class EmailClient:
         cc_emails: list[str],
         bcc_emails: list[str],
         subject: str,
-        body: str,
+        body: Optional[str] = None,
+        body_html: Optional[str] = None,
+        custom_headers: list[tuple[str, str]] | None = None,
         attachments: list[tuple[str, bytes]] | None = None,
     ) -> ExecutionResult:
         try:
@@ -48,7 +50,17 @@ class EmailClient:
             if cc_emails:
                 msg["Cc"] = ", ".join(cc_emails)
             msg["Subject"] = subject
-            msg.attach(MIMEText(body, "plain"))
+            for header_name, header_value in custom_headers or []:
+                msg[header_name] = header_value
+            if body and body_html:
+                alternative = MIMEMultipart("alternative")
+                alternative.attach(MIMEText(body, "plain"))
+                alternative.attach(MIMEText(body_html, "html"))
+                msg.attach(alternative)
+            elif body_html:
+                msg.attach(MIMEText(body_html, "html"))
+            else:
+                msg.attach(MIMEText(body or "", "plain"))
             for attachment_filename, attachment_content in attachments or []:
                 attachment_part = MIMEApplication(attachment_content)
                 attachment_part.add_header(

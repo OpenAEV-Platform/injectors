@@ -10,6 +10,101 @@ def _serialize_message(msg, *args, **kwargs):
     msg.as_bytes()
 
 
+def test_send_email_with_html_body_creates_alternative_part():
+    with patch("smtplib.SMTP") as mock_smtp:
+        instance = mock_smtp.return_value.__enter__.return_value
+
+        result = EmailClient.send_email(
+            smtp_hostname="localhost",
+            smtp_port=1025,
+            smtp_use_tls=False,
+            smtp_username=None,
+            smtp_password=None,
+            from_email="from@example.com",
+            mail_from="from@example.com",
+            reply_to=None,
+            to_email="to@example.com",
+            cc_emails=[],
+            bcc_emails=[],
+            subject="HTML Subject",
+            body="Plain body",
+            body_html="<p>HTML body</p>",
+            attachments=[],
+        )
+
+        assert result.success
+        sent_message = instance.send_message.call_args.args[0]
+        alternative = sent_message.get_payload()[0]
+        assert alternative.get_content_type() == "multipart/alternative"
+        parts = alternative.get_payload()
+        assert parts[0].get_content_type() == "text/plain"
+        assert parts[0].get_payload() == "Plain body"
+        assert parts[1].get_content_type() == "text/html"
+        assert parts[1].get_payload() == "<p>HTML body</p>"
+
+
+def test_send_email_without_html_body_stays_plain():
+    with patch("smtplib.SMTP") as mock_smtp:
+        instance = mock_smtp.return_value.__enter__.return_value
+
+        result = EmailClient.send_email(
+            smtp_hostname="localhost",
+            smtp_port=1025,
+            smtp_use_tls=False,
+            smtp_username=None,
+            smtp_password=None,
+            from_email="from@example.com",
+            mail_from="from@example.com",
+            reply_to=None,
+            to_email="to@example.com",
+            cc_emails=[],
+            bcc_emails=[],
+            subject="Plain Subject",
+            body="Plain body",
+            attachments=[],
+        )
+
+        assert result.success
+        sent_message = instance.send_message.call_args.args[0]
+        body_part = sent_message.get_payload()[0]
+        assert body_part.get_content_type() == "text/plain"
+        assert body_part.get_payload() == "Plain body"
+
+
+def test_send_email_with_html_body_and_attachment():
+    with patch("smtplib.SMTP") as mock_smtp:
+        instance = mock_smtp.return_value.__enter__.return_value
+
+        result = EmailClient.send_email(
+            smtp_hostname="localhost",
+            smtp_port=1025,
+            smtp_use_tls=False,
+            smtp_username=None,
+            smtp_password=None,
+            from_email="from@example.com",
+            mail_from="from@example.com",
+            reply_to=None,
+            to_email="to@example.com",
+            cc_emails=[],
+            bcc_emails=[],
+            subject="HTML + attachment",
+            body="Plain body",
+            body_html="<p>HTML body</p>",
+            attachments=[("test.txt", b"hello")],
+        )
+
+        assert result.success
+        sent_message = instance.send_message.call_args.args[0]
+        alternative = sent_message.get_payload()[0]
+        assert alternative.get_content_type() == "multipart/alternative"
+        attachment_parts = [
+            part
+            for part in sent_message.get_payload()
+            if part.get_filename() == "test.txt"
+        ]
+        assert len(attachment_parts) == 1
+
+
 def test_send_email_success():
     with patch("smtplib.SMTP") as mock_smtp:
         instance = mock_smtp.return_value.__enter__.return_value
@@ -166,6 +261,61 @@ def test_send_email_with_multiple_attachments():
             if part.get_filename() is not None
         ]
         assert attachment_parts == ["a.txt", "b.txt"]
+
+
+def test_send_email_with_one_custom_header():
+    with patch("smtplib.SMTP") as mock_smtp:
+        instance = mock_smtp.return_value.__enter__.return_value
+
+        result = EmailClient.send_email(
+            smtp_hostname="localhost",
+            smtp_port=1025,
+            smtp_use_tls=False,
+            smtp_username=None,
+            smtp_password=None,
+            from_email="from@example.com",
+            mail_from="from@example.com",
+            reply_to=None,
+            to_email="to@example.com",
+            cc_emails=[],
+            bcc_emails=[],
+            subject="Header Subject",
+            body="Header Body",
+            custom_headers=[("X-OpenAEV-Test", "true")],
+            attachments=[],
+        )
+
+        assert result.success
+        sent_message = instance.send_message.call_args.args[0]
+        assert sent_message["X-OpenAEV-Test"] == "true"
+
+
+def test_send_email_with_multiple_custom_headers():
+    with patch("smtplib.SMTP") as mock_smtp:
+        instance = mock_smtp.return_value.__enter__.return_value
+
+        result = EmailClient.send_email(
+            smtp_hostname="localhost",
+            smtp_port=1025,
+            smtp_use_tls=False,
+            smtp_username=None,
+            smtp_password=None,
+            from_email="from@example.com",
+            mail_from="from@example.com",
+            reply_to=None,
+            to_email="to@example.com",
+            cc_emails=[],
+            bcc_emails=[],
+            subject="Header Subject",
+            body="Header Body",
+            custom_headers=[("X-First", "one"), ("X-Second", "two")],
+            attachments=[],
+        )
+
+        assert result.success
+        sent_message = instance.send_message.call_args.args[0]
+        assert sent_message["X-First"] == "one"
+        assert sent_message["X-Second"] == "two"
 
 
 def test_send_email_closes_connection_on_send_failure():
