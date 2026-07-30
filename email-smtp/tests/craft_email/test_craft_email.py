@@ -79,7 +79,7 @@ def test_execute_parses_and_forwards_custom_headers(
         "to": "recipient@example.com",
         "subject": "Subject",
         "body": "Body",
-        "custom_headers": "X-OpenAEV-Test: true\nX-Trace-ID: abc-123",
+        "custom_headers": "X-OpenAEV-Test: true\nX-OpenAEV-Trace-ID: abc-123",
     }
 
     result = email_smtp_injector.execute(_data(content=content))
@@ -87,7 +87,7 @@ def test_execute_parses_and_forwards_custom_headers(
     assert result.success
     assert mock_send_email.call_args.kwargs["custom_headers"] == [
         ("X-OpenAEV-Test", "true"),
-        ("X-Trace-ID", "abc-123"),
+        ("X-OpenAEV-Trace-ID", "abc-123"),
     ]
 
 
@@ -109,6 +109,7 @@ def test_extract_attachments_requires_document_id(email_smtp_injector):
     "custom_headers,expected_message",
     [
         ("bad header: true", "unsafe header name"),
+        ("X-Trace-ID: abc-123", "header name must start with 'X-OpenAEV-'"),
         ("X-OpenAEV-Test:", "header value is required"),
     ],
 )

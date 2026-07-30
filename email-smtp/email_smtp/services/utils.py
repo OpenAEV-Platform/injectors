@@ -4,6 +4,7 @@ from typing import Dict, List, Optional
 from email_smtp.models.exceptions import CustomHeaderValidationError
 
 HEADER_NAME_PATTERN = re.compile(r"^[A-Za-z0-9!#$%&'*+\-.^_`|~]+$")
+CUSTOM_HEADER_PREFIX = "X-OpenAEV-"
 
 
 class EmailPayloadBuilder:
@@ -62,6 +63,11 @@ class EmailPayloadBuilder:
             if not HEADER_NAME_PATTERN.fullmatch(header_name):
                 raise CustomHeaderValidationError(
                     f"Invalid custom header at line {line_number}: unsafe header name"
+                )
+            if not header_name.startswith(CUSTOM_HEADER_PREFIX):
+                raise CustomHeaderValidationError(
+                    f"Invalid custom header at line {line_number}: "
+                    f"header name must start with '{CUSTOM_HEADER_PREFIX}'"
                 )
             if not header_value:
                 raise CustomHeaderValidationError(
