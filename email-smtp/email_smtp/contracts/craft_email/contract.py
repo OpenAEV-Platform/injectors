@@ -47,7 +47,14 @@ class CraftEmail:
             .optional(ContractText(key="cc", label="Cc (comma-separated emails)"))
             .optional(ContractText(key="bcc", label="Bcc (comma-separated emails)"))
             .mandatory(ContractText(key="subject", label="Subject"))
-            .mandatory(ContractTextArea(key="body", label="Body"))
+            .optional(ContractTextArea(key="body", label="Body (plain text)"))
+            .optional(
+                ContractTextArea(
+                    key="body_html",
+                    label="Body (HTML)",
+                    richText=True,
+                )
+            )
             .optional(
                 ContractTextArea(
                     key="custom_headers",
@@ -86,5 +93,7 @@ class CraftEmail:
             fields=contract_with_specific_fields,
             outputs=contract_with_specific_outputs,
             manual=False,
-            domains=[SecurityDomains.TABLE_TOP.value],
+            domains=[
+                SecurityDomains.TABLE_TOP.value
+            ],  # ty: ignore[invalid-argument-type]
         )

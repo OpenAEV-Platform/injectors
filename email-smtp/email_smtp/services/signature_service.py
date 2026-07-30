@@ -24,6 +24,7 @@ RECIPIENT_EMAIL = "recipient_email"
 REPLY_TO_EMAIL = "reply_to_email"
 URL_HASH = "url_hash"
 ATTACHMENT_HASH = "attachment_hash"
+CUSTOM_HEADER = "custom_header"
 
 DEFAULT_HASH_ALGORITHM = "sha256"
 
@@ -99,8 +100,9 @@ class EmailSignatureService:
         - ``sender_email``: from address + mail_from (envelope sender) if different
         - ``recipient_email``: to + cc + bcc addresses
         - ``reply_to_email``: reply-to address (only when present)
-        - ``url_hash``: hashes of URLs found in the body
+        - ``url_hash``: hashes of URLs found in the plain-text and HTML bodies
         - ``attachment_hash``: hashes of attachment file contents
+        - ``custom_header``: custom header name:value pairs (plain text)
         """
         signatures: dict[str, list[str]] = {}
 
@@ -134,9 +136,10 @@ class EmailSignatureService:
         if reply_to:
             signatures[REPLY_TO_EMAIL] = [reply_to]
 
-        # URL hash signatures from body
+        # URL hash signatures from body (plain text and HTML)
         url_hashes = EmailSignatureService._extract_url_hashes(
-            payload.get("body", ""), hash_algorithm
+            [payload.get("body", ""), payload.get("body_html", "")],
+            hash_algorithm,
         )
         if url_hashes:
             signatures[URL_HASH] = url_hashes
@@ -148,17 +151,37 @@ class EmailSignatureService:
             ]
             signatures[ATTACHMENT_HASH] = attachment_hashes
 
+        # Custom header signatures (stored as plain "name: value" strings)
+        custom_headers = payload.get("custom_headers", [])
+        if custom_headers:
+            signatures[CUSTOM_HEADER] = [
+                f"{name}: {value}" for name, value in custom_headers
+            ]
+
         return signatures
 
     @staticmethod
     def _extract_url_hashes(
-        body: str, algorithm: str = DEFAULT_HASH_ALGORITHM
+        bodies: str | list[str], algorithm: str = DEFAULT_HASH_ALGORITHM
     ) -> list[str]:
-        """Extract URLs from text or HTML body and return their hashes."""
-        if not body:
-            return []
-        urls = find_iocs(body).get("urls", [])
-        return [_hash_str(url, algorithm) for url in urls]
+        """Extract URLs from one or more text/HTML bodies and hash them.
+
+        URLs are deduplicated across all bodies while preserving their first
+        occurrence order.
+        """
+        if isinstance(bodies, str):
+            bodies = [bodies]
+        seen: set[str] = set()
+        hashes: list[str] = []
+        for body in bodies:
+            if not body:
+                continue
+            for url in find_iocs(body).get("urls", []):
+                url_hash = _hash_str(url, algorithm)
+                if url_hash not in seen:
+                    seen.add(url_hash)
+                    hashes.append(url_hash)
+        return hashes
 
     # -- payload & send ------------------------------------------------------
 
