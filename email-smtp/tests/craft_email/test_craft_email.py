@@ -433,7 +433,7 @@ def test_process_message_output_structured_includes_custom_header_hashes(
         "to": "victim@example.com",
         "subject": "Subject",
         "body": "Body",
-        "custom_headers": "X-Track: abc123\nX-Campaign: summer",
+        "custom_headers": "X-OpenAEV-Track: abc123\nX-OpenAEV-Campaign: summer",
     }
 
     email_smtp_injector.process_message(_data(content=content))
@@ -447,4 +447,7 @@ def test_process_message_output_structured_includes_custom_header_hashes(
 
     output = json.loads(callback_data["execution_output_structured"])
     sigs = output["expectation_signatures"]
-    assert sigs["custom_header"] == ["X-Track: abc123", "X-Campaign: summer"]
+    assert sigs["custom_header"] == [
+        "X-OpenAEV-Track: abc123",
+        "X-OpenAEV-Campaign: summer",
+    ]
