@@ -4,6 +4,8 @@ import hashlib
 from unittest.mock import Mock
 
 from email_smtp.services.signature_service import (
+    ATTACHMENT_HASH,
+    CUSTOM_HEADER,
     RECIPIENT_EMAIL,
     REPLY_TO_EMAIL,
     SENDER_EMAIL,
@@ -239,6 +241,195 @@ class TestUrlHashSignatures:
         assert signatures[SENDER_EMAIL] == ["sender@test.com"]
         assert signatures[RECIPIENT_EMAIL] == ["victim@test.com"]
         assert signatures[URL_HASH] == [_sha256("https://evil.com")]
+
+    def test_html_body_urls_are_hashed(self):
+        payload = {
+            "from": "",
+            "to": "",
+            "body": "",
+            "body_html": '<a href="https://evil.com/phish">Click</a>',
+        }
+        signatures = EmailSignatureService.build_email_signatures(payload)
+        assert signatures[URL_HASH] == [_sha256("https://evil.com/phish")]
+
+    def test_urls_from_plain_and_html_bodies_combined(self):
+        payload = {
+            "from": "",
+            "to": "",
+            "body": "Plain https://plain.example.com",
+            "body_html": '<a href="https://html.example.com">link</a>',
+        }
+        signatures = EmailSignatureService.build_email_signatures(payload)
+        assert _sha256("https://plain.example.com") in signatures[URL_HASH]
+        assert _sha256("https://html.example.com") in signatures[URL_HASH]
+        assert len(signatures[URL_HASH]) == 2
+
+    def test_url_present_in_both_bodies_deduplicated(self):
+        payload = {
+            "from": "",
+            "to": "",
+            "body": "https://dup.example.com",
+            "body_html": '<a href="https://dup.example.com">link</a>',
+        }
+        signatures = EmailSignatureService.build_email_signatures(payload)
+        assert signatures[URL_HASH] == [_sha256("https://dup.example.com")]
+
+    def test_no_url_hash_when_bodies_empty(self):
+        payload = {"from": "", "to": "", "body": "", "body_html": ""}
+        signatures = EmailSignatureService.build_email_signatures(payload)
+        assert URL_HASH not in signatures
+
+
+def _hash_bytes(data: bytes, algorithm: str = "sha256") -> str:
+    return hashlib.new(algorithm, data).hexdigest()
+
+
+class TestAttachmentHashSignatures:
+    def test_single_attachment(self):
+        payload = {"from": "", "to": ""}
+        attachments = [("file.pdf", b"pdf-content")]
+        signatures = EmailSignatureService.build_email_signatures(
+            payload, attachments=attachments
+        )
+        assert signatures[ATTACHMENT_HASH] == [_hash_bytes(b"pdf-content")]
+
+    def test_multiple_attachments(self):
+        payload = {"from": "", "to": ""}
+        attachments = [
+            ("a.txt", b"content-a"),
+            ("b.txt", b"content-b"),
+            ("c.txt", b"content-c"),
+        ]
+        signatures = EmailSignatureService.build_email_signatures(
+            payload, attachments=attachments
+        )
+        assert len(signatures[ATTACHMENT_HASH]) == 3
+        assert signatures[ATTACHMENT_HASH][0] == _hash_bytes(b"content-a")
+        assert signatures[ATTACHMENT_HASH][1] == _hash_bytes(b"content-b")
+        assert signatures[ATTACHMENT_HASH][2] == _hash_bytes(b"content-c")
+
+    def test_no_attachments(self):
+        payload = {"from": "", "to": ""}
+        signatures = EmailSignatureService.build_email_signatures(payload)
+        assert ATTACHMENT_HASH not in signatures
+
+    def test_empty_attachment_list(self):
+        payload = {"from": "", "to": ""}
+        signatures = EmailSignatureService.build_email_signatures(
+            payload, attachments=[]
+        )
+        assert ATTACHMENT_HASH not in signatures
+
+    def test_combined_with_email_and_url_signatures(self):
+        payload = {
+            "from": "sender@test.com",
+            "to": "victim@test.com",
+            "body": "Click https://evil.com",
+        }
+        attachments = [("malware.exe", b"malicious")]
+        signatures = EmailSignatureService.build_email_signatures(
+            payload, attachments=attachments
+        )
+        assert SENDER_EMAIL in signatures
+        assert RECIPIENT_EMAIL in signatures
+        assert URL_HASH in signatures
+        assert signatures[ATTACHMENT_HASH] == [_hash_bytes(b"malicious")]
+
+
+class TestHashAlgorithmConfig:
+    def test_url_hash_with_sha1(self):
+        payload = {"from": "", "to": "", "body": "Visit https://example.com"}
+        signatures = EmailSignatureService.build_email_signatures(
+            payload, hash_algorithm="sha1"
+        )
+        expected = hashlib.sha1("https://example.com".encode()).hexdigest()
+        assert signatures[URL_HASH] == [expected]
+
+    def test_url_hash_with_md5(self):
+        payload = {"from": "", "to": "", "body": "Visit https://example.com"}
+        signatures = EmailSignatureService.build_email_signatures(
+            payload, hash_algorithm="md5"
+        )
+        expected = hashlib.md5("https://example.com".encode()).hexdigest()
+        assert signatures[URL_HASH] == [expected]
+
+    def test_attachment_hash_with_sha1(self):
+        payload = {"from": "", "to": ""}
+        attachments = [("file.txt", b"data")]
+        signatures = EmailSignatureService.build_email_signatures(
+            payload, attachments=attachments, hash_algorithm="sha1"
+        )
+        expected = hashlib.sha1(b"data").hexdigest()
+        assert signatures[ATTACHMENT_HASH] == [expected]
+
+    def test_attachment_hash_with_md5(self):
+        payload = {"from": "", "to": ""}
+        attachments = [("file.txt", b"data")]
+        signatures = EmailSignatureService.build_email_signatures(
+            payload, attachments=attachments, hash_algorithm="md5"
+        )
+        expected = hashlib.md5(b"data").hexdigest()
+        assert signatures[ATTACHMENT_HASH] == [expected]
+
+    def test_default_algorithm_is_sha256(self):
+        payload = {"from": "", "to": "", "body": "https://example.com"}
+        attachments = [("f.bin", b"bin")]
+        signatures = EmailSignatureService.build_email_signatures(
+            payload, attachments=attachments
+        )
+        assert signatures[URL_HASH] == [_sha256("https://example.com")]
+        assert signatures[ATTACHMENT_HASH] == [_hash_bytes(b"bin", "sha256")]
+
+
+class TestCustomHeaderSignatures:
+    def test_single_custom_header(self):
+        payload = {"from": "", "to": "", "custom_headers": [("X-Track", "abc123")]}
+        signatures = EmailSignatureService.build_email_signatures(payload)
+        assert signatures[CUSTOM_HEADER] == ["X-Track: abc123"]
+
+    def test_multiple_custom_headers(self):
+        payload = {
+            "from": "",
+            "to": "",
+            "custom_headers": [
+                ("X-Track", "abc123"),
+                ("X-Campaign", "summer"),
+                ("X-Mailer", "openaev"),
+            ],
+        }
+        signatures = EmailSignatureService.build_email_signatures(payload)
+        assert signatures[CUSTOM_HEADER] == [
+            "X-Track: abc123",
+            "X-Campaign: summer",
+            "X-Mailer: openaev",
+        ]
+
+    def test_no_custom_headers(self):
+        payload = {"from": "", "to": "", "custom_headers": []}
+        signatures = EmailSignatureService.build_email_signatures(payload)
+        assert CUSTOM_HEADER not in signatures
+
+    def test_no_custom_headers_key(self):
+        payload = {"from": "", "to": ""}
+        signatures = EmailSignatureService.build_email_signatures(payload)
+        assert CUSTOM_HEADER not in signatures
+
+    def test_combined_with_other_signatures(self):
+        payload = {
+            "from": "sender@test.com",
+            "to": "victim@test.com",
+            "body": "Visit https://evil.com",
+            "custom_headers": [("X-Track", "id1")],
+        }
+        attachments = [("doc.pdf", b"content")]
+        signatures = EmailSignatureService.build_email_signatures(
+            payload, attachments=attachments
+        )
+        assert SENDER_EMAIL in signatures
+        assert RECIPIENT_EMAIL in signatures
+        assert URL_HASH in signatures
+        assert ATTACHMENT_HASH in signatures
+        assert signatures[CUSTOM_HEADER] == ["X-Track: id1"]
 
 
 class TestSendSignatures:
