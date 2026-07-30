@@ -68,6 +68,7 @@ class EmailSmtpInjector:
             bcc_emails=payload["bcc"],
             subject=payload["subject"],
             body=payload["body"],
+            body_html=payload["body_html"],
             custom_headers=payload["custom_headers"],
             attachments=attachments,
         )
@@ -209,7 +210,7 @@ class EmailSmtpInjector:
         signatures = EmailSignatureService.build_email_signatures(
             email_payload,
             attachments=attachments or [],
-            hash_algorithm=self.config.injector.hash_algorithm,
+            hash_algorithm=self.config.email_smtp.hash_algorithm,
         )
         if not signatures:
             return {}

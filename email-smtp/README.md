@@ -71,6 +71,12 @@ The injector is configured either through environment variables (recommended, re
 | Injector Name | `injector.name`      | `INJECTOR_NAME`             | Email (SMTP) | No        | The name of the injector as shown in OpenAEV.                                  |
 | Log Level     | `injector.log_level` | `INJECTOR_LOG_LEVEL`        | error        | No        | Verbosity of the logs. One of `debug`, `info`, `warning`, `error`, `critical`. |
 
+### Email-SMTP environment variables
+
+| Parameter      | config.yml                  | Docker environment variable | Default | Mandatory | Description                                                                    |
+|----------------|-----------------------------|-----------------------------|---------|-----------|--------------------------------------------------------------------------------|
+| Hash Algorithm | `email_smtp.hash_algorithm` | `EMAIL_SMTP_HASH_ALGORITHM` | sha256  | No        | Hash algorithm used for signature generation (URL and attachment hashes). One of `sha256`, `sha1`, `md5`. |
+
 ## Deployment
 
 ### Docker Deployment
@@ -114,12 +120,16 @@ injector:
   id: 'changeme'
   name: 'Email (SMTP)'
   log_level: 'info'
+
+email_smtp:
+  hash_algorithm: 'sha256'
 ```
 
 Injects carry the message-specific fields: `from`, optional `mail_from`
-(SMTP envelope sender), optional `reply_to`, `to`, `subject`, `body`, optional
-`cc` and `bcc` (comma-separated email lists), optional `custom_headers` (one
-`name: value` header per line), and SMTP fields:
+(SMTP envelope sender), optional `reply_to`, `to`, `subject`, optional `body`,
+optional `body_html` (HTML body sent as an `alternative` MIME part alongside the
+plain text), optional `cc` and `bcc` (comma-separated email lists), optional
+`custom_headers` (one `name: value` header per line), and SMTP fields:
 `smtp_hostname`, `smtp_port`, `smtp_use_tls`, `smtp_username`,
 `smtp_password`. They can also carry optional attachments through the
 contract attachment field.
@@ -128,23 +138,24 @@ contract attachment field.
 
 The injector registers a single contract labelled "Email (SMTP) - Craft email" in the `TABLE_TOP` security domain.
 
-| Field         | Content key     | Mandatory | Description                                                     |
-|---------------|-----------------|-----------|-----------------------------------------------------------------|
-| SMTP Hostname | `smtp_hostname` | Yes       | Hostname of the SMTP server used to send the email.             |
-| SMTP Port     | `smtp_port`     | Yes       | Port of the SMTP server.                                        |
-| Use TLS       | `smtp_use_tls`  | No        | Enables STARTTLS on the SMTP connection.                        |
-| SMTP Username | `smtp_username` | No        | SMTP authentication username (used together with the password). |
-| SMTP Password | `smtp_password` | No        | SMTP authentication password.                                   |
-| From Email    | `from`          | Yes       | Sender address of the email.                                    |
-| Mail From     | `mail_from`     | No        | SMTP envelope sender (MAIL FROM); defaults to `from`.           |
-| Reply-To      | `reply_to`      | No        | Reply-To header address; omitted when not provided.             |
-| To Email      | `to`            | Yes       | Primary recipient address.                                      |
-| Cc            | `cc`            | No        | Comma-separated list of Cc recipients.                          |
-| Bcc           | `bcc`           | No        | Comma-separated list of Bcc recipients.                         |
-| Subject       | `subject`       | Yes       | Subject of the email.                                           |
-| Body          | `body`          | Yes       | Plain-text body of the email.                                   |
-| Custom Headers| `custom_headers`| No        | One custom header per line (`name: value`); unsafe headers are rejected. |
-| Attachments   | `attachments`   | No        | Inject documents sent as email attachments.                     |
+| Field          | Content key      | Mandatory | Description                                                                 |
+|----------------|------------------|-----------|-----------------------------------------------------------------------------|
+| SMTP Hostname  | `smtp_hostname`  | Yes       | Hostname of the SMTP server used to send the email.                         |
+| SMTP Port      | `smtp_port`      | Yes       | Port of the SMTP server.                                                    |
+| Use TLS        | `smtp_use_tls`   | No        | Enables STARTTLS on the SMTP connection.                                    |
+| SMTP Username  | `smtp_username`  | No        | SMTP authentication username (used together with the password).             |
+| SMTP Password  | `smtp_password`  | No        | SMTP authentication password.                                               |
+| From Email     | `from`           | Yes       | Sender address of the email.                                                |
+| Mail From      | `mail_from`      | No        | SMTP envelope sender (MAIL FROM); defaults to `from`.                       |
+| Reply-To       | `reply_to`       | No        | Reply-To header address; omitted when not provided.                         |
+| To Email       | `to`             | Yes       | Primary recipient address.                                                  |
+| Cc             | `cc`             | No        | Comma-separated list of Cc recipients.                                      |
+| Bcc            | `bcc`            | No        | Comma-separated list of Bcc recipients.                                     |
+| Subject        | `subject`        | Yes       | Subject of the email.                                                       |
+| Body           | `body`           | No        | Plain-text body of the email.                                               |
+| Body (HTML)    | `body_html`      | No        | Optional HTML body; sent as an `alternative` part alongside the plain text. |
+| Custom Headers | `custom_headers` | No        | One custom header per line (`name: value`); unsafe headers are rejected.    |
+| Attachments    | `attachments`    | No        | Inject documents sent as email attachments.                                 |
 
 ## Target selection
 

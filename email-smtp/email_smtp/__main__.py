@@ -7,6 +7,7 @@ from pathlib import Path
 
 from email_smtp.injector.openaev_email_smtp import EmailSmtpInjector
 from email_smtp.models import ConfigLoader
+from email_smtp.models.configs.injector_config_override import ICON_FILEPATH
 from pydantic import ValidationError
 from pyoaev.helpers import OpenAEVConfigHelper, OpenAEVInjectorHelper
 
@@ -25,10 +26,7 @@ def main() -> None:
         intercept_dump_argument(config.to_daemon_config())
 
         # Load the injector icon for the helper
-        icon_path = config.injector.icon_filepath
-        icon_bytes = (
-            (Path(__file__).parents[1] / icon_path).read_bytes() if icon_path else None
-        )
+        icon_bytes = (Path(__file__).parents[1] / ICON_FILEPATH).read_bytes()
 
         # Instantiate the OpenAEV injector helper
         helper = OpenAEVInjectorHelper(
