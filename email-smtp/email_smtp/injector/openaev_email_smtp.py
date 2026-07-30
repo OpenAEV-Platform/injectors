@@ -29,14 +29,17 @@ class EmailSmtpInjector:
         )
         self.helper.injector_logger.info(f"{LOG_PREFIX} - Email injector initialized")
 
-    def execute(self, data: Dict) -> ExecutionResult:
+    def execute(
+        self, data: Dict, attachments: List[Tuple[str, bytes]] | None = None
+    ) -> ExecutionResult:
         inject_contract = DataHelpers.get_injector_contract_id(data)
         if inject_contract != EmailContractId.CRAFT_EMAIL:
             raise InvalidContractError("Unsupported contract for Email injector")
 
         content = DataHelpers.get_content(data)
         payload = EmailPayloadBuilder.build(content)
-        attachments = self._extract_attachments(data)
+        if attachments is None:
+            attachments = self._extract_attachments(data)
         self.helper.injector_logger.info(
             f"{LOG_PREFIX} - Crafting email",
             {
@@ -65,6 +68,7 @@ class EmailSmtpInjector:
             bcc_emails=payload["bcc"],
             subject=payload["subject"],
             body=payload["body"],
+            body_html=payload["body_html"],
             custom_headers=payload["custom_headers"],
             attachments=attachments,
         )
@@ -141,9 +145,15 @@ class EmailSmtpInjector:
         execution_signature = self.signature_service.build_execution_signature()
 
         try:
-            result = self.execute(data)
+            attachments = self._extract_attachments(data)
+            result = self.execute(data, attachments=attachments)
 
-            output_structured = self._build_output_structured(data)
+            content = DataHelpers.get_content(data)
+            email_payload = EmailPayloadBuilder.build(content)
+            output_structured = self._build_output_structured(
+                email_payload, attachments
+            )
+
             callback_data = {
                 "execution_message": result.message,
                 "execution_output_structured": json.dumps(output_structured),
@@ -191,12 +201,20 @@ class EmailSmtpInjector:
 
         self._send_signatures(inject_id, execution_details, execution_signature)
 
-    @staticmethod
-    def _build_output_structured(data: Dict) -> Dict:
-        """Build the contract output structure with the recipient email address."""
-        content = DataHelpers.get_content(data)
-        to_address = content.get("to", "")
-        return {"expectation_signatures": [to_address]} if to_address else {}
+    def _build_output_structured(
+        self,
+        email_payload: Dict,
+        attachments: List[Tuple[str, bytes]] | None = None,
+    ) -> Dict:
+        """Build the contract output with email address and attachment signatures."""
+        signatures = EmailSignatureService.build_email_signatures(
+            email_payload,
+            attachments=attachments or [],
+            hash_algorithm=self.config.email_smtp.hash_algorithm,
+        )
+        if not signatures:
+            return {}
+        return {"expectation_signatures": signatures}
 
     def _send_signatures(
         self,
