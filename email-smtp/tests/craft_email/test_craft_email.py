@@ -8,6 +8,7 @@ from email_smtp.models.exceptions import (
     MissingRequiredFieldError,
 )
 from email_smtp.services.email_client import ExecutionResult
+from pyoaev.signatures.types import SignatureTypes
 
 CONTRACT_ID = EmailContractId.CRAFT_EMAIL
 
@@ -275,8 +276,8 @@ def test_process_message_output_structured_contains_email_signatures(
 
     output = json.loads(callback_data["execution_output_structured"])
     sigs = output["expectation_signatures"]
-    assert sigs["sender_email"] == ["sender@example.com"]
-    assert sigs["recipient_email"] == ["recipient@example.com"]
+    assert sigs[SignatureTypes.SIG_TYPE_SOURCE_EMAIL.value] == ["sender@example.com"]
+    assert sigs[SignatureTypes.SIG_TYPE_TARGET_EMAIL.value] == ["recipient@example.com"]
 
 
 @patch("email_smtp.injector.openaev_email_smtp.EmailClient.send_email")
@@ -309,13 +310,16 @@ def test_process_message_output_structured_includes_all_address_fields(
 
     output = json.loads(callback_data["execution_output_structured"])
     sigs = output["expectation_signatures"]
-    assert sigs["sender_email"] == ["sender@example.com", "bounce@example.com"]
-    assert sigs["recipient_email"] == [
+    assert sigs[SignatureTypes.SIG_TYPE_SOURCE_EMAIL.value] == [
+        "sender@example.com",
+        "bounce@example.com",
+    ]
+    assert sigs[SignatureTypes.SIG_TYPE_TARGET_EMAIL.value] == [
         "victim@example.com",
         "copy@example.com",
         "hidden@example.com",
+        "reply@example.com",
     ]
-    assert sigs["reply_to_email"] == ["reply@example.com"]
 
 
 @patch("email_smtp.injector.openaev_email_smtp.EmailClient.send_email")
@@ -374,7 +378,7 @@ def test_process_message_output_structured_includes_url_hashes(
     output = json.loads(callback_data["execution_output_structured"])
     sigs = output["expectation_signatures"]
     expected_hash = hashlib.sha256(b"https://evil.com/phish").hexdigest()
-    assert sigs["url_hash"] == [expected_hash]
+    assert sigs[SignatureTypes.SIG_TYPE_URL_HASH.value] == [expected_hash]
 
 
 @patch("email_smtp.injector.openaev_email_smtp.EmailClient.send_email")
@@ -417,7 +421,7 @@ def test_process_message_output_structured_includes_attachment_hashes(
     output = json.loads(callback_data["execution_output_structured"])
     sigs = output["expectation_signatures"]
     expected_hash = hashlib.sha256(attachment_content).hexdigest()
-    assert sigs["attachment_hash"] == [expected_hash]
+    assert sigs[SignatureTypes.SIG_TYPE_FILE_HASH.value] == [expected_hash]
 
 
 @patch("email_smtp.injector.openaev_email_smtp.EmailClient.send_email")
@@ -447,7 +451,7 @@ def test_process_message_output_structured_includes_custom_header_hashes(
 
     output = json.loads(callback_data["execution_output_structured"])
     sigs = output["expectation_signatures"]
-    assert sigs["custom_header"] == [
+    assert sigs[SignatureTypes.SIG_TYPE_EMAIL_CUSTOM_HEADER.value] == [
         "X-OpenAEV-Track: abc123",
         "X-OpenAEV-Campaign: summer",
     ]

@@ -4,16 +4,11 @@ import hashlib
 from unittest.mock import Mock
 
 from email_smtp.services.signature_service import (
-    ATTACHMENT_HASH,
-    CUSTOM_HEADER,
-    RECIPIENT_EMAIL,
-    REPLY_TO_EMAIL,
-    SENDER_EMAIL,
-    URL_HASH,
     EmailSignatureService,
 )
 from pyoaev.signatures import ExtraSignatureData
 from pyoaev.signatures.models import ExecutionDetails, ExecutionSignature
+from pyoaev.signatures.types import SignatureTypes
 
 from injector_common.targets import TargetMeta
 
@@ -74,12 +69,16 @@ class TestBuildEmailSignatures:
     def test_from_field_generates_sender_email(self):
         payload = {"from": "sender@example.test", "to": ""}
         signatures = EmailSignatureService.build_email_signatures(payload)
-        assert signatures[SENDER_EMAIL] == ["sender@example.test"]
+        assert signatures[SignatureTypes.SIG_TYPE_SOURCE_EMAIL.value] == [
+            "sender@example.test"
+        ]
 
     def test_mail_from_generates_sender_email(self):
         payload = {"from": "", "mail_from": "bounce@example.test", "to": ""}
         signatures = EmailSignatureService.build_email_signatures(payload)
-        assert signatures[SENDER_EMAIL] == ["bounce@example.test"]
+        assert signatures[SignatureTypes.SIG_TYPE_SOURCE_EMAIL.value] == [
+            "bounce@example.test"
+        ]
 
     def test_mail_from_different_from_both_included(self):
         payload = {
@@ -88,7 +87,7 @@ class TestBuildEmailSignatures:
             "to": "",
         }
         signatures = EmailSignatureService.build_email_signatures(payload)
-        assert signatures[SENDER_EMAIL] == [
+        assert signatures[SignatureTypes.SIG_TYPE_SOURCE_EMAIL.value] == [
             "sender@example.test",
             "bounce@example.test",
         ]
@@ -100,22 +99,30 @@ class TestBuildEmailSignatures:
             "to": "",
         }
         signatures = EmailSignatureService.build_email_signatures(payload)
-        assert signatures[SENDER_EMAIL] == ["sender@example.test"]
+        assert signatures[SignatureTypes.SIG_TYPE_SOURCE_EMAIL.value] == [
+            "sender@example.test"
+        ]
 
     def test_to_field_generates_recipient_email(self):
         payload = {"from": "", "to": "victim@example.test"}
         signatures = EmailSignatureService.build_email_signatures(payload)
-        assert signatures[RECIPIENT_EMAIL] == ["victim@example.test"]
+        assert signatures[SignatureTypes.SIG_TYPE_TARGET_EMAIL.value] == [
+            "victim@example.test"
+        ]
 
     def test_cc_generates_recipient_email(self):
         payload = {"from": "", "to": "", "cc": ["copy@example.test"]}
         signatures = EmailSignatureService.build_email_signatures(payload)
-        assert signatures[RECIPIENT_EMAIL] == ["copy@example.test"]
+        assert signatures[SignatureTypes.SIG_TYPE_TARGET_EMAIL.value] == [
+            "copy@example.test"
+        ]
 
     def test_bcc_generates_recipient_email(self):
         payload = {"from": "", "to": "", "bcc": ["hidden@example.test"]}
         signatures = EmailSignatureService.build_email_signatures(payload)
-        assert signatures[RECIPIENT_EMAIL] == ["hidden@example.test"]
+        assert signatures[SignatureTypes.SIG_TYPE_TARGET_EMAIL.value] == [
+            "hidden@example.test"
+        ]
 
     def test_to_cc_bcc_all_combined(self):
         payload = {
@@ -125,7 +132,7 @@ class TestBuildEmailSignatures:
             "bcc": ["hidden@example.test"],
         }
         signatures = EmailSignatureService.build_email_signatures(payload)
-        assert signatures[RECIPIENT_EMAIL] == [
+        assert signatures[SignatureTypes.SIG_TYPE_TARGET_EMAIL.value] == [
             "victim@example.test",
             "copy@example.test",
             "hidden@example.test",
@@ -134,12 +141,16 @@ class TestBuildEmailSignatures:
     def test_reply_to_generates_reply_to_email(self):
         payload = {"from": "", "to": "", "reply_to": "reply@example.test"}
         signatures = EmailSignatureService.build_email_signatures(payload)
-        assert signatures[REPLY_TO_EMAIL] == ["reply@example.test"]
+        assert signatures[SignatureTypes.SIG_TYPE_TARGET_EMAIL.value] == [
+            "reply@example.test"
+        ]
 
     def test_no_reply_to_when_absent(self):
         payload = {"from": "sender@example.test", "to": "victim@example.test"}
         signatures = EmailSignatureService.build_email_signatures(payload)
-        assert REPLY_TO_EMAIL not in signatures
+        assert signatures[SignatureTypes.SIG_TYPE_TARGET_EMAIL.value] == [
+            "victim@example.test"
+        ]
 
     def test_no_reply_to_when_none(self):
         payload = {
@@ -148,7 +159,9 @@ class TestBuildEmailSignatures:
             "reply_to": None,
         }
         signatures = EmailSignatureService.build_email_signatures(payload)
-        assert REPLY_TO_EMAIL not in signatures
+        assert signatures[SignatureTypes.SIG_TYPE_TARGET_EMAIL.value] == [
+            "victim@example.test"
+        ]
 
     def test_empty_payload_returns_empty_signatures(self):
         payload = {"from": "", "to": "", "cc": [], "bcc": []}
@@ -165,16 +178,16 @@ class TestBuildEmailSignatures:
             "reply_to": "reply@example.test",
         }
         signatures = EmailSignatureService.build_email_signatures(payload)
-        assert signatures[SENDER_EMAIL] == [
+        assert signatures[SignatureTypes.SIG_TYPE_SOURCE_EMAIL.value] == [
             "sender@example.test",
             "bounce@example.test",
         ]
-        assert signatures[RECIPIENT_EMAIL] == [
+        assert signatures[SignatureTypes.SIG_TYPE_TARGET_EMAIL.value] == [
             "victim@example.test",
             "copy@example.test",
             "hidden@example.test",
+            "reply@example.test",
         ]
-        assert signatures[REPLY_TO_EMAIL] == ["reply@example.test"]
 
 
 def _sha256(url: str) -> str:
@@ -185,7 +198,9 @@ class TestUrlHashSignatures:
     def test_text_body_with_url(self):
         payload = {"from": "", "to": "", "body": "Visit https://example.com/path"}
         signatures = EmailSignatureService.build_email_signatures(payload)
-        assert signatures[URL_HASH] == [_sha256("https://example.com/path")]
+        assert signatures[SignatureTypes.SIG_TYPE_URL_HASH.value] == [
+            _sha256("https://example.com/path")
+        ]
 
     def test_html_body_with_url(self):
         payload = {
@@ -194,7 +209,9 @@ class TestUrlHashSignatures:
             "body": '<a href="https://evil.com/phish">Click here</a>',
         }
         signatures = EmailSignatureService.build_email_signatures(payload)
-        assert signatures[URL_HASH] == [_sha256("https://evil.com/phish")]
+        assert signatures[SignatureTypes.SIG_TYPE_URL_HASH.value] == [
+            _sha256("https://evil.com/phish")
+        ]
 
     def test_multiple_urls_in_body(self):
         payload = {
@@ -203,24 +220,30 @@ class TestUrlHashSignatures:
             "body": "Links: https://first.com and http://second.org/page",
         }
         signatures = EmailSignatureService.build_email_signatures(payload)
-        assert len(signatures[URL_HASH]) == 2
-        assert _sha256("https://first.com") in signatures[URL_HASH]
-        assert _sha256("http://second.org/page") in signatures[URL_HASH]
+        assert len(signatures[SignatureTypes.SIG_TYPE_URL_HASH.value]) == 2
+        assert (
+            _sha256("https://first.com")
+            in signatures[SignatureTypes.SIG_TYPE_URL_HASH.value]
+        )
+        assert (
+            _sha256("http://second.org/page")
+            in signatures[SignatureTypes.SIG_TYPE_URL_HASH.value]
+        )
 
     def test_no_url_in_body(self):
         payload = {"from": "", "to": "", "body": "No links here, just plain text."}
         signatures = EmailSignatureService.build_email_signatures(payload)
-        assert URL_HASH not in signatures
+        assert SignatureTypes.SIG_TYPE_URL_HASH.value not in signatures
 
     def test_empty_body(self):
         payload = {"from": "", "to": "", "body": ""}
         signatures = EmailSignatureService.build_email_signatures(payload)
-        assert URL_HASH not in signatures
+        assert SignatureTypes.SIG_TYPE_URL_HASH.value not in signatures
 
     def test_no_body_key(self):
         payload = {"from": "", "to": ""}
         signatures = EmailSignatureService.build_email_signatures(payload)
-        assert URL_HASH not in signatures
+        assert SignatureTypes.SIG_TYPE_URL_HASH.value not in signatures
 
     def test_duplicate_urls_deduplicated(self):
         payload = {
@@ -229,7 +252,9 @@ class TestUrlHashSignatures:
             "body": "https://dup.com https://dup.com",
         }
         signatures = EmailSignatureService.build_email_signatures(payload)
-        assert signatures[URL_HASH] == [_sha256("https://dup.com")]
+        assert signatures[SignatureTypes.SIG_TYPE_URL_HASH.value] == [
+            _sha256("https://dup.com")
+        ]
 
     def test_url_hashes_combined_with_email_signatures(self):
         payload = {
@@ -238,9 +263,15 @@ class TestUrlHashSignatures:
             "body": "Click https://evil.com",
         }
         signatures = EmailSignatureService.build_email_signatures(payload)
-        assert signatures[SENDER_EMAIL] == ["sender@test.com"]
-        assert signatures[RECIPIENT_EMAIL] == ["victim@test.com"]
-        assert signatures[URL_HASH] == [_sha256("https://evil.com")]
+        assert signatures[SignatureTypes.SIG_TYPE_SOURCE_EMAIL.value] == [
+            "sender@test.com"
+        ]
+        assert signatures[SignatureTypes.SIG_TYPE_TARGET_EMAIL.value] == [
+            "victim@test.com"
+        ]
+        assert signatures[SignatureTypes.SIG_TYPE_URL_HASH.value] == [
+            _sha256("https://evil.com")
+        ]
 
     def test_html_body_urls_are_hashed(self):
         payload = {
@@ -250,7 +281,9 @@ class TestUrlHashSignatures:
             "body_html": '<a href="https://evil.com/phish">Click</a>',
         }
         signatures = EmailSignatureService.build_email_signatures(payload)
-        assert signatures[URL_HASH] == [_sha256("https://evil.com/phish")]
+        assert signatures[SignatureTypes.SIG_TYPE_URL_HASH.value] == [
+            _sha256("https://evil.com/phish")
+        ]
 
     def test_urls_from_plain_and_html_bodies_combined(self):
         payload = {
@@ -260,9 +293,15 @@ class TestUrlHashSignatures:
             "body_html": '<a href="https://html.example.com">link</a>',
         }
         signatures = EmailSignatureService.build_email_signatures(payload)
-        assert _sha256("https://plain.example.com") in signatures[URL_HASH]
-        assert _sha256("https://html.example.com") in signatures[URL_HASH]
-        assert len(signatures[URL_HASH]) == 2
+        assert (
+            _sha256("https://plain.example.com")
+            in signatures[SignatureTypes.SIG_TYPE_URL_HASH.value]
+        )
+        assert (
+            _sha256("https://html.example.com")
+            in signatures[SignatureTypes.SIG_TYPE_URL_HASH.value]
+        )
+        assert len(signatures[SignatureTypes.SIG_TYPE_URL_HASH.value]) == 2
 
     def test_url_present_in_both_bodies_deduplicated(self):
         payload = {
@@ -272,12 +311,14 @@ class TestUrlHashSignatures:
             "body_html": '<a href="https://dup.example.com">link</a>',
         }
         signatures = EmailSignatureService.build_email_signatures(payload)
-        assert signatures[URL_HASH] == [_sha256("https://dup.example.com")]
+        assert signatures[SignatureTypes.SIG_TYPE_URL_HASH.value] == [
+            _sha256("https://dup.example.com")
+        ]
 
     def test_no_url_hash_when_bodies_empty(self):
         payload = {"from": "", "to": "", "body": "", "body_html": ""}
         signatures = EmailSignatureService.build_email_signatures(payload)
-        assert URL_HASH not in signatures
+        assert SignatureTypes.SIG_TYPE_URL_HASH.value not in signatures
 
 
 def _hash_bytes(data: bytes, algorithm: str = "sha256") -> str:
@@ -291,7 +332,9 @@ class TestAttachmentHashSignatures:
         signatures = EmailSignatureService.build_email_signatures(
             payload, attachments=attachments
         )
-        assert signatures[ATTACHMENT_HASH] == [_hash_bytes(b"pdf-content")]
+        assert signatures[SignatureTypes.SIG_TYPE_FILE_HASH.value] == [
+            _hash_bytes(b"pdf-content")
+        ]
 
     def test_multiple_attachments(self):
         payload = {"from": "", "to": ""}
@@ -303,22 +346,28 @@ class TestAttachmentHashSignatures:
         signatures = EmailSignatureService.build_email_signatures(
             payload, attachments=attachments
         )
-        assert len(signatures[ATTACHMENT_HASH]) == 3
-        assert signatures[ATTACHMENT_HASH][0] == _hash_bytes(b"content-a")
-        assert signatures[ATTACHMENT_HASH][1] == _hash_bytes(b"content-b")
-        assert signatures[ATTACHMENT_HASH][2] == _hash_bytes(b"content-c")
+        assert len(signatures[SignatureTypes.SIG_TYPE_FILE_HASH.value]) == 3
+        assert signatures[SignatureTypes.SIG_TYPE_FILE_HASH.value][0] == _hash_bytes(
+            b"content-a"
+        )
+        assert signatures[SignatureTypes.SIG_TYPE_FILE_HASH.value][1] == _hash_bytes(
+            b"content-b"
+        )
+        assert signatures[SignatureTypes.SIG_TYPE_FILE_HASH.value][2] == _hash_bytes(
+            b"content-c"
+        )
 
     def test_no_attachments(self):
         payload = {"from": "", "to": ""}
         signatures = EmailSignatureService.build_email_signatures(payload)
-        assert ATTACHMENT_HASH not in signatures
+        assert SignatureTypes.SIG_TYPE_FILE_HASH.value not in signatures
 
     def test_empty_attachment_list(self):
         payload = {"from": "", "to": ""}
         signatures = EmailSignatureService.build_email_signatures(
             payload, attachments=[]
         )
-        assert ATTACHMENT_HASH not in signatures
+        assert SignatureTypes.SIG_TYPE_FILE_HASH.value not in signatures
 
     def test_combined_with_email_and_url_signatures(self):
         payload = {
@@ -330,10 +379,12 @@ class TestAttachmentHashSignatures:
         signatures = EmailSignatureService.build_email_signatures(
             payload, attachments=attachments
         )
-        assert SENDER_EMAIL in signatures
-        assert RECIPIENT_EMAIL in signatures
-        assert URL_HASH in signatures
-        assert signatures[ATTACHMENT_HASH] == [_hash_bytes(b"malicious")]
+        assert SignatureTypes.SIG_TYPE_SOURCE_EMAIL.value in signatures
+        assert SignatureTypes.SIG_TYPE_TARGET_EMAIL.value in signatures
+        assert SignatureTypes.SIG_TYPE_URL_HASH.value in signatures
+        assert signatures[SignatureTypes.SIG_TYPE_FILE_HASH.value] == [
+            _hash_bytes(b"malicious")
+        ]
 
 
 class TestHashAlgorithmConfig:
@@ -343,7 +394,7 @@ class TestHashAlgorithmConfig:
             payload, hash_algorithm="sha1"
         )
         expected = hashlib.sha1("https://example.com".encode()).hexdigest()
-        assert signatures[URL_HASH] == [expected]
+        assert signatures[SignatureTypes.SIG_TYPE_URL_HASH.value] == [expected]
 
     def test_url_hash_with_md5(self):
         payload = {"from": "", "to": "", "body": "Visit https://example.com"}
@@ -351,7 +402,7 @@ class TestHashAlgorithmConfig:
             payload, hash_algorithm="md5"
         )
         expected = hashlib.md5("https://example.com".encode()).hexdigest()
-        assert signatures[URL_HASH] == [expected]
+        assert signatures[SignatureTypes.SIG_TYPE_URL_HASH.value] == [expected]
 
     def test_attachment_hash_with_sha1(self):
         payload = {"from": "", "to": ""}
@@ -360,7 +411,7 @@ class TestHashAlgorithmConfig:
             payload, attachments=attachments, hash_algorithm="sha1"
         )
         expected = hashlib.sha1(b"data").hexdigest()
-        assert signatures[ATTACHMENT_HASH] == [expected]
+        assert signatures[SignatureTypes.SIG_TYPE_FILE_HASH.value] == [expected]
 
     def test_attachment_hash_with_md5(self):
         payload = {"from": "", "to": ""}
@@ -369,7 +420,7 @@ class TestHashAlgorithmConfig:
             payload, attachments=attachments, hash_algorithm="md5"
         )
         expected = hashlib.md5(b"data").hexdigest()
-        assert signatures[ATTACHMENT_HASH] == [expected]
+        assert signatures[SignatureTypes.SIG_TYPE_FILE_HASH.value] == [expected]
 
     def test_default_algorithm_is_sha256(self):
         payload = {"from": "", "to": "", "body": "https://example.com"}
@@ -377,15 +428,21 @@ class TestHashAlgorithmConfig:
         signatures = EmailSignatureService.build_email_signatures(
             payload, attachments=attachments
         )
-        assert signatures[URL_HASH] == [_sha256("https://example.com")]
-        assert signatures[ATTACHMENT_HASH] == [_hash_bytes(b"bin", "sha256")]
+        assert signatures[SignatureTypes.SIG_TYPE_URL_HASH.value] == [
+            _sha256("https://example.com")
+        ]
+        assert signatures[SignatureTypes.SIG_TYPE_FILE_HASH.value] == [
+            _hash_bytes(b"bin", "sha256")
+        ]
 
 
 class TestCustomHeaderSignatures:
     def test_single_custom_header(self):
         payload = {"from": "", "to": "", "custom_headers": [("X-Track", "abc123")]}
         signatures = EmailSignatureService.build_email_signatures(payload)
-        assert signatures[CUSTOM_HEADER] == ["X-Track: abc123"]
+        assert signatures[SignatureTypes.SIG_TYPE_EMAIL_CUSTOM_HEADER.value] == [
+            "X-Track: abc123"
+        ]
 
     def test_multiple_custom_headers(self):
         payload = {
@@ -398,7 +455,7 @@ class TestCustomHeaderSignatures:
             ],
         }
         signatures = EmailSignatureService.build_email_signatures(payload)
-        assert signatures[CUSTOM_HEADER] == [
+        assert signatures[SignatureTypes.SIG_TYPE_EMAIL_CUSTOM_HEADER.value] == [
             "X-Track: abc123",
             "X-Campaign: summer",
             "X-Mailer: openaev",
@@ -407,12 +464,12 @@ class TestCustomHeaderSignatures:
     def test_no_custom_headers(self):
         payload = {"from": "", "to": "", "custom_headers": []}
         signatures = EmailSignatureService.build_email_signatures(payload)
-        assert CUSTOM_HEADER not in signatures
+        assert SignatureTypes.SIG_TYPE_EMAIL_CUSTOM_HEADER.value not in signatures
 
     def test_no_custom_headers_key(self):
         payload = {"from": "", "to": ""}
         signatures = EmailSignatureService.build_email_signatures(payload)
-        assert CUSTOM_HEADER not in signatures
+        assert SignatureTypes.SIG_TYPE_EMAIL_CUSTOM_HEADER.value not in signatures
 
     def test_combined_with_other_signatures(self):
         payload = {
@@ -425,11 +482,13 @@ class TestCustomHeaderSignatures:
         signatures = EmailSignatureService.build_email_signatures(
             payload, attachments=attachments
         )
-        assert SENDER_EMAIL in signatures
-        assert RECIPIENT_EMAIL in signatures
-        assert URL_HASH in signatures
-        assert ATTACHMENT_HASH in signatures
-        assert signatures[CUSTOM_HEADER] == ["X-Track: id1"]
+        assert SignatureTypes.SIG_TYPE_SOURCE_EMAIL.value in signatures
+        assert SignatureTypes.SIG_TYPE_TARGET_EMAIL.value in signatures
+        assert SignatureTypes.SIG_TYPE_URL_HASH.value in signatures
+        assert SignatureTypes.SIG_TYPE_FILE_HASH.value in signatures
+        assert signatures[SignatureTypes.SIG_TYPE_EMAIL_CUSTOM_HEADER.value] == [
+            "X-Track: id1"
+        ]
 
 
 class TestSendSignatures:

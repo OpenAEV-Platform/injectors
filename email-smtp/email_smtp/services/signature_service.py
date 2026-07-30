@@ -13,18 +13,11 @@ from pyoaev.signatures import (
     SignatureManager,
 )
 from pyoaev.signatures.models import ExecutionDetails, ExecutionSignature
+from pyoaev.signatures.types import SignatureTypes
 
 from injector_common.targets import TargetMeta
 
 logger = logging.getLogger(__name__)
-
-# Signature type constants for email indicators
-SENDER_EMAIL = "sender_email"
-RECIPIENT_EMAIL = "recipient_email"
-REPLY_TO_EMAIL = "reply_to_email"
-URL_HASH = "url_hash"
-ATTACHMENT_HASH = "attachment_hash"
-CUSTOM_HEADER = "custom_header"
 
 DEFAULT_HASH_ALGORITHM = "sha256"
 
@@ -97,12 +90,11 @@ class EmailSignatureService:
         inclusion in ``execution_output_structured["expectation_signatures"]``.
 
         Signature types produced:
-        - ``sender_email``: from address + mail_from (envelope sender) if different
-        - ``recipient_email``: to + cc + bcc addresses
-        - ``reply_to_email``: reply-to address (only when present)
+        - ``source_email``: from address + mail_from (envelope sender) if different
+        - ``target_email``: to + cc + bcc + reply-to addresses
         - ``url_hash``: hashes of URLs found in the plain-text and HTML bodies
-        - ``attachment_hash``: hashes of attachment file contents
-        - ``custom_header``: custom header name:value pairs (plain text)
+        - ``file_hash``: hashes of attachment file contents
+        - ``email_custom_header``: custom header name:value pairs (plain text)
         """
         signatures: dict[str, list[str]] = {}
 
@@ -115,7 +107,7 @@ class EmailSignatureService:
         if mail_from and mail_from != from_addr:
             sender_emails.append(mail_from)
         if sender_emails:
-            signatures[SENDER_EMAIL] = sender_emails
+            signatures[SignatureTypes.SIG_TYPE_SOURCE_EMAIL.value] = sender_emails
 
         # Recipient signatures
         recipient_emails: list[str] = []
@@ -128,13 +120,11 @@ class EmailSignatureService:
         for bcc in payload.get("bcc", []):
             if bcc:
                 recipient_emails.append(bcc)
-        if recipient_emails:
-            signatures[RECIPIENT_EMAIL] = recipient_emails
-
-        # Reply-To signature
         reply_to = payload.get("reply_to")
         if reply_to:
-            signatures[REPLY_TO_EMAIL] = [reply_to]
+            recipient_emails.append(reply_to)
+        if recipient_emails:
+            signatures[SignatureTypes.SIG_TYPE_TARGET_EMAIL.value] = recipient_emails
 
         # URL hash signatures from body (plain text and HTML)
         url_hashes = EmailSignatureService._extract_url_hashes(
@@ -142,19 +132,19 @@ class EmailSignatureService:
             hash_algorithm,
         )
         if url_hashes:
-            signatures[URL_HASH] = url_hashes
+            signatures[SignatureTypes.SIG_TYPE_URL_HASH.value] = url_hashes
 
         # Attachment hash signatures
         if attachments:
             attachment_hashes = [
                 _hash_bytes(content, hash_algorithm) for _, content in attachments
             ]
-            signatures[ATTACHMENT_HASH] = attachment_hashes
+            signatures[SignatureTypes.SIG_TYPE_FILE_HASH.value] = attachment_hashes
 
         # Custom header signatures (stored as plain "name: value" strings)
         custom_headers = payload.get("custom_headers", [])
         if custom_headers:
-            signatures[CUSTOM_HEADER] = [
+            signatures[SignatureTypes.SIG_TYPE_EMAIL_CUSTOM_HEADER.value] = [
                 f"{name}: {value}" for name, value in custom_headers
             ]
 
