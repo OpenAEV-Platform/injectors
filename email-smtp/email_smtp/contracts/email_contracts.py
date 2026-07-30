@@ -5,6 +5,8 @@ from email_smtp.contracts.craft_email import CraftEmail
 from pyoaev.contracts.contract_config import (
     Contract,
     ContractConfig,
+    ContractOutputElement,
+    ContractOutputType,
     SupportedLanguage,
     prepare_contracts,
 )
@@ -37,7 +39,14 @@ class EmailContracts:
 
     @staticmethod
     def _base_outputs() -> list:
-        return []
+        output_signatures = ContractOutputElement(
+            type=ContractOutputType.ExpectationSignature,
+            field="expectation_signatures",
+            isMultiple=True,
+            isFindingCompatible=False,
+            labels=["email_smtp"],
+        )
+        return [output_signatures]
 
     def _build_contract(
         self, contract_id: str, contract_cls: type[CraftEmail]

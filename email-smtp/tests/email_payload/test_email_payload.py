@@ -35,7 +35,40 @@ def test_email_payload_builder():
     assert payload["bcc"] == ["bcc@example.com"]
     assert payload["subject"] == "Hello"
     assert payload["body"] == "World"
+    assert payload["body_html"] is None
     assert payload["custom_headers"] == []
+
+
+def test_email_payload_builder_parses_html_body():
+    content = {
+        "smtp_hostname": "smtp.example.com",
+        "smtp_port": "25",
+        "from": "sender@example.com",
+        "to": "recipient@example.com",
+        "subject": "Hello",
+        "body": "World",
+        "body_html": "<p>World</p>",
+    }
+
+    payload = EmailPayloadBuilder.build(content)
+
+    assert payload["body_html"] == "<p>World</p>"
+
+
+def test_email_payload_builder_empty_html_body_is_none():
+    content = {
+        "smtp_hostname": "smtp.example.com",
+        "smtp_port": "25",
+        "from": "sender@example.com",
+        "to": "recipient@example.com",
+        "subject": "Hello",
+        "body": "World",
+        "body_html": "",
+    }
+
+    payload = EmailPayloadBuilder.build(content)
+
+    assert payload["body_html"] is None
 
 
 def test_email_payload_builder_defaults():

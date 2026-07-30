@@ -16,6 +16,12 @@ class EmailPayloadBuilder:
         return stripped or None
 
     @staticmethod
+    def parse_optional_body(value: str | None) -> Optional[str]:
+        if not value:
+            return None
+        return value or None
+
+    @staticmethod
     def parse_recipients(value: str | None) -> List[str]:
         if not value:
             return []
@@ -96,7 +102,10 @@ class EmailPayloadBuilder:
             "cc": EmailPayloadBuilder.parse_recipients(content.get("cc")),
             "bcc": EmailPayloadBuilder.parse_recipients(content.get("bcc")),
             "subject": content["subject"],
-            "body": content["body"],
+            "body": EmailPayloadBuilder.parse_optional_body(content.get("body")),
+            "body_html": EmailPayloadBuilder.parse_optional_body(
+                content.get("body_html")
+            ),
             "custom_headers": EmailPayloadBuilder.parse_custom_headers(
                 content.get("custom_headers")
             ),
