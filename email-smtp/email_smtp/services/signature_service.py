@@ -2,10 +2,12 @@
 
 from __future__ import annotations
 
+import hashlib
 import logging
 from datetime import datetime, timezone
 from typing import Any
 
+from ioc_finder import find_iocs
 from pyoaev.signatures import (
     ExtraSignatureData,
     SignatureManager,
@@ -20,6 +22,21 @@ logger = logging.getLogger(__name__)
 SENDER_EMAIL = "sender_email"
 RECIPIENT_EMAIL = "recipient_email"
 REPLY_TO_EMAIL = "reply_to_email"
+URL_HASH = "url_hash"
+ATTACHMENT_HASH = "attachment_hash"
+CUSTOM_HEADER = "custom_header"
+
+DEFAULT_HASH_ALGORITHM = "sha256"
+
+
+def _hash_bytes(data: bytes, algorithm: str = DEFAULT_HASH_ALGORITHM) -> str:
+    """Hash binary data using the specified algorithm."""
+    return hashlib.new(algorithm, data).hexdigest()
+
+
+def _hash_str(data: str, algorithm: str = DEFAULT_HASH_ALGORITHM) -> str:
+    """Hash a string using the specified algorithm."""
+    return _hash_bytes(data.encode(), algorithm)
 
 
 class EmailSignatureService:
@@ -27,9 +44,9 @@ class EmailSignatureService:
 
     Email is not a network/cloud scanner — there are no target IPs or cloud
     accounts.  The service builds minimal execution signatures (start/end
-    timing only).  Email address indicators are delivered via the contract
-    output (``execution_output_structured``) rather than through the
-    signature payload.
+    timing only).  Email address, URL hash, and attachment hash indicators
+    are delivered via the contract output (``execution_output_structured``)
+    rather than through the signature payload.
     """
 
     def __init__(self, signature_manager: SignatureManager) -> None:
@@ -69,8 +86,12 @@ class EmailSignatureService:
     # -- output structured ---------------------------------------------------
 
     @staticmethod
-    def build_email_signatures(payload: dict) -> dict[str, list[str]]:
-        """Extract email address indicators from the payload.
+    def build_email_signatures(
+        payload: dict,
+        attachments: list[tuple[str, bytes]] | None = None,
+        hash_algorithm: str = DEFAULT_HASH_ALGORITHM,
+    ) -> dict[str, list[str]]:
+        """Extract email indicators from the payload.
 
         Returns a dict of signature-type → list-of-values suitable for
         inclusion in ``execution_output_structured["expectation_signatures"]``.
@@ -79,6 +100,9 @@ class EmailSignatureService:
         - ``sender_email``: from address + mail_from (envelope sender) if different
         - ``recipient_email``: to + cc + bcc addresses
         - ``reply_to_email``: reply-to address (only when present)
+        - ``url_hash``: hashes of URLs found in the plain-text and HTML bodies
+        - ``attachment_hash``: hashes of attachment file contents
+        - ``custom_header``: custom header name:value pairs (plain text)
         """
         signatures: dict[str, list[str]] = {}
 
@@ -112,7 +136,52 @@ class EmailSignatureService:
         if reply_to:
             signatures[REPLY_TO_EMAIL] = [reply_to]
 
+        # URL hash signatures from body (plain text and HTML)
+        url_hashes = EmailSignatureService._extract_url_hashes(
+            [payload.get("body", ""), payload.get("body_html", "")],
+            hash_algorithm,
+        )
+        if url_hashes:
+            signatures[URL_HASH] = url_hashes
+
+        # Attachment hash signatures
+        if attachments:
+            attachment_hashes = [
+                _hash_bytes(content, hash_algorithm) for _, content in attachments
+            ]
+            signatures[ATTACHMENT_HASH] = attachment_hashes
+
+        # Custom header signatures (stored as plain "name: value" strings)
+        custom_headers = payload.get("custom_headers", [])
+        if custom_headers:
+            signatures[CUSTOM_HEADER] = [
+                f"{name}: {value}" for name, value in custom_headers
+            ]
+
         return signatures
+
+    @staticmethod
+    def _extract_url_hashes(
+        bodies: str | list[str], algorithm: str = DEFAULT_HASH_ALGORITHM
+    ) -> list[str]:
+        """Extract URLs from one or more text/HTML bodies and hash them.
+
+        URLs are deduplicated across all bodies while preserving their first
+        occurrence order.
+        """
+        if isinstance(bodies, str):
+            bodies = [bodies]
+        seen: set[str] = set()
+        hashes: list[str] = []
+        for body in bodies:
+            if not body:
+                continue
+            for url in find_iocs(body).get("urls", []):
+                url_hash = _hash_str(url, algorithm)
+                if url_hash not in seen:
+                    seen.add(url_hash)
+                    hashes.append(url_hash)
+        return hashes
 
     # -- payload & send ------------------------------------------------------
 
