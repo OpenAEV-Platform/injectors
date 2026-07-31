@@ -1,0 +1,12 @@
+openaev:
+  url: 'http://localhost:3001'
+  token: 'ChangeMe'
+  # tenant_id: 'ChangeMe'
+
+injector:
+  id: 'changeme'
+  name: 'Email'
+  # log_level: 'error'
+
+email:
+  # hash_algorithm: 'sha256'  # Hash algorithm for signatures (sha256, sha1, md5)
