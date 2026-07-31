@@ -1,6 +1,6 @@
 [project]
 name = "openaev-email-gws-injector"
-version = "3.260729.0"
+version = "3.260731.0"
 description = "An injector for sending emails through Google Workspace (Gmail API)"
 readme = "README.md"
 authors = [
@@ -9,7 +9,7 @@ authors = [
 license = "Apache-2.0"
 requires-python = ">=3.11,<4.0"
 dependencies = [
-    "pyoaev (==3.260729.0); extra != 'dev'",
+    "pyoaev (==3.260731.0); extra != 'dev'",
     "injector_common @ ../injector_common",
     "requests~=2.33",
     "google-auth~=2.35",

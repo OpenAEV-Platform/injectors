@@ -1,13 +1,15 @@
 [project]
 name = "openaev-email-injector"
-version = "2.260730.0"
+version = "3.260731.0"
 description = "An injector for crafting emails"
 readme = "README.md"
-authors = [{ name = "Filigran", email = "contact@filigran.io" }]
+authors = [
+    { name = "Filigran", email = "contact@filigran.io" },
+]
 license = "Apache-2.0"
 requires-python = ">=3.11,<4.0"
 dependencies = [
-    "pyoaev (==3.260729.0); extra != 'dev'",
+    "pyoaev (==3.260731.0); extra != 'dev'",
     "injector_common @ ../injector_common",
     "pydantic (>=2.11.3,<2.14.0)",
     "pydantic-settings (>=2.11.0,<2.15.0)",
@@ -36,7 +38,7 @@ dev = [
 
 [tool.poetry]
 packages = [
-    { include = "openaev_email" }
+    { include = "openaev_email" },
 ]
 
 [tool.poetry.dependencies]
@@ -44,20 +46,29 @@ pyoaev = [
     { markers = "extra != 'dev'", source = "PyPI" },
     { markers = "extra == 'dev'", develop = true },
 ]
-injector_common = { develop = true }
 
-[build-system]
-requires = ["poetry-core"]
-build-backend = "poetry.core.masonry.api"
+[tool.poetry.dependencies.injector_common]
+develop = true
 
 [tool.isort]
 profile = "black"
-src_paths = ["openaev_email", "tests"]
+src_paths = [
+    "openaev_email",
+    "tests",
+]
 
 [tool.pytest.ini_options]
-testpaths = ["./tests"]
+testpaths = [
+    "./tests",
+]
 
 [tool.cmw]
 install-command = "poetry install"
 config-dump-command = "poetry run python -m openaev_email --dump-config-schema"
 icon-path = "openaev_email/img/icon-email.png"
+
+[build-system]
+requires = [
+    "poetry-core",
+]
+build-backend = "poetry.core.masonry.api"
