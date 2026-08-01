@@ -4,7 +4,8 @@ services:
     environment:
       - OPENAEV_URL=${OPENAEV_URL}
       - OPENAEV_TOKEN=${OPENAEV_TOKEN}
-      - OPENAEV_TENANT_ID=${OPENAEV_TENANT_ID}
+      # only required for multi-tenancy (Enterprise Edition), keep commented otherwise
+      # - OPENAEV_TENANT_ID=${OPENAEV_TENANT_ID}
       - INJECTOR_ID=${INJECTOR_ID}
       - INJECTOR_NAME=${INJECTOR_NAME:-"AI Red Team"}
       - INJECTOR_LOG_LEVEL=${INJECTOR_LOG_LEVEL:-warn}
