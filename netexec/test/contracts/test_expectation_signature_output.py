@@ -41,13 +41,13 @@ class ExpectationSignatureOutputTest(TestCase):
         elements = _call_and_capture(set())
         self.assertEqual(elements, [_EXPECTATION_SIGNATURE_OUTPUT])
 
-    def test_text_output_includes_expectation_signature_appended(self):
+    def test_action_output_includes_expectation_signature_appended(self):
         """
-        Given output types {"text"}
+        Given output types {"action_output"}
         When build_outputs_for_types is called
         Then ExpectationSignature is the last element in the built list
         """
-        elements = _call_and_capture({"text"})
+        elements = _call_and_capture({"action_output"})
         self.assertGreater(len(elements), 1)
         self.assertIs(elements[-1], _EXPECTATION_SIGNATURE_OUTPUT)
 
@@ -58,13 +58,13 @@ class ExpectationSignatureOutputTest(TestCase):
         Then the last element is always _EXPECTATION_SIGNATURE_OUTPUT
         """
         from netexec.contracts.output_registry import (
+            ACTION_OUTPUT,
             CREDENTIALS,
             SHARE,
-            TEXT,
             USERNAME,
         )
 
-        elements = _call_and_capture({TEXT, CREDENTIALS, USERNAME, SHARE})
+        elements = _call_and_capture({ACTION_OUTPUT, CREDENTIALS, USERNAME, SHARE})
         self.assertIs(elements[-1], _EXPECTATION_SIGNATURE_OUTPUT)
         # 4 typed outputs + 1 expectation_signature
         self.assertEqual(len(elements), 5)
@@ -79,7 +79,7 @@ class ExpectationSignatureOutputTest(TestCase):
         """
         elements = _call_and_capture(get_base_output_types())
         self.assertIs(elements[-1], _EXPECTATION_SIGNATURE_OUTPUT)
-        # base = {TEXT} → 2 elements
+        # base = {ACTION_OUTPUT} → 2 elements
         self.assertEqual(len(elements), 2)
 
     # -- Scenario: option contracts include ExpectationSignature --

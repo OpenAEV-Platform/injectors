@@ -31,17 +31,19 @@ class NetExecOutputParserTest(TestCase):
             ]
         )
         result = parser.parse(stdout, self.ip_map)
-        self.assertEqual(result["outputs"], {})
+        # No typed finding was extracted, but the raw stdout is still routed to
+        # action_output (isFindingCompatible=False on the contract side).
+        self.assertEqual(result["outputs"], {"action_output": stdout})
 
     def test_parse_only_auth_lines(self):
         stdout = self._make_line("[+] NORTH\\admin:P@ss (Pwn3d!)")
         result = parser.parse(stdout, self.ip_map)
-        self.assertEqual(result["outputs"], {})
+        self.assertEqual(result["outputs"], {"action_output": stdout})
 
     def test_parse_only_error_lines(self):
         stdout = self._make_line("[-] SMB error: Connection refused")
         result = parser.parse(stdout, self.ip_map)
-        self.assertEqual(result["outputs"], {})
+        self.assertEqual(result["outputs"], {"action_output": stdout})
 
     def test_parse_noise_lines_skipped(self):
         stdout = "\n".join(
@@ -54,7 +56,7 @@ class NetExecOutputParserTest(TestCase):
             ]
         )
         result = parser.parse(stdout, self.ip_map)
-        self.assertEqual(result["outputs"], {})
+        self.assertEqual(result["outputs"], {"action_output": stdout})
 
     # ----------------------------------------------------------------
     # Credential parsing (SAM)
@@ -103,15 +105,15 @@ class NetExecOutputParserTest(TestCase):
         self.assertNotIn("asset_id", result["outputs"]["credentials"][0])
 
     # ----------------------------------------------------------------
-    # No family / identifier → empty
+    # No family / identifier → no typed extraction, action_output still present
     # ----------------------------------------------------------------
 
-    def test_parse_no_family_returns_empty_outputs(self):
+    def test_parse_no_family_returns_only_action_output(self):
         stdout = self._make_line(
             "Administrator:500:aad3b435b51404eeaad3b435b51404ee:dbd13e1c4e338284ac4e9874f7de6ef4:::"
         )
         result = parser.parse(stdout, self.ip_map, family=None, identifier=None)
-        self.assertEqual(result["outputs"], {})
+        self.assertEqual(result["outputs"], {"action_output": stdout})
 
     # ----------------------------------------------------------------
     # Mixed content
@@ -171,3 +173,37 @@ class NetExecOutputParserTest(TestCase):
         shares = result["outputs"].get("shares", [])
         self.assertEqual(len(shares), 1)
         self.assertEqual(shares[0]["share_name"], "NETLOGON")
+
+    # ----------------------------------------------------------------
+    # action_output: raw stdout, always routed, independent of typed dispatchers
+    # ----------------------------------------------------------------
+
+    def test_action_output_absent_for_blank_stdout(self):
+        result = parser.parse("   \n  ", self.ip_map)
+        self.assertNotIn("action_output", result["outputs"])
+
+    def test_action_output_present_alongside_typed_findings(self):
+        stdout = self._make_line(
+            "Administrator:500:aad3b435b51404eeaad3b435b51404ee:dbd13e1c4e338284ac4e9874f7de6ef4:::"
+        )
+        result = parser.parse(stdout, self.ip_map, family="option", identifier="sam")
+        self.assertIn("credentials", result["outputs"])
+        self.assertEqual(result["outputs"]["action_output"], stdout)
+
+    def test_action_output_preserved_on_partial_failure(self):
+        # Reproduces the reported bug: a run that fails partway through (e.g. a
+        # dropped SMB session) still has no typed dispatcher match, but the raw
+        # stdout — including the error line — must still reach action_output so
+        # it can be used as a chaining/event filter.
+        stdout = "\n".join(
+            [
+                self._make_line(
+                    "[*] Windows 10 / Server 2019 Build 17763 (name:KINGSLANDING)"
+                ),
+                self._make_line(
+                    "[-] Failed to enumerate disks: SMB SessionError: STATUS_USER_SESSION_DELETED"
+                ),
+            ]
+        )
+        result = parser.parse(stdout, self.ip_map, family="option", identifier="disks")
+        self.assertEqual(result["outputs"], {"action_output": stdout})
