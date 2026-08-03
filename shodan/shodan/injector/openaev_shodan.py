@@ -133,6 +133,11 @@ class ShodanInjector:
 
         results = shodan_results.get("data", [])
         found_assets_list = []
+        # Findings are collected across every result element, deduplicated, and emitted on
+        # every run regardless of asset auto-creation (assets need a hostname; findings do not).
+        hosts: set[str] = set()
+        ports: set[int] = set()
+        cves: set[str] = set()
 
         for item in results:
             result = item.get("result", {})
@@ -160,6 +165,21 @@ class ShodanInjector:
                 hostnames = element.get("hostnames", [])
                 os = element.get("os", "Unknown")
 
+                # Collect findings BEFORE the hostname guard below: a banner with no
+                # hostname still carries a host IP, an open port and possibly CVEs.
+                if ip_str:
+                    hosts.add(ip_str)
+                port = element.get("port")
+                if isinstance(port, bool):
+                    port = None
+                if isinstance(port, int):
+                    ports.add(port)
+                elif isinstance(port, str) and port.isdigit():
+                    ports.add(int(port))
+                for cve_id in element.get("vulns") or {}:
+                    if cve_id:
+                        cves.add(str(cve_id).upper())
+
                 if not ip_str or not hostnames:
                     continue
 
@@ -184,9 +204,19 @@ class ShodanInjector:
 
         self.helper.injector_logger.info(
             f"{LOG_PREFIX} - Structured output preparation and asset generation completed successfully.",
-            {"total_assets_generated": len(aggregate_assets)},
+            {
+                "total_assets_generated": len(aggregate_assets),
+                "total_hosts": len(hosts),
+                "total_ports": len(ports),
+                "total_cves": len(cves),
+            },
         )
-        return {"found_assets": aggregate_assets}
+        return {
+            "found_assets": aggregate_assets,
+            "hosts": sorted(hosts),
+            "ports": sorted(ports),
+            "cves": sorted(cves),
+        }
 
     def _resolve_assets(self, data: dict, selector_key: str) -> list[dict]:
 
@@ -441,10 +471,17 @@ class ShodanInjector:
             self.shodan_client_api.process_shodan_search(normalize_input_data)
         )
 
-        # Preparation and creation of auto_create_assets
-        output_structured = ""
+        # Structured output: findings (hosts / ports / CVEs) are ALWAYS emitted so the AI
+        # attack path can lateralize on the discovered exposure. Asset auto-creation stays
+        # opt-in (auto_create_assets), so found_assets is only included when requested.
+        structured = self._prepare_output_structured(shodan_results)
+        output_structured = {
+            "hosts": structured["hosts"],
+            "ports": structured["ports"],
+            "cves": structured["cves"],
+        }
         if normalize_input_data.inject_content.auto_create_assets:
-            output_structured = self._prepare_output_structured(shodan_results)
+            output_structured["found_assets"] = structured["found_assets"]
 
         # Preparation and creation of output_message
         output_message = self._prepare_output_message(

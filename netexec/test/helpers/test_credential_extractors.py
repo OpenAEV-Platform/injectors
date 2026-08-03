@@ -351,6 +351,43 @@ class CredentialExtractorsTest(TestCase):
         self.assertEqual(results, [])
 
     # ----------------------------------------------------------------
+    # Shared VULNERABLE-verdict extractor (ms17_010, zerologon, ...)
+    # ----------------------------------------------------------------
+
+    def test_verdict_extractor_emits_named_vulnerability(self):
+        extractor = get_vulnerability_extractor("module", "ms17_010")
+        self.assertIsNotNone(extractor)
+        lines = self._lines("Host is likely VULNERABLE to MS17-010! (Windows 7)")
+        results = extractor(lines, self.ip_map)
+        self.assertEqual(len(results), 1)
+        self.assertEqual(results[0]["name"], "MS17-010 (EternalBlue)")
+        self.assertEqual(results[0]["status"], "VULNERABLE")
+        self.assertEqual(results[0]["host"], self.ip)
+        self.assertEqual(results[0]["asset_id"], "asset-001")
+
+    def test_verdict_extractor_ignores_not_vulnerable(self):
+        extractor = get_vulnerability_extractor("module", "zerologon")
+        results = extractor(self._lines("Target is NOT VULNERABLE"), self.ip_map)
+        self.assertEqual(results, [])
+
+    def test_verdict_extractor_ignores_unrelated_line(self):
+        extractor = get_vulnerability_extractor("module", "nopac")
+        results = extractor(self._lines("Some unrelated output line"), self.ip_map)
+        self.assertEqual(results, [])
+
+    def test_verdict_extractor_dedupes_per_host(self):
+        extractor = get_vulnerability_extractor("module", "printnightmare")
+        lines = self._lines("VULNERABLE", "VULNERABLE, second line")
+        results = extractor(lines, self.ip_map)
+        self.assertEqual(len(results), 1)
+
+    def test_verdict_extractor_no_asset_id_when_unmapped(self):
+        extractor = get_vulnerability_extractor("module", "petitpotam")
+        results = extractor(self._lines("VULNERABLE"), self.empty_ip_map)
+        self.assertEqual(len(results), 1)
+        self.assertNotIn("asset_id", results[0])
+
+    # ----------------------------------------------------------------
     # Registry getters
     # ----------------------------------------------------------------
 

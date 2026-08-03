@@ -256,7 +256,30 @@ class ShodanContracts:
             isFindingCompatible=False,
             labels=["shodan"],
         )
-        return [output_assets]
+        # Findings emitted on every run (independent of asset auto-creation) so the
+        # discovered exposure can fuel the AI attack path: hosts, open ports and CVEs.
+        output_hosts = ContractOutputElement(
+            type=ContractOutputType.IPv4,
+            field="hosts",
+            isMultiple=True,
+            isFindingCompatible=True,
+            labels=["shodan"],
+        )
+        output_ports = ContractOutputElement(
+            type=ContractOutputType.Port,
+            field="ports",
+            isMultiple=True,
+            isFindingCompatible=True,
+            labels=["shodan"],
+        )
+        output_cves = ContractOutputElement(
+            type=ContractOutputType.CVE,
+            field="cves",
+            isMultiple=True,
+            isFindingCompatible=True,
+            labels=["shodan"],
+        )
+        return [output_assets, output_hosts, output_ports, output_cves]
 
     def _build_contract(
         self,

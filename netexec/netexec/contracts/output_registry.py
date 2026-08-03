@@ -127,17 +127,21 @@ _MODULE_OUTPUTS = {
     "enum_logins": {ACTION_OUTPUT},
     "pso": {ACTION_OUTPUT},
     "maq": {ACTION_OUTPUT},
-    # Vulnerability / exploit detection
-    "ms17_010": {ACTION_OUTPUT},
-    "smbghost": {ACTION_OUTPUT},
-    "zerologon": {ACTION_OUTPUT},
-    "nopac": {ACTION_OUTPUT},
-    "printnightmare": {ACTION_OUTPUT},
-    "petitpotam": {ACTION_OUTPUT},
-    "shadowcoerce": {ACTION_OUTPUT},
-    "dfscoerce": {ACTION_OUTPUT},
+    # Vulnerability / exploit detection. Modules that print an explicit
+    # "VULNERABLE" verdict emit a VULNERABILITY finding (shared verdict
+    # extractor). webdav / ntlmv1 / timeroast stay action_output-only: their
+    # positive output is not a VULNERABLE verdict, so it needs dedicated
+    # parsing (TODO).
+    "ms17_010": {ACTION_OUTPUT, VULNERABILITY},
+    "smbghost": {ACTION_OUTPUT, VULNERABILITY},
+    "zerologon": {ACTION_OUTPUT, VULNERABILITY},
+    "nopac": {ACTION_OUTPUT, VULNERABILITY},
+    "printnightmare": {ACTION_OUTPUT, VULNERABILITY},
+    "petitpotam": {ACTION_OUTPUT, VULNERABILITY},
+    "shadowcoerce": {ACTION_OUTPUT, VULNERABILITY},
+    "dfscoerce": {ACTION_OUTPUT, VULNERABILITY},
     "coerce_plus": {ACTION_OUTPUT, VULNERABILITY},
-    "printerbug": {ACTION_OUTPUT},
+    "printerbug": {ACTION_OUTPUT, VULNERABILITY},
     "spooler": {ACTION_OUTPUT, VULNERABILITY},
     "webdav": {ACTION_OUTPUT},
     "ntlmv1": {ACTION_OUTPUT},

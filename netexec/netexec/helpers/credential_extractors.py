@@ -1256,6 +1256,69 @@ def extract_mod_ldap_checker_vulnerabilities(
     return results
 
 
+# -------------------------------------------------------------------
+# Generic vulnerability verdict (VULNERABLE / NOT VULNERABLE)
+# -------------------------------------------------------------------
+# Many netexec vulnerability-check / coercion modules (ms17_010, zerologon,
+# nopac, printnightmare, petitpotam, smbghost, dfscoerce, shadowcoerce,
+# printerbug) print an explicit "VULNERABLE" verdict line when the target is
+# affected. One shared extractor turns that verdict into a vulnerability finding
+# named after the technique (deduplicated per host) so these checks stop being
+# plain text and start feeding the attack path. A "NOT VULNERABLE" line, or any
+# line without the verdict, never yields a finding.
+_VULNERABLE_VERDICT_RE = re.compile(r"\bvulnerable\b", re.IGNORECASE)
+_NOT_VULNERABLE_VERDICT_RE = re.compile(r"\bnot\s+vulnerable\b", re.IGNORECASE)
+
+
+def _make_verdict_vulnerability_extractor(display_name: str):
+    """Build an extractor that emits a vulnerability finding on a VULNERABLE line."""
+
+    def _extractor(
+        finding_lines: list[tuple[str, str, str]],
+        ip_to_asset_id_map: dict,
+    ) -> list[dict]:
+        results: list[dict] = []
+        seen: set[tuple[str, str]] = set()
+        for ip, hostname, rest in finding_lines:
+            if not _VULNERABLE_VERDICT_RE.search(rest):
+                continue
+            if _NOT_VULNERABLE_VERDICT_RE.search(rest):
+                continue
+            key = (ip, hostname)
+            if key in seen:
+                continue
+            seen.add(key)
+            finding: dict = {
+                "name": display_name,
+                "status": "VULNERABLE",
+                "details": rest,
+                "host": ip,
+                "hostname": hostname,
+                "source_line": rest,
+            }
+            asset_id = ip_to_asset_id_map.get(ip, "")
+            if asset_id:
+                finding["asset_id"] = asset_id
+            results.append(finding)
+        return results
+
+    return _extractor
+
+
+# Technique display names for the shared VULNERABLE-verdict extractor.
+_VERDICT_VULNERABILITY_MODULES = {
+    "ms17_010": "MS17-010 (EternalBlue)",
+    "smbghost": "SMBGhost (CVE-2020-0796)",
+    "zerologon": "Zerologon (CVE-2020-1472)",
+    "nopac": "noPac (CVE-2021-42278/42287)",
+    "printnightmare": "PrintNightmare (CVE-2021-1675/34527)",
+    "petitpotam": "PetitPotam",
+    "shadowcoerce": "ShadowCoerce",
+    "dfscoerce": "DFSCoerce",
+    "printerbug": "PrinterBug",
+}
+
+
 # ===================================================================
 # Registry: (family, identifier) -> dedicated extractor function
 # ===================================================================
@@ -1328,6 +1391,10 @@ _VULNERABILITY_EXTRACTORS = {
     ("module", "spooler"): extract_mod_spooler_vulnerabilities,
     ("module", "coerce_plus"): extract_mod_coerce_plus_vulnerabilities,
     ("module", "ldap_checker"): extract_mod_ldap_checker_vulnerabilities,
+    **{
+        ("module", module): _make_verdict_vulnerability_extractor(name)
+        for module, name in _VERDICT_VULNERABILITY_MODULES.items()
+    },
 }
 
 
