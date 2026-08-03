@@ -153,8 +153,10 @@ class NetExecOutputParser:
         identifier : str, optional
             Contract identifier (option_id or safe_module_key).
 
-        Returns ``{"message": str, "outputs": dict}`` where *outputs* maps
-        field names to lists of findings.
+        Returns ``{"message": str, "outputs": dict}`` where *outputs* maps field
+        names to lists of findings, except ``"action_output"`` which is the
+        stdout as a single string, trimmed of leading/trailing whitespace
+        (present whenever stdout is non-blank).
         Only populated keys are included; *outputs* may be empty.
         """
         if ip_to_asset_id_map is None:
@@ -178,9 +180,17 @@ class NetExecOutputParser:
                 continue
             finding_lines.append((ip, hostname, rest))
 
-        # Run all registered dispatchers
+        # The stdout (trimmed of leading/trailing whitespace only -- no line filtering),
+        # always routed to a single action_output entry (isFindingCompatible=False on the
+        # contract side) so it never becomes a visible Finding but stays usable as a
+        # chaining/event filter -- independently of whether any of the typed dispatchers
+        # below found something.
         outputs: dict = {}
         parts: list[str] = []
+        if stdout.strip():
+            outputs["action_output"] = stdout.strip()
+
+        # Run all registered dispatchers
         for field_name, getter in _DISPATCHERS:
             results = _dispatch(
                 getter, finding_lines, ip_to_asset_id_map, family, identifier
