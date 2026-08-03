@@ -387,6 +387,24 @@ class CredentialExtractorsTest(TestCase):
         self.assertEqual(len(results), 1)
         self.assertNotIn("asset_id", results[0])
 
+    def test_verdict_extractor_skips_line_without_host(self):
+        extractor = get_vulnerability_extractor("module", "ms17_010")
+        # Unparseable lines surface with ip == "" (no host prefix); a verdict
+        # there must not yield an invalid finding with an empty host.
+        results = extractor([("", "", "Host is VULNERABLE")], self.ip_map)
+        self.assertEqual(results, [])
+
+    def test_verdict_extractor_dedupes_per_host_across_hostnames(self):
+        extractor = get_vulnerability_extractor("module", "zerologon")
+        # Same host IP, different hostname spellings -> still one finding.
+        lines = [
+            (self.ip, "WINTERFELL", "VULNERABLE"),
+            (self.ip, "winterfell.north.local", "VULNERABLE"),
+        ]
+        results = extractor(lines, self.ip_map)
+        self.assertEqual(len(results), 1)
+        self.assertEqual(results[0]["host"], self.ip)
+
     # ----------------------------------------------------------------
     # Registry getters
     # ----------------------------------------------------------------

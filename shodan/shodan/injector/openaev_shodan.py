@@ -1,4 +1,6 @@
+import ipaddress
 import json
+import re
 import time
 from datetime import datetime, timezone
 from urllib.parse import urlparse
@@ -27,6 +29,18 @@ from shodan.models import (
 from shodan.services import ShodanClientAPI, Utils
 
 LOG_PREFIX = "[SHODAN_INJECTOR]"
+
+# Shodan `vulns` keys are CVE identifiers; only emit contract-valid CVEs.
+_CVE_RE = re.compile(r"^CVE-\d{4}-\d{4,}$")
+
+
+def _is_valid_ipv4(value: str) -> bool:
+    """Return True if *value* is a valid IPv4 address (the `hosts` output type)."""
+    try:
+        ipaddress.IPv4Address(value)
+    except ValueError:
+        return False
+    return True
 
 
 class ShodanInjector:
@@ -167,18 +181,24 @@ class ShodanInjector:
 
                 # Collect findings BEFORE the hostname guard below: a banner with no
                 # hostname still carries a host IP, an open port and possibly CVEs.
-                if ip_str:
+                # Validate against the declared contract output types (IPv4 / Port /
+                # CVE) so Shodan noise (IPv6, malformed IPs, out-of-range ports or
+                # non-CVE vuln keys) never yields contract-incompatible findings.
+                if ip_str and _is_valid_ipv4(ip_str):
                     hosts.add(ip_str)
                 port = element.get("port")
                 if isinstance(port, bool):
                     port = None
-                if isinstance(port, int):
-                    ports.add(port)
                 elif isinstance(port, str) and port.isdigit():
-                    ports.add(int(port))
+                    port = int(port)
+                if isinstance(port, int) and 1 <= port <= 65535:
+                    ports.add(port)
                 for cve_id in element.get("vulns") or {}:
-                    if cve_id:
-                        cves.add(str(cve_id).upper())
+                    if not cve_id:
+                        continue
+                    cve_str = str(cve_id).upper()
+                    if _CVE_RE.match(cve_str):
+                        cves.add(cve_str)
 
                 if not ip_str or not hostnames:
                     continue

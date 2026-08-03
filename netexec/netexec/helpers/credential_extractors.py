@@ -1278,16 +1278,21 @@ def _make_verdict_vulnerability_extractor(display_name: str):
         ip_to_asset_id_map: dict,
     ) -> list[dict]:
         results: list[dict] = []
-        seen: set[tuple[str, str]] = set()
+        seen: set[str] = set()
         for ip, hostname, rest in finding_lines:
             if not _VULNERABLE_VERDICT_RE.search(rest):
                 continue
             if _NOT_VULNERABLE_VERDICT_RE.search(rest):
                 continue
-            key = (ip, hostname)
-            if key in seen:
+            # An unparseable line yields ip == "": a verdict with no host cannot
+            # feed the attack path and would create an invalid empty-host finding.
+            if not ip:
                 continue
-            seen.add(key)
+            # Deduplicate per host: the finding is named after the technique, so a
+            # single VULNERABLE line per host is enough regardless of hostname.
+            if ip in seen:
+                continue
+            seen.add(ip)
             finding: dict = {
                 "name": display_name,
                 "status": "VULNERABLE",

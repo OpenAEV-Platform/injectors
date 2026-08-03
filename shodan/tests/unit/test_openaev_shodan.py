@@ -2,6 +2,7 @@ import unittest
 from unittest.mock import MagicMock, patch
 
 import shodan.injector.openaev_shodan as module
+from shodan.contracts import InjectorKey
 
 
 @patch.object(module, "ShodanClientAPI")
@@ -211,3 +212,120 @@ class TestShodanInjector(unittest.TestCase):
                 },
             ],
         )
+
+    # ----------------------------------------------------------------
+    # Findings collection (_prepare_output_structured)
+    # ----------------------------------------------------------------
+
+    @staticmethod
+    def _results(*matches):
+        return {"data": [{"url": None, "result": {"matches": list(matches)}}]}
+
+    def test_prepare_output_structured_validates_findings(self, m_api):
+        injector = module.ShodanInjector(config=MagicMock(), helper=MagicMock())
+
+        shodan_results = self._results(
+            {
+                "ip_str": "51.38.220.153",
+                "hostnames": ["automation.filigran.io"],
+                "port": 443,
+                "vulns": {"CVE-2023-44487": {}, "cve-2025-23419": {}},
+            },
+            # No hostname: a banner still yields host / port / CVE findings.
+            {
+                "ip_str": "142.250.80.46",
+                "hostnames": [],
+                "port": "80",
+                "vulns": {"CVE-2019-8936": {}, "NOT-A-CVE": {}},
+            },
+            # IPv6 and malformed IPs are dropped from the IPv4 `hosts` output.
+            {"ip_str": "2001:db8::1", "hostnames": [], "port": 22},
+            {"ip_str": "not-an-ip", "hostnames": [], "port": 70000},
+            # Booleans and out-of-range ports never reach the Port output.
+            {"ip_str": "8.8.8.8", "hostnames": [], "port": True},
+        )
+
+        structured = injector._prepare_output_structured(shodan_results)
+
+        self.assertEqual(
+            structured["hosts"], ["142.250.80.46", "51.38.220.153", "8.8.8.8"]
+        )
+        self.assertEqual(structured["ports"], [22, 80, 443])
+        self.assertEqual(
+            structured["cves"],
+            ["CVE-2019-8936", "CVE-2023-44487", "CVE-2025-23419"],
+        )
+
+    def test_prepare_output_structured_deduplicates_findings(self, m_api):
+        injector = module.ShodanInjector(config=MagicMock(), helper=MagicMock())
+
+        shodan_results = self._results(
+            {
+                "ip_str": "1.1.1.1",
+                "hostnames": [],
+                "port": 443,
+                "vulns": {"CVE-2023-1111": {}},
+            },
+            {
+                "ip_str": "1.1.1.1",
+                "hostnames": [],
+                "port": 443,
+                "vulns": {"CVE-2023-1111": {}},
+            },
+        )
+
+        structured = injector._prepare_output_structured(shodan_results)
+
+        self.assertEqual(structured["hosts"], ["1.1.1.1"])
+        self.assertEqual(structured["ports"], [443])
+        self.assertEqual(structured["cves"], ["CVE-2023-1111"])
+        self.assertEqual(structured["found_assets"], [])
+
+    # ----------------------------------------------------------------
+    # Findings are always emitted; assets stay opt-in (_shodan_execution)
+    # ----------------------------------------------------------------
+
+    def _run_execution(self, injector, *, auto_create_assets):
+        structured = {
+            "found_assets": [{"name": "host.local"}],
+            "hosts": ["1.2.3.4"],
+            "ports": [443],
+            "cves": ["CVE-2023-1111"],
+        }
+        data = {
+            "injection": {
+                "inject_content": {
+                    InjectorKey.TARGET_SELECTOR_KEY: "manual",
+                    InjectorKey.TARGET_PROPERTY_SELECTOR_KEY: "automatic",
+                }
+            }
+        }
+        normalize_input_data = MagicMock()
+        normalize_input_data.inject_content.auto_create_assets = auto_create_assets
+        injector.shodan_client_api.process_shodan_search.return_value = ({}, {})
+        with patch.object(
+            injector, "_normalize_input_data", return_value=normalize_input_data
+        ), patch.object(
+            injector, "_prepare_output_structured", return_value=structured
+        ), patch.object(
+            injector, "_prepare_output_message", return_value="message"
+        ):
+            return injector._shodan_execution(data)
+
+    def test_shodan_execution_emits_findings_without_assets(self, m_api):
+        injector = module.ShodanInjector(config=MagicMock(), helper=MagicMock())
+
+        output_structured, _ = self._run_execution(injector, auto_create_assets=False)
+
+        self.assertEqual(output_structured["hosts"], ["1.2.3.4"])
+        self.assertEqual(output_structured["ports"], [443])
+        self.assertEqual(output_structured["cves"], ["CVE-2023-1111"])
+        self.assertNotIn("found_assets", output_structured)
+
+    def test_shodan_execution_includes_assets_when_opted_in(self, m_api):
+        injector = module.ShodanInjector(config=MagicMock(), helper=MagicMock())
+
+        output_structured, _ = self._run_execution(injector, auto_create_assets=True)
+
+        self.assertEqual(output_structured["found_assets"], [{"name": "host.local"}])
+        self.assertEqual(output_structured["hosts"], ["1.2.3.4"])
