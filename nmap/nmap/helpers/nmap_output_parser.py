@@ -45,7 +45,20 @@ class NmapOutputParser:
 
                     ports_scans_results.append(port_result)
 
+        outputs = {"scan_results": ports_scans_results, "ports": ports_results}
+        # Raw stdout (the nmap XML report), stored as a single non-finding-compatible
+        # entry: it never shows up as a visible Finding, but stays usable as a
+        # chaining/event filter, independent of what the structured extraction above
+        # found.
+        # Best-effort decode: lxml above honors whatever encoding the XML
+        # declaration specifies, but this is a non-critical, chaining-only
+        # field (isFindingCompatible=False) - a non-UTF-8 declared report
+        # degrades gracefully here instead of failing the whole parse.
+        raw_stdout = stdout.decode("utf-8", errors="replace").strip()
+        if raw_stdout:
+            outputs["action_output"] = raw_stdout
+
         return {
             "message": f"Targets successfully scanned ({len(ports_results)} ports found)",
-            "outputs": {"scan_results": ports_scans_results, "ports": ports_results},
+            "outputs": outputs,
         }
