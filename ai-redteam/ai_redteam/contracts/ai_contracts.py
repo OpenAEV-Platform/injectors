@@ -182,7 +182,7 @@ def _expectations():
 def _outputs():
     return [
         ContractOutputElement(
-            type=ContractOutputType.Text,
+            type=ContractOutputType.ActionOutput,
             field="response",
             isMultiple=False,
             isFindingCompatible=False,
