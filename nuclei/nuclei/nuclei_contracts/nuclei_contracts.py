@@ -170,7 +170,22 @@ class NucleiContracts:
             isFindingCompatible=True,
             labels=["nuclei"],
         )
-        return [output_expectation_signatures, output_vulns, output_others]
+        # The raw stdout, additive alongside "others" (which keeps behaving
+        # exactly as it does today, unlike netexec's dead catch-all): never a
+        # visible Finding, but stays usable as a chaining/event filter.
+        output_action_output = ContractOutputElement(
+            type=ContractOutputType.ActionOutput,
+            field="action_output",
+            isMultiple=False,
+            isFindingCompatible=False,
+            labels=["nuclei"],
+        )
+        return [
+            output_expectation_signatures,
+            output_vulns,
+            output_others,
+            output_action_output,
+        ]
 
     @staticmethod
     def build_contract(
@@ -195,6 +210,7 @@ class NucleiContracts:
             outputs=ContractBuilder().add_outputs(contract_outputs).build_outputs(),
             manual=False,
             domains=domains,
+            contract_attack_patterns_external_ids=["T1595.002"],
         )
 
     @staticmethod
