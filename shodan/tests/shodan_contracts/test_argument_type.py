@@ -1,6 +1,5 @@
 """argumentType on the ip_enumeration / cve_specific_watchlist fields: lets a
-discovered IPv4 or CVE finding auto-link into these inputs (see the typing
-spec, docs/specs/2026-08-input-and-output-typing.md in the injectors repo)."""
+discovered IPv4 or CVE finding auto-link into these inputs."""
 
 from pyoaev.contracts.contract_config import PrimitiveType
 

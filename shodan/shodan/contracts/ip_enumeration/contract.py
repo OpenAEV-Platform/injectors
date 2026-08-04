@@ -153,10 +153,9 @@ class IPEnumeration:
             ContractText(
                 key="ip",
                 label="IP",
-                # IPv4, picked as the practical default: PrimitiveType carries
-                # one value per field, and shodan's own IP-typed outputs are
-                # overwhelmingly IPv4. An IPv6 finding won't auto-link here —
-                # narrower than ideal, flagged rather than silently assumed.
+                # IPv4 as the practical default: PrimitiveType carries one
+                # value per field and Shodan IP-typed outputs are overwhelmingly
+                # IPv4. An IPv6 finding will not auto-link here.
                 argumentType=PrimitiveType.IPv4,
                 **cls._build_conditions(
                     source_selector=source_selector_key,
