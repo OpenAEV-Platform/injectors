@@ -109,6 +109,15 @@ class OpenAEVHttp:
         try:
             execution_result = self.http_execution(data)
             execution_outputs = {"url": execution_result["url"]}
+            # The raw response body, stored as a single non-finding-compatible
+            # entry (isFindingCompatible=False on the contract side): it never
+            # shows up as a visible Finding, but stays usable as a
+            # chaining/event filter. Omitted on a request that returned no body
+            # (e.g. HTTP 204) — there is nothing to route. .strip() matches the
+            # non-blank check nmap/nuclei use for the same field.
+            body = execution_result.get("body", "").strip()
+            if body:
+                execution_outputs["action_output"] = body
             callback_data = {
                 "execution_message": execution_result["message"],
                 "execution_output_structured": json.dumps(execution_outputs),
@@ -120,6 +129,11 @@ class OpenAEVHttp:
                 inject_id=inject_id, data=callback_data
             )
         except Exception as e:
+            # Decision: no action_output on this path. Unlike nmap/netexec,
+            # a request that raised (timeout, DNS failure, connection refused)
+            # has no response object at all — there is no real body to route,
+            # only an error message, which would misrepresent action_output as
+            # response content.
             callback_data = {
                 "execution_message": str(e),
                 "execution_status": "ERROR",
