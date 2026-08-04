@@ -7,6 +7,7 @@ from pyoaev.contracts.contract_config import (
     ContractElement,
     ContractOutputElement,
     ContractText,
+    PrimitiveType,
     SupportedLanguage,
 )
 
@@ -152,6 +153,11 @@ class IPEnumeration:
             ContractText(
                 key="ip",
                 label="IP",
+                # IPv4, picked as the practical default: PrimitiveType carries
+                # one value per field, and shodan's own IP-typed outputs are
+                # overwhelmingly IPv4. An IPv6 finding won't auto-link here —
+                # narrower than ideal, flagged rather than silently assumed.
+                argumentType=PrimitiveType.IPv4,
                 **cls._build_conditions(
                     source_selector=source_selector_key,
                     target_selector=[target_selector_field.MANUAL.key],
@@ -193,4 +199,5 @@ class IPEnumeration:
             fields=contract_with_specific_fields,
             outputs=contract_with_specific_outputs,
             manual=False,
+            contract_attack_patterns_external_ids=["T1596.005"],
         )
