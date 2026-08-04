@@ -121,7 +121,7 @@ def _expectations_element() -> ContractExpectations:
 
 def _output_element(platform_key: str) -> ContractOutputElement:
     return ContractOutputElement(
-        type=ContractOutputType.Text,
+        type=ContractOutputType.ActionOutput,
         field="technique",
         isMultiple=False,
         isFindingCompatible=False,
