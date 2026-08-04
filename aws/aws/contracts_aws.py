@@ -428,8 +428,8 @@ class AWSContracts:
             en: str,
             fr: str,
             outputs: List[ContractOutputElement],
-            fields: List[ContractElement] = None,
-            attack_patterns: List[str] = None,
+            fields: List[ContractElement] | None = None,
+            attack_patterns: List[str] | None = None,
         ) -> Contract:
             return Contract(
                 contract_id=contract_id,
