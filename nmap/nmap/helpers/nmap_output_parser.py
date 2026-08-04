@@ -52,7 +52,7 @@ class NmapOutputParser:
         # found.
         # Best-effort decode: lxml above honors whatever encoding the XML
         # declaration specifies, but this is a non-critical, chaining-only
-        # field (isFindingCompatible=False) — a non-UTF-8 declared report
+        # field (isFindingCompatible=False) - a non-UTF-8 declared report
         # degrades gracefully here instead of failing the whole parse.
         raw_stdout = stdout.decode("utf-8", errors="replace").strip()
         if raw_stdout:
