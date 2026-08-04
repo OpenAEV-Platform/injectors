@@ -16,6 +16,7 @@ from pyoaev.contracts.contract_config import (
     ContractTuple,
     Expectation,
     ExpectationType,
+    PrimitiveType,
     SecurityPlatformType,
     SupportedLanguage,
     prepare_contracts,
@@ -46,9 +47,20 @@ class HttpContracts:
             expose=True,
         )
         # Output
-        output = ContractOutputElement(
+        output_url = ContractOutputElement(
             type=ContractOutputType.Text,
             field="url",
+            isMultiple=False,
+            isFindingCompatible=False,
+            labels=["remote"],
+        )
+        # The raw HTTP response body, stored as a single non-finding-compatible
+        # entry: it never shows up as a visible Finding, but stays usable as a
+        # chaining/event filter. Omitted by the injector when the response has
+        # no body.
+        output_action_output = ContractOutputElement(
+            type=ContractOutputType.ActionOutput,
+            field="action_output",
             isMultiple=False,
             isFindingCompatible=False,
             labels=["remote"],
@@ -69,6 +81,7 @@ class HttpContracts:
             mandatoryConditionValues={basic_auth_field.key: True},
             visibleConditionFields=[basic_auth_field.key],
             visibleConditionValues={basic_auth_field.key: True},
+            argumentType=PrimitiveType.Username,
         )
         basic_password = ContractText(
             key="basicPassword",
@@ -79,6 +92,7 @@ class HttpContracts:
             mandatoryConditionValues={basic_auth_field.key: True},
             visibleConditionFields=[basic_auth_field.key],
             visibleConditionValues={basic_auth_field.key: True},
+            argumentType=PrimitiveType.Password,
         )
         auth_fields = [basic_auth_field, username_field, basic_password]
         expectation_items = [
@@ -126,7 +140,9 @@ class HttpContracts:
             .build_fields()
         )
         outputs: List[ContractOutputElement] = (
-            ContractBuilder().add_outputs([output]).build_outputs()
+            ContractBuilder()
+            .add_outputs([output_url, output_action_output])
+            .build_outputs()
         )
         raw_post_contract = Contract(
             contract_id=HTTP_RAW_POST_CONTRACT,
