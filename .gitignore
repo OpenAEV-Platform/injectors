@@ -145,3 +145,4 @@ poetry.lock
 
 # Local context docs
 NETEXEC_INJECTOR_CONTEXT.md
+docs/specs/
