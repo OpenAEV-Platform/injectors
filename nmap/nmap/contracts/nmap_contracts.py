@@ -152,6 +152,17 @@ class NmapContracts:
             isFindingCompatible=False,
             labels=["scan"],
         )
+        # The raw nmap XML report, stored as a single non-finding-compatible entry:
+        # it never shows up as a visible Finding, but stays usable as a
+        # chaining/event filter, independent of the structured PortsScan/Port
+        # extraction above.
+        output_action_output = ContractOutputElement(
+            type=ContractOutputType.ActionOutput,
+            field="action_output",
+            isMultiple=False,
+            isFindingCompatible=False,
+            labels=["scan"],
+        )
         expectation_signatures = ContractOutputElement(
             type=ContractOutputType.ExpectationSignature,
             field="expectation_signatures",
@@ -176,7 +187,14 @@ class NmapContracts:
         )
         nmap_contract_outputs: List[ContractOutputElement] = (
             ContractBuilder()
-            .add_outputs([output_ports_scans, output_port, expectation_signatures])
+            .add_outputs(
+                [
+                    output_ports_scans,
+                    output_port,
+                    output_action_output,
+                    expectation_signatures,
+                ]
+            )
             .build_outputs()
         )
         syn_scan_contract = Contract(
@@ -190,6 +208,7 @@ class NmapContracts:
             outputs=nmap_contract_outputs,
             manual=False,
             domains=[SecurityDomains.NETWORK.value],
+            contract_attack_patterns_external_ids=["T1046"],
         )
         tcp_scan_contract = Contract(
             contract_id=TCP_CONNECT_SCAN_CONTRACT,
@@ -202,6 +221,7 @@ class NmapContracts:
             outputs=nmap_contract_outputs,
             manual=False,
             domains=[SecurityDomains.NETWORK.value],
+            contract_attack_patterns_external_ids=["T1046"],
         )
         fin_scan_contract = Contract(
             contract_id=FIN_SCAN_CONTRACT,
@@ -214,6 +234,7 @@ class NmapContracts:
             outputs=nmap_contract_outputs,
             manual=False,
             domains=[SecurityDomains.NETWORK.value],
+            contract_attack_patterns_external_ids=["T1046"],
         )
         return prepare_contracts(
             [syn_scan_contract, tcp_scan_contract, fin_scan_contract]
