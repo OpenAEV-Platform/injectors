@@ -1,6 +1,6 @@
 [project]
 name = "openaev-teams-injector"
-version = "3.260731.1"
+version = "3.260805.0"
 description = "An injector for Microsoft Teams (Microsoft Graph API, Adaptive Cards)"
 readme = "README.md"
 authors = [
@@ -9,7 +9,7 @@ authors = [
 license = "Apache-2.0"
 requires-python = ">=3.11,<4.0"
 dependencies = [
-    "pyoaev (==3.260731.1); extra != 'dev'",
+    "pyoaev (==3.260805.0); extra != 'dev'",
     "injector_common @ ../injector_common",
     "requests~=2.33",
 ]
