@@ -32,6 +32,20 @@ class CommonTargetsTest(TestCase):
             "asset_ips": [],  # no ips
             "asset_agents": True,
         }
+        self.asset_seen_and_local_ip = {
+            "asset_id": "a4",
+            "asset_hostname": None,
+            "asset_ips": ["192.168.56.11"],  # local address
+            "asset_seen_ip": "74.234.220.121",  # what the endpoint screen shows
+            "asset_agents": True,
+        }
+        self.asset_loopback_seen_ip = {
+            "asset_id": "a5",
+            "asset_hostname": None,
+            "asset_ips": ["10.0.0.5"],
+            "asset_seen_ip": "127.0.0.1",  # unusable, must fall back
+            "asset_agents": True,
+        }
 
         self.mock_helper = MagicMock()
 
@@ -50,6 +64,22 @@ class CommonTargetsTest(TestCase):
     def test_extract_property_target_value_no_valid_field(self):
         target = Targets.extract_property_target_value(self.empty_asset_ips)
         self.assertIsNone(target)
+
+    def test_extract_property_target_value_prefers_seen_ip_over_local_ip(self):
+        # The endpoint screen shows the seen IP, so automatic targeting must use it rather
+        # than a local address the operator never saw.
+        target, asset_id = Targets.extract_property_target_value(
+            self.asset_seen_and_local_ip
+        )
+        self.assertEqual(target, "74.234.220.121")
+        self.assertEqual(asset_id, "a4")
+
+    def test_extract_property_target_value_falls_back_when_seen_ip_unusable(self):
+        target, asset_id = Targets.extract_property_target_value(
+            self.asset_loopback_seen_ip
+        )
+        self.assertEqual(target, "10.0.0.5")
+        self.assertEqual(asset_id, "a5")
 
     # ---------- extract_targets ----------
 
