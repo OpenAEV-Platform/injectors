@@ -21,6 +21,7 @@ def test_privesc_paths_emit_vulnerability_findings():
             "stdout": (
                 "Potential privilege escalation found: CreateAccessKey\n"
                 "Vulnerable path via iam:PassRole to admin role\n"
+                "No potential privilege escalation methods worked.\n"
                 "just an informational line with no signal\n"
             )
         },
@@ -30,10 +31,23 @@ def test_privesc_paths_emit_vulnerability_findings():
     paths = outputs["privesc_paths"]
 
     assert len(paths) == 2
+    details = {p["details"] for p in paths}
+    assert "No potential privilege escalation methods worked." not in details
     for path in paths:
         assert path["status"] == "VULNERABLE"
         assert path["name"]
         assert path["details"]
+
+
+def test_privesc_negative_summaries_are_not_emitted():
+    """Failure/absence summaries must not become VULNERABLE findings."""
+    stdout = (
+        "No privilege escalation paths found.\n"
+        "Target is not vulnerable to any known privesc.\n"
+        "Could not find an exploit chain.\n"
+    )
+    paths = _executor()._parse_privesc_paths(stdout)
+    assert paths == []
 
 
 def test_secrets_manager_emits_credentials():

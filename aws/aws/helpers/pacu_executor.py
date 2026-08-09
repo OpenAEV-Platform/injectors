@@ -917,24 +917,54 @@ class PacuExecutor:
                     roles.append(role_name)
         return roles
 
+    # Negative / failure phrases that also contain a privesc keyword but report
+    # the ABSENCE of a finding (e.g. "No potential privilege escalation methods
+    # worked."). Lines matching any of these must never be emitted as a
+    # Vulnerability finding.
+    _PRIVESC_NEGATIVE_MARKERS = (
+        "no potential",
+        "no privilege",
+        "no privesc",
+        "no escalation",
+        "no exploit",
+        "no methods",
+        "no method",
+        "no paths",
+        "no path",
+        "not vulnerable",
+        "none found",
+        "not found",
+        "did not",
+        "does not",
+        "could not",
+        "unable to",
+    )
+
     def _parse_privesc_paths(self, stdout: str) -> List[Dict]:
         """Parse privilege escalation paths from Pacu output into Vulnerability
         findings.
 
         Each detected path is shaped as the platform Vulnerability output
         processor expects: ``name`` and ``status`` are required, ``details``
-        carries the raw line.
+        carries the raw line. Negative / failure summaries (e.g. "No potential
+        privilege escalation methods worked.") also contain a privesc keyword,
+        so they are explicitly rejected to avoid emitting a false VULNERABLE
+        finding.
         """
         privesc_paths: List[Dict] = []
         seen = set()
         for line in stdout.split("\n"):
             line = line.strip()
+            lowered = line.lower()
             # Look for privilege escalation indicators
             if any(
-                keyword in line.lower()
+                keyword in lowered
                 for keyword in ["escalation", "privesc", "vulnerable", "exploit"]
             ):
                 if not line or line in seen:
+                    continue
+                # Skip lines that report the absence of a finding.
+                if any(neg in lowered for neg in self._PRIVESC_NEGATIVE_MARKERS):
                     continue
                 seen.add(line)
                 privesc_paths.append(
