@@ -32,6 +32,27 @@ class CommonTargetsTest(TestCase):
             "asset_ips": [],  # no ips
             "asset_agents": True,
         }
+        self.asset_seen_and_local_ip = {
+            "asset_id": "a4",
+            "asset_hostname": None,
+            "asset_ips": ["192.168.56.11"],  # local address
+            "asset_seen_ip": "74.234.220.121",  # what the endpoint screen shows
+            "asset_agents": True,
+        }
+        self.asset_loopback_seen_ip = {
+            "asset_id": "a5",
+            "asset_hostname": None,
+            "asset_ips": ["10.0.0.5"],
+            "asset_seen_ip": "127.0.0.1",  # unusable, must fall back
+            "asset_agents": True,
+        }
+        self.asset_none_seen_ip = {
+            "asset_id": "a6",
+            "asset_hostname": None,
+            "asset_ips": ["10.0.0.6"],
+            "asset_seen_ip": None,  # optional field, explicitly absent
+            "asset_agents": True,
+        }
 
         self.mock_helper = MagicMock()
 
@@ -50,6 +71,40 @@ class CommonTargetsTest(TestCase):
     def test_extract_property_target_value_no_valid_field(self):
         target = Targets.extract_property_target_value(self.empty_asset_ips)
         self.assertIsNone(target)
+
+    def test_extract_property_target_value_prefers_seen_ip_over_local_ip(self):
+        # The endpoint screen shows the seen IP, so automatic targeting must use it rather
+        # than a local address the operator never saw.
+        target, asset_id = Targets.extract_property_target_value(
+            self.asset_seen_and_local_ip
+        )
+        self.assertEqual(target, "74.234.220.121")
+        self.assertEqual(asset_id, "a4")
+
+    def test_extract_property_target_value_falls_back_when_seen_ip_unusable(self):
+        target, asset_id = Targets.extract_property_target_value(
+            self.asset_loopback_seen_ip
+        )
+        self.assertEqual(target, "10.0.0.5")
+        self.assertEqual(asset_id, "a5")
+
+    def test_extract_property_target_value_falls_back_when_seen_ip_is_none(self):
+        # asset_seen_ip is optional and may be missing or None. That must not raise
+        # and must fall back to the first valid local IP.
+        target, asset_id = Targets.extract_property_target_value(
+            self.asset_none_seen_ip
+        )
+        self.assertEqual(target, "10.0.0.6")
+        self.assertEqual(asset_id, "a6")
+
+    def test_is_valid_ip_handles_none_and_invalid(self):
+        # Guards is_valid_ip against optional/None payload fields (asset_seen_ip)
+        # so automatic targeting never raises on assets without a seen IP.
+        self.assertFalse(Targets.is_valid_ip(None))
+        self.assertFalse(Targets.is_valid_ip(""))
+        self.assertFalse(Targets.is_valid_ip("not-an-ip"))
+        self.assertFalse(Targets.is_valid_ip("127.0.0.1"))
+        self.assertTrue(Targets.is_valid_ip("74.234.220.121"))
 
     # ---------- extract_targets ----------
 

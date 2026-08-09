@@ -215,14 +215,20 @@ class Targets:
         return None
 
     @staticmethod
-    def is_valid_ip(ip: str) -> bool:
-        """Filter out loopback, unspecified ip"""
+    def is_valid_ip(ip: Optional[str]) -> bool:
+        """Filter out loopback, unspecified ip.
+
+        Accepts an optional value because callers pass raw payload fields
+        (asset_seen_ip is optional and may be missing or None). A None or
+        non-string value is treated as invalid: ipaddress.ip_address raises
+        ValueError for None/empty strings and TypeError for other types.
+        """
         try:
             ip_obj = ipaddress.ip_address(ip)
             return not (
                 ip_obj.is_loopback or ip_obj.is_unspecified or ip_obj.is_link_local
             )
-        except ValueError:
+        except (ValueError, TypeError):
             return False
 
     @staticmethod
@@ -230,7 +236,12 @@ class Targets:
         """
         Extract target value from asset based on conditions:
         - Agentless + hostname => hostname
-        - Otherwise => first valid IP
+        - Otherwise => seen IP, else first valid local IP
+
+        The seen IP comes before the local ones because it is the address the platform
+        actually observed the endpoint at, and it is what the endpoint screen displays.
+        Going straight to the local IPs made the execution target an address the UI never
+        showed - an endpoint listed as 74.234.220.121 scanned at 192.168.56.11.
         """
         asset_id = asset.get("asset_id")
         agents = asset.get("asset_agents", [])
@@ -241,7 +252,12 @@ class Targets:
         if not agents and hostname:
             return hostname, asset_id
 
-        # Case 2: Agent present => try IPs
+        # Case 2: the address the platform saw this endpoint at
+        seen_ip = asset.get("asset_seen_ip")
+        if Targets.is_valid_ip(seen_ip):
+            return seen_ip, asset_id
+
+        # Case 3: no usable seen IP => fall back to the local ones
         for ip in asset_ips:
             if Targets.is_valid_ip(ip):
                 return ip, asset_id
