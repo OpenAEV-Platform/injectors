@@ -3,9 +3,11 @@ Helper module for executing Pacu modules within OpenAEV injector.
 This module handles the execution of Pacu commands and parsing of results.
 """
 
+import ipaddress
 import json
 import os
 import platform
+import re
 import subprocess
 from typing import Dict, List, Optional, Tuple
 
@@ -755,8 +757,38 @@ class PacuExecutor:
         elif "ec2__enum" in module_name:
             stdout = data.get("stdout", "")
             instances, security_groups = self._parse_ec2_data(stdout)
+            public_ips = self._extract_public_ipv4s(stdout)
+            open_ports = self._extract_open_ports(stdout)
 
-            message = f"Found {len(instances)} EC2 instances, {len(security_groups)} security groups"
+            message = (
+                f"Found {len(instances)} EC2 instances, "
+                f"{len(security_groups)} security groups, "
+                f"{len(public_ips)} public IPs, {len(open_ports)} open ports"
+            )
+            if self.logger:
+                self.logger.info(message)
+
+            outputs: Dict = {
+                "instances": instances,
+                "security_groups": security_groups,
+            }
+            if public_ips:
+                outputs["public_ips"] = public_ips
+            if open_ports:
+                outputs["open_ports"] = open_ports
+
+            return {
+                "success": True,
+                "message": message,
+                "outputs": outputs,
+            }
+
+        # Parse Secrets Manager enumeration -> Credentials findings
+        elif "secrets" in module_name:
+            stdout = data.get("stdout", "") or data.get("output", "")
+            secrets = self._parse_secrets_credentials(stdout)
+
+            message = f"Found {len(secrets)} secrets"
             if self.logger:
                 self.logger.info(message)
 
@@ -764,8 +796,28 @@ class PacuExecutor:
                 "success": True,
                 "message": message,
                 "outputs": {
-                    "instances": instances,
-                    "security_groups": security_groups,
+                    "secrets": secrets,
+                },
+            }
+
+        # Parse SSM parameters enumeration -> Credentials findings
+        elif (
+            "systemsmanager" in module_name
+            or "ssm" in module_name
+            or "parameter" in module_name
+        ):
+            stdout = data.get("stdout", "") or data.get("output", "")
+            parameters = self._parse_ssm_credentials(stdout)
+
+            message = f"Found {len(parameters)} SSM parameters"
+            if self.logger:
+                self.logger.info(message)
+
+            return {
+                "success": True,
+                "message": message,
+                "outputs": {
+                    "parameters": parameters,
                 },
             }
 
@@ -865,18 +917,63 @@ class PacuExecutor:
                     roles.append(role_name)
         return roles
 
-    def _parse_privesc_paths(self, stdout: str) -> List[str]:
-        """Parse privilege escalation paths from Pacu output"""
-        privesc_paths = []
+    # Negative / failure phrases that also contain a privesc keyword but report
+    # the ABSENCE of a finding (e.g. "No potential privilege escalation methods
+    # worked."). Lines matching any of these must never be emitted as a
+    # Vulnerability finding.
+    _PRIVESC_NEGATIVE_MARKERS = (
+        "no potential",
+        "no privilege",
+        "no privesc",
+        "no escalation",
+        "no exploit",
+        "no methods",
+        "no method",
+        "no paths",
+        "no path",
+        "not vulnerable",
+        "none found",
+        "not found",
+        "did not",
+        "does not",
+        "could not",
+        "unable to",
+    )
+
+    def _parse_privesc_paths(self, stdout: str) -> List[Dict]:
+        """Parse privilege escalation paths from Pacu output into Vulnerability
+        findings.
+
+        Each detected path is shaped as the platform Vulnerability output
+        processor expects: ``name`` and ``status`` are required, ``details``
+        carries the raw line. Negative / failure summaries (e.g. "No potential
+        privilege escalation methods worked.") also contain a privesc keyword,
+        so they are explicitly rejected to avoid emitting a false VULNERABLE
+        finding.
+        """
+        privesc_paths: List[Dict] = []
+        seen = set()
         for line in stdout.split("\n"):
             line = line.strip()
+            lowered = line.lower()
             # Look for privilege escalation indicators
             if any(
-                keyword in line.lower()
+                keyword in lowered
                 for keyword in ["escalation", "privesc", "vulnerable", "exploit"]
             ):
-                if line not in privesc_paths:
-                    privesc_paths.append(line)
+                if not line or line in seen:
+                    continue
+                # Skip lines that report the absence of a finding.
+                if any(neg in lowered for neg in self._PRIVESC_NEGATIVE_MARKERS):
+                    continue
+                seen.add(line)
+                privesc_paths.append(
+                    {
+                        "name": line[:120],
+                        "status": "VULNERABLE",
+                        "details": line,
+                    }
+                )
         return privesc_paths
 
     def _parse_ec2_data(self, stdout: str) -> Tuple[List[str], List[str]]:
@@ -939,6 +1036,7 @@ class PacuExecutor:
             )
         elif "vpc" in module_name:
             outputs["vpcs"] = self._extract_items(stdout, ["vpc-", "VPC:", "VpcId:"])
+            outputs["public_ips"] = self._extract_public_ipv4s(stdout)
         elif "cloudtrail" in module_name:
             outputs["events"] = self._extract_items(
                 stdout, ["Event:", "EventName:", "Trail:"]
@@ -997,6 +1095,84 @@ class PacuExecutor:
         outputs = {k: v for k, v in outputs.items() if v}
 
         return outputs
+
+    def _parse_secrets_credentials(self, stdout: str) -> List[Dict]:
+        """Parse Secrets Manager identifiers into Credentials findings."""
+        identifiers = self._extract_items(stdout, ["SecretName:", "Secret:", "ARN:"])
+        return self._identifiers_to_credentials(identifiers)
+
+    def _parse_ssm_credentials(self, stdout: str) -> List[Dict]:
+        """Parse SSM parameter identifiers into Credentials findings."""
+        identifiers = self._extract_items(stdout, ["Parameter:", "Name:", "SSM:"])
+        return self._identifiers_to_credentials(identifiers)
+
+    def _identifiers_to_credentials(self, identifiers: List[str]) -> List[Dict]:
+        """Shape credential-store identifiers as Credentials findings.
+
+        The enumeration modules surface the identifier of a secret / parameter,
+        not the plaintext value, so the identifier is used as both the username
+        and the hash to satisfy the platform Credentials validator (username +
+        password OR hash). The finding acts as a lead for credential-reuse
+        injects.
+        """
+        credentials: List[Dict] = []
+        seen = set()
+        for identifier in identifiers:
+            if not identifier or identifier in seen:
+                continue
+            seen.add(identifier)
+            credentials.append({"username": identifier, "hash": identifier})
+        return credentials
+
+    def _extract_public_ipv4s(self, stdout: str) -> List[str]:
+        """Extract distinct, globally-routable IPv4 addresses from Pacu output."""
+        public_ips: List[str] = []
+        seen = set()
+        for candidate in re.findall(r"\b(?:\d{1,3}\.){3}\d{1,3}\b", stdout):
+            if candidate in seen:
+                continue
+            try:
+                address = ipaddress.ip_address(candidate)
+            except ValueError:
+                continue
+            if address.version != 4 or not address.is_global:
+                continue
+            seen.add(candidate)
+            public_ips.append(candidate)
+        return public_ips
+
+    def _extract_open_ports(self, stdout: str) -> List[int]:
+        """Extract distinct open security-group ports from Pacu output.
+
+        Security-group rules are expressed as ``FromPort`` / ``ToPort`` pairs. A
+        pair only identifies a single open port when ``FromPort == ToPort``; a
+        genuine range (e.g. ``FromPort: 80 ToPort: 82``) cannot be represented by
+        the contract's list-of-single-``Port`` output, so it is skipped rather
+        than misrepresented as just its two endpoints. Explicit "open port N"
+        lines are parsed separately.
+        """
+        open_ports: List[int] = []
+        seen = set()
+
+        def _add(value: int) -> None:
+            if 0 < value <= 65535 and value not in seen:
+                seen.add(value)
+                open_ports.append(value)
+
+        # Single-port security-group rules (FromPort == ToPort). ``\D+`` between
+        # the two values never crosses another digit, so it cannot pair a
+        # FromPort with a ToPort from a different rule.
+        for from_port, to_port in re.findall(
+            r"FromPort\W{0,3}(\d{1,5})\D+ToPort\W{0,3}(\d{1,5})", stdout
+        ):
+            if from_port == to_port:
+                _add(int(from_port))
+
+        # Explicit "open port N" mentions.
+        for match in re.findall(r"open port\W{0,3}(\d{1,5})", stdout, re.IGNORECASE):
+            _add(int(match))
+
+        return open_ports
 
     def _extract_items(self, text: str, patterns: List[str]) -> List[str]:
         """Extract items matching any of the given patterns"""
