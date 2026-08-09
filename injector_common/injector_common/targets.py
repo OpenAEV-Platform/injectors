@@ -215,14 +215,20 @@ class Targets:
         return None
 
     @staticmethod
-    def is_valid_ip(ip: str) -> bool:
-        """Filter out loopback, unspecified ip"""
+    def is_valid_ip(ip: Optional[str]) -> bool:
+        """Filter out loopback, unspecified ip.
+
+        Accepts an optional value because callers pass raw payload fields
+        (asset_seen_ip is optional and may be missing or None). A None or
+        non-string value is treated as invalid: ipaddress.ip_address raises
+        ValueError for None/empty strings and TypeError for other types.
+        """
         try:
             ip_obj = ipaddress.ip_address(ip)
             return not (
                 ip_obj.is_loopback or ip_obj.is_unspecified or ip_obj.is_link_local
             )
-        except ValueError:
+        except (ValueError, TypeError):
             return False
 
     @staticmethod
