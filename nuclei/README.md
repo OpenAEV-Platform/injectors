@@ -75,12 +75,13 @@ The injector is configured either through environment variables (recommended, re
 
 ### Nuclei injector environment variables
 
-These tune how Nuclei runs. Each maps to a Nuclei command-line flag (shown in the description). `exclude_type` and
+These tune how Nuclei runs. Most map to a Nuclei command-line flag (shown in the description). `exclude_type` and
 `exclude_severity` accept comma-separated values.
 
 | Parameter                      | config.yml                              | Docker environment variable             | Default   | Mandatory | Description                                                                                                    |
 |--------------------------------|-----------------------------------------|-----------------------------------------|-----------|-----------|----------------------------------------------------------------------------------------------------------------|
 | Scan strategy                  | `nuclei.scan_strategy`                  | `NUCLEI_SCAN_STRATEGY`                  | host-spray| No        | Strategy used while scanning. One of `auto`, `host-spray`, `template-spray` (`-scan-strategy`).                |
+| Scan timeout                   | `nuclei.scan_timeout`                   | `NUCLEI_SCAN_TIMEOUT`                   | 540       | No        | Hard ceiling in seconds for a whole scan. When exceeded, the scan is terminated and the inject is reported as a timeout error instead of hanging forever. Not a Nuclei flag (`-timeout` is per-request). Keep it below the platform's inject execution threshold (default 10 min). |
 | Templates parallelism          | `nuclei.templates_parallelism`          | `NUCLEI_TEMPLATES_PARALLELISM`          | 5         | No        | Maximum number of templates executed in parallel (`-concurrency`).                                             |
 | Hosts parallelism per template | `nuclei.hosts_parallelism_per_template` | `NUCLEI_HOSTS_PARALLELISM_PER_TEMPLATE` | 5         | No        | Maximum number of hosts analyzed in parallel per template (`-bulk-size`).                                      |
 | Max requests per second        | `nuclei.max_requests_per_second`        | `NUCLEI_MAX_REQUESTS_PER_SECOND`        | 50        | No        | Maximum number of requests sent per second (`-rate-limit`).                                                    |

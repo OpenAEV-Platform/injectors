@@ -1,7 +1,7 @@
 import json
 import subprocess
 import time
-from typing import Dict
+from typing import Dict, Optional
 
 from pyoaev.helpers import OpenAEVConfigHelper, OpenAEVInjectorHelper
 from pyoaev.signatures import (
@@ -34,6 +34,15 @@ SECURITY_PLATFORM_DESCRIPTION = (
     "verdicts of its scans."
 )
 SECURITY_PLATFORM_LOGO_PATH = "nuclei/img/nuclei.jpg"
+
+# Max characters of Nuclei's captured stderr kept in a log line, so a very
+# noisy scan cannot flood the injector logs.
+_STDERR_LOG_TAIL = 2000
+
+
+def _decode(raw: Optional[bytes]) -> str:
+    """Best-effort decode of captured subprocess output for logging/errors."""
+    return (raw or b"").decode("utf-8", "replace").strip()
 
 
 class OpenAEVNuclei:
@@ -99,7 +108,52 @@ class OpenAEVNuclei:
         )
 
         input_data = ("\n".join(targets) + "\n").encode("utf-8")
-        result = NucleiProcess.nuclei_execute(nuclei_args, input_data)
+        scan_timeout = self.config_loader.nuclei.scan_timeout
+        try:
+            result = NucleiProcess.nuclei_execute(
+                nuclei_args, input_data, timeout=scan_timeout
+            )
+        except subprocess.TimeoutExpired as exc:
+            # A hung scan must not block the consumer forever: Nuclei's own
+            # -timeout is per-request, so only this ceiling bounds the whole run.
+            # Surface the partial output and re-raise so process_message emits a
+            # terminal ERROR callback - otherwise the inject stays PENDING until
+            # the platform's stale-inject sweep marks it failed with no reason.
+            stderr_tail = _decode(exc.stderr)
+            self.helper.injector_logger.error(
+                f"Nuclei scan timed out after {scan_timeout}s for inject "
+                f"{msg_data.inject_id} and was terminated. Nuclei stderr tail: "
+                f"{stderr_tail[-_STDERR_LOG_TAIL:] or '<none>'}"
+            )
+            raise RuntimeError(
+                f"Nuclei scan timed out after {scan_timeout} seconds and was "
+                "terminated before completion. Reduce the scan scope (tags / "
+                "manual template path / fewer targets) or raise NUCLEI_SCAN_TIMEOUT."
+            ) from exc
+        except subprocess.CalledProcessError as exc:
+            # Non-zero exit: bubble up the stderr so the terminal error trace is
+            # actionable instead of a bare "returned non-zero exit status N".
+            stderr_tail = _decode(exc.stderr)
+            self.helper.injector_logger.error(
+                f"Nuclei exited with code {exc.returncode} for inject "
+                f"{msg_data.inject_id}. Nuclei stderr tail: "
+                f"{stderr_tail[-_STDERR_LOG_TAIL:] or '<none>'}"
+            )
+            raise RuntimeError(
+                f"Nuclei exited with code {exc.returncode}: "
+                f"{stderr_tail[-_STDERR_LOG_TAIL:] or 'no stderr output'}"
+            ) from exc
+
+        # Nuclei writes its runtime progress and warnings to stderr; log it so a
+        # completed scan is no longer silent between "Executing nuclei with ..."
+        # and the results.
+        stderr_tail = _decode(result.stderr)
+        if stderr_tail:
+            self.helper.injector_logger.info(
+                f"Nuclei finished for inject {msg_data.inject_id} in "
+                f"{int(time.time() - start)}s. Nuclei stderr tail: "
+                f"{stderr_tail[-_STDERR_LOG_TAIL:]}"
+            )
 
         return self.parser.parse(
             result.stdout.decode("utf-8"), msg_data.target_results.ip_to_asset_id_map

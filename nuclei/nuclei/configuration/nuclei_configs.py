@@ -50,6 +50,19 @@ class ConfigLoaderNuclei(BaseSettings):
         ),
     )
 
+    scan_timeout: PositiveInt = Field(
+        default=540,
+        description=(
+            "Hard ceiling in seconds for a whole Nuclei scan. When exceeded, the "
+            "scan process is terminated and the inject is reported as a timeout "
+            "error instead of hanging forever (Nuclei's own -timeout is "
+            "per-request and never bounds the total run). Keep it below the "
+            "platform's inject.execution.threshold.minutes (default 10 min) so "
+            "the injector reports the timeout before the platform marks the "
+            "inject stale. Not a Nuclei flag."
+        ),
+    )
+
     retries: PositiveInt = Field(
         default=1,
         description=(

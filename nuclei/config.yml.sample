@@ -15,6 +15,7 @@ nuclei:
   hosts_parallelism_per_template: 5 # (bulk_size)
   max_requests_per_second: 50 # (rate_limit)
   timeout: 10
+  scan_timeout: 540 # hard ceiling (seconds) for a whole scan; keep below the platform inject execution threshold (default 10 min)
   retries: 1
   max_host_error: 30
   response_size_read: 1048576  # in bytes

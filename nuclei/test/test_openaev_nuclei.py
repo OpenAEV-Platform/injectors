@@ -79,7 +79,9 @@ class TestOpenAEVNuclei(unittest.TestCase):
             },
         )
         m_nucleiprocess.nuclei_execute.assert_called_once_with(
-            m_builder.return_value.build.return_value, b"1.1.1.1\n"
+            m_builder.return_value.build.return_value,
+            b"1.1.1.1\n",
+            timeout=injector.config_loader.nuclei.scan_timeout,
         )
         m_parser.return_value.parse.assert_called_once_with(
             m_nucleiprocess.nuclei_execute.return_value.stdout.decode.return_value,
@@ -127,6 +129,44 @@ class TestOpenAEVNuclei(unittest.TestCase):
         self.assertEqual(identifiers, ["asset-1", "asset-2"])
         for c in target_calls:
             self.assertEqual(c.kwargs["data"]["execution_action"], "command_execution")
+
+    @patch.object(module.Targets, "build_execution_message")
+    @patch.object(module, "NucleiCommandBuilder")
+    def test_openaev_nuclei_execution_timeout_raises_runtime_error(
+        self,
+        m_builder,
+        m_build_execution_message,
+        m_configloader,
+        m_confighelper,
+        m_helper,
+        m_nucleiprocess,
+        m_parser,
+        m_msgdata,
+        _,
+    ):
+        # A hung scan hitting the subprocess ceiling must surface as a clear
+        # RuntimeError (so process_message reports a terminal timeout error)
+        # rather than propagating the raw TimeoutExpired or hanging forever.
+        m_helper.return_value.api = MagicMock()
+        m_helper.return_value.injector_logger = MagicMock()
+        injector = module.OpenAEVNuclei()
+        injector.config_loader.nuclei.scan_timeout = 5
+
+        message_data = MagicMock()
+        message_data.inject_id = "inject-id"
+        message_data.get_targets.return_value = ["1.1.1.1"]
+        message_data.target_results.ip_to_asset_id_map = {}
+        m_builder.return_value.build.return_value = ["nuclei", "-jsonl"]
+        m_nucleiprocess.nuclei_execute.side_effect = module.subprocess.TimeoutExpired(
+            cmd="nuclei", timeout=5, stderr=b"partial stderr"
+        )
+
+        with self.assertRaises(RuntimeError) as ctx:
+            injector.nuclei_execution(1, message_data)
+
+        self.assertIn("timed out after 5 seconds", str(ctx.exception))
+        m_parser.return_value.parse.assert_not_called()
+        injector.helper.injector_logger.error.assert_called()
 
     @patch.object(module.OpenAEVNuclei, "nuclei_execution")
     @patch.object(module, "ExecutionDetails")
