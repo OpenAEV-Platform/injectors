@@ -75,12 +75,16 @@ The injector is configured either through environment variables (recommended, re
 
 ### Nuclei injector environment variables
 
-These tune how Nuclei runs. Each maps to a Nuclei command-line flag (shown in the description). `exclude_type` and
+These tune how Nuclei runs. Most map to a Nuclei command-line flag (shown in the description). `exclude_type` and
 `exclude_severity` accept comma-separated values.
 
 | Parameter                      | config.yml                              | Docker environment variable             | Default   | Mandatory | Description                                                                                                    |
 |--------------------------------|-----------------------------------------|-----------------------------------------|-----------|-----------|----------------------------------------------------------------------------------------------------------------|
 | Scan strategy                  | `nuclei.scan_strategy`                  | `NUCLEI_SCAN_STRATEGY`                  | host-spray| No        | Strategy used while scanning. One of `auto`, `host-spray`, `template-spray` (`-scan-strategy`).                |
+| Scan timeout                   | `nuclei.scan_timeout`                   | `NUCLEI_SCAN_TIMEOUT`                   | 540       | No        | Hard ceiling in seconds for a whole scan. When exceeded, the scan is terminated and the inject is reported as a timeout error instead of hanging forever. Not a Nuclei flag (`-timeout` is per-request). Keep it below the platform's inject execution threshold (default 10 min). |
+| Template update timeout        | `nuclei.template_update_timeout`        | `NUCLEI_TEMPLATE_UPDATE_TIMEOUT`        | 300       | No        | Hard ceiling in seconds for a template refresh (`nuclei -update-templates`), applied at startup and on each periodic refresh. The refresh holds the writer side of the templates lock, so a hung update would otherwise block every scan (and startup) forever; when it fires, the refresh is terminated and degrades to best-effort (the templates already on disk are used). Not a Nuclei flag. |
+| Max concurrent scans           | `nuclei.max_concurrent_scans`           | `NUCLEI_MAX_CONCURRENT_SCANS`           | 5         | No        | Maximum number of scans running at the same time. The injector runs one Nuclei subprocess per inject; extra injects wait for a slot so a burst cannot exhaust CPU/memory/sockets. Not a Nuclei flag. |
+| Disable interactsh             | `nuclei.disable_interactsh`             | `NUCLEI_DISABLE_INTERACTSH`             | false     | No        | Disable out-of-band (OOB) interaction polling. In networks that cannot reach the public interactsh servers, OOB templates stall for the whole poll window; enabling this skips them and avoids the stall (`-no-interactsh`). |
 | Templates parallelism          | `nuclei.templates_parallelism`          | `NUCLEI_TEMPLATES_PARALLELISM`          | 5         | No        | Maximum number of templates executed in parallel (`-concurrency`).                                             |
 | Hosts parallelism per template | `nuclei.hosts_parallelism_per_template` | `NUCLEI_HOSTS_PARALLELISM_PER_TEMPLATE` | 5         | No        | Maximum number of hosts analyzed in parallel per template (`-bulk-size`).                                      |
 | Max requests per second        | `nuclei.max_requests_per_second`        | `NUCLEI_MAX_REQUESTS_PER_SECOND`        | 50        | No        | Maximum number of requests sent per second (`-rate-limit`).                                                    |
@@ -126,6 +130,29 @@ poetry run python -m nuclei.openaev_nuclei
 
 > For local development against a checkout of [client-python](https://github.com/OpenAEV-Platform/client-python)
 > (cloned next to this repository), use `poetry install --extras dev`.
+
+## Templates and scan reliability
+
+Nuclei needs its templates present and complete on disk to scan. The injector manages them so scans do not race the
+template files:
+
+- **Bundled at build time.** The Docker image runs `nuclei -update-templates` during the build, so a fresh container
+  can scan immediately instead of downloading templates on first use.
+- **Refreshed before listening.** At startup the injector refreshes templates once (best-effort) before it starts
+  consuming injects, closing the cold-start window where a scan could read a half-written template tree.
+- **Refreshed periodically under a lock.** The background refresh rewrites the templates directory while holding the
+  writer side of a readers-writer lock; scans hold the reader side, so a scan never overlaps a refresh mid-write. The
+  refresh (at startup and periodically) is bounded by `template_update_timeout`, so a hung `nuclei -update-templates`
+  cannot hold the writer lock and block every scan (or startup) forever - it is terminated and the templates already on
+  disk are used.
+- **No in-scan updates.** Scans run with `-disable-update-check`, so a scan never triggers its own template/engine
+  update mid-run.
+
+Together with `scan_timeout` (a hard ceiling that turns a hung scan into a reported timeout) and
+`max_concurrent_scans` (a bound on how many scans run at once), this removes the "same asset scans fine sometimes and
+times out other times" behaviour caused by templates being downloaded or rewritten underneath a running scan. In
+locked-down networks that cannot reach the public interactsh servers, also set `disable_interactsh` so out-of-band
+templates do not stall for the whole poll window.
 
 ## Usage
 

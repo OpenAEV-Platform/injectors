@@ -24,8 +24,9 @@ class ExternalContractsTest(unittest.TestCase):
 
     def setUp(self):
         self.LOGGER.log_level = "INFO"
-        # permanently disable actual nuclei subprocess command
-        NucleiProcess.nuclei_update_templates = lambda: None
+        # permanently disable actual nuclei subprocess command (accept the
+        # timeout kwarg the manager now passes)
+        NucleiProcess.nuclei_update_templates = lambda *a, **k: None
 
     def default_repository_templates_fetch(self, mock_session_get):
         mock_response = MagicMock()
