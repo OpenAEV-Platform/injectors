@@ -11,6 +11,8 @@ from pyoaev.contracts.contract_config import (
     SupportedLanguage,
 )
 
+from shodan.contracts.finding_outputs import ipv4_output
+
 if TYPE_CHECKING:
     from shodan.contracts.shodan_contracts import TargetSelectorField
 
@@ -207,7 +209,7 @@ class CloudProviderAssetDiscovery:
     def contract_with_specific_outputs(
         base_outputs: list[ContractOutputElement],
     ) -> list[ContractOutputElement]:
-        specific_outputs = []
+        specific_outputs = [ipv4_output()]
         contract_outputs = (
             ContractBuilder()
             .add_outputs(base_outputs + specific_outputs)
