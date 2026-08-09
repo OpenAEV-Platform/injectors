@@ -16,6 +16,7 @@ nuclei:
   max_requests_per_second: 50 # (rate_limit)
   timeout: 10
   scan_timeout: 540 # hard ceiling (seconds) for a whole scan; keep below the platform inject execution threshold (default 10 min)
+  template_update_timeout: 300 # hard ceiling (seconds) for a template refresh; a hung update cannot block scans or startup, it degrades to best-effort
   max_concurrent_scans: 5 # max number of scans running at the same time; extra injects wait for a slot
   disable_interactsh: false # set to true in locked-down networks that cannot reach the public interactsh (OOB) servers
   retries: 1

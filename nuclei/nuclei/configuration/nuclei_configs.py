@@ -63,6 +63,18 @@ class ConfigLoaderNuclei(BaseSettings):
         ),
     )
 
+    template_update_timeout: PositiveInt = Field(
+        default=300,
+        description=(
+            "Hard ceiling in seconds for a Nuclei template refresh ("
+            "'nuclei -update-templates'), applied at startup and on each periodic "
+            "refresh. The refresh holds the writer side of the templates lock, so "
+            "a hung update would otherwise block every scan (and startup) forever; "
+            "when it fires, the refresh is terminated and degrades to best-effort "
+            "(the templates already on disk are used). Not a Nuclei flag."
+        ),
+    )
+
     max_concurrent_scans: PositiveInt = Field(
         default=5,
         description=(

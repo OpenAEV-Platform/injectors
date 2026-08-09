@@ -168,6 +168,46 @@ class TestOpenAEVNuclei(unittest.TestCase):
         m_parser.return_value.parse.assert_not_called()
         injector.helper.injector_logger.error.assert_called()
 
+    @patch.object(module.Targets, "build_execution_message")
+    @patch.object(module, "NucleiCommandBuilder")
+    def test_openaev_nuclei_execution_non_zero_exit_raises_runtime_error(
+        self,
+        m_builder,
+        m_build_execution_message,
+        m_configloader,
+        m_confighelper,
+        m_helper,
+        m_nucleiprocess,
+        m_parser,
+        m_msgdata,
+        _,
+    ):
+        # A non-zero Nuclei exit must surface as a RuntimeError carrying the
+        # stderr tail so the terminal error trace is actionable instead of a bare
+        # "returned non-zero exit status N".
+        m_helper.return_value.api = MagicMock()
+        m_helper.return_value.injector_logger = MagicMock()
+        injector = module.OpenAEVNuclei()
+
+        message_data = MagicMock()
+        message_data.inject_id = "inject-id"
+        message_data.get_targets.return_value = ["1.1.1.1"]
+        message_data.target_results.ip_to_asset_id_map = {}
+        m_builder.return_value.build.return_value = ["nuclei", "-jsonl"]
+        m_nucleiprocess.nuclei_execute.side_effect = (
+            module.subprocess.CalledProcessError(
+                returncode=2, cmd="nuclei", stderr=b"boom: bad flag"
+            )
+        )
+
+        with self.assertRaises(RuntimeError) as ctx:
+            injector.nuclei_execution(1, message_data)
+
+        self.assertIn("exited with code 2", str(ctx.exception))
+        self.assertIn("boom: bad flag", str(ctx.exception))
+        m_parser.return_value.parse.assert_not_called()
+        injector.helper.injector_logger.error.assert_called()
+
     @patch.object(module.OpenAEVNuclei, "nuclei_execution")
     @patch.object(module, "ExecutionDetails")
     @patch.object(module, "SignatureManager")
@@ -426,8 +466,8 @@ class TestOpenAEVNuclei(unittest.TestCase):
         m_helper.return_value.injector_logger = MagicMock()
 
         order = []
-        m_nucleiprocess.nuclei_update_templates.side_effect = lambda: order.append(
-            "update"
+        m_nucleiprocess.nuclei_update_templates.side_effect = (
+            lambda *_a, **_kw: order.append("update")
         )
 
         injector = module.OpenAEVNuclei()
@@ -436,10 +476,19 @@ class TestOpenAEVNuclei(unittest.TestCase):
         with patch.object(module, "ExternalContractsScheduler") as m_sched:
             injector.start()
 
-        m_nucleiprocess.nuclei_update_templates.assert_called_once()
+        # The startup refresh must be bounded so a hung update cannot block
+        # startup (and, holding the writer lock, every scan) forever.
+        m_nucleiprocess.nuclei_update_templates.assert_called_once_with(
+            timeout=injector.config_loader.nuclei.template_update_timeout
+        )
         self.assertEqual(order, ["update", "listen"])
         self.assertIs(
             m_sched.call_args.kwargs["templates_lock"], injector._templates_lock
+        )
+        # The same bound is handed to the periodic refresh.
+        self.assertIs(
+            m_sched.call_args.kwargs["template_update_timeout"],
+            injector.config_loader.nuclei.template_update_timeout,
         )
 
     def test_openaev_nuclei_start_template_refresh_is_best_effort(

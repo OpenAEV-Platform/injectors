@@ -4,8 +4,14 @@ import subprocess
 class NucleiProcess:
 
     @staticmethod
-    def nuclei_update_templates():
-        subprocess.run(["nuclei", "-update-templates"], check=True)
+    def nuclei_update_templates(timeout=None):
+        # timeout is a hard ceiling for the template refresh. The refresh holds
+        # the writer side of the templates lock, so a hung "nuclei
+        # -update-templates" would otherwise block every scan (reader) forever -
+        # before a scan's own subprocess timeout could even start. When it fires,
+        # subprocess.run kills the process and raises TimeoutExpired, and the
+        # caller releases the lock so scanning degrades to best-effort.
+        subprocess.run(["nuclei", "-update-templates"], check=True, timeout=timeout)
 
     @staticmethod
     def nuclei_version():

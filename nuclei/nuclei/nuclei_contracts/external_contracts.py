@@ -28,10 +28,15 @@ class ExternalContractsScheduler:
         period: int,
         logger,
         templates_lock=None,
+        template_update_timeout=None,
     ):
         self.scheduler = sched.scheduler(time.time, time.sleep)
         self.manager = ExternalContractsManager(
-            api_client, injector_id, logger, templates_lock=templates_lock
+            api_client,
+            injector_id,
+            logger,
+            templates_lock=templates_lock,
+            template_update_timeout=template_update_timeout,
         )
         self._period = period
 
@@ -56,7 +61,12 @@ class ExternalContractsScheduler:
 
 class ExternalContractsManager:
     def __init__(
-        self, api_client: OpenAEV, injector_id: str, logger, templates_lock=None
+        self,
+        api_client: OpenAEV,
+        injector_id: str,
+        logger,
+        templates_lock=None,
+        template_update_timeout=None,
     ):
         self._api_client = api_client
         self._injector_id = injector_id
@@ -65,6 +75,9 @@ class ExternalContractsManager:
         # child process spawn_process creates). None means "no coordination"
         # (unit tests / standalone use).
         self._templates_lock = templates_lock
+        # Hard ceiling for the update subprocess so a hung refresh cannot hold
+        # the writer lock (and block every scan) forever. None means no ceiling.
+        self._template_update_timeout = template_update_timeout
 
     def spawn_process(self):
         process = Process(target=self.manage_contracts)
@@ -245,9 +258,19 @@ class ExternalContractsManager:
         try:
             if self._templates_lock is not None:
                 with self._templates_lock.write():
-                    NucleiProcess.nuclei_update_templates()
+                    NucleiProcess.nuclei_update_templates(
+                        timeout=self._template_update_timeout
+                    )
             else:
-                NucleiProcess.nuclei_update_templates()
+                NucleiProcess.nuclei_update_templates(
+                    timeout=self._template_update_timeout
+                )
             self._logger.info("Templates updated successfully.")
+        except subprocess.TimeoutExpired as e:
+            # A hung refresh must not hold the writer lock forever: the context
+            # manager above releases it as this unwinds, so later scans (readers)
+            # are not blocked behind a stuck update. Degrade to best-effort - the
+            # templates already on disk (bundled or from a prior refresh) are used.
+            self._logger.error(f"Template update timed out and was terminated: {e}")
         except subprocess.CalledProcessError as e:
             self._logger.error(f"Template update failed: {e}")

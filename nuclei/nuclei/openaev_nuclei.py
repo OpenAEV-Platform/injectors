@@ -378,7 +378,9 @@ class OpenAEVNuclei:
         """
         try:
             with self._templates_lock.write():
-                NucleiProcess.nuclei_update_templates()
+                NucleiProcess.nuclei_update_templates(
+                    timeout=self.config_loader.nuclei.template_update_timeout
+                )
             self.helper.injector_logger.info(
                 "Nuclei templates refreshed before starting the consumer."
             )
@@ -400,6 +402,7 @@ class OpenAEVNuclei:
             ),
             self.helper.injector_logger,
             templates_lock=self._templates_lock,
+            template_update_timeout=self.config_loader.nuclei.template_update_timeout,
         ).start()
 
 
