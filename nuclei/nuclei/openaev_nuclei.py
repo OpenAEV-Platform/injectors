@@ -1,5 +1,6 @@
 import json
 import subprocess
+import threading
 import time
 from typing import Dict, Optional
 
@@ -18,6 +19,7 @@ from nuclei.configuration.config_loader import ConfigLoader
 from nuclei.helpers.nuclei_command_builder import NucleiCommandBuilder
 from nuclei.helpers.nuclei_output_parser import NucleiOutputParser
 from nuclei.helpers.nuclei_process import NucleiProcess
+from nuclei.helpers.scan_coordination import TemplateAccessLock
 from nuclei.models.data import MessageData
 from nuclei.nuclei_contracts.external_contracts import ExternalContractsScheduler
 
@@ -61,6 +63,15 @@ class OpenAEVNuclei:
                 "Nuclei is not installed or is not accessible from your PATH."
             )
         self.parser = NucleiOutputParser()
+
+        # The consumer spawns one thread per inject, so a burst of injects would
+        # otherwise start an unbounded number of Nuclei subprocesses at once.
+        # Extra scans wait for a slot instead.
+        max_scans = max(1, int(self.config_loader.nuclei.max_concurrent_scans))
+        self._scan_slots = threading.BoundedSemaphore(max_scans)
+        # Readers-writer lock shared with the template refresh: scans read the
+        # templates directory, the refresh rewrites it. See scan_coordination.
+        self._templates_lock = TemplateAccessLock()
 
     def nuclei_execution(
         self,
@@ -110,9 +121,13 @@ class OpenAEVNuclei:
         input_data = ("\n".join(targets) + "\n").encode("utf-8")
         scan_timeout = self.config_loader.nuclei.scan_timeout
         try:
-            result = NucleiProcess.nuclei_execute(
-                nuclei_args, input_data, timeout=scan_timeout
-            )
+            # Bound concurrency (one slot per running Nuclei subprocess) and take
+            # the reader side of the templates lock so a scan never overlaps the
+            # periodic refresh rewriting the templates directory.
+            with self._scan_slots, self._templates_lock.read():
+                result = NucleiProcess.nuclei_execute(
+                    nuclei_args, input_data, timeout=scan_timeout
+                )
         except subprocess.TimeoutExpired as exc:
             # A hung scan must not block the consumer forever: Nuclei's own
             # -timeout is per-request, so only this ceiling bounds the whole run.
@@ -350,8 +365,32 @@ class OpenAEVNuclei:
                 "type): " + str(err)
             )
 
+    def _ensure_templates_ready(self) -> None:
+        """Refresh Nuclei templates BEFORE the consumer starts listening.
+
+        Templates are bundled in the Docker image at build time, so the
+        injector is functional even offline; this synchronous refresh just
+        brings them up to date. Doing it before ``helper.listen`` closes the
+        cold-start race where an inject was consumed and scanned while the
+        very first template download was still writing the directory.
+        Best-effort by design: on failure (air-gapped network, registry
+        hiccup) the bundled templates are used as-is.
+        """
+        try:
+            with self._templates_lock.write():
+                NucleiProcess.nuclei_update_templates()
+            self.helper.injector_logger.info(
+                "Nuclei templates refreshed before starting the consumer."
+            )
+        except Exception as err:
+            self.helper.injector_logger.warning(
+                "Could not refresh Nuclei templates at startup; scanning with "
+                "the templates bundled in the image. Reason: " + str(err)
+            )
+
     def start(self):
         self._register_security_platform()
+        self._ensure_templates_ready()
         self.helper.listen(message_callback=self.process_message)
         ExternalContractsScheduler(
             self.helper.api,
@@ -360,6 +399,7 @@ class OpenAEVNuclei:
                 "injector_external_contracts_maintenance_schedule_seconds"
             ),
             self.helper.injector_logger,
+            templates_lock=self._templates_lock,
         ).start()
 
 

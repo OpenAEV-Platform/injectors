@@ -30,11 +30,13 @@ def nuclei_configs():
     config.response_size_save = 1048576
     config.exclude_type = ["headless"]
     config.exclude_severity = ["info"]
+    config.disable_interactsh = False
     return config
 
 
 BASE_ARGS = [
     "nuclei",
+    "-disable-update-check",
     "-concurrency",
     "5",
     "-bulk-size",
@@ -107,3 +109,43 @@ def test_nuclei_builder(nuclei_configs, contract_id, content, extra_args):
 
     expected_args = BASE_ARGS + extra_args
     assert nuclei_args == expected_args
+
+
+def test_nuclei_builder_disables_update_check_always(nuclei_configs):
+    # Every command must carry -disable-update-check so a scan never self-updates
+    # templates/engine mid-run.
+    nuclei_args = NucleiCommandBuilder(
+        nuclei_configs=nuclei_configs,
+        contract_id=CVE_SCAN_CONTRACT,
+        content={},
+        targets=["http://example.com"],
+    ).build()
+
+    assert "-disable-update-check" in nuclei_args
+
+
+def test_nuclei_builder_adds_no_interactsh_when_disabled(nuclei_configs):
+    # When interactsh is disabled in config, -no-interactsh must be added so OOB
+    # templates do not stall in networks that cannot reach the interactsh servers.
+    nuclei_configs.disable_interactsh = True
+
+    nuclei_args = NucleiCommandBuilder(
+        nuclei_configs=nuclei_configs,
+        contract_id=CVE_SCAN_CONTRACT,
+        content={},
+        targets=["http://example.com"],
+    ).build()
+
+    assert "-no-interactsh" in nuclei_args
+
+
+def test_nuclei_builder_omits_no_interactsh_by_default(nuclei_configs):
+    # Off by default: OOB-based templates keep working where OOB is reachable.
+    nuclei_args = NucleiCommandBuilder(
+        nuclei_configs=nuclei_configs,
+        contract_id=CVE_SCAN_CONTRACT,
+        content={},
+        targets=["http://example.com"],
+    ).build()
+
+    assert "-no-interactsh" not in nuclei_args

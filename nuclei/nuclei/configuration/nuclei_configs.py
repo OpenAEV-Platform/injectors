@@ -63,6 +63,30 @@ class ConfigLoaderNuclei(BaseSettings):
         ),
     )
 
+    max_concurrent_scans: PositiveInt = Field(
+        default=5,
+        description=(
+            "Maximum number of Nuclei scans this injector runs at the same time. "
+            "The consumer spawns one thread (and one Nuclei subprocess) per "
+            "inject, so under a burst of injects an unbounded number of scans "
+            "could run at once and exhaust CPU / memory / sockets. This bounds "
+            "that: extra injects wait for a slot. Not a Nuclei flag."
+        ),
+    )
+
+    disable_interactsh: bool = Field(
+        default=False,
+        description=(
+            "Disable Nuclei's interactsh (out-of-band / OOB) interaction "
+            "polling. Some templates use OOB checks against ProjectDiscovery's "
+            "public interactsh servers; in a locked-down network those servers "
+            "are unreachable and the affected templates stall for the whole poll "
+            "window, making scans intermittently slow or time out. Enable this "
+            "in restricted networks (OOB-only findings are then skipped). "
+            "Nuclei Flags: -ni, -no-interactsh"
+        ),
+    )
+
     retries: PositiveInt = Field(
         default=1,
         description=(

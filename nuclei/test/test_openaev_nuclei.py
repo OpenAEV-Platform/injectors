@@ -370,6 +370,24 @@ class TestOpenAEVNuclei(unittest.TestCase):
         m_signaturemanager.return_value.send_signatures.assert_not_called()
         injector.helper.injector_logger.error.assert_called()
 
+    def test_openaev_nuclei_init_creates_scan_coordination(
+        self,
+        m_configloader,
+        m_confighelper,
+        m_helper,
+        m_nucleiprocess,
+        m_parser,
+        m_msgdata,
+        _,
+    ):
+        # The concurrency semaphore and the templates readers-writer lock must be
+        # created at construction so scans are bounded and never race the refresh.
+        m_helper.return_value.api = MagicMock()
+        injector = module.OpenAEVNuclei()
+
+        self.assertIsNotNone(injector._scan_slots)
+        self.assertIsNotNone(injector._templates_lock)
+
     def test_openaev_nuclei_start(
         self,
         m_configloader,
@@ -387,6 +405,66 @@ class TestOpenAEVNuclei(unittest.TestCase):
         with patch.object(module, "ExternalContractsScheduler"):
             injector.start()
 
+        injector.helper.listen.assert_called_with(
+            message_callback=injector.process_message
+        )
+
+    def test_openaev_nuclei_start_refreshes_templates_before_listening(
+        self,
+        m_configloader,
+        m_confighelper,
+        m_helper,
+        m_nucleiprocess,
+        m_parser,
+        m_msgdata,
+        _,
+    ):
+        # Templates must be refreshed BEFORE the consumer starts listening (so an
+        # inject cannot be scanned while the first template download is still
+        # writing), and the same lock must be handed to the periodic refresh.
+        m_helper.return_value.api = MagicMock()
+        m_helper.return_value.injector_logger = MagicMock()
+
+        order = []
+        m_nucleiprocess.nuclei_update_templates.side_effect = lambda: order.append(
+            "update"
+        )
+
+        injector = module.OpenAEVNuclei()
+        injector.helper.listen.side_effect = lambda **_kw: order.append("listen")
+
+        with patch.object(module, "ExternalContractsScheduler") as m_sched:
+            injector.start()
+
+        m_nucleiprocess.nuclei_update_templates.assert_called_once()
+        self.assertEqual(order, ["update", "listen"])
+        self.assertIs(
+            m_sched.call_args.kwargs["templates_lock"], injector._templates_lock
+        )
+
+    def test_openaev_nuclei_start_template_refresh_is_best_effort(
+        self,
+        m_configloader,
+        m_confighelper,
+        m_helper,
+        m_nucleiprocess,
+        m_parser,
+        m_msgdata,
+        _,
+    ):
+        # A failed startup refresh (offline / air-gapped) must not stop the
+        # injector: it logs a warning and still starts listening with the
+        # templates bundled in the image.
+        m_helper.return_value.api = MagicMock()
+        m_helper.return_value.injector_logger = MagicMock()
+        m_nucleiprocess.nuclei_update_templates.side_effect = RuntimeError("no network")
+
+        injector = module.OpenAEVNuclei()
+
+        with patch.object(module, "ExternalContractsScheduler"):
+            injector.start()
+
+        injector.helper.injector_logger.warning.assert_called()
         injector.helper.listen.assert_called_with(
             message_callback=injector.process_message
         )

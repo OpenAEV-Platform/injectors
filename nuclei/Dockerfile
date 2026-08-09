@@ -45,4 +45,12 @@ ARG NUCLEI_URL=https://github.com/projectdiscovery/nuclei/releases/download/v${N
 ADD ${NUCLEI_URL} /tmp
 RUN unzip /tmp/nuclei_${NUCLEI_VERSION}_linux_amd64.zip -d /usr/local/bin/
 
+# Bundle the nuclei templates into the image at build time. Without this the
+# container starts with NO templates on an ephemeral filesystem and re-downloads
+# them on every restart, and a scan consumed during that first download reads a
+# half-written template tree (intermittent empty/errored/hung scans). With the
+# templates baked in, a fresh container can scan immediately; the injector still
+# refreshes them synchronously at startup and periodically afterwards.
+RUN nuclei -update-templates
+
 CMD ["python3", "-m", "nuclei.openaev_nuclei"]
