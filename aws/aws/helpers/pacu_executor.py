@@ -1112,14 +1112,36 @@ class PacuExecutor:
         return public_ips
 
     def _extract_open_ports(self, stdout: str) -> List[int]:
-        """Extract distinct open security-group ports from Pacu output."""
+        """Extract distinct open security-group ports from Pacu output.
+
+        Security-group rules are expressed as ``FromPort`` / ``ToPort`` pairs. A
+        pair only identifies a single open port when ``FromPort == ToPort``; a
+        genuine range (e.g. ``FromPort: 80 ToPort: 82``) cannot be represented by
+        the contract's list-of-single-``Port`` output, so it is skipped rather
+        than misrepresented as just its two endpoints. Explicit "open port N"
+        lines are parsed separately.
+        """
         open_ports: List[int] = []
         seen = set()
-        for match in re.findall(r"(?:FromPort|ToPort|[Pp]ort)\W{0,3}(\d{1,5})", stdout):
-            port = int(match)
-            if 0 < port <= 65535 and port not in seen:
-                seen.add(port)
-                open_ports.append(port)
+
+        def _add(value: int) -> None:
+            if 0 < value <= 65535 and value not in seen:
+                seen.add(value)
+                open_ports.append(value)
+
+        # Single-port security-group rules (FromPort == ToPort). ``\D+`` between
+        # the two values never crosses another digit, so it cannot pair a
+        # FromPort with a ToPort from a different rule.
+        for from_port, to_port in re.findall(
+            r"FromPort\W{0,3}(\d{1,5})\D+ToPort\W{0,3}(\d{1,5})", stdout
+        ):
+            if from_port == to_port:
+                _add(int(from_port))
+
+        # Explicit "open port N" mentions.
+        for match in re.findall(r"open port\W{0,3}(\d{1,5})", stdout, re.IGNORECASE):
+            _add(int(match))
+
         return open_ports
 
     def _extract_items(self, text: str, patterns: List[str]) -> List[str]:

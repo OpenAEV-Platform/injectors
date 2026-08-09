@@ -97,3 +97,18 @@ def test_extract_public_ipv4s_excludes_private_ranges():
         "8.8.8.8 10.1.2.3 192.168.1.1 172.16.0.1 1.1.1.1 not.an.ip"
     )
     assert set(ips) == {"8.8.8.8", "1.1.1.1"}
+
+
+def test_extract_open_ports_single_port_rules_and_explicit_lines():
+    executor = _executor()
+    ports = executor._extract_open_ports(
+        "SecurityGroup rule FromPort: 22 ToPort: 22\n" "Open port 443 to 0.0.0.0/0\n"
+    )
+    assert ports == [22, 443]
+
+
+def test_extract_open_ports_skips_multi_port_ranges():
+    """A genuine FromPort/ToPort range must not be emitted as its endpoints."""
+    executor = _executor()
+    ports = executor._extract_open_ports("FromPort: 8000 ToPort: 8010")
+    assert ports == []
