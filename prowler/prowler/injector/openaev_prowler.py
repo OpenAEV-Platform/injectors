@@ -8,9 +8,7 @@ from prowler.models import ConfigLoader
 class ProwlerInjector:
     """Register the foundation injector without assessment contracts."""
 
-    def __init__(
-        self, config: ConfigLoader, helper: OpenAEVInjectorHelper
-    ) -> None:
+    def __init__(self, config: ConfigLoader, helper: OpenAEVInjectorHelper) -> None:
         """Initialize the injector with its configuration and helper."""
         self.config = config
         self.helper = helper
