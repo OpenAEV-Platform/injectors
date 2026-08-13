@@ -1,4 +1,4 @@
-"""Behavior tests for the CHK.001 Prowler catalog scaffold."""
+"""Behaviour tests for the CHK.001 Prowler catalog scaffold."""
 
 import json
 from pathlib import Path
@@ -10,7 +10,7 @@ import pytest
 from prowler.injector.openaev_prowler import ProwlerInjector
 from prowler.models.configs.config_loader import ConfigLoader
 
-PROJECT_ROOT = Path(__file__).parents[2]
+PROJECT_ROOT = Path(__file__).parents[3]
 STANDARD_ENV_SETTINGS = {
     "OPENAEV_URL",
     "OPENAEV_TOKEN",
