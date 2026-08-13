@@ -48,16 +48,24 @@ def _then_only_standard_settings_are_available(settings: set[str]) -> None:
     assert settings == STANDARD_ENV_SETTINGS
 
 
-def _when_injector_starts() -> tuple[Mock, Mock]:
+def _when_injector_starts() -> tuple[object, Mock]:
     module = importlib.import_module("prowler.injector.openaev_prowler")
-    config = Mock()
+    config_module = importlib.import_module("prowler.models.configs.config_loader")
+    config = config_module.ConfigLoader.model_construct(
+        openaev=config_module.ConfigLoaderOAEV(
+            url="http://localhost:8080", token="test-token"
+        ),
+        injector=config_module.InjectorConfig(
+            id="test-injector", name="Prowler"
+        ),
+    )
     helper = Mock()
     injector = module.ProwlerInjector(config=config, helper=helper)
     injector.start()
     return config, helper
 
 
-def _then_zero_contracts_are_registered(config: Mock, helper: Mock) -> None:
+def _then_zero_contracts_are_registered(config: object, helper: Mock) -> None:
     assert config.to_daemon_config().get("injector_contracts") == []
     helper.listen.assert_called_once_with()
 
