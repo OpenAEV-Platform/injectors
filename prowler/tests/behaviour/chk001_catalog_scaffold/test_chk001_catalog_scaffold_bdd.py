@@ -174,6 +174,10 @@ def test_foundation_configuration_excludes_future_provider_settings() -> None:
 
     prowler_main.main()
 
+def test_foundation_startup_registers_no_assessment_contracts(
     monkeypatch: pytest.MonkeyPatch,
-    caplog: pytest.LogCaptureFixture,
 ) -> None:
+    """The foundation starts its listener with an empty contract catalog."""
+    _given_the_prowler_project()
+    config, helper = _when_injector_starts(monkeypatch)
+    _then_zero_contracts_are_registered(config, helper)
