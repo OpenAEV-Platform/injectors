@@ -20,7 +20,8 @@ def main() -> None:
         helper = OpenAEVInjectorHelper(
             config=OpenAEVConfigHelper.from_configuration_object(
                 config.to_daemon_config()
-            )
+            ),
+            icon=None,
         )
         ProwlerInjector(config=config, helper=helper).start()
     except ValidationError as error:

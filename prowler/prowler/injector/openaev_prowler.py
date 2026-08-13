@@ -18,4 +18,8 @@ class ProwlerInjector:
     def start(self) -> None:
         """Start the injector listener after zero-contract registration."""
         self.config.to_daemon_config()
-        self.helper.listen()
+        self.helper.listen(message_callback=self.process_message)
+
+    def process_message(self, _data: dict[str, object]) -> None:
+        """Reject execution because CHK.001 registers no contracts."""
+        raise RuntimeError("Prowler assessment contracts are not registered")
