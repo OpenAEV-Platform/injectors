@@ -1,0 +1,10 @@
+openaev:
+  url: 'ChangeMe'
+  token: 'ChangeMe'
+  # Optional for multi-tenancy (Enterprise Edition)
+  tenant_id: 'ChangeMe'
+
+injector:
+  id: 'ChangeMe'
+  name: 'Prowler'
+  log_level: 'error'
