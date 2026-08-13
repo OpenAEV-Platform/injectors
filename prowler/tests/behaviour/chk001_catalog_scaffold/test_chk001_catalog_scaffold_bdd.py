@@ -5,8 +5,6 @@ from pathlib import Path
 from typing import cast
 from unittest.mock import Mock
 
-import pytest
-
 from prowler.injector.openaev_prowler import ProwlerInjector
 from prowler.models.configs.config_loader import ConfigLoader
 
@@ -55,13 +53,7 @@ def _then_only_standard_settings_are_available(settings: set[str]) -> None:
     assert settings == STANDARD_ENV_SETTINGS
 
 
-def _when_injector_starts(monkeypatch: pytest.MonkeyPatch) -> tuple[ConfigLoader, Mock]:
-    monkeypatch.setenv("OPENAEV_URL", "http://localhost:8080")
-    monkeypatch.setenv("OPENAEV_TOKEN", "test-token")
-    monkeypatch.setenv("OPENAEV_TENANT_ID", "test-tenant")
-    monkeypatch.setenv("INJECTOR_ID", "test-injector")
-    monkeypatch.setenv("INJECTOR_NAME", "Prowler")
-    monkeypatch.setenv("INJECTOR_LOG_LEVEL", "debug")
+def _when_injector_starts() -> tuple[ConfigLoader, Mock]:
     config = ConfigLoader()
     helper = Mock()
     injector = ProwlerInjector(config=config, helper=helper)
@@ -90,9 +82,9 @@ def test_foundation_configuration_excludes_future_provider_settings() -> None:
 
 
 def test_foundation_startup_registers_no_assessment_contracts(
-    monkeypatch: pytest.MonkeyPatch,
+    standard_injector_environment: None,
 ) -> None:
     """The foundation starts its listener with an empty contract catalog."""
     _given_the_prowler_project()
-    config, helper = _when_injector_starts(monkeypatch)
+    config, helper = _when_injector_starts()
     _then_zero_contracts_are_registered(config, helper)
