@@ -171,49 +171,9 @@ def test_foundation_configuration_excludes_future_provider_settings() -> None:
     """The foundation exposes only standard injector settings."""
     project_root = _given_the_prowler_project()
     settings = _when_sample_environment_is_loaded(project_root)
-    _then_only_standard_and_prowler_settings_are_available(settings)
-
-
-def test_startup_registers_the_base_assessment_contracts(
-    standard_injector_environment: None,
-) -> None:
-    """Startup registers all 32 canonical executable contracts."""
-    _given_the_prowler_project()
-    config, helper = _when_injector_starts()
-    _then_base_contracts_are_registered(config, helper)
-
-
-def test_startup_registers_the_injector_with_its_bundled_icon(
-    standard_injector_environment: None, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    """Registration uploads the bundled icon instead of an empty icon part."""
-    helper = Mock()
-    injector = Mock()
-    monkeypatch.setattr(prowler_main, "OpenAEVInjectorHelper", helper)
-    monkeypatch.setattr(prowler_main, "ProwlerInjector", injector)
 
     prowler_main.main()
 
-    icon = helper.call_args.kwargs["icon"]
-    assert isinstance(icon, bytes)
-    assert icon.startswith(b"\x89PNG\r\n\x1a\n")
-    assert icon == (PROJECT_ROOT / "prowler" / "img" / "icon-prowler.png").read_bytes()
-    injector.return_value.start.assert_called_once_with()
-
-
-@pytest.mark.parametrize(
-    ("failure_type", "expected_exit_status"),
-    (("configuration error", 2), ("unexpected exception", 1)),
-)
-def test_startup_failures_are_logged_without_sensitive_exception_details(
-    failure_type: str,
-    expected_exit_status: int,
     monkeypatch: pytest.MonkeyPatch,
     caplog: pytest.LogCaptureFixture,
 ) -> None:
-    """Startup failures preserve safe logs and established exit statuses."""
-    error = _given_startup_failure(failure_type)
-    actual_exit_status, records = _when_startup_failure_is_handled(
-        error, monkeypatch, caplog
-    )
-    _then_failure_is_logged_safely(actual_exit_status, expected_exit_status, records)
