@@ -67,7 +67,8 @@ def _when_injector_starts() -> tuple[object, Mock]:
 
 def _then_zero_contracts_are_registered(config: object, helper: Mock) -> None:
     assert config.to_daemon_config().get("injector_contracts") == []
-    helper.listen.assert_called_once_with()
+    callback = helper.listen.call_args.kwargs["message_callback"]
+    assert callable(callback)
 
 
 def test_discoverable_prowler_catalog_registration() -> None:
