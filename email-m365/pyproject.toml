@@ -1,6 +1,6 @@
 [project]
 name = "openaev-email-m365-injector"
-version = "3.260817.0"
+version = "3.260818.0"
 description = "An injector for sending emails through Microsoft 365 (Microsoft Graph API)"
 readme = "README.md"
 authors = [
@@ -9,7 +9,7 @@ authors = [
 license = "Apache-2.0"
 requires-python = ">=3.11,<4.0"
 dependencies = [
-    "pyoaev (==3.260817.0); extra != 'dev'",
+    "pyoaev (==3.260818.0); extra != 'dev'",
     "injector_common @ ../injector_common",
     "requests~=2.33",
     "msal~=1.31",
