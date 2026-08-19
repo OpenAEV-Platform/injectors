@@ -15,3 +15,14 @@ Feature: Prowler catalog registration and project scaffold
     Given assessment contracts are deferred to CHK.006
     When the Prowler injector starts
     Then it registers with an empty contract catalog
+
+  Scenario Outline: Startup failures are logged without sensitive exception details
+    Given startup fails with a <failure type> containing a sensitive canary
+    When the Prowler injector handles the startup failure
+    Then it emits a safe ERROR log without the exception or a traceback
+    And it exits with status <exit status>
+
+    Examples:
+      | failure type         | exit status |
+      | configuration error  | 2           |
+      | unexpected exception | 1           |
