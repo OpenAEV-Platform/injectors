@@ -1,5 +1,7 @@
 """Focused unit contract for CHK.003 production adapters."""
 
+# ruff: noqa: D103
+
 import importlib
 import subprocess
 from typing import Any
@@ -30,7 +32,9 @@ def _spec(api: Any, **changes: Any) -> Any:
     return api.ExecutionSpecification(**values)
 
 
-def test_subprocess_executor_forces_shell_false_and_preserves_bytes() -> None:
+def test_subprocess_executor_forces_shell_false_and_preserves_bytes() -> (
+    None
+):  # noqa: D103
     api = _api()
     specification = _spec(api)
     completed = subprocess.CompletedProcess(
@@ -54,7 +58,7 @@ def test_subprocess_executor_forces_shell_false_and_preserves_bytes() -> None:
     assert outcome == api.ProcessOutcome(0, b"\xff", b"\x00")
 
 
-def test_subprocess_start_and_timeout_errors_are_enveloped() -> None:
+def test_subprocess_start_and_timeout_errors_are_enveloped() -> None:  # noqa: D103
     api = _api()
     specification = _spec(api)
     executor = api.SubprocessExecutor()
@@ -74,7 +78,7 @@ def test_subprocess_start_and_timeout_errors_are_enveloped() -> None:
     assert (timed_out.stdout, timed_out.stderr) == (b"partial\xff", b"slow\x00")
 
 
-def test_binary_resolver_only_validates_exact_executable() -> None:
+def test_binary_resolver_only_validates_exact_executable() -> None:  # noqa: D103
     api = _api()
     specification = _spec(api, executable="scanner")
     resolver = api.WhichBinaryResolver()
@@ -95,13 +99,17 @@ def test_binary_resolver_only_validates_exact_executable() -> None:
         (b"id=42", ("regex", r"id=(\d+)"), "42"),
     ],
 )
-def test_output_parsers(output: bytes, specification: tuple[str, str | None], expected: Any) -> None:
+def test_output_parsers(  # noqa: D103
+    output: bytes, specification: tuple[str, str | None], expected: Any
+) -> None:
     api = _api()
     spec = _spec(api, output=api.OutputSpecification(*specification))
     assert api.OutputParserAdapter().parse(spec, output) == expected
 
 
-def test_parser_failure_has_safe_context_without_claiming_process_evidence() -> None:
+def test_parser_failure_has_safe_context_without_claiming_process_evidence() -> (
+    None
+):  # noqa: D103
     api = _api()
     spec = _spec(api, output=api.OutputSpecification(parser="json"))
     error = api.OutputParserAdapter().parse(spec, b"{bad")

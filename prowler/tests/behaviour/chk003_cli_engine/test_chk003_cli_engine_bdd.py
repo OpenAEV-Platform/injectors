@@ -1,5 +1,7 @@
 """Executable behaviour contract for CHK.003."""
 
+# ruff: noqa: D103
+
 import importlib
 from dataclasses import FrozenInstanceError
 from typing import Any
@@ -35,7 +37,7 @@ def _engine(api: Any, ports: RecordingPorts) -> Any:
     return api.CliEngine(policy=ports, resolver=ports, executor=ports, parser=ports)
 
 
-def test_specification_is_deeply_immutable() -> None:
+def test_specification_is_deeply_immutable() -> None:  # noqa: D103
     api = _api()
     arguments = ["--format", "json"]
     environment = {"LANG": "C"}
@@ -53,7 +55,9 @@ def test_specification_is_deeply_immutable() -> None:
         specification.executable = "other"
 
 
-def test_metacharacters_are_inert_structured_arguments(recording_ports: RecordingPorts) -> None:
+def test_metacharacters_are_inert_structured_arguments(  # noqa: D103
+    recording_ports: RecordingPorts,
+) -> None:
     api = _api()
     recording_ports.execution_result = api.ProcessOutcome(0, b"ok", b"")
     request = _request(api, arguments=["a; rm -rf /", "$(touch nope)", "x && y"])
@@ -69,7 +73,9 @@ def test_metacharacters_are_inert_structured_arguments(recording_ports: Recordin
     assert not hasattr(recording_ports.seen[2], "shell")
 
 
-def test_same_exact_specification_crosses_all_boundaries(recording_ports: RecordingPorts) -> None:
+def test_same_exact_specification_crosses_all_boundaries(  # noqa: D103
+    recording_ports: RecordingPorts,
+) -> None:
     api = _api()
     recording_ports.execution_result = api.ProcessOutcome(0, b"ok", b"")
 
@@ -89,14 +95,18 @@ def test_same_exact_specification_crosses_all_boundaries(recording_ports: Record
         ("parsing", "ParsingError", ["policy", "resolution", "execution", "parsing"]),
     ],
 )
-def test_expected_failures_use_result_envelope(
+def test_expected_failures_use_result_envelope(  # noqa: D103
     recording_ports: RecordingPorts, boundary: str, error_name: str, events: list[str]
 ) -> None:
     api = _api()
     error_type = getattr(api, error_name)
     error = error_type(message=f"{boundary} failed")
     recording_ports.execution_result = api.ProcessOutcome(0, b"output", b"warning")
-    setattr(recording_ports, f"{boundary}_error" if boundary != "parsing" else "parsing_result", error)
+    setattr(
+        recording_ports,
+        f"{boundary}_error" if boundary != "parsing" else "parsing_result",
+        error,
+    )
     if boundary == "execution":
         recording_ports.execution_result = error
 
@@ -106,7 +116,7 @@ def test_expected_failures_use_result_envelope(
     assert recording_ports.events == events
 
 
-def test_unsuccessful_outcome_retains_exact_bytes_and_skips_parser(
+def test_unsuccessful_outcome_retains_exact_bytes_and_skips_parser(  # noqa: D103
     recording_ports: RecordingPorts,
 ) -> None:
     api = _api()
@@ -127,7 +137,7 @@ def test_unsuccessful_outcome_retains_exact_bytes_and_skips_parser(
     assert recording_ports.events == ["policy", "resolution", "execution"]
 
 
-def test_engine_replaces_parser_owned_evidence_and_preserves_context(
+def test_engine_replaces_parser_owned_evidence_and_preserves_context(  # noqa: D103
     recording_ports: RecordingPorts,
 ) -> None:
     api = _api()
@@ -152,7 +162,7 @@ def test_engine_replaces_parser_owned_evidence_and_preserves_context(
     )
 
 
-def test_post_capture_output_size_classification_is_honest(
+def test_post_capture_output_size_classification_is_honest(  # noqa: D103
     recording_ports: RecordingPorts,
 ) -> None:
     api = _api()
@@ -168,7 +178,9 @@ def test_post_capture_output_size_classification_is_honest(
     assert recording_ports.events == ["policy", "resolution", "execution"]
 
 
-def test_arbitrary_bytes_remain_exact(recording_ports: RecordingPorts) -> None:
+def test_arbitrary_bytes_remain_exact(
+    recording_ports: RecordingPorts,
+) -> None:  # noqa: D103
     api = _api()
     payload, stderr = b"\x00\xffline\n", b"\x80warn\r\n"
     recording_ports.execution_result = api.ProcessOutcome(0, payload, stderr)
@@ -182,7 +194,7 @@ def test_arbitrary_bytes_remain_exact(recording_ports: RecordingPorts) -> None:
     assert (result.parsed, result.stdout, result.stderr) == (payload, payload, stderr)
 
 
-def test_only_core_package_is_public() -> None:
+def test_only_core_package_is_public() -> None:  # noqa: D103
     api = _api()
     assert api.CliEngine
     for obsolete in ("prowler.cli_engine", "prowler.cli_engine_errors"):

@@ -1,5 +1,7 @@
 """Fixtures local to CHK.003 behaviour tests."""
 
+# ruff: noqa: D102, D103
+
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -17,22 +19,22 @@ class RecordingPorts:
     execution_result: Any = None
     parsing_result: Any = None
 
-    def check(self, specification: Any) -> Any:
+    def check(self, specification: Any) -> Any:  # noqa: D102
         self.events.append("policy")
         self.seen.append(specification)
         return self.policy_error
 
-    def validate(self, specification: Any) -> Any:
+    def validate(self, specification: Any) -> Any:  # noqa: D102
         self.events.append("resolution")
         self.seen.append(specification)
         return self.resolution_error
 
-    def execute(self, specification: Any) -> Any:
+    def execute(self, specification: Any) -> Any:  # noqa: D102
         self.events.append("execution")
         self.seen.append(specification)
         return self.execution_result
 
-    def parse(self, specification: Any, payload: bytes) -> Any:
+    def parse(self, specification: Any, payload: bytes) -> Any:  # noqa: D102
         self.events.append("parsing")
         self.seen.append(specification)
         if self.parsing_result is not None:
@@ -41,5 +43,5 @@ class RecordingPorts:
 
 
 @pytest.fixture
-def recording_ports() -> RecordingPorts:
+def recording_ports() -> RecordingPorts:  # noqa: D103
     return RecordingPorts()
