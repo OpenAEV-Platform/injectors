@@ -8,6 +8,7 @@ from typing import Any
 from unittest.mock import patch
 
 import pytest
+from pydantic import SecretStr
 
 from prowler.models.configs.config_loader import ProwlerConfig
 
@@ -87,6 +88,53 @@ def test_same_exact_specification_crosses_all_boundaries(  # noqa: D103
     assert recording_ports.events == ["policy", "resolution", "execution", "parsing"]
     assert len({id(value) for value in recording_ports.seen}) == 1
     assert result.specification is recording_ports.seen[0]
+
+
+def test_secret_environment_stays_wrapped_and_redacted_across_boundaries(
+    recording_ports: RecordingPorts,
+) -> None:
+    api = _api()
+    environment_value = "chk003-boundary-secret"
+    secret = SecretStr(environment_value)
+    recording_ports.execution_result = api.ProcessOutcome(0, b"ok", b"")
+
+    result = _engine(api, recording_ports).run(
+        _request(api, environment={"LANG": "C", "TOKEN": secret})
+    )
+
+    assert result.error is None
+    assert all(
+        dict(specification.environment)["TOKEN"] is secret
+        for specification in recording_ports.seen
+    )
+    assert environment_value not in repr(result.specification)
+    assert environment_value not in str(result.specification)
+    assert environment_value not in repr(result)
+    assert environment_value not in str(result)
+
+
+def test_secret_path_is_rejected_without_lookup_or_unwrapping(
+    recording_ports: RecordingPorts,
+) -> None:
+    api = _api()
+    secret_path = SecretStr("/secret/bin")
+    engine = api.CliEngine(
+        policy=recording_ports,
+        resolver=api.WhichBinaryResolver(),
+        executor=recording_ports,
+        parser=recording_ports,
+    )
+
+    with patch.object(secret_path, "get_secret_value") as unwrap, patch(
+        "shutil.which", return_value="/secret/bin/scanner"
+    ) as which:
+        result = engine.run(_request(api, environment={"PATH": secret_path}))
+
+    assert isinstance(result.error, api.ResolutionError)
+    assert "secret" not in result.error.message.lower()
+    assert recording_ports.events == ["policy"]
+    unwrap.assert_not_called()
+    which.assert_not_called()
 
 
 @pytest.mark.parametrize("environment", [{"LANG": "C"}, {"PATH": ""}, {"PATH": " \t "}])

@@ -18,6 +18,16 @@ Feature: Safe local CLI engine orchestration
     When resolution validates and the engine runs it
     Then policy, resolution, execution, and parsing observe that exact specification
 
+  Scenario: Preserve secret environment values through trusted boundaries
+    Given a validated command environment contains an ordinary value and a secret value
+    When the immutable specification crosses policy and resolver boundaries
+    Then the secret remains wrapped and ordinary diagnostics remain redacted
+
+  Scenario: Reject a secret PATH without using it for resolution
+    Given a relative executable and a secret PATH in the specification environment
+    When resolution runs
+    Then resolution fails without unwrapping PATH or searching for the executable
+
   Scenario Outline: Reject a relative executable without a usable specification PATH
     Given a relative executable and a <path> PATH in the specification environment
     When resolution runs while the parent environment can find that executable
@@ -76,6 +86,17 @@ Feature: Safe local CLI engine orchestration
       | regex  | captures       |
 
 # ---- Constraints identified ----
+
+  Scenario: Unwrap secrets only at subprocess execution
+    Given an immutable environment contains an ordinary value and a secret value
+    When the subprocess executor starts the structured command
+    Then a fresh exact environment containing the unwrapped secret reaches subprocess execution
+    And shell execution and inherited environment merging remain disabled
+
+  Scenario: Keep environment values out of execution errors
+    Given process startup fails with an operating-system diagnostic containing an environment value
+    When the subprocess executor envelopes the failure
+    Then the execution error does not expose that value
 
   Scenario: Classify oversized captured output honestly
     Given process output has already been captured beyond the accepted size

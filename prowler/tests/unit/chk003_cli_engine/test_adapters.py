@@ -8,6 +8,7 @@ from typing import Any
 from unittest.mock import patch
 
 import pytest
+from pydantic import SecretStr
 
 
 def _api() -> Any:
@@ -56,6 +57,48 @@ def test_subprocess_executor_forces_shell_false_and_preserves_bytes() -> (
         check=False,
     )
     assert outcome == api.ProcessOutcome(0, b"\xff", b"\x00")
+
+
+def test_subprocess_executor_alone_unwraps_secret_into_fresh_exact_environment() -> (
+    None
+):
+    api = _api()
+    source_environment = (("LANG", "C"), ("TOKEN", SecretStr("exec-secret")))
+    specification = _spec(api, environment=source_environment)
+    completed = subprocess.CompletedProcess(
+        args=specification.argv, returncode=0, stdout=b"", stderr=b""
+    )
+
+    with patch("subprocess.run", return_value=completed) as run:
+        outcome = api.SubprocessExecutor().execute(specification)
+
+    passed_environment = run.call_args.kwargs["env"]
+    assert passed_environment == {"LANG": "C", "TOKEN": "exec-secret"}
+    assert passed_environment is not source_environment
+    assert dict(specification.environment)["TOKEN"].get_secret_value() == "exec-secret"
+    assert run.call_args.kwargs["shell"] is False
+    assert outcome == api.ProcessOutcome(0, b"", b"")
+
+
+def test_subprocess_start_error_does_not_expose_environment_values() -> None:
+    api = _api()
+    environment_value = "error-secret-value"
+    specification = _spec(
+        api,
+        environment=(
+            ("VISIBLE", environment_value),
+            ("TOKEN", SecretStr(environment_value)),
+        ),
+    )
+
+    with patch(
+        "subprocess.run", side_effect=OSError(f"failed near {environment_value}")
+    ):
+        error = api.SubprocessExecutor().execute(specification)
+
+    assert environment_value not in repr(error)
+    assert environment_value not in str(error)
+    assert environment_value not in (error.cause or "")
 
 
 def test_subprocess_start_and_timeout_errors_are_enveloped() -> None:  # noqa: D103
