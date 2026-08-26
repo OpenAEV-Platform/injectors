@@ -87,7 +87,7 @@ def test_same_exact_specification_crosses_all_boundaries(  # noqa: D103
     assert result.specification is recording_ports.seen[0]
 
 
-@pytest.mark.parametrize("environment", [{"LANG": "C"}, {"PATH": ""}])
+@pytest.mark.parametrize("environment", [{"LANG": "C"}, {"PATH": ""}, {"PATH": " \t "}])
 def test_relative_executable_requires_usable_specification_path(  # noqa: D103
     recording_ports: RecordingPorts, environment: dict[str, str]
 ) -> None:
