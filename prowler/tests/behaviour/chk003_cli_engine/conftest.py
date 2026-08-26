@@ -15,24 +15,31 @@ class RecordingPorts:
     resolvable: bool = True
     outcome: Any = None
     parse_error: Exception | None = None
+    resolver_return: Any = None
+    policy_specification: Any = None
+    resolution_specification: Any = None
     invocation: Any = None
     parsed_payload: bytes | None = None
 
     def check(self, specification: Any) -> None:
         """Record policy evaluation and reject when configured."""
         self.events.append("policy")
+        self.policy_specification = specification
         if not self.allowed:
             from prowler.cli_engine import PolicyError
 
             raise PolicyError("request rejected")
 
     def resolve(self, specification: Any) -> Any:
-        """Record resolution and return the prepared specification."""
+        """Record resolution without replacing the immutable specification."""
         self.events.append("resolution")
+        self.resolution_specification = specification
         if not self.resolvable:
             from prowler.cli_engine import ResolutionError
 
             raise ResolutionError("value unresolved")
+        if self.resolver_return is not None:
+            return self.resolver_return
         return specification
 
     def execute(self, specification: Any) -> Any:

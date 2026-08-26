@@ -75,6 +75,28 @@ def test_structured_arguments_keep_shell_metacharacters_inert(
     assert not hasattr(recording_ports.invocation, "command")
 
 
+def test_resolver_cannot_replace_policy_approved_specification(
+    recording_ports: RecordingPorts,
+) -> None:
+    """Keep the exact policy-approved specification through execution."""
+    api = _api()
+    request = _request(api)
+    replacement = api.ExecutionSpecification.from_request(
+        _request(api, executable="unapproved", arguments=("--bypass",))
+    )
+    recording_ports.resolver_return = replacement
+    recording_ports.outcome = api.ProcessOutcome(0, b"ok", b"")
+
+    _engine(api, recording_ports).run(request)
+
+    assert (
+        recording_ports.policy_specification is recording_ports.resolution_specification
+    )
+    assert recording_ports.policy_specification is recording_ports.invocation
+    assert recording_ports.invocation.executable == "scanner"
+    assert recording_ports.invocation.arguments == ("--format", "json")
+
+
 @pytest.mark.parametrize(
     ("allowed", "resolvable", "error_type", "events"),
     [
@@ -149,6 +171,28 @@ def test_parser_exception_retains_original_process_bytes(
 
     assert (caught.value.stdout, caught.value.stderr) == (stdout, stderr)
     assert recording_ports.parsed_payload == stdout
+
+
+def test_parser_parsing_error_is_rebuilt_with_actual_process_bytes(
+    recording_ports: RecordingPorts,
+) -> None:
+    """Replace parser-owned evidence while retaining its failure as the cause."""
+    api = _api()
+    stdout = b"actual stdout\x00\xff"
+    stderr = b"actual stderr\x80"
+    parser_error = api.ParsingError(
+        "invalid provider output", stdout=b"forged", stderr=b""
+    )
+    recording_ports.outcome = api.ProcessOutcome(0, stdout, stderr)
+    recording_ports.parse_error = parser_error
+
+    with pytest.raises(api.ParsingError) as caught:
+        _engine(api, recording_ports).run(_request(api))
+
+    assert caught.value is not parser_error
+    assert caught.value.message == "invalid provider output"
+    assert (caught.value.stdout, caught.value.stderr) == (stdout, stderr)
+    assert caught.value.__cause__ is parser_error
 
 
 def test_success_preserves_all_bytes_and_returns_parsed_result(
