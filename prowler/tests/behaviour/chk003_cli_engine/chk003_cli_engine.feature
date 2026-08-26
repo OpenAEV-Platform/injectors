@@ -33,6 +33,11 @@ Feature: Safe local CLI engine orchestration
     When resolution validates that exact executable
     Then execution continues with the unchanged specification environment
 
+  Scenario: Preserve the configured Prowler executable in the command specification
+    Given Prowler configuration selects an absolute executable path
+    When a caller builds a validated command request from that configuration
+    Then the immutable execution specification uses that exact executable path
+
   Scenario Outline: Return distinct expected failures without raising
     Given the <boundary> boundary reports an expected failure
     When the engine runs the command

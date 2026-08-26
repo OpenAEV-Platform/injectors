@@ -9,6 +9,8 @@ from unittest.mock import patch
 
 import pytest
 
+from prowler.models.configs.config_loader import ProwlerConfig
+
 from .conftest import RecordingPorts
 
 
@@ -128,6 +130,20 @@ def test_absolute_executable_does_not_require_path(  # noqa: D103
     assert result.error is None
     which.assert_called_once_with(executable, path="")
     assert recording_ports.seen[1].environment == (("LANG", "C"),)
+
+
+def test_configured_prowler_executable_becomes_immutable_specification() -> None:
+    api = _api()
+    config = ProwlerConfig(executable_path="/opt/prowler/bin/prowler")
+
+    specification = api.ExecutionSpecification.from_request(
+        _request(api, executable=str(config.executable_path))
+    )
+
+    assert specification.executable == "/opt/prowler/bin/prowler"
+    assert specification.argv[0] == "/opt/prowler/bin/prowler"
+    with pytest.raises(FrozenInstanceError):
+        specification.executable = "other"
 
 
 @pytest.mark.parametrize(

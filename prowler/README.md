@@ -23,6 +23,11 @@ the equivalent environment variables. Never commit real tokens.
 require the file to exist; executable resolution happens immediately before a
 future assessment execution.
 
+CHK.003 accepts this configured absolute path at its validated command-request
+boundary and preserves it in the immutable execution specification. The later
+Prowler adapter must pass `str(config.prowler.executable_path)` into that request;
+the generic engine does not hardcode a Prowler binary location.
+
 ## Run
 
 ```shell
