@@ -1,9 +1,14 @@
 """Behavior tests for the CHK.001 Prowler catalog scaffold."""
 
-import importlib
 import json
 from pathlib import Path
+from typing import cast
 from unittest.mock import Mock
+
+import pytest
+
+from prowler.injector.openaev_prowler import ProwlerInjector
+from prowler.models.configs.config_loader import ConfigLoader
 
 PROJECT_ROOT = Path(__file__).parents[2]
 STANDARD_ENV_SETTINGS = {
@@ -24,7 +29,9 @@ def _given_the_prowler_project() -> Path:
 def _when_manifest_is_loaded(project_root: Path) -> dict[str, object]:
     manifest_path = project_root / "manifest-metadata.json"
     assert manifest_path.is_file(), "Prowler catalog manifest is absent"
-    return json.loads(manifest_path.read_text(encoding="utf-8"))
+    return cast(
+        dict[str, object], json.loads(manifest_path.read_text(encoding="utf-8"))
+    )
 
 
 def _then_manifest_identifies_prowler(manifest: dict[str, object]) -> None:
@@ -48,33 +55,44 @@ def _then_only_standard_settings_are_available(settings: set[str]) -> None:
     assert settings == STANDARD_ENV_SETTINGS
 
 
-def _when_injector_starts() -> tuple[Mock, Mock]:
-    module = importlib.import_module("prowler.injector.openaev_prowler")
-    config = Mock()
+def _when_injector_starts(monkeypatch: pytest.MonkeyPatch) -> tuple[ConfigLoader, Mock]:
+    monkeypatch.setenv("OPENAEV_URL", "http://localhost:8080")
+    monkeypatch.setenv("OPENAEV_TOKEN", "test-token")
+    monkeypatch.setenv("OPENAEV_TENANT_ID", "test-tenant")
+    monkeypatch.setenv("INJECTOR_ID", "test-injector")
+    monkeypatch.setenv("INJECTOR_NAME", "Prowler")
+    monkeypatch.setenv("INJECTOR_LOG_LEVEL", "debug")
+    config = ConfigLoader()
     helper = Mock()
-    injector = module.ProwlerInjector(config=config, helper=helper)
+    injector = ProwlerInjector(config=config, helper=helper)
     injector.start()
     return config, helper
 
 
-def _then_zero_contracts_are_registered(config: Mock, helper: Mock) -> None:
+def _then_zero_contracts_are_registered(config: ConfigLoader, helper: Mock) -> None:
     assert config.to_daemon_config().get("injector_contracts") == []
-    helper.listen.assert_called_once_with()
+    callback = helper.listen.call_args.kwargs["message_callback"]
+    assert callable(callback)
 
 
 def test_discoverable_prowler_catalog_registration() -> None:
+    """Prowler is represented by a discoverable catalog manifest."""
     project_root = _given_the_prowler_project()
     manifest = _when_manifest_is_loaded(project_root)
     _then_manifest_identifies_prowler(manifest)
 
 
 def test_foundation_configuration_excludes_future_provider_settings() -> None:
+    """The foundation exposes only standard injector settings."""
     project_root = _given_the_prowler_project()
     settings = _when_sample_environment_is_loaded(project_root)
     _then_only_standard_settings_are_available(settings)
 
 
-def test_foundation_startup_registers_no_assessment_contracts() -> None:
+def test_foundation_startup_registers_no_assessment_contracts(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The foundation starts its listener with an empty contract catalog."""
     _given_the_prowler_project()
-    config, helper = _when_injector_starts()
+    config, helper = _when_injector_starts(monkeypatch)
     _then_zero_contracts_are_registered(config, helper)
