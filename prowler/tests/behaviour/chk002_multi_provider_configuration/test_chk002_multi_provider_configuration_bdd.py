@@ -6,7 +6,7 @@ from pathlib import Path
 from typing import Any
 
 import pytest
-from pydantic import TypeAdapter, ValidationError
+from pydantic import SecretStr, TypeAdapter, ValidationError
 
 from prowler.models.configs.config_loader import ConfigLoader
 
@@ -110,11 +110,16 @@ def test_reject_mutation_of_provider_fields_without_leaking_secrets(
 
     assert not isinstance(result, ValidationError)
     for field in (ORDINARY_FIELDS[provider], *SECRET_FIELDS[provider]):
-        replacement = f"replacement-{provider}-secret"
+        replacement_value = f"replacement-{provider}-secret"
+        replacement = (
+            SecretStr(replacement_value)
+            if field in SECRET_FIELDS[provider]
+            else "replacement-ordinary-value"
+        )
         with pytest.raises(ValidationError) as raised:
             setattr(result, field, replacement)
         assert raised.value.errors(include_input=False)[0]["type"] == "frozen_instance"
-        assert replacement not in str(raised.value)
+        assert replacement_value not in str(raised.value)
         assert all(
             payload[secret] not in str(raised.value)
             for secret in SECRET_FIELDS[provider]
