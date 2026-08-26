@@ -26,7 +26,9 @@ NonBlankSecretStr = Annotated[SecretStr, BeforeValidator(_reject_blank)]
 class AwsProviderInput(BaseModel):
     """AWS provider form input."""
 
-    model_config = ConfigDict(extra="forbid", strict=True, hide_input_in_errors=True)
+    model_config = ConfigDict(
+        extra="forbid", strict=True, hide_input_in_errors=True, frozen=True
+    )
 
     provider: Literal["aws"]
     aws_access_key_id: NonBlankStr
@@ -39,7 +41,9 @@ class AwsProviderInput(BaseModel):
 class AzureProviderInput(BaseModel):
     """Azure provider form input."""
 
-    model_config = ConfigDict(extra="forbid", strict=True, hide_input_in_errors=True)
+    model_config = ConfigDict(
+        extra="forbid", strict=True, hide_input_in_errors=True, frozen=True
+    )
 
     provider: Literal["azure"]
     azure_tenant_id: NonBlankStr
@@ -52,7 +56,9 @@ class AzureProviderInput(BaseModel):
 class GcpProviderInput(BaseModel):
     """GCP provider form input."""
 
-    model_config = ConfigDict(extra="forbid", strict=True, hide_input_in_errors=True)
+    model_config = ConfigDict(
+        extra="forbid", strict=True, hide_input_in_errors=True, frozen=True
+    )
 
     provider: Literal["gcp"]
     gcp_service_account_json: NonBlankSecretStr
@@ -62,7 +68,9 @@ class GcpProviderInput(BaseModel):
 class KubernetesProviderInput(BaseModel):
     """Kubernetes provider form input."""
 
-    model_config = ConfigDict(extra="forbid", strict=True, hide_input_in_errors=True)
+    model_config = ConfigDict(
+        extra="forbid", strict=True, hide_input_in_errors=True, frozen=True
+    )
 
     provider: Literal["kubernetes"]
     kubernetes_kubeconfig: NonBlankSecretStr
