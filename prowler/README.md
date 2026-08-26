@@ -1,8 +1,8 @@
 # OpenAEV Prowler Injector
 
-The Prowler injector foundation registers Prowler with OpenAEV. Assessment
-providers, credentials, execution, mapping, routes, and contracts are outside
-CHK.001 and are intentionally not configured here.
+The Prowler injector foundation registers Prowler with OpenAEV. Provider and
+account inputs, credentials, execution, mapping, routes, and contracts are not
+startup configuration and remain outside this chunk.
 
 ## Configuration
 
@@ -14,9 +14,14 @@ CHK.001 and are intentionally not configured here.
 | `INJECTOR_ID` | `injector.id` | / | Yes | Unique injector identifier |
 | `INJECTOR_NAME` | `injector.name` | `Prowler` | No | Injector display name |
 | `INJECTOR_LOG_LEVEL` | `injector.log_level` | `error` | No | Runtime log level |
+| `PROWLER_EXECUTABLE_PATH` | `prowler.executable_path` | `/usr/local/bin/prowler` | No | Absolute path to the Prowler executable |
 
 Copy `config.yml.sample` to the ignored `config.yml` for local use, or supply
 the equivalent environment variables. Never commit real tokens.
+
+`prowler.executable_path` must be nonblank and absolute. Startup does not
+require the file to exist; executable resolution happens immediately before a
+future assessment execution.
 
 ## Run
 
