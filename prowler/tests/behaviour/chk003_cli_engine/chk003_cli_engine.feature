@@ -18,6 +18,21 @@ Feature: Safe local CLI engine orchestration
     When resolution validates and the engine runs it
     Then policy, resolution, execution, and parsing observe that exact specification
 
+  Scenario Outline: Reject a relative executable without a usable specification PATH
+    Given a relative executable and a <path> PATH in the specification environment
+    When resolution runs while the parent environment can find that executable
+    Then resolution fails before execution without consulting the parent environment
+
+    Examples:
+      | path    |
+      | missing |
+      | blank   |
+
+  Scenario: Validate an absolute executable without PATH
+    Given an absolute executable and no PATH in the specification environment
+    When resolution validates that exact executable
+    Then execution continues with the unchanged specification environment
+
   Scenario Outline: Return distinct expected failures without raising
     Given the <boundary> boundary reports an expected failure
     When the engine runs the command

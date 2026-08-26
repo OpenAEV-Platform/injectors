@@ -5,6 +5,7 @@
 import importlib
 from dataclasses import FrozenInstanceError
 from typing import Any
+from unittest.mock import patch
 
 import pytest
 
@@ -84,6 +85,49 @@ def test_same_exact_specification_crosses_all_boundaries(  # noqa: D103
     assert recording_ports.events == ["policy", "resolution", "execution", "parsing"]
     assert len({id(value) for value in recording_ports.seen}) == 1
     assert result.specification is recording_ports.seen[0]
+
+
+@pytest.mark.parametrize("environment", [{"LANG": "C"}, {"PATH": ""}])
+def test_relative_executable_requires_usable_specification_path(  # noqa: D103
+    recording_ports: RecordingPorts, environment: dict[str, str]
+) -> None:
+    api = _api()
+    engine = api.CliEngine(
+        policy=recording_ports,
+        resolver=api.WhichBinaryResolver(),
+        executor=recording_ports,
+        parser=recording_ports,
+    )
+
+    with patch("shutil.which", return_value="/parent/bin/scanner") as which:
+        result = engine.run(_request(api, environment=environment))
+
+    assert isinstance(result.error, api.ResolutionError)
+    assert recording_ports.events == ["policy"]
+    which.assert_not_called()
+
+
+def test_absolute_executable_does_not_require_path(  # noqa: D103
+    recording_ports: RecordingPorts,
+) -> None:
+    api = _api()
+    executable = "/opt/tools/scanner"
+    recording_ports.execution_result = api.ProcessOutcome(0, b"ok", b"")
+    engine = api.CliEngine(
+        policy=recording_ports,
+        resolver=api.WhichBinaryResolver(),
+        executor=recording_ports,
+        parser=recording_ports,
+    )
+
+    with patch("shutil.which", return_value=executable) as which:
+        result = engine.run(
+            _request(api, executable=executable, environment={"LANG": "C"})
+        )
+
+    assert result.error is None
+    which.assert_called_once_with(executable, path="")
+    assert recording_ports.seen[1].environment == (("LANG", "C"),)
 
 
 @pytest.mark.parametrize(

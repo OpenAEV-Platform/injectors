@@ -80,13 +80,42 @@ def test_subprocess_start_and_timeout_errors_are_enveloped() -> None:  # noqa: D
 
 def test_binary_resolver_only_validates_exact_executable() -> None:  # noqa: D103
     api = _api()
-    specification = _spec(api, executable="scanner")
+    specification = _spec(
+        api, executable="scanner", environment=(("PATH", "/spec/bin"),)
+    )
     resolver = api.WhichBinaryResolver()
     with patch("shutil.which", return_value="/different/scanner") as which:
         result = resolver.validate(specification)
     assert result is None
-    which.assert_called_once_with("scanner", path="value" if False else None)
+    which.assert_called_once_with("scanner", path="/spec/bin")
     assert specification.executable == "scanner"
+
+
+@pytest.mark.parametrize("environment", [(), (("PATH", ""),)])
+def test_binary_resolver_rejects_relative_executable_without_usable_path(
+    environment: tuple[tuple[str, str], ...],
+) -> None:  # noqa: D103
+    api = _api()
+    specification = _spec(api, executable="scanner", environment=environment)
+
+    with patch("shutil.which", return_value="/parent/bin/scanner") as which:
+        result = api.WhichBinaryResolver().validate(specification)
+
+    assert isinstance(result, api.ResolutionError)
+    which.assert_not_called()
+
+
+def test_binary_resolver_validates_absolute_executable_without_path() -> (
+    None
+):  # noqa: D103
+    api = _api()
+    specification = _spec(api, executable="/opt/tools/scanner", environment=())
+
+    with patch("shutil.which", return_value="/opt/tools/scanner") as which:
+        result = api.WhichBinaryResolver().validate(specification)
+
+    assert result is None
+    which.assert_called_once_with("/opt/tools/scanner", path="")
 
 
 @pytest.mark.parametrize(
