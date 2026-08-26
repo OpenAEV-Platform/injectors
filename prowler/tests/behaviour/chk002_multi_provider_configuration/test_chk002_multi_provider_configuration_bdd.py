@@ -49,6 +49,13 @@ SECRET_FIELDS = {
     "kubernetes": ("kubernetes_kubeconfig",),
 }
 
+ORDINARY_FIELDS = {
+    "aws": "aws_region",
+    "azure": "azure_tenant_id",
+    "gcp": "gcp_project_id",
+    "kubernetes": "kubernetes_context",
+}
+
 
 def _provider_input_adapter() -> TypeAdapter[Any]:
     try:
@@ -91,6 +98,46 @@ def test_protect_credentials_from_ordinary_output(provider: str) -> None:
     for field in SECRET_FIELDS[provider]:
         assert all(payload[field] not in output for output in outputs)
     assert all("**********" in output for output in outputs)
+
+
+@pytest.mark.parametrize("provider", ["aws", "azure", "gcp", "kubernetes"])
+def test_reject_mutation_of_provider_fields_without_leaking_secrets(
+    provider: str,
+) -> None:
+    """Reject ordinary and secret assignment as frozen-instance validation errors."""
+    payload = PROVIDER_PAYLOADS[provider]
+    result = _when_submitted(payload)
+
+    assert not isinstance(result, ValidationError)
+    for field in (ORDINARY_FIELDS[provider], *SECRET_FIELDS[provider]):
+        replacement = f"replacement-{provider}-secret"
+        with pytest.raises(ValidationError) as raised:
+            setattr(result, field, replacement)
+        assert raised.value.errors(include_input=False)[0]["type"] == "frozen_instance"
+        assert replacement not in str(raised.value)
+        assert all(
+            payload[secret] not in str(raised.value)
+            for secret in SECRET_FIELDS[provider]
+        )
+
+
+@pytest.mark.parametrize("provider", ["aws", "azure", "gcp", "kubernetes"])
+def test_deep_copy_preserves_secret_values_and_redaction(provider: str) -> None:
+    """Deep-copy provider input without losing or exposing protected values."""
+    payload = PROVIDER_PAYLOADS[provider]
+    result = _when_submitted(payload)
+
+    assert not isinstance(result, ValidationError)
+    snapshot = result.model_copy(deep=True)
+    assert snapshot is not result
+    for field in SECRET_FIELDS[provider]:
+        source_secret = getattr(result, field)
+        copied_secret = getattr(snapshot, field)
+        assert copied_secret is not source_secret
+        assert copied_secret.get_secret_value() == payload[field]
+        assert payload[field] not in repr(snapshot)
+        assert payload[field] not in str(snapshot)
+        assert payload[field] not in json.dumps(snapshot.model_dump(mode="json"))
 
 
 def test_protect_optional_aws_session_token() -> None:
