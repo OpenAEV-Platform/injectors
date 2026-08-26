@@ -93,8 +93,8 @@ class PolicyPort(Protocol):
 class ResolverPort(Protocol):
     """Resolve values needed by one immutable execution specification."""
 
-    def resolve(self, specification: ExecutionSpecification) -> ExecutionSpecification:
-        """Return the resolved specification or raise ResolutionError."""
+    def resolve(self, specification: ExecutionSpecification) -> None:
+        """Resolve required values or raise ResolutionError."""
 
 
 class ExecutorPort(Protocol):
@@ -132,7 +132,7 @@ class CliEngine:
         """Run a validated request through each boundary exactly in order."""
         specification = ExecutionSpecification.from_request(request)
         self._policy.check(specification)
-        specification = self._resolver.resolve(specification)
+        self._resolver.resolve(specification)
         try:
             outcome = self._executor.execute(specification)
         except ExecutionError:
@@ -148,11 +148,10 @@ class CliEngine:
             )
         try:
             parsed = self._parser.parse(specification.parser, outcome.stdout)
-        except ParsingError:
-            raise
         except Exception as error:
+            message = error.message if isinstance(error, ParsingError) else str(error)
             raise ParsingError(
-                str(error), stdout=outcome.stdout, stderr=outcome.stderr
+                message, stdout=outcome.stdout, stderr=outcome.stderr
             ) from error
         return ExecutionSuccess(parsed, outcome.stdout, outcome.stderr)
 
