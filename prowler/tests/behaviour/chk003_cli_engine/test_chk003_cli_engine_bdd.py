@@ -33,14 +33,6 @@ def _engine(api: Any, ports: RecordingPorts) -> Any:
     return api.CliEngine(policy=ports, resolver=ports, executor=ports, parser=ports)
 
 
-def _attach(api: Any, ports: RecordingPorts, request: Any) -> Any:
-    object.__setattr__(request, "errors", api)
-    object.__setattr__(
-        request, "specification", api.ExecutionSpecification.from_request(request)
-    )
-    return request
-
-
 def test_execution_specification_is_deeply_immutable() -> None:
     """Copy nested mutable request values into immutable structures."""
     api = _api()
@@ -69,11 +61,7 @@ def test_structured_arguments_keep_shell_metacharacters_inert(
 ) -> None:
     """Keep shell syntax as inert individual arguments."""
     api = _api()
-    request = _attach(
-        api,
-        recording_ports,
-        _request(api, arguments=("value; rm -rf /", "$(unsafe)", "a && b")),
-    )
+    request = _request(api, arguments=("value; rm -rf /", "$(unsafe)", "a && b"))
     recording_ports.outcome = api.ProcessOutcome(0, b"ok", b"")
 
     _engine(api, recording_ports).run(request)
@@ -105,7 +93,7 @@ def test_failures_short_circuit_in_boundary_order(
     api = _api()
     recording_ports.allowed = allowed
     recording_ports.resolvable = resolvable
-    request = _attach(api, recording_ports, _request(api))
+    request = _request(api)
 
     with pytest.raises(getattr(api, error_type)):
         _engine(api, recording_ports).run(request)
@@ -121,7 +109,7 @@ def test_nonzero_outcome_retains_bytes_and_skips_parsing(
     stdout = b"partial\x00\xff\n"
     stderr = b"failure\x80\r\n"
     recording_ports.outcome = api.ProcessOutcome(7, stdout, stderr)
-    request = _attach(api, recording_ports, _request(api))
+    request = _request(api)
 
     with pytest.raises(api.ExecutionError) as caught:
         _engine(api, recording_ports).run(request)
@@ -136,7 +124,7 @@ def test_executor_exception_becomes_execution_error(
     """Translate process-start exceptions into execution errors."""
     api = _api()
     recording_ports.outcome = OSError("cannot start")
-    request = _attach(api, recording_ports, _request(api))
+    request = _request(api)
 
     with pytest.raises(api.ExecutionError) as caught:
         _engine(api, recording_ports).run(request)
@@ -154,7 +142,7 @@ def test_parser_exception_retains_original_process_bytes(
     stderr = b"warning\x80"
     recording_ports.outcome = api.ProcessOutcome(0, stdout, stderr)
     recording_ports.parse_error = ValueError("invalid")
-    request = _attach(api, recording_ports, _request(api))
+    request = _request(api)
 
     with pytest.raises(api.ParsingError) as caught:
         _engine(api, recording_ports).run(request)
@@ -170,7 +158,7 @@ def test_success_preserves_all_bytes_and_returns_parsed_result(
     api = _api()
     payload = b"\x00\xffline1\r\nline2\n"
     stderr = b"\x80warning\x00"
-    request = _attach(api, recording_ports, _request(api, input_bytes=payload))
+    request = _request(api, input_bytes=payload)
     recording_ports.outcome = api.ProcessOutcome(0, payload, stderr)
 
     result = _engine(api, recording_ports).run(request)
@@ -188,16 +176,12 @@ def test_success_preserves_all_bytes_and_returns_parsed_result(
 def test_empty_values_remain_structured(recording_ports: RecordingPorts) -> None:
     """Preserve valid empty boundaries without coercion."""
     api = _api()
-    request = _attach(
+    request = _request(
         api,
-        recording_ports,
-        _request(
-            api,
-            arguments=(),
-            environment=(),
-            working_directory=None,
-            input_bytes=b"",
-        ),
+        arguments=(),
+        environment=(),
+        working_directory=None,
+        input_bytes=b"",
     )
     recording_ports.outcome = api.ProcessOutcome(0, b"", b"")
 
