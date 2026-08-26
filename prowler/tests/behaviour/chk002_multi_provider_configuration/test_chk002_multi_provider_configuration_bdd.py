@@ -15,6 +15,7 @@ PROVIDER_PAYLOADS: dict[str, dict[str, str]] = {
         "provider": "aws",
         "aws_access_key_id": "EXAMPLEACCESSKEY",
         "aws_secret_access_key": "example-aws-secret",
+        "aws_session_token": "example-aws-session-token",
         "aws_account_id": "123456789012",
         "aws_region": "eu-west-1",
     },
@@ -43,7 +44,7 @@ PROVIDER_PAYLOADS: dict[str, dict[str, str]] = {
 }
 
 SECRET_FIELDS = {
-    "aws": ("aws_secret_access_key",),
+    "aws": ("aws_secret_access_key", "aws_session_token"),
     "azure": ("azure_client_secret",),
     "gcp": ("gcp_service_account_json",),
     "kubernetes": ("kubernetes_kubeconfig",),
@@ -104,26 +105,31 @@ def test_protect_credentials_from_ordinary_output(provider: str) -> None:
 def test_reject_mutation_of_provider_fields_without_leaking_secrets(
     provider: str,
 ) -> None:
-    """Reject ordinary and secret assignment as frozen-instance validation errors."""
+    """Reject raw assignment before attempted credentials can enter an error."""
     payload = PROVIDER_PAYLOADS[provider]
     result = _when_submitted(payload)
 
     assert not isinstance(result, ValidationError)
     for field in (ORDINARY_FIELDS[provider], *SECRET_FIELDS[provider]):
         replacement_value = f"replacement-{provider}-secret"
-        replacement = (
-            SecretStr(replacement_value)
-            if field in SECRET_FIELDS[provider]
-            else "replacement-ordinary-value"
-        )
-        with pytest.raises(ValidationError) as raised:
-            setattr(result, field, replacement)
-        assert raised.value.errors(include_input=False)[0]["type"] == "frozen_instance"
+        original_value = getattr(result, field)
+        with pytest.raises(
+            TypeError, match="^Provider inputs are immutable$"
+        ) as raised:
+            setattr(result, field, replacement_value)
         assert replacement_value not in str(raised.value)
+        assert replacement_value not in repr(raised.value)
         assert all(
             payload[secret] not in str(raised.value)
             for secret in SECRET_FIELDS[provider]
         )
+        assert all(
+            payload[secret] not in repr(raised.value)
+            for secret in SECRET_FIELDS[provider]
+        )
+        assert raised.value.__cause__ is None
+        assert raised.value.__context__ is None
+        assert getattr(result, field) == original_value
 
 
 @pytest.mark.parametrize("provider", ["aws", "azure", "gcp", "kubernetes"])
@@ -138,11 +144,22 @@ def test_deep_copy_preserves_secret_values_and_redaction(provider: str) -> None:
     for field in SECRET_FIELDS[provider]:
         source_secret = getattr(result, field)
         copied_secret = getattr(snapshot, field)
+        assert isinstance(source_secret, SecretStr)
+        assert isinstance(copied_secret, SecretStr)
         assert copied_secret is not source_secret
         assert copied_secret.get_secret_value() == payload[field]
         assert payload[field] not in repr(snapshot)
         assert payload[field] not in str(snapshot)
         assert payload[field] not in json.dumps(snapshot.model_dump(mode="json"))
+        for provider_input in (result, snapshot):
+            attempted_value = f"deep-copy-replacement-{field}"
+            with pytest.raises(
+                TypeError, match="^Provider inputs are immutable$"
+            ) as raised:
+                setattr(provider_input, field, attempted_value)
+            assert attempted_value not in str(raised.value)
+            assert attempted_value not in repr(raised.value)
+            assert getattr(provider_input, field).get_secret_value() == payload[field]
 
 
 def test_protect_optional_aws_session_token() -> None:
