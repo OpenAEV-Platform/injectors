@@ -26,6 +26,30 @@ Feature: Prowler multi-provider form input
       | gcp        |
       | kubernetes |
 
+  Scenario Outline: Keep accepted provider input immutable
+    Given a complete "<provider>" provider form input
+    When the provider input is accepted
+    Then neither ordinary fields nor credential secrets can be replaced
+
+    Examples:
+      | provider   |
+      | aws        |
+      | azure      |
+      | gcp        |
+      | kubernetes |
+
+  Scenario Outline: Safely snapshot accepted provider input
+    Given a complete "<provider>" provider form input
+    When the provider input is deeply copied
+    Then the snapshot preserves protected credential values without exposing them
+
+    Examples:
+      | provider   |
+      | aws        |
+      | azure      |
+      | gcp        |
+      | kubernetes |
+
   Scenario: Accept an optional AWS session token safely
     Given a complete AWS provider form input with a session token
     When the provider input is accepted
