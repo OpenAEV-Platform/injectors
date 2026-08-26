@@ -4,6 +4,10 @@ from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from typing import Any
 
+from pydantic import SecretStr
+
+EnvironmentValue = str | SecretStr
+
 
 @dataclass(frozen=True)
 class OutputSpecification:
@@ -19,7 +23,7 @@ class ValidatedCommandRequest:
 
     executable: str
     arguments: Sequence[str]
-    environment: Mapping[str, str] | Sequence[tuple[str, str]]
+    environment: Mapping[str, EnvironmentValue] | Sequence[tuple[str, EnvironmentValue]]
     working_directory: str | None
     input_bytes: bytes
     output: OutputSpecification
@@ -33,7 +37,7 @@ class ExecutionSpecification:
 
     executable: str
     arguments: tuple[str, ...]
-    environment: tuple[tuple[str, str], ...]
+    environment: tuple[tuple[str, EnvironmentValue], ...]
     working_directory: str | None
     input_bytes: bytes
     output: OutputSpecification

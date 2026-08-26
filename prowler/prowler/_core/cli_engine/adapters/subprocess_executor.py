@@ -2,6 +2,8 @@
 
 import subprocess
 
+from pydantic import SecretStr
+
 from ..contracts import ExecutionSpecification, ProcessOutcome
 from ..errors import ExecutionError
 
@@ -13,6 +15,10 @@ class SubprocessExecutor:
         self, specification: ExecutionSpecification
     ) -> ProcessOutcome | ExecutionError:
         """Capture exact bytes and envelope startup and timeout failures."""
+        environment = {
+            name: value.get_secret_value() if isinstance(value, SecretStr) else value
+            for name, value in specification.environment
+        }
         try:
             completed = subprocess.run(  # noqa: S603 - policy-approved structured argv
                 specification.argv,
@@ -20,7 +26,7 @@ class SubprocessExecutor:
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
                 cwd=specification.working_directory,
-                env=dict(specification.environment),
+                env=environment,
                 timeout=specification.timeout_seconds,
                 shell=False,
                 check=False,
@@ -37,6 +43,6 @@ class SubprocessExecutor:
             return ExecutionError(
                 "process could not be started",
                 kind="process_start_failed",
-                cause=f"{type(error).__name__}: {error}",
+                cause=type(error).__name__,
             )
         return ProcessOutcome(completed.returncode, completed.stdout, completed.stderr)

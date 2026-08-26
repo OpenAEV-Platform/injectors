@@ -13,6 +13,10 @@ class WhichBinaryResolver:
     def validate(self, specification: ExecutionSpecification) -> ResolutionError | None:
         """Check the executable using only the specification environment."""
         path = dict(specification.environment).get("PATH")
+        if path is not None and not isinstance(path, str):
+            return ResolutionError(
+                "PATH must be an ordinary non-blank string when provided"
+            )
         if not Path(specification.executable).is_absolute() and (
             not path or not path.strip()
         ):
