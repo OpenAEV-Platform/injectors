@@ -26,3 +26,11 @@ python -m prowler
 
 The CHK.001 foundation starts with zero assessment contracts. Contract catalog
 registration is deferred to CHK.006.
+
+## Provider input boundary
+
+Provider selection, account or target values, and credentials are not injector
+startup configuration. They will be supplied per OpenAEV form contract so that
+credential changes do not require redeploying the injector. CHK.002 provides
+only reusable, strict provider input models; it does not register forms, routes,
+or contracts.
