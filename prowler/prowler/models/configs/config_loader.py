@@ -1,6 +1,8 @@
 """Configuration foundation for the Prowler injector."""
 
-from pydantic import Field
+from pathlib import Path
+
+from pydantic import BaseModel, Field, field_validator
 from pyoaev.configuration import (
     ConfigLoaderCollector,
     ConfigLoaderOAEV,
@@ -18,11 +20,31 @@ class InjectorConfig(ConfigLoaderCollector):
     )
 
 
+class ProwlerConfig(BaseModel):
+    """Prowler command runtime settings."""
+
+    executable_path: Path = Field(
+        default=Path("/usr/local/bin/prowler"),
+        description="Absolute path to the Prowler executable.",
+    )
+
+    @field_validator("executable_path", mode="before")
+    @classmethod
+    def validate_executable_path(cls, value: object) -> object:
+        """Reject blank and non-absolute executable paths."""
+        if isinstance(value, str) and not value.strip():
+            raise ValueError("executable path must not be blank")
+        if isinstance(value, (str, Path)) and not Path(value).is_absolute():
+            raise ValueError("executable path must be absolute")
+        return value
+
+
 class ConfigLoader(SettingsLoader):
-    """Load only the standard OpenAEV and injector settings."""
+    """Load standard settings and the Prowler runtime section."""
 
     openaev: ConfigLoaderOAEV = Field(default_factory=ConfigLoaderOAEV)
     injector: InjectorConfig = Field(default_factory=InjectorConfig)
+    prowler: ProwlerConfig = Field(default_factory=ProwlerConfig)
 
     def to_daemon_config(self) -> Configuration:
         """Translate settings into the OpenAEV daemon configuration."""
