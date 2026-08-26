@@ -1,4 +1,4 @@
-"""Fixtures local to CHK.003 CLI engine behaviour."""
+"""Fixtures local to CHK.003 behaviour tests."""
 
 from dataclasses import dataclass, field
 from typing import Any
@@ -8,58 +8,38 @@ import pytest
 
 @dataclass
 class RecordingPorts:
-    """Deterministic port bundle recording boundary order and values."""
+    """Deterministic ports recording identity, order, and exact payloads."""
 
     events: list[str] = field(default_factory=list)
-    allowed: bool = True
-    resolvable: bool = True
-    outcome: Any = None
-    parse_error: Exception | None = None
-    resolver_return: Any = None
-    policy_specification: Any = None
-    resolution_specification: Any = None
-    invocation: Any = None
-    parsed_payload: bytes | None = None
+    seen: list[Any] = field(default_factory=list)
+    policy_error: Any = None
+    resolution_error: Any = None
+    execution_result: Any = None
+    parsing_result: Any = None
 
-    def check(self, specification: Any) -> None:
-        """Record policy evaluation and reject when configured."""
+    def check(self, specification: Any) -> Any:
         self.events.append("policy")
-        self.policy_specification = specification
-        if not self.allowed:
-            from prowler.cli_engine import PolicyError
+        self.seen.append(specification)
+        return self.policy_error
 
-            raise PolicyError("request rejected")
-
-    def resolve(self, specification: Any) -> Any:
-        """Record resolution without replacing the immutable specification."""
+    def validate(self, specification: Any) -> Any:
         self.events.append("resolution")
-        self.resolution_specification = specification
-        if not self.resolvable:
-            from prowler.cli_engine import ResolutionError
-
-            raise ResolutionError("value unresolved")
-        if self.resolver_return is not None:
-            return self.resolver_return
-        return specification
+        self.seen.append(specification)
+        return self.resolution_error
 
     def execute(self, specification: Any) -> Any:
-        """Record execution and return the configured outcome."""
         self.events.append("execution")
-        self.invocation = specification
-        if isinstance(self.outcome, Exception):
-            raise self.outcome
-        return self.outcome
+        self.seen.append(specification)
+        return self.execution_result
 
-    def parse(self, parser: str, payload: bytes) -> object:
-        """Record parsing and return deterministic parsed data."""
+    def parse(self, specification: Any, payload: bytes) -> Any:
         self.events.append("parsing")
-        self.parsed_payload = payload
-        if self.parse_error is not None:
-            raise self.parse_error
-        return {"parser": parser, "size": len(payload)}
+        self.seen.append(specification)
+        if self.parsing_result is not None:
+            return self.parsing_result
+        return {"parser": specification.output.parser, "bytes": payload}
 
 
 @pytest.fixture
 def recording_ports() -> RecordingPorts:
-    """Return fresh deterministic CLI boundary ports."""
     return RecordingPorts()
