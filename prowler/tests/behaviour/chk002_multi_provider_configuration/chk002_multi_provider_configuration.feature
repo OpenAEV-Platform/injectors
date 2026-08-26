@@ -75,6 +75,11 @@ Feature: Prowler multi-provider form input
     When startup configuration is loaded
     Then no provider input is present in startup configuration
 
+  Scenario: Keep AWS endpoint overrides out of startup configuration
+    Given an AWS endpoint override appears in environment or YAML startup input
+    When startup configuration is loaded
+    Then the AWS endpoint override is not exposed by startup configuration
+
   Scenario: Use the recommended Prowler executable by default
     Given no Prowler executable path is configured
     When startup configuration is loaded
@@ -95,6 +100,31 @@ Feature: Prowler multi-provider form input
       |                  |
       |                  |
       | bin/prowler      |
+
+  Scenario: Use the default AWS service endpoint for an assessment
+    Given an AWS provider input without an endpoint override
+    When the provider input is accepted
+    Then the AWS endpoint override is absent
+
+  Scenario: Supply a trusted AWS endpoint override per assessment
+    Given an AWS provider input with an absolute HTTP or HTTPS endpoint URL
+    When the provider input is accepted
+    Then that endpoint is available as an ordinary string without a reachability check
+
+  Scenario Outline: Reject an unsafe AWS endpoint override
+    Given an AWS provider input whose endpoint override is "<endpoint>"
+    When the provider input is submitted
+    Then the provider input is rejected
+
+    Examples:
+      | endpoint                              |
+      |                                       |
+      | /relative                             |
+      | https:///missing-host                 |
+      | ftp://localhost:4566                  |
+      | https://user:password@aws.example.com |
+      | https://aws.example.com?region=local  |
+      | https://aws.example.com#credentials   |
 
   # ---- Constraints identified ----
 
@@ -119,3 +149,13 @@ Feature: Prowler multi-provider form input
       | azure      | azure_client_secret         |
       | gcp        | gcp_service_account_json    |
       | kubernetes | kubernetes_kubeconfig       |
+
+  Scenario: Reject a non-string AWS endpoint override
+    Given an AWS provider input whose endpoint override is a non-string value
+    When the provider input is submitted
+    Then the provider input is rejected before type coercion
+
+  Scenario: Reject an AWS endpoint override with an empty explicit port
+    Given an AWS provider input whose endpoint override has a port delimiter without a port
+    When the provider input is submitted
+    Then the provider input is rejected

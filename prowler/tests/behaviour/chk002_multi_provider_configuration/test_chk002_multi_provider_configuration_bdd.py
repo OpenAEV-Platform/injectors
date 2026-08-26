@@ -6,9 +6,9 @@ from pathlib import Path
 from typing import Any
 
 import pytest
-from pydantic import SecretStr, TypeAdapter, ValidationError
+from pydantic import HttpUrl, SecretStr, TypeAdapter, ValidationError
 
-from prowler.models.configs.config_loader import ConfigLoader
+from prowler.models.configs.config_loader import ConfigLoader, ProwlerConfig
 
 PROVIDER_PAYLOADS: dict[str, dict[str, str]] = {
     "aws": {
@@ -300,6 +300,136 @@ def test_reject_invalid_prowler_executable_path(
 
     with pytest.raises(ValidationError):
         ConfigLoader()
+
+
+def test_aws_endpoint_url_defaults_to_none() -> None:
+    """Use the AWS SDK service endpoint when an assessment supplies no override."""
+    result = _when_submitted(PROVIDER_PAYLOADS["aws"])
+
+    assert not isinstance(result, ValidationError)
+    assert result.aws_endpoint_url is None
+
+
+@pytest.mark.parametrize(
+    "configured_url",
+    [
+        "https://s3.us-east-1.amazonaws.com",
+        "http://localhost:4566",
+        "http://localstack:4566",
+        "http://10.0.0.25:4566",
+        "https://aws.example.com:1/service/path",
+        "https://aws.example.com:65535/service/path",
+    ],
+)
+def test_trusted_aws_endpoint_url_can_be_supplied_per_assessment(
+    configured_url: str,
+) -> None:
+    """Accept assessment-trusted HTTP endpoints without contacting their hosts."""
+    result = _when_submitted(
+        {**PROVIDER_PAYLOADS["aws"], "aws_endpoint_url": configured_url}
+    )
+
+    assert not isinstance(result, ValidationError)
+    assert result.aws_endpoint_url == configured_url
+    assert type(result.aws_endpoint_url) is str
+
+
+def test_aws_endpoint_url_is_not_loaded_from_startup_environment(
+    standard_injector_environment: None,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Keep the per-assessment endpoint outside environment startup settings."""
+    monkeypatch.setenv("PROWLER_AWS_ENDPOINT_URL", "http://localhost:4566")
+
+    config = ConfigLoader()
+
+    assert "aws_endpoint_url" not in ProwlerConfig.model_fields
+    assert not hasattr(config.prowler, "aws_endpoint_url")
+
+
+def test_aws_endpoint_url_is_not_loaded_from_startup_yaml(
+    standard_injector_environment: None,
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    """Keep the per-assessment endpoint outside YAML startup settings."""
+    (tmp_path / "config.yml").write_text(
+        "prowler:\n  aws_endpoint_url: 'http://localhost:4566'\n",
+        encoding="utf-8",
+    )
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setitem(ConfigLoader.model_config, "yaml_file", None)
+
+    config = ConfigLoader()
+
+    assert "aws_endpoint_url" not in ProwlerConfig.model_fields
+    assert not hasattr(config.prowler, "aws_endpoint_url")
+
+
+@pytest.mark.parametrize(
+    "configured_url",
+    [
+        b"https://aws.example.com/unchecked",
+        HttpUrl("https://aws.example.com/service"),
+        4566,
+    ],
+)
+def test_reject_non_string_aws_endpoint_url(configured_url: object) -> None:
+    """Reject endpoint values that could bypass checks through later coercion."""
+    payload: dict[str, object] = {
+        **PROVIDER_PAYLOADS["aws"],
+        "aws_endpoint_url": configured_url,
+    }
+
+    with pytest.raises(ValidationError):
+        _provider_input_adapter().validate_python(payload)
+
+
+@pytest.mark.parametrize(
+    "configured_url",
+    [
+        "",
+        "   ",
+        "/relative",
+        "//localhost:4566",
+        "https:///missing-host",
+        "ftp://localhost:4566",
+        "https://user:password@aws.example.com",
+        "https://aws.example.com?region=local",
+        "https://aws.example.com#credentials",
+        "https://aws.example.com /service",
+        "https://aws.example.com:\t4566",
+        "https://aws.example.com:",
+        "https://aws.example.com:abc",
+        "https://aws.example.com:0",
+        "https://aws.example.com:65536",
+    ],
+)
+def test_reject_invalid_trusted_aws_endpoint_url(
+    configured_url: str,
+) -> None:
+    """Reject endpoint overrides that cross the provider-input boundary."""
+    payload = {**PROVIDER_PAYLOADS["aws"], "aws_endpoint_url": configured_url}
+
+    with pytest.raises(ValidationError):
+        _provider_input_adapter().validate_python(payload)
+
+
+def test_aws_endpoint_url_samples_and_documentation_are_consistent() -> None:
+    """Document the endpoint as provider input, never as a startup setting."""
+    project_root = Path(__file__).parents[3]
+
+    assert "PROWLER_AWS_ENDPOINT_URL" not in (project_root / ".env.sample").read_text(
+        encoding="utf-8"
+    )
+    assert "aws_endpoint_url" not in (project_root / "config.yml.sample").read_text(
+        encoding="utf-8"
+    )
+    readme = (project_root / "README.md").read_text(encoding="utf-8")
+    assert "`PROWLER_AWS_ENDPOINT_URL`" not in readme
+    assert "`prowler.aws_endpoint_url`" not in readme
+    assert "`aws_endpoint_url`" in readme
+    assert "per-assessment provider input" in readme
 
 
 def test_runtime_path_samples_and_documentation_are_consistent() -> None:

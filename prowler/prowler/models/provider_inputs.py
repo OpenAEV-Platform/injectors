@@ -1,6 +1,7 @@
 """Strict, secret-safe provider inputs for future OpenAEV form contracts."""
 
 from typing import Annotated, Any, Literal, NoReturn
+from urllib.parse import urlsplit
 
 from pydantic import (
     BaseModel,
@@ -9,6 +10,7 @@ from pydantic import (
     Field,
     SecretStr,
     TypeAdapter,
+    field_validator,
 )
 
 
@@ -48,6 +50,38 @@ class AwsProviderInput(ImmutableProviderInput):
     aws_account_id: NonBlankStr
     aws_region: NonBlankStr
     aws_session_token: NonBlankSecretStr | None = None
+    aws_endpoint_url: str | None = None
+
+    @field_validator("aws_endpoint_url", mode="before")
+    @classmethod
+    def validate_aws_endpoint_url(cls, value: object) -> object:
+        """Accept only absolute HTTP(S) endpoints without unsafe URL extras."""
+        if value is None:
+            return None
+        if not isinstance(value, str):
+            raise ValueError("AWS endpoint URL must be a string")
+        if not value.strip():
+            raise ValueError("AWS endpoint URL must not be blank")
+        if any(character.isspace() for character in value):
+            raise ValueError("AWS endpoint URL must not contain whitespace")
+        if "?" in value or "#" in value:
+            raise ValueError("AWS endpoint URL must not include query or fragment")
+        try:
+            endpoint = urlsplit(value)
+            if endpoint.netloc.rsplit("@", maxsplit=1)[-1].endswith(":"):
+                raise ValueError("AWS endpoint URL port must not be empty")
+            port = endpoint.port
+        except ValueError as error:
+            raise ValueError("AWS endpoint URL must be valid") from error
+        if endpoint.scheme not in {"http", "https"}:
+            raise ValueError("AWS endpoint URL must use HTTP or HTTPS")
+        if not endpoint.netloc or endpoint.hostname is None:
+            raise ValueError("AWS endpoint URL must include a host")
+        if endpoint.username is not None or endpoint.password is not None:
+            raise ValueError("AWS endpoint URL must not include user information")
+        if port is not None and not 1 <= port <= 65535:
+            raise ValueError("AWS endpoint URL port must be between 1 and 65535")
+        return value
 
 
 class AzureProviderInput(ImmutableProviderInput):
