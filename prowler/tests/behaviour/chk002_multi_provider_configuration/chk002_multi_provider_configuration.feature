@@ -51,6 +51,27 @@ Feature: Prowler multi-provider form input
     When startup configuration is loaded
     Then no provider input is present in startup configuration
 
+  Scenario: Use the recommended Prowler executable by default
+    Given no Prowler executable path is configured
+    When startup configuration is loaded
+    Then the Prowler executable path is "/usr/local/bin/prowler"
+
+  Scenario: Configure an absolute Prowler executable path
+    Given an absolute Prowler executable path is configured
+    When startup configuration is loaded
+    Then that Prowler executable path is available as ordinary runtime configuration
+
+  Scenario Outline: Reject an invalid Prowler executable path
+    Given the Prowler executable path is "<path>"
+    When startup configuration is loaded
+    Then the startup configuration is rejected
+
+    Examples:
+      | path             |
+      |                  |
+      |                  |
+      | bin/prowler      |
+
   # ---- Constraints identified ----
 
   Scenario Outline: Provider selection is a strict discriminator
