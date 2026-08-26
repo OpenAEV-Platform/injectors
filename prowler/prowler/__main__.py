@@ -24,13 +24,13 @@ def main() -> None:
             icon=None,
         )
         ProwlerInjector(config=config, helper=helper).start()
-    except ValidationError as error:
-        logger.error("%s Configuration error: %s", LOG_PREFIX, error)
+    except ValidationError:
+        logger.error("[PROWLER_MAIN] Configuration error")
         sys.exit(2)
     except KeyboardInterrupt:
         logger.info("%s Injector stopped by user", LOG_PREFIX)
-    except Exception as error:
-        logger.exception("%s Fatal startup error: %s", LOG_PREFIX, error)
+    except Exception:
+        logger.error("[PROWLER_MAIN] Fatal startup error")
         sys.exit(1)
 
 

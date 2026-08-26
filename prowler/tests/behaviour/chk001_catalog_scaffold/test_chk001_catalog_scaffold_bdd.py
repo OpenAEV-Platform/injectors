@@ -1,10 +1,15 @@
 """Behaviour tests for the CHK.001 Prowler catalog scaffold."""
 
 import json
+import logging
 from pathlib import Path
 from typing import cast
 from unittest.mock import Mock
 
+import pytest
+from pydantic import BaseModel, ValidationError
+
+from prowler import __main__ as prowler_main
 from prowler.injector.openaev_prowler import ProwlerInjector
 from prowler.models.configs.config_loader import ConfigLoader
 
@@ -17,6 +22,13 @@ STANDARD_ENV_SETTINGS = {
     "INJECTOR_NAME",
     "INJECTOR_LOG_LEVEL",
 }
+VALIDATION_CANARY = "PYDANTIC_VALIDATION_CANARY"
+UNEXPECTED_CANARY = "UNEXPECTED_EXCEPTION_CANARY"
+SENSITIVE_CANARIES = (VALIDATION_CANARY, UNEXPECTED_CANARY)
+
+
+class _IntegerSetting(BaseModel):
+    value: int
 
 
 def _given_the_prowler_project() -> Path:
@@ -67,6 +79,50 @@ def _then_zero_contracts_are_registered(config: ConfigLoader, helper: Mock) -> N
     assert callable(callback)
 
 
+def _given_startup_failure(failure_type: str) -> Exception:
+    if failure_type == "configuration error":
+        try:
+            _IntegerSetting(value=VALIDATION_CANARY)
+        except ValidationError as error:
+            return error
+        raise AssertionError("Validation canary did not trigger a configuration error")
+    return RuntimeError(UNEXPECTED_CANARY)
+
+
+def _when_startup_failure_is_handled(
+    error: Exception,
+    monkeypatch: pytest.MonkeyPatch,
+    caplog: pytest.LogCaptureFixture,
+) -> tuple[int, list[logging.LogRecord]]:
+    monkeypatch.setattr(prowler_main, "ConfigLoader", Mock(side_effect=error))
+
+    with caplog.at_level(logging.DEBUG, logger=prowler_main.__name__):
+        with pytest.raises(SystemExit) as raised:
+            prowler_main.main()
+
+    return cast(int, raised.value.code), list(caplog.records)
+
+
+def _then_failure_is_logged_safely(
+    actual_exit_status: int,
+    expected_exit_status: int,
+    records: list[logging.LogRecord],
+) -> None:
+    assert actual_exit_status == expected_exit_status
+    error_records = [record for record in records if record.levelno == logging.ERROR]
+    assert len(error_records) == 1
+
+    for record in records:
+        assert record.exc_info is None
+        assert record.exc_text is None
+        log_surfaces = (record.getMessage(), str(record.msg), repr(record.args))
+        assert all(
+            canary not in surface
+            for canary in SENSITIVE_CANARIES
+            for surface in log_surfaces
+        )
+
+
 def test_discoverable_prowler_catalog_registration() -> None:
     """Prowler is represented by a discoverable catalog manifest."""
     project_root = _given_the_prowler_project()
@@ -88,3 +144,21 @@ def test_foundation_startup_registers_no_assessment_contracts(
     _given_the_prowler_project()
     config, helper = _when_injector_starts()
     _then_zero_contracts_are_registered(config, helper)
+
+
+@pytest.mark.parametrize(
+    ("failure_type", "expected_exit_status"),
+    (("configuration error", 2), ("unexpected exception", 1)),
+)
+def test_startup_failures_are_logged_without_sensitive_exception_details(
+    failure_type: str,
+    expected_exit_status: int,
+    monkeypatch: pytest.MonkeyPatch,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """Startup failures preserve safe logs and established exit statuses."""
+    error = _given_startup_failure(failure_type)
+    actual_exit_status, records = _when_startup_failure_is_handled(
+        error, monkeypatch, caplog
+    )
+    _then_failure_is_logged_safely(actual_exit_status, expected_exit_status, records)
