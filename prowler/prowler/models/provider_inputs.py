@@ -1,6 +1,6 @@
 """Strict, secret-safe provider inputs for future OpenAEV form contracts."""
 
-from typing import Annotated, Literal
+from typing import Annotated, Any, Literal, NoReturn
 
 from pydantic import (
     BaseModel,
@@ -23,7 +23,19 @@ NonBlankStr = Annotated[str, BeforeValidator(_reject_blank)]
 NonBlankSecretStr = Annotated[SecretStr, BeforeValidator(_reject_blank)]
 
 
-class AwsProviderInput(BaseModel):
+class ImmutableProviderInput(BaseModel):
+    """Provider boundary that rejects assignment without retaining its value."""
+
+    model_config = ConfigDict(
+        extra="forbid", strict=True, hide_input_in_errors=True, frozen=True
+    )
+
+    def __setattr__(self, name: str, value: Any) -> NoReturn:
+        """Reject all post-construction assignment with a value-free error."""
+        raise TypeError("Provider inputs are immutable")
+
+
+class AwsProviderInput(ImmutableProviderInput):
     """AWS provider form input."""
 
     model_config = ConfigDict(
@@ -38,7 +50,7 @@ class AwsProviderInput(BaseModel):
     aws_session_token: NonBlankSecretStr | None = None
 
 
-class AzureProviderInput(BaseModel):
+class AzureProviderInput(ImmutableProviderInput):
     """Azure provider form input."""
 
     model_config = ConfigDict(
@@ -53,7 +65,7 @@ class AzureProviderInput(BaseModel):
     azure_provider: NonBlankStr
 
 
-class GcpProviderInput(BaseModel):
+class GcpProviderInput(ImmutableProviderInput):
     """GCP provider form input."""
 
     model_config = ConfigDict(
@@ -65,7 +77,7 @@ class GcpProviderInput(BaseModel):
     gcp_project_id: NonBlankStr
 
 
-class KubernetesProviderInput(BaseModel):
+class KubernetesProviderInput(ImmutableProviderInput):
     """Kubernetes provider form input."""
 
     model_config = ConfigDict(
