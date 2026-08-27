@@ -17,7 +17,10 @@ from prowler._core.cli_engine import (
     ExecutionSpecification,
     ValidatedCommandRequest,
 )
-from prowler._core.prowler_client import ProwlerClientFactory
+from prowler._core.prowler_client import (
+    OUTPUT_ARTIFACT_FILENAME,
+    ProwlerClientFactory,
+)
 from prowler.contracts import DEFAULT_PROWLER_CONTRACTS, stable_contract_id
 from prowler.models.configs.config_loader import (
     ConfigLoader,
@@ -135,10 +138,12 @@ def test_valid_request_invokes_client_once_without_narrowing(
     gcp_form: dict[str, object], gcp_ocsf_record_factory: Any
 ) -> None:
     """The concrete base route passes the complete GCP scope once."""
+    artifact = json.dumps([gcp_ocsf_record_factory("one")]).encode()
     result = CommandResult(
         specification=_specification(),
         return_code=0,
-        stdout=json.dumps([gcp_ocsf_record_factory("one")]).encode(),
+        stdout=b"\x1b[32mconsole output is not OCSF JSON\x1b[0m",
+        parsed=artifact,
     )
     factory = _ClientFactory(result)
     contract = _contract()
@@ -149,6 +154,9 @@ def test_valid_request_invokes_client_once_without_narrowing(
     assert len(factory.calls) == 1
     assert factory.calls[0][2] == ()
     assert len(outcome.findings) == 1
+    assert outcome.raw_record_count == 1
+    assert outcome.raw_output_bytes == len(artifact)
+    assert len(outcome.raw_preview) == 1
 
 
 @dataclass
@@ -161,10 +169,13 @@ class _Engine:
         assert self.lifecycle == ["create:.json"]
         self.lifecycle.append("engine")
         self.requests.append(request)
+        arguments = tuple(request.arguments)
+        output_directory = Path(arguments[arguments.index("--output-directory") + 1])
+        (output_directory / OUTPUT_ARTIFACT_FILENAME).write_bytes(self.payload)
         return CommandResult(
             specification=ExecutionSpecification.from_request(request),
             return_code=0,
-            stdout=self.payload,
+            stdout=b"\x1b[32mconsole output is not OCSF JSON\x1b[0m",
         )
 
 
@@ -195,7 +206,10 @@ class _CredentialLeaseFactory:
     def create(self, secret: SecretStr, *, suffix: str) -> _CredentialLease:
         self.calls.append((secret, suffix))
         self.lifecycle.append(f"create:{suffix}")
-        return _CredentialLease(Path("/tmp/CANARY-GCP-CREDENTIAL.json"), self.lifecycle)
+        return _CredentialLease(
+            Path("/tmp/CANARY-GCP-CREDENTIAL.json"),  # noqa: S108 - leak canary
+            self.lifecycle,
+        )
 
 
 def test_fake_engine_proves_exact_gcp_subprocess_arguments(
@@ -203,9 +217,7 @@ def test_fake_engine_proves_exact_gcp_subprocess_arguments(
 ) -> None:
     """The real client composition emits exact non-shell full-scope argv."""
     lifecycle: list[str] = []
-    engine = _Engine(
-        json.dumps([gcp_ocsf_record_factory("argv")]).encode(), lifecycle
-    )
+    engine = _Engine(json.dumps([gcp_ocsf_record_factory("argv")]).encode(), lifecycle)
     engine_factory = _EngineFactory(engine)
     leases = _CredentialLeaseFactory(lifecycle)
     contract = _contract()
@@ -222,9 +234,22 @@ def test_fake_engine_proves_exact_gcp_subprocess_arguments(
     assert tuple(request.arguments) == (
         "gcp",
         "--credentials-file",
-        "/tmp/CANARY-GCP-CREDENTIAL.json",
+        "/tmp/CANARY-GCP-CREDENTIAL.json",  # noqa: S108 - leak canary
         "--project-id",
         "PROJECT-ID-CANARY",
+        "--severity",
+        "critical",
+        "high",
+        "medium",
+        "low",
+        "informational",
+        "--output-directory",
+        request.arguments[request.arguments.index("--output-directory") + 1],
+        "--output-filename",
+        "findings",
+        "-z",
+        "--only-logs",
+        "--no-color",
         "-M",
         "json-ocsf",
     )
@@ -249,11 +274,13 @@ def test_mapping_filters_normalizes_preserves_order_and_projects_outputs(
         gcp_ocsf_record_factory("excluded", provider="AWS", status="FAIL"),
         gcp_ocsf_record_factory("second", provider="gcp", status="FAIL"),
     ]
+    artifact = json.dumps(records).encode()
     factory = _ClientFactory(
         CommandResult(
             specification=_specification(),
             return_code=0,
-            stdout=json.dumps(records).encode(),
+            stdout=b"\x1b[32mconsole output is not OCSF JSON\x1b[0m",
+            parsed=artifact,
         )
     )
     contract = _contract()
@@ -339,8 +366,9 @@ def test_runtime_success_and_safe_error_are_end_to_end(
     records = [
         gcp_ocsf_record_factory("CALLBACK-CANARY", status="PASS"),
         gcp_ocsf_record_factory("FINDING-CANARY", status="FAIL"),
-        gcp_ocsf_record_factory("STDOUT-CANARY", provider="aws", status="FAIL"),
+        gcp_ocsf_record_factory("excluded", provider="aws", status="FAIL"),
     ]
+    artifact = json.dumps(records).encode()
     result = CommandResult(
         specification=_specification(
             (
@@ -350,8 +378,9 @@ def test_runtime_success_and_safe_error_are_end_to_end(
             (("ENV-NAME-CANARY", "ENV-VALUE-CANARY"),),
         ),
         return_code=0,
-        stdout=json.dumps(records).encode(),
+        stdout=b"\x1b[31mSTDOUT-CANARY\x1b[0m",
         stderr=b"STDERR-CANARY",
+        parsed=artifact,
     )
     factory = _ClientFactory(result)
     contract = _contract()
@@ -373,7 +402,13 @@ def test_runtime_success_and_safe_error_are_end_to_end(
         "FINDING-CANARY",
     )
     assert all(name in callback["execution_message"] for name in mapped_names)
-    assert "STDOUT-CANARY" not in callback["execution_message"]
+    raw_section_index = callback["execution_message"].index(
+        "[PROWLER] Raw OCSF evidence (bounded preview)"
+    )
+    assert "excluded" not in callback["execution_message"][:raw_section_index]
+    assert callback["execution_message"].index("Prowler Findings") < raw_section_index
+    assert "Total raw records: 3" in callback["execution_message"]
+    assert f"Artifact bytes: {len(artifact)}" in callback["execution_message"]
     serialized_callback = json.dumps(callback)
     assert (
         tuple(marker for marker in sensitive_canaries if marker in serialized_callback)
@@ -424,6 +459,8 @@ def test_runtime_success_and_safe_error_are_end_to_end(
     assert success_metadata["status"] == "SUCCESS"
     assert success_metadata["finding_count"] == 2
     assert success_metadata["vulnerability_count"] == 1
+    assert success_metadata["raw_record_count"] == 3
+    assert success_metadata["raw_output_bytes"] == len(artifact)
     callback_metadata = logs[6].metadata
     assert callback_metadata is not None
     assert callback_metadata["assessment_status"] == "SUCCESS"
