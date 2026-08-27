@@ -50,7 +50,7 @@ strict = true
 plugins = ["pydantic.mypy"]
 
 [[tool.mypy.overrides]]
-module = ["prowler.__main__", "prowler.injector.*"]
+module = ["prowler.__main__", "prowler.contracts.*", "prowler.injector.*"]
 # pyoaev 2.3.5 does not publish a py.typed marker or external stubs.
 disable_error_code = ["import-untyped"]
 

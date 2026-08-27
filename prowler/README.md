@@ -1,8 +1,8 @@
 # OpenAEV Prowler Injector
 
-The Prowler injector foundation registers Prowler with OpenAEV. Provider and
-account inputs, credentials, execution, mapping, routes, and contracts are not
-startup configuration and remain outside this chunk.
+The Prowler injector foundation registers Prowler with OpenAEV. CHK.006 adds
+reusable contract declarations and the canonical route catalog, but does not
+register the future concrete assessment contracts.
 
 ## Configuration
 
@@ -34,16 +34,28 @@ the generic engine does not hardcode a Prowler binary location.
 python -m prowler
 ```
 
-The CHK.001 foundation starts with zero assessment contracts. Contract catalog
-registration is deferred to CHK.006.
+The injector still starts with zero assessment contracts. CHK.006 describes
+routes and an inheritable contract boundary only; CHK.007–CHK.016 will supply
+and register concrete contracts.
 
 ## Provider input boundary
 
 Provider selection, account or target values, and credentials are not injector
-startup configuration. They will be supplied per OpenAEV form contract so that
-credential changes do not require redeploying the injector. CHK.002 provides
-only reusable, strict provider input models; it does not register forms, routes,
-or contracts.
+startup configuration. Concrete contracts supply them per assessment and
+CHK.006 converts form data immediately into CHK.002's strict provider models.
+
+### Plaintext credential limitation
+
+At the current pyoaev/OpenAEV contract boundary, Prowler credential fields use
+ordinary `ContractText` or `ContractTextArea` controls. They are **plaintext
+inputs**; this implementation does not claim masking or secret-field protection.
+Credential fields have no defaults, are never intentionally logged or echoed,
+and are converted immediately to `SecretStr`-backed provider models after form
+submission. This limits handling inside the injector but does not remove the
+plaintext platform-boundary exposure.
+
+A future iteration will migrate these fields to credential references. CHK.006
+does not extend pyoaev or the platform with a new secret-field mechanism.
 
 `aws_endpoint_url` is an optional per-assessment provider input for AWS, like
 its credentials. When supplied, it must be an absolute HTTP or HTTPS URL with a

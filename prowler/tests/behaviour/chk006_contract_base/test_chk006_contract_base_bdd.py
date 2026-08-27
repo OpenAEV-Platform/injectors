@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import importlib
+import inspect
 import json
 from dataclasses import dataclass, field
 from typing import Any
@@ -10,7 +11,11 @@ from typing import Any
 import pytest
 from pydantic import SecretStr
 
-from prowler._core.cli_engine import CommandResult, ExecutionSpecification, OutputSpecification
+from prowler._core.cli_engine import (
+    CommandResult,
+    ExecutionSpecification,
+    OutputSpecification,
+)
 from prowler.models.configs.config_loader import ProwlerConfig
 from prowler.models.provider_inputs import (
     AwsProviderInput,
@@ -50,7 +55,9 @@ PROVIDER_CASES = {
     "gcp": (
         GcpProviderInput,
         {
-            "gcp_service_account_json": '{"type":"service_account","private_key":"placeholder"}',
+            "gcp_service_account_json": (
+                '{"type":"service_account","private_key":"placeholder"}'
+            ),
             "gcp_project_id": "project-placeholder",
         },
     ),
@@ -76,7 +83,9 @@ def _contract_class(provider: str, **overrides: Any) -> type[Any]:
         "check_filters": ("first-check", "second-check"),
         **overrides,
     }
-    return type(f"Test{provider.title()}Contract", (subject.BaseProwlerContract,), attributes)
+    return type(
+        f"Test{provider.title()}Contract", (subject.BaseProwlerContract,), attributes
+    )
 
 
 def _specification() -> ExecutionSpecification:
@@ -97,12 +106,16 @@ class _Factory:
     result: CommandResult
     calls: list[tuple[Any, Any, tuple[str, ...]]] = field(default_factory=list)
 
-    def run(self, config: Any, provider: Any, *, check_filters: Any = ()) -> CommandResult:
+    def run(
+        self, config: Any, provider: Any, *, check_filters: Any = ()
+    ) -> CommandResult:
         self.calls.append((config, provider, tuple(check_filters)))
         return self.result
 
 
 def test_minimal_subclass_builds_provider_specific_openaev_contract() -> None:
+    """A subclass supplies IDs and receives only its provider's fields."""
+    assert inspect.isabstract(_subject().BaseProwlerContract)
     contract = _contract_class("aws")().build_contract()
 
     assert contract.contract_id == "9d5b71f8-f36f-50ee-a896-d7ff41f541f9"
@@ -120,6 +133,7 @@ def test_minimal_subclass_builds_provider_specific_openaev_contract() -> None:
 
 @pytest.mark.parametrize("provider", tuple(PROVIDER_CASES))
 def test_provider_input_is_converted_immediately_to_strict_model(provider: str) -> None:
+    """Each provider's raw form data enters the exact CHK.002 model."""
     expected_type, raw = PROVIDER_CASES[provider]
 
     parsed = _contract_class(provider)().parse_input(dict(raw))
@@ -135,10 +149,11 @@ def test_provider_input_is_converted_immediately_to_strict_model(provider: str) 
 
 
 def test_invalid_input_error_contains_structure_but_not_raw_values() -> None:
+    """Validation reports safe locations without rejected values."""
     subject = _subject()
     marker = "DO_NOT_ECHO_THIS_CREDENTIAL"
     raw = {**PROVIDER_CASES["aws"][1], "aws_secret_access_key": marker}
-    raw["azure_client_secret"] = "cross-provider-placeholder"
+    raw["azure_client_secret"] = "cross-provider-placeholder"  # noqa: S105
 
     with pytest.raises(subject.ContractInputError) as raised:
         _contract_class("aws")().parse_input(raw)
@@ -153,6 +168,7 @@ def test_invalid_input_error_contains_structure_but_not_raw_values() -> None:
 
 
 def test_execution_preserves_exact_command_error_without_mapping() -> None:
+    """Expected command failure objects cross the base unchanged."""
     exact_error = RuntimeError("safe command failure")
     factory = _Factory(CommandResult(specification=_specification(), error=exact_error))
     instance = _contract_class("aws")(client_factory=factory)
@@ -165,9 +181,14 @@ def test_execution_preserves_exact_command_error_without_mapping() -> None:
     assert len(factory.calls) == 1
 
 
-def test_execution_maps_success_and_passes_route_filters_once(ocsf_record: dict[str, Any]) -> None:
+def test_execution_maps_success_and_passes_route_filters_once(
+    ocsf_record: dict[str, Any],
+) -> None:
+    """Successful raw output is mapped after one filtered client run."""
     result = CommandResult(
-        specification=_specification(), return_code=0, stdout=json.dumps([ocsf_record]).encode()
+        specification=_specification(),
+        return_code=0,
+        stdout=json.dumps([ocsf_record]).encode(),
     )
     factory = _Factory(result)
     instance = _contract_class("aws")(client_factory=factory)
@@ -211,19 +232,31 @@ EXPECTED_ROUTES = (
 
 
 def test_route_catalog_is_the_immutable_canonical_catalog() -> None:
+    """All 25 provider/family route descriptors stay fixed and ordered."""
     catalog = _subject().ROUTE_CATALOG
     assert type(catalog) is tuple
-    assert tuple((r.route_name, r.provider, r.family) for r in catalog) == EXPECTED_ROUTES
-    assert all("/" in route.route_name or route.route_name in PROVIDER_CASES for route in catalog)
+    assert (
+        tuple((r.route_name, r.provider, r.family) for r in catalog) == EXPECTED_ROUTES
+    )
+    assert all(
+        "/" in route.route_name or route.route_name in PROVIDER_CASES
+        for route in catalog
+    )
 
 
 def test_filtering_deduplicates_in_canonical_order() -> None:
+    """Filtering uses set membership but emits catalog order."""
     dispatcher = _subject().ContractDispatcher({})
     filtered = dispatcher.filter_routes(("gcp/compute", "aws", "aws", "aws/iam"))
-    assert tuple(route.route_name for route in filtered) == ("aws", "aws/iam", "gcp/compute")
+    assert tuple(route.route_name for route in filtered) == (
+        "aws",
+        "aws/iam",
+        "gcp/compute",
+    )
 
 
 def test_dispatch_delegates_once_and_returns_exact_result() -> None:
+    """A known implemented route delegates once without result wrapping."""
     expected = object()
     calls: list[tuple[str, object]] = []
 
@@ -238,6 +271,7 @@ def test_dispatch_delegates_once_and_returns_exact_result() -> None:
 
 
 def test_unknown_dispatch_is_rejected_before_handler() -> None:
+    """An unknown route cannot reach any injected handler."""
     subject = _subject()
     calls: list[object] = []
 
@@ -251,6 +285,7 @@ def test_unknown_dispatch_is_rejected_before_handler() -> None:
 
 
 def test_startup_remains_zero_contract_registration() -> None:
+    """Declarations do not mutate the CHK.001 startup surface."""
     from unittest.mock import Mock
 
     from prowler.injector import ProwlerInjector
