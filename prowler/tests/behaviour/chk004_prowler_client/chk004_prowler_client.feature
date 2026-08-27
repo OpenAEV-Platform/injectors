@@ -32,6 +32,24 @@ Feature: Synchronous Prowler CLI assessments
       | GCP        |
       | Kubernetes |
 
+  Scenario: A configured AWS endpoint is scoped to the AWS invocation environment
+    Given an AWS endpoint override is configured
+    When the client runs an AWS provider assessment
+    Then the endpoint is submitted as a plain AWS_ENDPOINT_URL environment value
+    And the endpoint is absent from command arguments
+
+  Scenario Outline: An AWS endpoint does not change another provider invocation
+    Given an AWS endpoint override is configured
+    And a <provider> provider input
+    When the client runs the provider assessment
+    Then the exact <provider> environment and arguments remain unchanged
+
+    Examples:
+      | provider   |
+      | Azure      |
+      | GCP        |
+      | Kubernetes |
+
   Scenario: Kubernetes selects a kubeconfig context with Prowler 5.36 syntax
     Given a Kubernetes provider input with a named context
     When the client runs the provider assessment
@@ -43,6 +61,12 @@ Feature: Synchronous Prowler CLI assessments
   Scenario: Blank check filters are rejected before execution
     When the client receives a blank check filter
     Then no Prowler command runs
+
+  Scenario: An unset AWS endpoint ignores the ambient parent endpoint
+    Given AWS credentials without an optional session token
+    And the parent process has an ambient AWS_ENDPOINT_URL
+    When the client runs an AWS provider assessment without an endpoint override
+    Then only the exact required AWS credential environment is submitted
 
   Scenario: Configured executable and bounded raw execution are mandatory
     When the client runs an assessment

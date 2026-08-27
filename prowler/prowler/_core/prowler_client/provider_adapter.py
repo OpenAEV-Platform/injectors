@@ -2,6 +2,7 @@
 
 from pydantic import SecretStr
 
+from prowler._core.cli_engine.contracts import EnvironmentValue
 from prowler.models.provider_inputs import (
     AwsProviderInput,
     AzureProviderInput,
@@ -18,18 +19,26 @@ _OCSF_OUTPUT_ARGUMENTS = ("-M", "json-ocsf")
 class ProviderInvocationAdapter:
     """Build credential-safe provider arguments and exact environments."""
 
-    def __init__(self, credential_leases: CredentialLeaseFactoryPort) -> None:
+    def __init__(
+        self,
+        credential_leases: CredentialLeaseFactoryPort,
+        *,
+        aws_endpoint_url: str | None = None,
+    ) -> None:
         self._credential_leases = credential_leases
+        self._aws_endpoint_url = aws_endpoint_url
 
     def adapt(self, provider: ProviderInput) -> ProviderInvocation:
         """Return the invocation for one validated provider input."""
         if isinstance(provider, AwsProviderInput):
-            environment = [
+            environment: list[tuple[str, EnvironmentValue]] = [
                 ("AWS_ACCESS_KEY_ID", SecretStr(provider.aws_access_key_id)),
                 ("AWS_SECRET_ACCESS_KEY", provider.aws_secret_access_key),
             ]
             if provider.aws_session_token is not None:
                 environment.append(("AWS_SESSION_TOKEN", provider.aws_session_token))
+            if self._aws_endpoint_url is not None:
+                environment.append(("AWS_ENDPOINT_URL", self._aws_endpoint_url))
             return ProviderInvocation(
                 arguments=(
                     "aws",
