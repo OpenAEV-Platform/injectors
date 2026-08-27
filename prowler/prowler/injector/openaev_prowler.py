@@ -11,6 +11,8 @@ from prowler.contracts.base import BaseProwlerContract
 from prowler.models import ConfigLoader
 from prowler.models.provider_inputs import ProviderInput
 
+_SAFE_EXECUTION_ERROR = "Prowler contract execution failed safely"
+
 
 class ProwlerInjector:
     """Register the foundation injector without assessment contracts."""
@@ -72,24 +74,32 @@ class ProwlerInjector:
             }
         except Exception:
             duration = int(monotonic() - started)
-            safe_message = "Prowler contract execution failed safely"
             callback = {
-                "execution_message": (
-                    contract.render_trace(
-                        provider,
-                        (),
-                        duration,
-                        is_error=True,
-                        error_message=safe_message,
-                    )
-                    if contract is not None
-                    else safe_message
+                "execution_message": self._render_safe_error(
+                    contract, provider, duration
                 ),
                 "execution_status": "ERROR",
                 "execution_duration": duration,
                 "execution_action": "complete",
             }
         self.helper.api.inject.execution_callback(inject_id=inject_id, data=callback)
+
+    @staticmethod
+    def _render_safe_error(
+        contract: BaseProwlerContract | None,
+        provider: ProviderInput | None,
+        duration: int,
+    ) -> str:
+        """Use a resolved contract's renderer without admitting exception details."""
+        if contract is None:
+            return _SAFE_EXECUTION_ERROR
+        return contract.render_trace(
+            provider,
+            (),
+            duration,
+            is_error=True,
+            error_message=_SAFE_EXECUTION_ERROR,
+        )
 
     @staticmethod
     def _contract_id(injection: Mapping[str, object]) -> str:

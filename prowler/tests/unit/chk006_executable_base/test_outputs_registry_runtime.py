@@ -282,7 +282,8 @@ def test_runtime_accepts_both_id_shapes_and_calls_success_once(
     injector.process_message(message)
     assert _RuntimeContract.events == [
         "reception",
-        "parse:('aws_access_key_id', 'aws_secret_access_key', 'aws_account_id', 'aws_region')",
+        "parse:('aws_access_key_id', 'aws_secret_access_key', "
+        "'aws_account_id', 'aws_region')",
         "execute",
         "render:success",
     ]
@@ -327,7 +328,8 @@ def test_runtime_resolved_contract_uses_renderer_for_safe_error(
 
     assert _RuntimeContract.events == [
         "reception",
-        "parse:('aws_access_key_id', 'aws_secret_access_key', 'aws_account_id', 'aws_region')",
+        "parse:('aws_access_key_id', 'aws_secret_access_key', "
+        "'aws_account_id', 'aws_region')",
         "render:error",
     ]
     callback = helper.api.inject.execution_callback.call_args.kwargs["data"]
