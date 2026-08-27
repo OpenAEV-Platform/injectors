@@ -1,6 +1,7 @@
 """Prowler contract declarations and the executable default registry."""
 
 from .aws import AwsBaseContract
+from .azure import AzureBaseContract
 from .base import (
     BaseProwlerContract,
     ContractExecutionOutcome,
@@ -21,6 +22,7 @@ from .registry import (
 __all__ = [
     "BaseProwlerContract",
     "AwsBaseContract",
+    "AzureBaseContract",
     "ContractDispatcher",
     "ContractExecutionOutcome",
     "ContractInputError",
