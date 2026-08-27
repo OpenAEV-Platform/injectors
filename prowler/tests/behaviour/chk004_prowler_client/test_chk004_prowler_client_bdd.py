@@ -27,11 +27,8 @@ def _factory(engine: RecordingEngine) -> Any:
     return _api().ProwlerClientFactory(engine_factory=RecordingEngineFactory(engine))
 
 
-def _config(*, aws_endpoint_url: str | None = None) -> ProwlerConfig:
-    return ProwlerConfig(
-        executable_path="/opt/prowler/bin/prowler",
-        aws_endpoint_url=aws_endpoint_url,
-    )
+def _config() -> ProwlerConfig:
+    return ProwlerConfig(executable_path="/opt/prowler/bin/prowler")
 
 
 def _environment(request: Any) -> dict[str, Any]:
@@ -166,10 +163,9 @@ def test_configured_aws_endpoint_is_a_plain_aws_only_environment_value(
     recording_engine: RecordingEngine, provider_inputs: dict[str, Any]
 ) -> None:
     endpoint = "https://aws.internal.example:8443"
+    provider = provider_inputs["AWS"].model_copy(update={"aws_endpoint_url": endpoint})
 
-    _factory(recording_engine).run(
-        _config(aws_endpoint_url=endpoint), provider_inputs["AWS"]
-    )
+    _factory(recording_engine).run(_config(), provider)
 
     request = recording_engine.requests[0]
     assert _environment(request) == {
@@ -182,32 +178,18 @@ def test_configured_aws_endpoint_is_a_plain_aws_only_environment_value(
     assert endpoint not in request.arguments
 
 
-@pytest.mark.parametrize("provider_name", ["Azure", "GCP", "Kubernetes"])
-def test_configured_aws_endpoint_does_not_change_non_aws_invocations(
-    recording_engine: RecordingEngine,
-    provider_inputs: dict[str, Any],
-    provider_name: str,
+def test_unset_aws_endpoint_preserves_exact_aws_environment(
+    recording_engine: RecordingEngine, provider_inputs: dict[str, Any]
 ) -> None:
-    endpoint = "https://aws.internal.example:8443"
+    _factory(recording_engine).run(_config(), provider_inputs["AWS"])
 
-    baseline_factory = _factory(recording_engine)
-    baseline_factory.run(_config(), provider_inputs[provider_name])
-    baseline = recording_engine.requests[-1]
-    baseline_factory.run(
-        _config(aws_endpoint_url=endpoint), provider_inputs[provider_name]
-    )
-    configured = recording_engine.requests[-1]
-
-    baseline_arguments = list(baseline.arguments)
-    configured_arguments = list(configured.arguments)
-    if provider_name in {"GCP", "Kubernetes"}:
-        baseline_arguments[2] = "<temporary>"
-        configured_arguments[2] = "<temporary>"
-
-    assert configured_arguments == baseline_arguments
-    assert configured.environment == baseline.environment
-    assert endpoint not in configured.arguments
-    assert "AWS_ENDPOINT_URL" not in _environment(configured)
+    request = recording_engine.requests[0]
+    assert _environment(request) == {
+        "AWS_ACCESS_KEY_ID": SecretStr("AKIA_TEST"),
+        "AWS_SECRET_ACCESS_KEY": SecretStr("aws-secret"),
+        "AWS_SESSION_TOKEN": SecretStr("aws-session"),
+    }
+    assert "AWS_ENDPOINT_URL" not in request.arguments
 
 
 def test_unset_aws_endpoint_ignores_ambient_value_without_session_token(

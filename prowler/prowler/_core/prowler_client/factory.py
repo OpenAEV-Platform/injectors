@@ -28,10 +28,7 @@ class ProwlerClientFactory:
             config=config,
             provider=provider,
             engine=self.engine_factory.create(),
-            provider_adapter=ProviderInvocationAdapter(
-                self.credential_lease_factory,
-                aws_endpoint_url=config.aws_endpoint_url,
-            ),
+            provider_adapter=ProviderInvocationAdapter(self.credential_lease_factory),
         )
 
     def run(
