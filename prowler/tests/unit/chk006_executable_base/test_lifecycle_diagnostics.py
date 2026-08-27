@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 from pathlib import Path
 from typing import Any, ClassVar, cast
 from unittest.mock import Mock
@@ -32,7 +33,7 @@ from prowler.models.configs.config_loader import (
     InjectorConfig,
     ProwlerConfig,
 )
-from prowler.models.findings import OpenAevFinding
+from prowler.models.findings import OcsfMappingError, OpenAevFinding
 
 _LISTENER_START = "[PROWLER_INJECTOR] - Listener starting"
 _ASSESSMENT_RECEIVED = "[PROWLER_INJECTOR] - Assessment received"
@@ -111,6 +112,31 @@ class _DiagnosticContract(BaseProwlerContract):
     ) -> str:
         if self.render_failure:
             raise RuntimeError("RAW-ERROR-MESSAGE-CANARY")
+        return super().render_trace(provider, findings, duration, **kwargs)
+
+
+class _RealExecutionContract(BaseProwlerContract):
+    """Exercise the real CLI and OCSF mapping boundary from the injector."""
+
+    contract_id = _CONTRACT_ID
+    external_id = "prowler:aws"
+    route_name = "aws"
+    provider = "aws"
+    family = "base"
+    label = "Real diagnostic AWS"
+
+
+class _SerializationFailureContract(_DiagnosticContract):
+    render_calls: ClassVar[int] = 0
+
+    def output_payload(self, findings: Any) -> dict[str, list[Any]]:
+        del findings
+        raise RuntimeError("SERIALIZATION-FAILURE-CANARY")
+
+    def render_trace(
+        self, provider: Any, findings: Any, duration: int, **kwargs: Any
+    ) -> str:
+        type(self).render_calls += 1
         return super().render_trace(provider, findings, duration, **kwargs)
 
 
@@ -235,7 +261,13 @@ def test_success_lifecycle_has_ordered_correlated_context_and_safe_aws_facts(
         metadata = item.args[1]
         assert metadata["inject_id"] == "inject:diagnostic-006"
         assert 0 <= metadata["elapsed_ms"] <= 86_400_000
-        if item.args[0] in calls[2:]:
+        if item.args[0] in {
+            _CONTRACT_RESOLVED,
+            _ASSESSMENT_VALIDATED,
+            _EXECUTION_STARTED,
+            _ASSESSMENT_SUCCEEDED,
+            _CALLBACK_COMPLETED,
+        }:
             assert metadata["contract_id"] == _CONTRACT_ID
             assert metadata["route"] == "aws"
             assert metadata["provider"] == "aws"
@@ -244,10 +276,15 @@ def test_success_lifecycle_has_ordered_correlated_context_and_safe_aws_facts(
     assert completed["vulnerability_count"] == 1
     assert completed["aws_account_id"] == "123456789012"
     assert completed["aws_region"] == "eu-west-1"
-    assert completed["aws_endpoint_url"] == ("https://localhost.localstack.cloud:4566")
+    assert completed["aws_endpoint_origin"] == (
+        "https://localhost.localstack.cloud:4566"
+    )
     assert completed["aws_session_token_present"] is True
     assert completed["aws_endpoint_override_present"] is True
-    assert calls[-1].args[1]["attempted_status"] == "SUCCESS"
+    assert calls[-1].args[1]["assessment_status"] == "SUCCESS"
+    assert calls[-1].args[1]["delivery_status"] == "SUCCESS"
+    assert "status" not in calls[-1].args[1]
+    assert "attempted_status" not in calls[-1].args[1]
     _assert_no_raw_canaries(_all_logged(helper))
 
 
@@ -273,19 +310,33 @@ def test_invalid_messages_use_closed_reason_codes_without_payload(
     _assert_no_raw_canaries(_all_logged(helper))
 
 
-def test_malformed_correlation_is_replaced_by_a_fixed_log_sentinel() -> None:
-    """Unsafe correlation text still delivers using the raw ID but is never logged."""
-    unsafe_id = "inject\nFORGED-CORRELATION-CANARY"
+def test_malformed_correlations_are_distinct_bounded_hashes_without_raw_ids() -> None:
+    """Unsafe IDs retain distinguishable correlation without exposing their text."""
+    unsafe_ids = (
+        "inject\nFORGED-CORRELATION-CANARY-A",
+        "x" * 129 + "FORGED-CORRELATION-CANARY-B",
+    )
     injector, helper = _runtime()
 
-    injector.process_message(_message(inject_id=unsafe_id))
+    observed = []
+    for unsafe_id in unsafe_ids:
+        helper.reset_mock()
+        injector.process_message(_message(inject_id=unsafe_id))
+        correlations = {
+            item.args[1]["inject_id"] for item in helper.injector_logger.method_calls
+        }
+        assert len(correlations) == 1
+        observed.append(correlations.pop())
+        expected = f"invalid:{hashlib.sha256(unsafe_id.encode()).hexdigest()[:16]}"
+        assert observed[-1] == expected
+        assert len(observed[-1]) == 24
+        assert unsafe_id not in _all_logged(helper)
+        assert (
+            helper.api.inject.execution_callback.call_args.kwargs["inject_id"]
+            == unsafe_id
+        )
 
-    for item in helper.injector_logger.method_calls:
-        assert item.args[1]["inject_id"] == "invalid-inject-id"
-    assert unsafe_id not in _all_logged(helper)
-    assert (
-        helper.api.inject.execution_callback.call_args.kwargs["inject_id"] == unsafe_id
-    )
+    assert observed[0] != observed[1]
 
 
 def test_input_failure_has_summary_action_issues_and_full_correlation() -> None:
@@ -541,6 +592,267 @@ def test_real_resolution_failure_reveals_exact_missing_path_checks_and_correlati
         assert expected in trace
 
 
+def _write_executable(tmp_path: Path, body: str) -> Path:
+    executable = tmp_path / "prowler-test"
+    executable.write_text(f"#!/bin/sh\n{body}\n", encoding="utf-8")
+    executable.chmod(0o700)
+    return executable
+
+
+@pytest.mark.parametrize(
+    ("body", "expected_code", "expected_path"),
+    (
+        ("printf '%s' '{\"broken\"'", "invalid_json", None),
+        ("printf '%s' '{}'", "missing_source_path", "finding_info|finding"),
+    ),
+)
+def test_real_ocsf_failures_are_parsing_failures_with_closed_safe_evidence(
+    tmp_path: Path,
+    body: str,
+    expected_code: str,
+    expected_path: str | None,
+) -> None:
+    """Real successful processes retain typed OCSF decode/mapping diagnostics."""
+    executable = _write_executable(tmp_path, body)
+    injector, helper = _runtime(
+        config=_config(str(executable)),
+        registry=ProwlerContracts((_RealExecutionContract,)),
+    )
+
+    injector.process_message(_message())
+
+    metadata = _error_metadata(helper)
+    assert metadata["stage"] == "assessment_execution"
+    assert metadata["failure_kind"] == "parsing_failed"
+    assert metadata["ocsf_error_code"] == expected_code
+    assert metadata["record_index"] == 0
+    if expected_path is None:
+        assert "source_path" not in metadata
+    else:
+        assert metadata["source_path"] == expected_path
+    assert metadata["configured_executable_path"] == str(executable)
+    assert metadata["actual_executable_path"] == str(executable)
+    assert metadata["executable_exists"] is True
+    assert metadata["executable_is_file"] is True
+    assert metadata["executable_is_executable"] is True
+    assert metadata["stdout_bytes"] > 0
+    assert "broken" not in _all_logged(helper)
+
+
+def test_existing_nonzero_executable_has_path_stat_and_byte_diagnostics(
+    tmp_path: Path,
+) -> None:
+    """A wrong executable that starts is distinguished from a missing binary."""
+    executable = _write_executable(
+        tmp_path, "printf '%s' 'STDERR-EXECUTABLE-CANARY' >&2; exit 17"
+    )
+    injector, helper = _runtime(
+        config=_config(str(executable)),
+        registry=ProwlerContracts((_RealExecutionContract,)),
+    )
+
+    injector.process_message(_message())
+
+    metadata = _error_metadata(helper)
+    assert metadata["failure_kind"] == "unsuccessful_process"
+    assert metadata["return_code"] == 17
+    assert metadata["configured_executable_path"] == str(executable)
+    assert metadata["actual_executable_path"] == str(executable)
+    assert metadata["executable_exists"] is True
+    assert metadata["executable_is_file"] is True
+    assert metadata["executable_is_executable"] is True
+    assert metadata["stderr_bytes"] == len(b"STDERR-EXECUTABLE-CANARY")
+    assert "STDERR-EXECUTABLE-CANARY" not in _all_logged(helper)
+
+
+def test_forged_ocsf_evidence_uses_closed_sentinels_without_error_text() -> None:
+    """Typed OCSF errors cannot smuggle arbitrary code, path, or message text."""
+    injector, helper = _runtime()
+    error = OcsfMappingError(
+        "OCSF-CODE-CANARY",
+        "OCSF-MESSAGE-CANARY",
+        -99,
+        "unmapped.compliance.OCSF-SOURCE-PATH-CANARY",
+    )
+    _DiagnosticContract.outcome = ContractExecutionOutcome(
+        command_result=CommandResult(
+            _specification(), return_code=0, stdout=b"OCSF-STDOUT-CANARY"
+        ),
+        error=error,
+    )
+
+    injector.process_message(_message())
+
+    metadata = _error_metadata(helper)
+    assert metadata["failure_kind"] == "parsing_failed"
+    assert metadata["ocsf_error_code"] == "unrecognized"
+    assert metadata["record_index"] == 0
+    assert metadata["source_path"] == "unrecognized_source_path"
+    rendered = _all_logged(helper) + repr(
+        helper.api.inject.execution_callback.call_args.kwargs["data"]
+    )
+    for canary in (
+        "OCSF-CODE-CANARY",
+        "OCSF-MESSAGE-CANARY",
+        "OCSF-SOURCE-PATH-CANARY",
+        "OCSF-STDOUT-CANARY",
+    ):
+        assert canary not in rendered
+
+
+def test_aws_endpoint_logs_only_normalized_origin_and_never_path() -> None:
+    """Endpoint override context cannot retain secret or oversized URL paths."""
+    path_canary = "SECRET-ENDPOINT-PATH-CANARY" + "x" * 700
+    injector, helper = _runtime()
+
+    injector.process_message(
+        _message(
+            content=_aws_content(
+                aws_endpoint_url=(
+                    f"HTTPS://LOCALHOST.localstack.cloud:4566/{path_canary}/nested"
+                )
+            )
+        )
+    )
+
+    logged = _all_logged(helper)
+    assert path_canary not in logged
+    assert "nested" not in logged
+    completed = next(
+        item.args[1]
+        for item in helper.injector_logger.method_calls
+        if item.args[0] == _ASSESSMENT_SUCCEEDED
+    )
+    assert completed["aws_endpoint_override_present"] is True
+    assert completed["aws_endpoint_origin"] == (
+        "https://localhost.localstack.cloud:4566"
+    )
+    assert "aws_endpoint_url" not in completed
+
+
+def test_serialization_failure_does_not_render_and_delivers_one_plain_failure() -> None:
+    """Structured output is prepared before the success renderer is invoked."""
+    _SerializationFailureContract.render_calls = 0
+    injector, helper = _runtime(
+        registry=ProwlerContracts((_SerializationFailureContract,))
+    )
+
+    injector.process_message(_message())
+
+    assert _SerializationFailureContract.render_calls == 0
+    helper.api.inject.execution_callback.assert_called_once()
+    callback = helper.api.inject.execution_callback.call_args.kwargs["data"]
+    assert callback["execution_status"] == "ERROR"
+    assert callback["execution_message"].startswith("Error code: rendering_failed\n")
+    assert "execution_output_structured" not in callback
+    assert "SERIALIZATION-FAILURE-CANARY" not in (
+        _all_logged(helper) + callback["execution_message"]
+    )
+
+
+def test_reception_exception_logs_safe_failure_and_stops_without_callback() -> None:
+    """A failed reception is not misreported as an acknowledged assessment."""
+    injector, helper = _runtime()
+    helper.api.inject.execution_reception.side_effect = RuntimeError(
+        "RECEPTION-EXCEPTION-CANARY"
+    )
+
+    injector.process_message(_message())
+
+    metadata = _error_metadata(helper)
+    assert metadata["stage"] == "reception"
+    assert metadata["failure_kind"] == "reception_failed"
+    assert metadata["failure_summary"] == (
+        "The assessment reception could not be acknowledged."
+    )
+    assert metadata["operator_guidance"] == (
+        "Check OpenAEV connectivity and retry assessment reception."
+    )
+    helper.api.inject.execution_callback.assert_not_called()
+    assert _RECEPTION_ACKNOWLEDGED not in _all_logged(helper)
+    assert _CALLBACK_COMPLETED not in _all_logged(helper)
+    assert "RECEPTION-EXCEPTION-CANARY" not in _all_logged(helper)
+
+
+@pytest.mark.parametrize(
+    "metadata_method",
+    (
+        "_success_metadata",
+        "_callback_metadata",
+        "_context_metadata",
+        "_provider_metadata",
+        "_bounded_count",
+    ),
+)
+def test_success_delivery_survives_metadata_extraction_failures(
+    monkeypatch: pytest.MonkeyPatch, metadata_method: str
+) -> None:
+    """Best-effort success diagnostics cannot interfere with terminal delivery."""
+    injector, helper = _runtime()
+
+    def explode(*args: Any, **kwargs: Any) -> Any:
+        del args, kwargs
+        raise RuntimeError("METADATA-EXTRACTION-CANARY")
+
+    monkeypatch.setattr(ProwlerInjector, metadata_method, explode)
+
+    injector.process_message(_message())
+
+    callback = helper.api.inject.execution_callback.call_args.kwargs["data"]
+    assert callback["execution_status"] == "SUCCESS"
+    assert helper.api.inject.execution_callback.call_count == 1
+    assert not helper.injector_logger.local_logger.error.called
+    assert "METADATA-EXTRACTION-CANARY" not in _all_logged(helper)
+
+
+def test_failure_delivery_survives_failure_metadata_extraction(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Failure callback construction is independent from diagnostic metadata."""
+    injector, helper = _runtime()
+    _DiagnosticContract.parse_failure = RuntimeError("ASSESSMENT-FAILURE-CANARY")
+
+    def explode(*args: Any, **kwargs: Any) -> Any:
+        del args, kwargs
+        raise RuntimeError("FAILURE-METADATA-CANARY")
+
+    monkeypatch.setattr(ProwlerInjector, "_failure_metadata", explode)
+
+    injector.process_message(_message())
+
+    callback = helper.api.inject.execution_callback.call_args.kwargs["data"]
+    assert callback["execution_status"] == "ERROR"
+    assert helper.api.inject.execution_callback.call_count == 1
+    assert "FAILURE-METADATA-CANARY" not in _all_logged(helper)
+
+
+def test_executable_diagnostic_extraction_failure_cannot_escape(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Optional stat evidence is internally no-throw on an assessment failure."""
+    injector, helper = _runtime()
+    error = ExecutionError(
+        "EXECUTION-ERROR-CANARY", kind="unsuccessful_process", return_code=9
+    )
+    _DiagnosticContract.outcome = ContractExecutionOutcome(
+        command_result=CommandResult(_specification(), return_code=9, error=error),
+        error=error,
+    )
+
+    def explode(*args: Any, **kwargs: Any) -> Any:
+        del args, kwargs
+        raise RuntimeError("EXECUTABLE-DIAGNOSTIC-CANARY")
+
+    monkeypatch.setattr(ProwlerInjector, "_executable_diagnostics", explode)
+
+    injector.process_message(_message())
+
+    callback = helper.api.inject.execution_callback.call_args.kwargs["data"]
+    assert callback["execution_status"] == "ERROR"
+    assert helper.api.inject.execution_callback.call_count == 1
+    assert "EXECUTABLE-DIAGNOSTIC-CANARY" not in _all_logged(helper)
+
+
 @pytest.mark.parametrize(
     ("route", "provider", "content", "expected"),
     (
@@ -551,7 +863,7 @@ def test_real_resolution_failure_reveals_exact_missing_path_checks_and_correlati
             {
                 "aws_account_id": "123456789012",
                 "aws_region": "eu-west-1",
-                "aws_endpoint_url": "https://localhost.localstack.cloud:4566",
+                "aws_endpoint_origin": "https://localhost.localstack.cloud:4566",
                 "aws_session_token_present": True,
                 "aws_endpoint_override_present": True,
             },
@@ -688,7 +1000,10 @@ def test_callback_failure_logs_attempted_status_and_context_without_exception() 
     assert metadata["failure_summary"] == (
         "The terminal OpenAEV callback could not be delivered."
     )
-    assert metadata["attempted_status"] == "SUCCESS"
+    assert metadata["assessment_status"] == "SUCCESS"
+    assert metadata["delivery_status"] == "ERROR"
+    assert "status" not in metadata
+    assert "attempted_status" not in metadata
     assert metadata["inject_id"] == "inject:diagnostic-006"
     assert metadata["contract_id"] == _CONTRACT_ID
     assert metadata["route"] == "aws"

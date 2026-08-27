@@ -67,8 +67,9 @@ action, sanitized inject correlation, canonical contract/route/provider identity
 and applicable typed evidence. The trace never receives parsed provider input, so
 account, subscription, project, and Kubernetes context do not appear in an error
 unless the contract already rendered them from its existing safe request summary.
-If Rich rendering fails, the callback falls back to the same bounded plain
-diagnostics without a second render attempt.
+Structured output is serialized before success rendering. If serialization or
+Rich rendering fails, the callback uses the same bounded plain diagnostics with
+one callback attempt and no second render attempt.
 
 The runtime emits fixed `[PROWLER_INJECTOR]` lifecycle diagnostics through the
 injector logger. Startup INFO identifies the configured injector, registered
@@ -76,14 +77,17 @@ contract count, executable path, and whether that path is absolute, exists, is a
 regular file, and is executable. Assessment events distinguish received,
 reception acknowledged, contract resolved, input validated, execution starting,
 terminal completion/failure, and callback completion/failure. Every usable-inject
-event carries a log-safe inject ID (`[A-Za-z0-9._:-]`, at most 128 characters, or
-the fixed `invalid-inject-id` sentinel), a controlled stage, and bounded monotonic
-`elapsed_ms`; the logger supplies wall-clock timestamps. Once resolution succeeds,
+event carries a log-safe inject ID (`[A-Za-z0-9._:-]`, at most 128 characters).
+Malformed or oversized IDs use a bounded deterministic `invalid:<sha256-prefix>`
+correlation, so events remain distinguishable without logging the raw ID. Events
+also carry a controlled stage and bounded monotonic `elapsed_ms`; the logger
+supplies wall-clock timestamps. Once resolution succeeds,
 the canonical contract ID, route, and provider accompany every later event.
 Malformed envelopes receive a closed reason code without payload data.
 
 Successful and callback diagnostics also include approved provider facts: AWS
-account, region, endpoint URL, and session-token/endpoint-override presence;
+account, region, normalized endpoint origin (`scheme://host[:port]`), and
+session-token/endpoint-override presence;
 Azure subscription and provider with credential-presence booleans; GCP project
 with a credential-presence boolean; or Kubernetes context with a
 credential-presence boolean. AWS access keys, Azure tenant/client ID values, and
@@ -92,14 +96,18 @@ all credential material remain excluded.
 Known failures add only evidence derived from the typed command specification,
 engine error, or result: configured/actual executable paths and stat checks;
 allowlisted process-start cause classes; configured timeout or output limit;
-parser name; return code; and captured stdout/stderr byte counts. Input rejection
+parser name; return code; and captured stdout/stderr byte counts. OCSF decode and
+mapping failures are reported as `parsing_failed` with an allowlisted code, bounded
+record index, and closed source-path evidence. Input rejection
 uses only bounded field locations and issue types. The operational executable path
 is intentionally visible, but raw form values, credentials, arguments,
 environment values, stdin, stdout/stderr contents, exception text or traceback,
 callback payloads, finding content, GCP JSON, kubeconfig, and temporary credential
 paths are never logged or added to error traces. ERROR logging keeps
-`exc_info=False`, and all logging remains best-effort so it cannot gate assessment
-delivery.
+`exc_info=False`. Metadata construction and log emission are both best-effort, so
+they cannot gate assessment delivery. Callback events distinguish
+`assessment_status` from `delivery_status`; a failed reception stops before any
+terminal callback is attempted.
 
 ## Provider input boundary
 

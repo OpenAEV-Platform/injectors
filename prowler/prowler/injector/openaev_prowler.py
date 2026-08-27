@@ -5,9 +5,11 @@ import os
 import re
 from collections.abc import Mapping
 from dataclasses import dataclass
+from hashlib import sha256
 from pathlib import Path
 from time import monotonic
 from typing import Literal
+from urllib.parse import urlsplit
 
 from pyoaev.helpers import OpenAEVInjectorHelper
 from pyoaev.utils import AppLogger
@@ -20,6 +22,7 @@ from prowler.contracts.base import (
     ContractInputError,
 )
 from prowler.models import ConfigLoader
+from prowler.models.findings import OcsfDecodeError, OcsfMappingError
 from prowler.models.provider_inputs import ProviderInput
 
 _LISTENER_START = "[PROWLER_INJECTOR] - Listener starting"
@@ -96,8 +99,8 @@ _MAX_LOG_DURATION_SECONDS = 86_400
 _MAX_ELAPSED_MS = 86_400_000
 _MAX_BYTE_COUNT = 1_000_000_000
 _MAX_SAFE_TEXT = 512
-_INVALID_INJECT_ID = "invalid-inject-id"
 _INJECT_ID_PATTERN = re.compile(r"[A-Za-z0-9._:-]{1,128}")
+_INVALID_INJECT_ID_DIGEST_LENGTH = 16
 _PROCESS_START_CAUSES = frozenset(
     {
         "FileNotFoundError",
@@ -108,6 +111,73 @@ _PROCESS_START_CAUSES = frozenset(
     }
 )
 _PARSER_NAMES = frozenset({"raw", "text", "json", "lines", "regex"})
+_OCSF_DECODE_CODES = frozenset(
+    {
+        "invalid_json",
+        "invalid_payload_type",
+        "invalid_top_level",
+        "invalid_utf8",
+        "non_object_record",
+    }
+)
+_OCSF_MAPPING_CODES = frozenset(
+    {"command_not_successful", "invalid_source_value", "missing_source_path"}
+)
+_OCSF_CODE_SENTINEL = "unrecognized"
+_OCSF_SOURCE_PATH_SENTINEL = "unrecognized_source_path"
+_OCSF_SOURCE_PATHS = frozenset(
+    {
+        "cloud",
+        "cloud.account",
+        "cloud.account.uid",
+        "cloud.provider",
+        "cloud.region",
+        "compliance",
+        "compliance.requirements",
+        "finding",
+        "finding.desc",
+        "finding.remediation",
+        "finding.remediation.desc",
+        "finding.remediation.kb_articles",
+        "finding.remediation.kb_articles[0]",
+        "finding.remediation.references",
+        "finding.remediation.references[0]",
+        "finding.title",
+        "finding.uid",
+        "finding_info",
+        "finding_info.desc",
+        "finding_info.remediation",
+        "finding_info.remediation.desc",
+        "finding_info.remediation.kb_articles",
+        "finding_info.remediation.kb_articles[0]",
+        "finding_info.remediation.references",
+        "finding_info.remediation.references[0]",
+        "finding_info.title",
+        "finding_info.uid",
+        "finding_info|finding",
+        "remediation",
+        "remediation.desc",
+        "remediation.references",
+        "remediation.references[0]",
+        "remediation|finding.remediation",
+        "remediation|finding_info.remediation",
+        "resources",
+        "resources[0]",
+        "resources[0].name",
+        "resources[0].namespace",
+        "resources[0].uid",
+        "severity",
+        "status",
+        "status_code",
+        "unmapped",
+        "unmapped.compliance",
+        "unmapped.provider",
+        "unmapped.provider_uid",
+    }
+)
+_OCSF_INDEXED_SOURCE_PATH_PATTERN = re.compile(
+    r"(?:compliance\.requirements|unmapped\.compliance)(?:\[[0-9]{1,6}\])+$"
+)
 
 _GENERIC_INPUT_GUIDANCE = "Correct the listed assessment fields and retry."
 _GUIDANCE_BY_FAILURE_KIND = {
@@ -139,6 +209,7 @@ _GUIDANCE_BY_FAILURE_KIND = {
     "parsing_failed": "Verify Prowler emits valid JSON-OCSF output and retry.",
     "invalid_input": _GENERIC_INPUT_GUIDANCE,
     "rendering_failed": "Review injector trace rendering configuration and retry.",
+    "reception_failed": "Check OpenAEV connectivity and retry assessment reception.",
     "callback_failed": "Check OpenAEV connectivity and retry callback delivery.",
     "unexpected_failure": "Review injector configuration and retry the assessment.",
 }
@@ -157,6 +228,7 @@ _SUMMARY_BY_FAILURE_KIND = {
     "parsing_failed": "Captured Prowler output could not be parsed safely.",
     "invalid_input": "The assessment input was invalid.",
     "rendering_failed": "The OpenAEV execution trace could not be rendered.",
+    "reception_failed": "The assessment reception could not be acknowledged.",
     "callback_failed": "The terminal OpenAEV callback could not be delivered.",
     "unexpected_failure": "The assessment failed at an unexpected internal boundary.",
 }
@@ -193,6 +265,18 @@ _ISSUE_TYPE_PHRASES = {
 
 
 @dataclass(frozen=True)
+class _ExecutableEvidence:
+    """No-throw executable path and stat evidence."""
+
+    configured_executable_path: str | None = None
+    actual_executable_path: str | None = None
+    executable_is_absolute: bool | None = None
+    executable_exists: bool | None = None
+    executable_is_file: bool | None = None
+    executable_is_executable: bool | None = None
+
+
+@dataclass(frozen=True)
 class _FailurePresentation:
     """One closed classification shared by logs and OpenAEV presentation."""
 
@@ -213,6 +297,9 @@ class _FailurePresentation:
     parser_name: str | None = None
     stdout_bytes: int | None = None
     stderr_bytes: int | None = None
+    ocsf_error_code: str | None = None
+    record_index: int | None = None
+    source_path: str | None = None
     issues: tuple[dict[str, object], ...] | None = None
     issues_omitted: int = 0
     issues_truncated: bool = False
@@ -235,15 +322,19 @@ class ProwlerInjector:
 
     def start(self) -> None:
         """Start the injector listener after zero-contract registration."""
-        raw_executable = str(self.config.prowler.executable_path)
-        executable = self._safe_text(raw_executable)
-        metadata: dict[str, object] = {
-            "injector_id": self._safe_text(str(self.config.injector.id)),
-            "injector_name": self._safe_text(str(self.config.injector.name)),
-            "registered_contract_count": self._bounded_count(len(self.registry)),
-            "configured_executable_path": executable,
-        }
-        metadata.update(self._executable_diagnostics(raw_executable))
+        metadata: dict[str, object] | None = None
+        try:
+            raw_executable = str(self.config.prowler.executable_path)
+            executable = self._safe_text(raw_executable)
+            metadata = {
+                "injector_id": self._safe_text(str(self.config.injector.id)),
+                "injector_name": self._safe_text(str(self.config.injector.name)),
+                "registered_contract_count": self._bounded_count(len(self.registry)),
+                "configured_executable_path": executable,
+            }
+            metadata.update(self._executable_diagnostics(raw_executable))
+        except Exception:
+            metadata = None
         self._log("info", _LISTENER_START, metadata)
         self.config.to_daemon_config(self.registry)
         self.helper.listen(message_callback=self.process_message)
@@ -271,25 +362,37 @@ class ProwlerInjector:
         self._log(
             "info",
             _ASSESSMENT_RECEIVED,
-            self._context_metadata(started, safe_inject_id, stage=stage),
+            self._best_effort_context_metadata(started, safe_inject_id, stage=stage),
         )
         try:
             self.helper.api.inject.execution_reception(
                 inject_id=inject_id, data={"tracking_total_count": 1}
             )
-            stage = "reception_acknowledged"
-            self._log(
-                "debug",
-                _RECEPTION_ACKNOWLEDGED,
-                self._context_metadata(started, safe_inject_id, stage=stage),
+        except Exception:
+            failure = self._classify_internal_failure(
+                stage="reception", failure_kind="reception_failed"
             )
+            metadata = self._best_effort_failure_metadata(
+                started, safe_inject_id, contract, provider, failure
+            )
+            if metadata is not None:
+                self._log_error(_ASSESSMENT_FAILED, metadata)
+            return
+
+        stage = "reception_acknowledged"
+        self._log(
+            "debug",
+            _RECEPTION_ACKNOWLEDGED,
+            self._best_effort_context_metadata(started, safe_inject_id, stage=stage),
+        )
+        try:
             stage = "contract_resolution"
             contract_id = self._contract_id(injection)
             contract = self.registry.resolve(contract_id)
             self._log(
                 "debug",
                 _CONTRACT_RESOLVED,
-                self._context_metadata(
+                self._best_effort_context_metadata(
                     started, safe_inject_id, stage=stage, contract=contract
                 ),
             )
@@ -301,7 +404,7 @@ class ProwlerInjector:
             self._log(
                 "debug",
                 _ASSESSMENT_VALIDATED,
-                self._context_metadata(
+                self._best_effort_context_metadata(
                     started,
                     safe_inject_id,
                     stage=stage,
@@ -313,7 +416,7 @@ class ProwlerInjector:
             self._log(
                 "info",
                 _EXECUTION_STARTED,
-                self._context_metadata(
+                self._best_effort_context_metadata(
                     started,
                     safe_inject_id,
                     stage=stage,
@@ -325,7 +428,7 @@ class ProwlerInjector:
             if outcome.error is not None or outcome.command_result.return_code != 0:
                 duration = int(monotonic() - started)
                 failure = self._classify_assessment_failure(
-                    outcome, configured_executable=self.config.prowler.executable_path
+                    outcome, configured_executable=self._configured_executable()
                 )
                 callback = {
                     "execution_message": self._render_safe_error(
@@ -338,7 +441,7 @@ class ProwlerInjector:
                     "execution_duration": duration,
                     "execution_action": "complete",
                 }
-                failure_metadata = self._failure_metadata(
+                failure_metadata = self._best_effort_failure_metadata(
                     started,
                     safe_inject_id,
                     contract,
@@ -349,6 +452,11 @@ class ProwlerInjector:
                 stage = "output_preparation"
                 duration = int(monotonic() - started)
                 try:
+                    execution_output_structured = json.dumps(
+                        contract.output_payload(outcome.findings),
+                        ensure_ascii=False,
+                        separators=(",", ":"),
+                    )
                     execution_message = contract.render_trace(
                         provider, outcome.findings, duration
                     )
@@ -356,6 +464,8 @@ class ProwlerInjector:
                     failure = self._classify_internal_failure(
                         stage="output_preparation",
                         failure_kind="rendering_failed",
+                        configured_executable=self._configured_executable(),
+                        specification=outcome.command_result.specification,
                     )
                     callback = {
                         "execution_message": self._plain_safe_error(
@@ -367,7 +477,7 @@ class ProwlerInjector:
                         "execution_duration": duration,
                         "execution_action": "complete",
                     }
-                    failure_metadata = self._failure_metadata(
+                    failure_metadata = self._best_effort_failure_metadata(
                         started,
                         safe_inject_id,
                         contract,
@@ -377,16 +487,12 @@ class ProwlerInjector:
                 else:
                     callback = {
                         "execution_message": execution_message,
-                        "execution_output_structured": json.dumps(
-                            contract.output_payload(outcome.findings),
-                            ensure_ascii=False,
-                            separators=(",", ":"),
-                        ),
+                        "execution_output_structured": execution_output_structured,
                         "execution_status": "SUCCESS",
                         "execution_duration": duration,
                         "execution_action": "complete",
                     }
-                    success_metadata = self._success_metadata(
+                    success_metadata = self._best_effort_success_metadata(
                         started,
                         safe_inject_id,
                         contract,
@@ -395,7 +501,11 @@ class ProwlerInjector:
                     )
         except Exception as error:
             duration = int(monotonic() - started)
-            failure = self._classify_exception_failure(stage, error)
+            failure = self._classify_exception_failure(
+                stage,
+                error,
+                configured_executable=self._configured_executable(),
+            )
             callback = {
                 "execution_message": self._render_safe_error(
                     contract,
@@ -407,7 +517,7 @@ class ProwlerInjector:
                 "execution_duration": duration,
                 "execution_action": "complete",
             }
-            failure_metadata = self._failure_metadata(
+            failure_metadata = self._best_effort_failure_metadata(
                 started,
                 safe_inject_id,
                 contract,
@@ -427,22 +537,21 @@ class ProwlerInjector:
             failure = self._classify_internal_failure(
                 stage="callback", failure_kind="callback_failed"
             )
-            self._log_error(
-                _CALLBACK_FAILED,
-                self._failure_metadata(
-                    started,
-                    safe_inject_id,
-                    contract,
-                    provider,
-                    failure,
-                    attempted_status=callback["execution_status"],
-                ),
+            metadata = self._best_effort_failure_metadata(
+                started,
+                safe_inject_id,
+                contract,
+                provider,
+                failure,
+                attempted_status=callback["execution_status"],
             )
+            if metadata is not None:
+                self._log_error(_CALLBACK_FAILED, metadata)
             return
         self._log(
             "debug",
             _CALLBACK_COMPLETED,
-            self._callback_metadata(
+            self._best_effort_callback_metadata(
                 started,
                 safe_inject_id,
                 contract,
@@ -478,6 +587,82 @@ class ProwlerInjector:
         except Exception:
             return
 
+    def _best_effort_context_metadata(
+        self,
+        started: float,
+        inject_id: str,
+        *,
+        stage: str,
+        contract: BaseProwlerContract | None = None,
+        provider: ProviderInput | None = None,
+    ) -> dict[str, object] | None:
+        """Keep lifecycle metadata construction outside the assessment path."""
+        try:
+            return self._context_metadata(
+                started,
+                inject_id,
+                stage=stage,
+                contract=contract,
+                provider=provider,
+            )
+        except Exception:
+            return None
+
+    def _best_effort_success_metadata(
+        self,
+        started: float,
+        inject_id: str,
+        contract: BaseProwlerContract,
+        provider: ProviderInput,
+        outcome: ContractExecutionOutcome,
+    ) -> dict[str, object] | None:
+        """Drop unavailable success metadata instead of changing the result."""
+        try:
+            return self._success_metadata(
+                started, inject_id, contract, provider, outcome
+            )
+        except Exception:
+            return None
+
+    def _best_effort_failure_metadata(
+        self,
+        started: float,
+        inject_id: str,
+        contract: BaseProwlerContract | None,
+        provider: ProviderInput | None,
+        failure: _FailurePresentation,
+        *,
+        attempted_status: object | None = None,
+    ) -> dict[str, object] | None:
+        """Keep a failure callback deliverable when diagnostics cannot be built."""
+        try:
+            return self._failure_metadata(
+                started,
+                inject_id,
+                contract,
+                provider,
+                failure,
+                attempted_status=attempted_status,
+            )
+        except Exception:
+            return None
+
+    def _best_effort_callback_metadata(
+        self,
+        started: float,
+        inject_id: str,
+        contract: BaseProwlerContract | None,
+        provider: ProviderInput | None,
+        status: object,
+    ) -> dict[str, object] | None:
+        """Keep delivered callbacks final even if completion metadata fails."""
+        try:
+            return self._callback_metadata(
+                started, inject_id, contract, provider, status
+            )
+        except Exception:
+            return None
+
     @classmethod
     def _success_metadata(
         cls,
@@ -512,14 +697,19 @@ class ProwlerInjector:
         cls,
         outcome: ContractExecutionOutcome,
         *,
-        configured_executable: Path,
+        configured_executable: object,
     ) -> _FailurePresentation:
         """Classify one returned assessment failure exactly once."""
         error = outcome.error
         result = outcome.command_result
-        specification = result.specification
+        try:
+            specification: object | None = result.specification
+        except Exception:
+            specification = None
         failure_kind = "unexpected_failure"
-        if (
+        if isinstance(error, (OcsfDecodeError, OcsfMappingError)):
+            failure_kind = "parsing_failed"
+        elif (
             isinstance(error, CliEngineError)
             and error.kind in _ALLOWED_CLI_FAILURE_KINDS
         ):
@@ -534,31 +724,22 @@ class ProwlerInjector:
             and return_code != 0
             else None
         )
-        configured_path: str | None = None
-        actual_path: str | None = None
-        executable_is_absolute: bool | None = None
-        executable_exists: bool | None = None
-        executable_is_file: bool | None = None
-        executable_is_executable: bool | None = None
+        executable = cls._executable_evidence(configured_executable, specification)
+        configured_path = executable.configured_executable_path
+        actual_path = executable.actual_executable_path
+        executable_is_absolute = executable.executable_is_absolute
+        executable_exists = executable.executable_exists
+        executable_is_file = executable.executable_is_file
+        executable_is_executable = executable.executable_is_executable
         process_start_cause: str | None = None
         timeout_seconds: float | None = None
         maximum_accepted_output_bytes: int | None = None
         parser_name: str | None = None
         stdout_bytes: int | None = None
         stderr_bytes: int | None = None
-        if failure_kind in {
-            "policy_rejected",
-            "policy_evaluation_failed",
-            "resolution_failed",
-            "process_start_failed",
-        }:
-            configured_path = cls._safe_text(str(configured_executable))
-            actual_path = cls._safe_text(specification.executable)
-            diagnostics = cls._executable_diagnostics(specification.executable)
-            executable_is_absolute = diagnostics["executable_is_absolute"] is True
-            executable_exists = diagnostics["executable_exists"] is True
-            executable_is_file = diagnostics["executable_is_file"] is True
-            executable_is_executable = diagnostics["executable_is_executable"] is True
+        ocsf_error_code: str | None = None
+        record_index: int | None = None
+        source_path: str | None = None
         if failure_kind in {
             "execution_failed",
             "timeout",
@@ -573,16 +754,30 @@ class ProwlerInjector:
             if error.cause in _PROCESS_START_CAUSES:
                 process_start_cause = error.cause
         if failure_kind == "timeout":
-            timeout_seconds = cls._bounded_seconds(specification.timeout_seconds)
+            value = cls._specification_value(specification, "timeout_seconds")
+            if isinstance(value, (int, float)) and not isinstance(value, bool):
+                timeout_seconds = cls._bounded_seconds(value)
         if failure_kind == "output_too_large_after_capture":
-            maximum_accepted_output_bytes = cls._bounded_bytes(
-                specification.maximum_accepted_output_bytes
+            value = cls._specification_value(
+                specification, "maximum_accepted_output_bytes"
             )
+            if isinstance(value, int) and not isinstance(value, bool):
+                maximum_accepted_output_bytes = cls._bounded_bytes(value)
         if failure_kind == "parsing_failed":
-            selected_parser = specification.output.parser.lower()
-            parser_name = (
-                selected_parser if selected_parser in _PARSER_NAMES else "unrecognized"
-            )
+            output = cls._specification_value(specification, "output")
+            selected_parser = cls._specification_value(output, "parser")
+            if isinstance(selected_parser, str):
+                selected_parser = selected_parser.lower()
+                parser_name = (
+                    selected_parser
+                    if selected_parser in _PARSER_NAMES
+                    else "unrecognized"
+                )
+            if isinstance(error, (OcsfDecodeError, OcsfMappingError)):
+                ocsf_error_code = cls._safe_ocsf_code(error)
+                record_index = cls._safe_record_index(error.record_index)
+            if isinstance(error, OcsfMappingError):
+                source_path = cls._safe_ocsf_source_path(error.source_path)
         if failure_kind not in {"execution_failed", "unsuccessful_process"}:
             safe_return_code = None
         return _FailurePresentation(
@@ -603,7 +798,94 @@ class ProwlerInjector:
             parser_name=parser_name,
             stdout_bytes=stdout_bytes,
             stderr_bytes=stderr_bytes,
+            ocsf_error_code=ocsf_error_code,
+            record_index=record_index,
+            source_path=source_path,
         )
+
+    @classmethod
+    def _executable_evidence(
+        cls, configured_executable: object, specification: object | None
+    ) -> _ExecutableEvidence:
+        """Extract path and stat evidence without trusting command internals."""
+        configured_path: str | None = None
+        actual_path: str | None = None
+        try:
+            configured_path = cls._safe_text(str(configured_executable))
+        except Exception:
+            configured_path = None
+        actual = cls._specification_value(specification, "executable")
+        if isinstance(actual, str):
+            actual_path = cls._safe_text(actual)
+        elif configured_path is not None:
+            actual_path = configured_path
+        try:
+            diagnostics = cls._executable_diagnostics(
+                actual_path or configured_path or ""
+            )
+        except Exception:
+            diagnostics = {
+                "executable_is_absolute": False,
+                "executable_exists": False,
+                "executable_is_file": False,
+                "executable_is_executable": False,
+            }
+        return _ExecutableEvidence(
+            configured_executable_path=configured_path,
+            actual_executable_path=actual_path,
+            executable_is_absolute=bool(diagnostics["executable_is_absolute"]),
+            executable_exists=bool(diagnostics["executable_exists"]),
+            executable_is_file=bool(diagnostics["executable_is_file"]),
+            executable_is_executable=bool(diagnostics["executable_is_executable"]),
+        )
+
+    def _configured_executable(self) -> object | None:
+        """Read the configured executable only as optional diagnostic evidence."""
+        try:
+            executable: object = self.config.prowler.executable_path
+            return executable
+        except Exception:
+            return None
+
+    @staticmethod
+    def _specification_value(source: object, name: str) -> object | None:
+        """Read one approved command-specification field without propagating."""
+        try:
+            value: object = getattr(source, name)
+            return value
+        except Exception:
+            return None
+
+    @staticmethod
+    def _safe_ocsf_code(error: OcsfDecodeError | OcsfMappingError) -> str:
+        """Normalize OCSF error codes through type-specific closed allowlists."""
+        code = error.code
+        allowed = (
+            _OCSF_DECODE_CODES
+            if isinstance(error, OcsfDecodeError)
+            else _OCSF_MAPPING_CODES
+        )
+        return code if code in allowed else _OCSF_CODE_SENTINEL
+
+    @classmethod
+    def _safe_record_index(cls, value: object) -> int | None:
+        """Keep only a bounded nonnegative OCSF record index."""
+        if not isinstance(value, int) or isinstance(value, bool):
+            return None
+        return cls._bounded_count(value)
+
+    @staticmethod
+    def _safe_ocsf_source_path(value: object) -> str | None:
+        """Admit only static or indexed paths generated by findings.py."""
+        if value is None:
+            return None
+        if not isinstance(value, str):
+            return _OCSF_SOURCE_PATH_SENTINEL
+        if value in _OCSF_SOURCE_PATHS or _OCSF_INDEXED_SOURCE_PATH_PATTERN.fullmatch(
+            value
+        ):
+            return value
+        return _OCSF_SOURCE_PATH_SENTINEL
 
     @staticmethod
     def _captured_bytes(error: object, result: object) -> tuple[bytes, bytes]:
@@ -619,7 +901,11 @@ class ProwlerInjector:
 
     @classmethod
     def _classify_exception_failure(
-        cls, stage: str, error: Exception
+        cls,
+        stage: str,
+        error: Exception,
+        *,
+        configured_executable: object | None = None,
     ) -> _FailurePresentation:
         """Classify a raised failure without reading its text or representation."""
         if stage == "input_validation" and isinstance(error, ContractInputError):
@@ -635,25 +921,75 @@ class ProwlerInjector:
                 issues_omitted=omitted,
                 issues_truncated=truncated,
             )
+        if stage == "assessment_execution" and isinstance(
+            error, (OcsfDecodeError, OcsfMappingError)
+        ):
+            executable = cls._executable_evidence(configured_executable, None)
+            return _FailurePresentation(
+                stage=stage,
+                failure_kind="parsing_failed",
+                failure_summary=_SUMMARY_BY_FAILURE_KIND["parsing_failed"],
+                operator_guidance=_GUIDANCE_BY_FAILURE_KIND["parsing_failed"],
+                configured_executable_path=executable.configured_executable_path,
+                actual_executable_path=executable.actual_executable_path,
+                executable_is_absolute=executable.executable_is_absolute,
+                executable_exists=executable.executable_exists,
+                executable_is_file=executable.executable_is_file,
+                executable_is_executable=executable.executable_is_executable,
+                ocsf_error_code=cls._safe_ocsf_code(error),
+                record_index=cls._safe_record_index(error.record_index),
+                source_path=(
+                    cls._safe_ocsf_source_path(error.source_path)
+                    if isinstance(error, OcsfMappingError)
+                    else None
+                ),
+            )
+        executable = (
+            cls._executable_evidence(configured_executable, None)
+            if stage in {"assessment_execution", "output_preparation"}
+            else _ExecutableEvidence()
+        )
         return _FailurePresentation(
             stage=stage,
             failure_kind="unexpected_failure",
             failure_summary=_SUMMARY_BY_FAILURE_KIND["unexpected_failure"],
             operator_guidance=_GUIDANCE_BY_FAILURE_KIND["unexpected_failure"],
+            configured_executable_path=executable.configured_executable_path,
+            actual_executable_path=executable.actual_executable_path,
+            executable_is_absolute=executable.executable_is_absolute,
+            executable_exists=executable.executable_exists,
+            executable_is_file=executable.executable_is_file,
+            executable_is_executable=executable.executable_is_executable,
         )
 
-    @staticmethod
+    @classmethod
     def _classify_internal_failure(
+        cls,
         *,
-        stage: Literal["output_preparation", "callback"],
-        failure_kind: Literal["rendering_failed", "callback_failed"],
+        stage: Literal["output_preparation", "callback", "reception"],
+        failure_kind: Literal[
+            "rendering_failed", "callback_failed", "reception_failed"
+        ],
+        configured_executable: object | None = None,
+        specification: object | None = None,
     ) -> _FailurePresentation:
         """Classify one fixed injector-owned failure."""
+        executable = (
+            cls._executable_evidence(configured_executable, specification)
+            if stage == "output_preparation"
+            else _ExecutableEvidence()
+        )
         return _FailurePresentation(
             stage=stage,
             failure_kind=failure_kind,
             failure_summary=_SUMMARY_BY_FAILURE_KIND[failure_kind],
             operator_guidance=_GUIDANCE_BY_FAILURE_KIND[failure_kind],
+            configured_executable_path=executable.configured_executable_path,
+            actual_executable_path=executable.actual_executable_path,
+            executable_is_absolute=executable.executable_is_absolute,
+            executable_exists=executable.executable_exists,
+            executable_is_file=executable.executable_is_file,
+            executable_is_executable=executable.executable_is_executable,
         )
 
     @classmethod
@@ -676,15 +1012,17 @@ class ProwlerInjector:
             provider=provider,
         )
         metadata.update(
-            status="ERROR",
             failure_kind=failure.failure_kind,
             failure_summary=failure.failure_summary,
             operator_guidance=failure.operator_guidance,
         )
-        if attempted_status is not None:
-            metadata["attempted_status"] = (
+        if failure.stage == "callback":
+            metadata["assessment_status"] = (
                 "SUCCESS" if attempted_status == "SUCCESS" else "ERROR"
             )
+            metadata["delivery_status"] = "ERROR"
+        else:
+            metadata["status"] = "ERROR"
         if failure.return_code is not None:
             metadata["return_code"] = failure.return_code
         for key in (
@@ -700,6 +1038,9 @@ class ProwlerInjector:
             "parser_name",
             "stdout_bytes",
             "stderr_bytes",
+            "ocsf_error_code",
+            "record_index",
+            "source_path",
         ):
             value = getattr(failure, key)
             if value is not None:
@@ -796,8 +1137,8 @@ class ProwlerInjector:
             provider=provider,
         )
         metadata.update(
-            status="SUCCESS" if status == "SUCCESS" else "ERROR",
-            attempted_status="SUCCESS" if status == "SUCCESS" else "ERROR",
+            assessment_status="SUCCESS" if status == "SUCCESS" else "ERROR",
+            delivery_status="SUCCESS",
         )
         return metadata
 
@@ -818,14 +1159,30 @@ class ProwlerInjector:
             "elapsed_ms": cls._elapsed_ms(started),
         }
         if contract is not None:
-            metadata.update(
-                contract_id=cls._safe_text(contract.contract_id),
-                route=cls._safe_text(contract.route_name),
-                provider=contract.provider,
-            )
+            for key, attribute in (
+                ("contract_id", "contract_id"),
+                ("route", "route_name"),
+                ("provider", "provider"),
+            ):
+                value = cls._safe_attribute_text(contract, attribute)
+                if value is not None:
+                    metadata[key] = value
         if provider is not None:
-            metadata.update(cls._provider_metadata(provider))
+            try:
+                provider_metadata = cls._provider_metadata(provider)
+            except Exception:
+                provider_metadata = {}
+            metadata.update(provider_metadata)
         return metadata
+
+    @classmethod
+    def _safe_attribute_text(cls, source: object, attribute: str) -> str | None:
+        """Read and bound one allowlisted context attribute without propagating."""
+        try:
+            value = getattr(source, attribute)
+            return cls._safe_text(value) if isinstance(value, str) else None
+        except Exception:
+            return None
 
     @classmethod
     def _provider_metadata(cls, provider: ProviderInput) -> dict[str, object]:
@@ -838,39 +1195,81 @@ class ProwlerInjector:
         )
 
         if isinstance(provider, AwsProviderInput):
-            metadata: dict[str, object] = {
-                "aws_account_id": cls._safe_text(provider.aws_account_id),
-                "aws_region": cls._safe_text(provider.aws_region),
-                "aws_session_token_present": provider.aws_session_token is not None,
-                "aws_endpoint_override_present": provider.aws_endpoint_url is not None,
-            }
-            if provider.aws_endpoint_url is not None:
-                metadata["aws_endpoint_url"] = cls._safe_text(provider.aws_endpoint_url)
+            account = cls._safe_attribute_text(provider, "aws_account_id")
+            region = cls._safe_attribute_text(provider, "aws_region")
+            endpoint = cls._safe_attribute_text(provider, "aws_endpoint_url")
+            metadata: dict[str, object] = {}
+            if account is not None:
+                metadata["aws_account_id"] = account
+            if region is not None:
+                metadata["aws_region"] = region
+            try:
+                session_token_present: bool | None = (
+                    provider.aws_session_token is not None
+                )
+            except Exception:
+                session_token_present = None
+            if session_token_present is not None:
+                metadata["aws_session_token_present"] = session_token_present
+            metadata["aws_endpoint_override_present"] = endpoint is not None
+            origin = cls._endpoint_origin(endpoint)
+            if origin is not None:
+                metadata["aws_endpoint_origin"] = origin
             return metadata
         if isinstance(provider, AzureProviderInput):
-            return {
-                "azure_subscription_id": cls._safe_text(provider.azure_subscription_id),
-                "azure_provider": cls._safe_text(provider.azure_provider),
+            metadata = {
                 "azure_tenant_id_present": True,
                 "azure_client_id_present": True,
                 "azure_client_secret_present": True,
             }
+            subscription = cls._safe_attribute_text(provider, "azure_subscription_id")
+            azure_provider = cls._safe_attribute_text(provider, "azure_provider")
+            if subscription is not None:
+                metadata["azure_subscription_id"] = subscription
+            if azure_provider is not None:
+                metadata["azure_provider"] = azure_provider
+            return metadata
         if isinstance(provider, GcpProviderInput):
-            return {
-                "gcp_project_id": cls._safe_text(provider.gcp_project_id),
-                "gcp_credentials_present": True,
-            }
+            metadata = {"gcp_credentials_present": True}
+            project = cls._safe_attribute_text(provider, "gcp_project_id")
+            if project is not None:
+                metadata["gcp_project_id"] = project
+            return metadata
         if isinstance(provider, KubernetesProviderInput):
-            return {
-                "kubernetes_context": cls._safe_text(provider.kubernetes_context),
-                "kubernetes_credentials_present": True,
-            }
+            metadata = {"kubernetes_credentials_present": True}
+            context = cls._safe_attribute_text(provider, "kubernetes_context")
+            if context is not None:
+                metadata["kubernetes_context"] = context
+            return metadata
         return {}
+
+    @classmethod
+    def _endpoint_origin(cls, value: str | None) -> str | None:
+        """Reduce a validated AWS endpoint override to scheme and authority."""
+        if value is None:
+            return None
+        try:
+            endpoint = urlsplit(value)
+            host = endpoint.hostname
+            if endpoint.scheme.lower() not in {"http", "https"} or host is None:
+                return None
+            normalized_host = host.lower()
+            if ":" in normalized_host:
+                normalized_host = f"[{normalized_host}]"
+            authority = normalized_host
+            if endpoint.port is not None:
+                authority = f"{authority}:{endpoint.port}"
+            return cls._safe_text(f"{endpoint.scheme.lower()}://{authority}")
+        except Exception:
+            return None
 
     @staticmethod
     def _safe_inject_id(value: str) -> str:
         """Allow only bounded log-safe correlation syntax."""
-        return value if _INJECT_ID_PATTERN.fullmatch(value) else _INVALID_INJECT_ID
+        if _INJECT_ID_PATTERN.fullmatch(value):
+            return value
+        digest = sha256(value.encode("utf-8")).hexdigest()
+        return f"invalid:{digest[:_INVALID_INJECT_ID_DIGEST_LENGTH]}"
 
     @staticmethod
     def _safe_text(value: str) -> str:
@@ -885,14 +1284,14 @@ class ProwlerInjector:
     @staticmethod
     def _executable_diagnostics(executable: str) -> dict[str, object]:
         """Inspect one approved executable path without raising into execution."""
-        path = Path(executable)
         try:
+            path = Path(executable)
             is_absolute = path.is_absolute()
             exists = path.exists()
             is_file = path.is_file()
             is_executable = is_file and os.access(path, os.X_OK)
-        except OSError:
-            is_absolute = path.is_absolute()
+        except Exception:
+            is_absolute = False
             exists = False
             is_file = False
             is_executable = False
@@ -949,13 +1348,14 @@ class ProwlerInjector:
             f"Inject ID: {inject_id}",
         ]
         if contract is not None:
-            lines.extend(
-                (
-                    f"Contract: {cls._safe_text(contract.contract_id)}",
-                    f"Route: {cls._safe_text(contract.route_name)}",
-                    f"Provider: {contract.provider}",
-                )
-            )
+            for label, attribute in (
+                ("Contract", "contract_id"),
+                ("Route", "route_name"),
+                ("Provider", "provider"),
+            ):
+                value = cls._safe_attribute_text(contract, attribute)
+                if value is not None:
+                    lines.append(f"{label}: {value}")
         labels = (
             ("configured_executable_path", "Configured executable"),
             ("actual_executable_path", "Actual executable"),
@@ -970,6 +1370,9 @@ class ProwlerInjector:
             ("stdout_bytes", "Captured stdout bytes"),
             ("stderr_bytes", "Captured stderr bytes"),
             ("return_code", "Return code"),
+            ("ocsf_error_code", "OCSF error code"),
+            ("record_index", "OCSF record index"),
+            ("source_path", "OCSF source path"),
         )
         for key, label in labels:
             value = getattr(failure, key)

@@ -444,7 +444,10 @@ def test_runtime_logs_fixed_safe_success_lifecycle(
     assert success_meta["aws_account_id"] == "123456789012"
     assert success_meta["aws_region"] == "eu-west-1"
     callback_meta = calls[-1].args[1]
-    assert callback_meta["attempted_status"] == "SUCCESS"
+    assert callback_meta["assessment_status"] == "SUCCESS"
+    assert callback_meta["delivery_status"] == "SUCCESS"
+    assert "status" not in callback_meta
+    assert "attempted_status" not in callback_meta
     assert calls[-1] == call.debug(_CALLBACK_COMPLETED, callback_meta)
     _assert_logger_excludes(
         helper,
@@ -505,7 +508,10 @@ def test_runtime_logs_bounded_value_free_contract_input_issues(
         helper.injector_logger.local_logger.error.call_args.kwargs["exc_info"] is False
     )
     callback_meta = helper.injector_logger.method_calls[-1].args[1]
-    assert callback_meta["attempted_status"] == "ERROR"
+    assert callback_meta["assessment_status"] == "ERROR"
+    assert callback_meta["delivery_status"] == "SUCCESS"
+    assert "status" not in callback_meta
+    assert "attempted_status" not in callback_meta
     assert callback_meta["inject_id"] == "inject-test"
     _assert_logger_excludes(
         helper,

@@ -23,7 +23,12 @@ from pyoaev.contracts.contract_config import (
 from prowler._core.cli_engine import CommandResult
 from prowler._core.prowler_client import ProwlerClientFactory
 from prowler.models.configs.config_loader import ProwlerConfig
-from prowler.models.findings import OpenAevFinding, map_command_result
+from prowler.models.findings import (
+    OcsfDecodeError,
+    OcsfMappingError,
+    OpenAevFinding,
+    map_command_result,
+)
 from prowler.models.provider_inputs import (
     PROVIDER_INPUT_ADAPTER,
     AwsProviderInput,
@@ -311,7 +316,8 @@ class BaseProwlerContract(ABC):
         )
         if result.error is not None or result.return_code != 0:
             return ContractExecutionOutcome(command_result=result, error=result.error)
-        return ContractExecutionOutcome(
-            command_result=result,
-            findings=map_command_result(result),
-        )
+        try:
+            findings = map_command_result(result)
+        except (OcsfDecodeError, OcsfMappingError) as error:
+            return ContractExecutionOutcome(command_result=result, error=error)
+        return ContractExecutionOutcome(command_result=result, findings=findings)
