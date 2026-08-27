@@ -104,6 +104,7 @@ _MAX_LOG_DURATION_SECONDS = 86_400
 _MAX_ELAPSED_MS = 86_400_000
 _MAX_BYTE_COUNT = 1_000_000_000
 _MAX_SAFE_TEXT = 512
+_MAXIMUM_ACCEPTED_STRUCTURED_OUTPUT_BYTES = 32 * 1024 * 1024
 _INJECT_ID_PATTERN = re.compile(r"[A-Za-z0-9._:-]{1,128}")
 _INVALID_INJECT_ID_DIGEST_LENGTH = 16
 _PROCESS_START_CAUSES = frozenset(
@@ -237,6 +238,10 @@ _GUIDANCE_BY_FAILURE_KIND = {
         "Review temporary output storage cleanup and retry the assessment."
     ),
     "invalid_input": _GENERIC_INPUT_GUIDANCE,
+    "structured_output_failed": "Review structured output projection and retry.",
+    "structured_output_too_large": (
+        "Reduce the assessment scope so structured output stays within its limit."
+    ),
     "rendering_failed": "Review injector trace rendering configuration and retry.",
     "reception_failed": "Check OpenAEV connectivity and retry assessment reception.",
     "callback_failed": "Check OpenAEV connectivity and retry callback delivery.",
@@ -270,6 +275,12 @@ _SUMMARY_BY_FAILURE_KIND = {
         "The temporary Prowler output workspace could not be cleaned."
     ),
     "invalid_input": "The assessment input was invalid.",
+    "structured_output_failed": (
+        "The OpenAEV structured output could not be serialized."
+    ),
+    "structured_output_too_large": (
+        "The OpenAEV structured output exceeded the accepted size limit."
+    ),
     "rendering_failed": "The OpenAEV execution trace could not be rendered.",
     "reception_failed": "The assessment reception could not be acknowledged.",
     "callback_failed": "The terminal OpenAEV callback could not be delivered.",
@@ -337,6 +348,8 @@ class _FailurePresentation:
     process_start_cause: str | None = None
     timeout_seconds: float | None = None
     maximum_accepted_output_bytes: int | None = None
+    maximum_accepted_structured_output_bytes: int | None = None
+    structured_output_bytes: int | None = None
     parser_name: str | None = None
     stdout_bytes: int | None = None
     stderr_bytes: int | None = None
@@ -500,18 +513,13 @@ class ProwlerInjector:
                         ensure_ascii=False,
                         separators=(",", ":"),
                     )
-                    execution_message = contract.render_trace(
-                        provider,
-                        outcome.findings,
-                        duration,
-                        raw_record_count=outcome.raw_record_count,
-                        raw_output_bytes=outcome.raw_output_bytes,
-                        raw_preview=outcome.raw_preview,
+                    structured_output_bytes = len(
+                        execution_output_structured.encode("utf-8")
                     )
                 except Exception:
                     failure = self._classify_internal_failure(
                         stage="output_preparation",
-                        failure_kind="rendering_failed",
+                        failure_kind="structured_output_failed",
                         configured_executable=self._configured_executable(),
                         specification=outcome.command_result.specification,
                     )
@@ -533,20 +541,85 @@ class ProwlerInjector:
                         failure,
                     )
                 else:
-                    callback = {
-                        "execution_message": execution_message,
-                        "execution_output_structured": execution_output_structured,
-                        "execution_status": "SUCCESS",
-                        "execution_duration": duration,
-                        "execution_action": "complete",
-                    }
-                    success_metadata = self._best_effort_success_metadata(
-                        started,
-                        safe_inject_id,
-                        contract,
-                        provider,
-                        outcome,
-                    )
+                    if (
+                        structured_output_bytes
+                        > _MAXIMUM_ACCEPTED_STRUCTURED_OUTPUT_BYTES
+                    ):
+                        failure = self._classify_internal_failure(
+                            stage="output_preparation",
+                            failure_kind="structured_output_too_large",
+                            configured_executable=self._configured_executable(),
+                            specification=outcome.command_result.specification,
+                            structured_output_bytes=structured_output_bytes,
+                        )
+                        callback = {
+                            "execution_message": self._plain_safe_error(
+                                failure,
+                                inject_id=safe_inject_id,
+                                contract=contract,
+                            ),
+                            "execution_status": "ERROR",
+                            "execution_duration": duration,
+                            "execution_action": "complete",
+                        }
+                        failure_metadata = self._best_effort_failure_metadata(
+                            started,
+                            safe_inject_id,
+                            contract,
+                            provider,
+                            failure,
+                        )
+                    else:
+                        try:
+                            execution_message = contract.render_trace(
+                                provider,
+                                outcome.findings,
+                                duration,
+                                raw_record_count=outcome.raw_record_count,
+                                raw_output_bytes=outcome.raw_output_bytes,
+                                raw_preview=outcome.raw_preview,
+                            )
+                        except Exception:
+                            failure = self._classify_internal_failure(
+                                stage="output_preparation",
+                                failure_kind="rendering_failed",
+                                configured_executable=self._configured_executable(),
+                                specification=outcome.command_result.specification,
+                            )
+                            callback = {
+                                "execution_message": self._plain_safe_error(
+                                    failure,
+                                    inject_id=safe_inject_id,
+                                    contract=contract,
+                                ),
+                                "execution_status": "ERROR",
+                                "execution_duration": duration,
+                                "execution_action": "complete",
+                            }
+                            failure_metadata = self._best_effort_failure_metadata(
+                                started,
+                                safe_inject_id,
+                                contract,
+                                provider,
+                                failure,
+                            )
+                        else:
+                            callback = {
+                                "execution_message": execution_message,
+                                "execution_output_structured": (
+                                    execution_output_structured
+                                ),
+                                "execution_status": "SUCCESS",
+                                "execution_duration": duration,
+                                "execution_action": "complete",
+                            }
+                            success_metadata = self._best_effort_success_metadata(
+                                started,
+                                safe_inject_id,
+                                contract,
+                                provider,
+                                outcome,
+                            )
         except Exception as error:
             duration = int(monotonic() - started)
             failure = self._classify_exception_failure(
@@ -1085,10 +1158,15 @@ class ProwlerInjector:
         *,
         stage: Literal["output_preparation", "callback", "reception"],
         failure_kind: Literal[
-            "rendering_failed", "callback_failed", "reception_failed"
+            "structured_output_failed",
+            "structured_output_too_large",
+            "rendering_failed",
+            "callback_failed",
+            "reception_failed",
         ],
         configured_executable: object | None = None,
         specification: object | None = None,
+        structured_output_bytes: int | None = None,
     ) -> _FailurePresentation:
         """Classify one fixed injector-owned failure."""
         executable = (
@@ -1107,6 +1185,16 @@ class ProwlerInjector:
             executable_exists=executable.executable_exists,
             executable_is_file=executable.executable_is_file,
             executable_is_executable=executable.executable_is_executable,
+            maximum_accepted_structured_output_bytes=(
+                _MAXIMUM_ACCEPTED_STRUCTURED_OUTPUT_BYTES
+                if failure_kind == "structured_output_too_large"
+                else None
+            ),
+            structured_output_bytes=(
+                cls._bounded_bytes(structured_output_bytes)
+                if structured_output_bytes is not None
+                else None
+            ),
         )
 
     @classmethod
@@ -1152,6 +1240,8 @@ class ProwlerInjector:
             "process_start_cause",
             "timeout_seconds",
             "maximum_accepted_output_bytes",
+            "maximum_accepted_structured_output_bytes",
+            "structured_output_bytes",
             "parser_name",
             "stdout_bytes",
             "stderr_bytes",
@@ -1483,6 +1573,11 @@ class ProwlerInjector:
             ("process_start_cause", "Process start cause"),
             ("timeout_seconds", "Timeout seconds"),
             ("maximum_accepted_output_bytes", "Accepted output byte limit"),
+            (
+                "maximum_accepted_structured_output_bytes",
+                "Accepted structured output byte limit",
+            ),
+            ("structured_output_bytes", "Structured output bytes"),
             ("parser_name", "Parser"),
             ("stdout_bytes", "Captured stdout bytes"),
             ("stderr_bytes", "Captured stderr bytes"),

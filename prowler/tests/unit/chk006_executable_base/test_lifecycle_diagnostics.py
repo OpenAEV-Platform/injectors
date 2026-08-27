@@ -141,6 +141,12 @@ class _SerializationFailureContract(_DiagnosticContract):
         return super().render_trace(provider, findings, duration, **kwargs)
 
 
+class _JsonSerializationFailureContract(_SerializationFailureContract):
+    def output_payload(self, findings: Any) -> dict[str, list[Any]]:
+        del findings
+        return {"findings": [object()], "vulnerabilities": []}
+
+
 def _config(executable: str = "/opt/prowler/bin/prowler") -> ConfigLoader:
     return cast(
         ConfigLoader,
@@ -789,20 +795,34 @@ def test_aws_endpoint_logs_only_normalized_origin_and_never_path() -> None:
     assert "aws_endpoint_url" not in completed
 
 
-def test_serialization_failure_does_not_render_and_delivers_one_plain_failure() -> None:
-    """Structured output is prepared before the success renderer is invoked."""
-    _SerializationFailureContract.render_calls = 0
-    injector, helper = _runtime(
-        registry=ProwlerContracts((_SerializationFailureContract,))
-    )
+@pytest.mark.parametrize(
+    "contract_class",
+    (_SerializationFailureContract, _JsonSerializationFailureContract),
+)
+def test_structured_output_failure_does_not_render_and_is_classified_separately(
+    contract_class: type[_SerializationFailureContract],
+) -> None:
+    """Projection and JSON failures are distinct from Rich trace rendering."""
+    contract_class.render_calls = 0
+    injector, helper = _runtime(registry=ProwlerContracts((contract_class,)))
 
     injector.process_message(_message())
 
-    assert _SerializationFailureContract.render_calls == 0
+    assert contract_class.render_calls == 0
     helper.api.inject.execution_callback.assert_called_once()
     callback = helper.api.inject.execution_callback.call_args.kwargs["data"]
     assert callback["execution_status"] == "ERROR"
-    assert callback["execution_message"].startswith("Error code: rendering_failed\n")
+    assert callback["execution_message"].startswith(
+        "Error code: structured_output_failed\n"
+    )
+    assert (
+        "Reason: The OpenAEV structured output could not be serialized."
+        in callback["execution_message"]
+    )
+    assert (
+        "Action: Review structured output projection and retry."
+        in callback["execution_message"]
+    )
     assert "execution_output_structured" not in callback
     assert "SERIALIZATION-FAILURE-CANARY" not in (
         _all_logged(helper) + callback["execution_message"]

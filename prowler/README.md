@@ -76,9 +76,12 @@ action, sanitized inject correlation, canonical contract/route/provider identity
 and applicable typed evidence. The trace never receives parsed provider input, so
 account, subscription, project, and Kubernetes context do not appear in an error
 unless the contract already rendered them from its existing safe request summary.
-Structured output is serialized before success rendering. If serialization or
-Rich rendering fails, the callback uses the same bounded plain diagnostics with
-one callback attempt and no second render attempt.
+Structured output is serialized and measured as UTF-8 before success rendering.
+The callback accepts at most 32 MiB of encoded `execution_output_structured`; an
+oversized projection closes as `structured_output_too_large` with actual and
+accepted byte counts and no partial findings. Projection/JSON failures close as
+`structured_output_failed`, while Rich failures remain `rendering_failed`. Each
+path uses one callback attempt and no second render attempt.
 
 The runtime emits fixed `[PROWLER_INJECTOR]` lifecycle diagnostics through the
 injector logger. Startup INFO identifies the configured injector, registered
@@ -117,6 +120,8 @@ paths are never logged or added to error traces. ERROR logging keeps
 they cannot gate assessment delivery. Callback events distinguish
 `assessment_status` from `delivery_status`; a failed reception stops before any
 terminal callback is attempted.
+Correlated secondary cleanup is not performed inside callback handling and
+remains future work.
 
 Artifact lifecycle failures are also closed and actionable. Missing, nonregular,
 unreadable, and oversized artifacts, plus output-workspace preparation and cleanup
@@ -204,10 +209,12 @@ single expected artifact as `findings.ocsf.json` (`--output-filename findings`
 with `-M json-ocsf`). Console stdout and stderr remain bounded diagnostics; the
 artifact is opened only at its exact path as a regular, non-symlink file and is
 read incrementally to its separate 100 MiB limit. CHK.004 debug metadata reports
-only the artifact byte size. The downstream mapper decodes the captured artifact
-once, maps every record once, computes byte/record counts during that pass, retains
-only the mapped findings and ten field-allowlisted preview rows, and releases the
-full decoded records. Console stdout remains separate and is never parsed as OCSF.
+only the artifact byte size. The downstream mapper requires that captured
+artifact as bytes or text, decodes it, maps every decoded record, retains only the
+mapped findings and ten field-allowlisted preview rows, and then releases the full
+decoded records. The byte count comes from the captured artifact and the record
+count from the decoded collection; this is not a streaming or one-pass JSON
+implementation. Console stdout remains separate and is never parsed as OCSF.
 
 On Linux/POSIX, a writable directory at `/dev/shm` is preferred and labelled
 `memory_tmpfs`, keeping normal output in memory-backed temporary storage. It is

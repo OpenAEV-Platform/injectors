@@ -32,7 +32,11 @@ from prowler.models.configs.config_loader import (
     InjectorConfig,
     ProwlerConfig,
 )
-from prowler.models.findings import OcsfPreviewRecord, OpenAevFinding
+from prowler.models.findings import (
+    OcsfPreviewRecord,
+    OpenAevFinding,
+    map_ocsf_finding,
+)
 
 
 def _config() -> ConfigLoader:
@@ -297,6 +301,35 @@ def _runtime(findings: tuple[OpenAevFinding, ...]) -> tuple[Any, Mock]:
     return injector, helper
 
 
+def _lightweight_mapped_findings(
+    count: int, *, description_length: int = 1, description_character: str = "d"
+) -> tuple[OpenAevFinding, ...]:
+    """Map a full synthetic OCSF record set through the production mapper."""
+    return tuple(
+        map_ocsf_finding(
+            {
+                "finding_info": {
+                    "uid": f"check-{index}",
+                    "title": f"Check {index}",
+                    "desc": description_character * description_length,
+                },
+                "status": "New",
+                "status_code": "PASS",
+                "severity": "Low",
+                "resources": [{"uid": f"r-{index}", "name": f"R {index}"}],
+                "cloud": {
+                    "provider": "aws",
+                    "region": "eu-west-1",
+                    "account": {"uid": "account"},
+                },
+                "remediation": {"desc": "fix", "references": []},
+            },
+            record_index=index,
+        )
+        for index in range(count)
+    )
+
+
 _LISTENER_START = "[PROWLER_INJECTOR] - Listener starting"
 _INVALID_MESSAGE = "[PROWLER_INJECTOR] - Invalid injection message rejected"
 _ASSESSMENT_RECEIVED = "[PROWLER_INJECTOR] - Assessment received"
@@ -470,12 +503,11 @@ def test_runtime_logs_fixed_safe_success_lifecycle(
     )
 
 
-def test_runtime_success_callback_bounds_raw_preview_without_structured_raw_data(
-    findings: tuple[OpenAevFinding, ...],
-) -> None:
-    """The real success callback carries only mapped output and a bounded raw trace."""
+def test_runtime_keeps_all_2410_mapped_findings_and_bounds_trace() -> None:
+    """An under-budget callback keeps the complete mapped record set."""
     identifier = str(_subject().stable_contract_id("aws"))
-    injector, helper = _runtime(findings[:1])
+    mapped_findings = _lightweight_mapped_findings(2410)
+    injector, helper = _runtime(mapped_findings)
     _RuntimeContract.use_base_renderer = True
     _RuntimeContract.outcome = replace(
         _RuntimeContract.outcome,
@@ -506,13 +538,60 @@ def test_runtime_success_callback_bounds_raw_preview_without_structured_raw_data
     structured = json.loads(callback["execution_output_structured"])
     assert callback["execution_status"] == "SUCCESS"
     assert tuple(structured) == ("findings", "vulnerabilities")
+    assert len(structured["findings"]) == 2410
+    assert structured["vulnerabilities"] == []
+    assert json.loads(structured["findings"][0])["value"] == "Check 0"
+    assert json.loads(structured["findings"][-1])["value"] == "Check 2409"
     assert "raw_preview" not in structured
     assert "raw_records" not in structured
     assert "Total raw records: 2410" in trace
     assert "Records omitted: 2400" in trace
     assert "safe-check-9" in trace
     assert "safe-check-10" not in trace
-    assert len(trace) < 20_000
+    assert len(trace) < 25_000
+
+
+def test_runtime_rejects_oversized_maximal_structured_output_without_partial_data() -> (
+    None
+):
+    """A maximal mapped set beyond 32 MiB closes with exact byte evidence."""
+    identifier = str(_subject().stable_contract_id("aws"))
+    mapped_findings = _lightweight_mapped_findings(
+        2410, description_length=4_700, description_character="€"
+    )
+    injector, helper = _runtime(mapped_findings)
+    _RuntimeContract.use_base_renderer = True
+    _RuntimeContract.outcome = replace(
+        _RuntimeContract.outcome,
+        raw_record_count=2410,
+        raw_output_bytes=104_857_600,
+    )
+
+    injector.process_message(_message(identifier))
+
+    helper.api.inject.execution_callback.assert_called_once()
+    callback = helper.api.inject.execution_callback.call_args.kwargs["data"]
+    assert callback["execution_status"] == "ERROR"
+    assert callback["execution_action"] == "complete"
+    assert "execution_output_structured" not in callback
+    assert _RuntimeContract.events.count("render:success") == 0
+    error_meta = helper.injector_logger.local_logger.error.call_args.kwargs["extra"][
+        "attributes"
+    ]
+    assert error_meta["failure_kind"] == "structured_output_too_large"
+    assert error_meta["maximum_accepted_structured_output_bytes"] == 32 * 1024 * 1024
+    assert (
+        error_meta["structured_output_bytes"]
+        > error_meta["maximum_accepted_structured_output_bytes"]
+    )
+    assert (
+        f"Structured output bytes: {error_meta['structured_output_bytes']}"
+        in callback["execution_message"]
+    )
+    assert (
+        "Accepted structured output byte limit: 33554432"
+        in callback["execution_message"]
+    )
 
 
 def test_runtime_logs_bounded_value_free_contract_input_issues(

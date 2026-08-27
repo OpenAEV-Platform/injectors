@@ -268,9 +268,9 @@ def map_command_result_with_evidence(result: CommandResult) -> OcsfMappingResult
             "command_not_successful",
             "Prowler command result is not successful",
         )
-    payload = (
-        result.parsed if isinstance(result.parsed, (bytes, str)) else result.stdout
-    )
+    payload = result.parsed
+    if not isinstance(payload, (bytes, str)):
+        raise OcsfDecodeError("invalid_payload_type", _DECODE_MESSAGE)
     records = decode_ocsf_output(payload)
     findings: list[OpenAevFinding] = []
     previews: list[OcsfPreviewRecord] = []
