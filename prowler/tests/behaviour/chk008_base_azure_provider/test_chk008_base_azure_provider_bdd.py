@@ -85,16 +85,19 @@ class _ClientFactory:
 
 
 def test_default_registration_identity_fields_and_outputs() -> None:
-    """Azure remains second as the canonical registry grows through Kubernetes."""
+    """Azure remains second as the canonical registry grows through CHK.011."""
     serialized = DEFAULT_PROWLER_CONTRACTS.contracts()
     expected_id = stable_contract_id("azure")
 
-    assert len(serialized) == 4
+    assert len(serialized) == 7
     assert [item["contract_id"] for item in serialized] == [
         str(stable_contract_id("aws")),
         str(expected_id),
         str(stable_contract_id("gcp")),
         str(stable_contract_id("kubernetes")),
+        str(stable_contract_id("aws/iam")),
+        str(stable_contract_id("aws/s3")),
+        str(stable_contract_id("aws/ec2")),
     ]
     assert UUID(serialized[1]["contract_id"]) == expected_id
     assert expected_id.version == 5
