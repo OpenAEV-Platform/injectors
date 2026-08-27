@@ -44,6 +44,24 @@ JSON text. FAILED findings are additionally projected as OpenAEV vulnerability
 outputs. SUCCESS and IGNORED findings are not projected as vulnerabilities, and
 Prowler cloud resource identifiers are not claimed to be OpenAEV asset UUIDs.
 
+### Rich execution traces
+
+Execution messages are deterministic Rich reports captured without terminal
+colour at a fixed width. The base contract supplies bounded default columns for
+CHK.005's flattened `OpenAevFinding` fields; a concrete contract can override
+`output_trace_config()` to select route-specific columns, including nested,
+numeric-index, wildcard, and fallback display paths. Missing and empty results
+remain valid display states, while row and cell limits prevent oversized
+callbacks.
+
+The trace is presentation only. It is separate from registered contract outputs
+and does not alter `execution_output_structured`. The renderer receives an
+explicit allowlist built from the parsed provider model (route, filters, and
+non-secret account, subscription, project, context, region, or requested-provider
+context). It never receives the raw form payload, credential fields, command
+environment or arguments, temporary credential paths, or raw stderr. Runtime
+errors use a fixed safe message rather than exception or command internals.
+
 ## Provider input boundary
 
 Provider selection, account or target values, and credentials are not injector

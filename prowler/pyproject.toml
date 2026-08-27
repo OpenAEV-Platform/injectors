@@ -10,6 +10,7 @@ dependencies = [
     "pyoaev==2.260521.0",
     "pydantic>=2.13.3,<2.14.0",
     "pydantic-settings>=2.14.0,<2.15.0",
+    "rich==14.2.0",
 ]
 
 [project.scripts]

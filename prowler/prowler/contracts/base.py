@@ -24,7 +24,15 @@ from prowler._core.cli_engine import CommandResult
 from prowler._core.prowler_client import ProwlerClientFactory
 from prowler.models.configs.config_loader import ProwlerConfig
 from prowler.models.findings import OpenAevFinding, map_command_result
-from prowler.models.provider_inputs import PROVIDER_INPUT_ADAPTER, ProviderInput
+from prowler.models.provider_inputs import (
+    PROVIDER_INPUT_ADAPTER,
+    AwsProviderInput,
+    AzureProviderInput,
+    GcpProviderInput,
+    KubernetesProviderInput,
+    ProviderInput,
+)
+from prowler.services.output_trace import generate
 
 from .provider_fields import ProviderName as ProviderName
 from .provider_fields import build_provider_fields as _build_provider_fields
@@ -173,35 +181,60 @@ class BaseProwlerContract(ABC):
             ],
         }
 
-    def execution_trace(self, findings: Sequence[OpenAevFinding]) -> str:
-        """Render a deterministic plain-text summary of flattened findings."""
-        counts = {
-            status: sum(finding.expectation_result == status for finding in findings)
-            for status in ("SUCCESS", "FAILED", "IGNORED")
-        }
-        lines = [
-            f"Route: {self.route_name}",
-            (
-                f"Findings: {len(findings)} "
-                f"(SUCCESS={counts['SUCCESS']} FAILED={counts['FAILED']} "
-                f"IGNORED={counts['IGNORED']})"
-            ),
-        ]
-        for index, finding in enumerate(findings, start=1):
-            flattened = finding.model_dump(mode="json")
-            rendered = " | ".join(
-                f"{field}={self._trace_value(flattened[field])}"
-                for field in OpenAevFinding.model_fields
-            )
-            lines.append(f"{index}. {rendered}")
-        return "\n".join(lines)
-
     @staticmethod
-    def _trace_value(value: object) -> str:
-        """Render one flattened model value without terminal styling."""
-        if isinstance(value, list):
-            return ", ".join(str(item) for item in value)
-        return "" if value is None else str(value)
+    def output_trace_config() -> dict[str, object]:
+        """Return the common flattened-field trace contract."""
+        return {
+            "columns": [
+                {"title": "Check", "path": "value"},
+                {"title": "Status", "path": "expectation_result"},
+                {"title": "Severity", "path": "severity"},
+                {"title": "Asset", "path": "asset_name"},
+                {"title": "Region", "path": "region"},
+                {"title": "Account", "path": "cloud_account"},
+            ],
+            "options": {"max_rows": 50, "max_cell_length": 120},
+        }
+
+    def safe_request_info(self, provider: ProviderInput | None) -> dict[str, object]:
+        """Allowlist non-credential context from a parsed provider model."""
+        info: dict[str, object] = {
+            "route": self.route_name,
+            "filters": ", ".join(self.check_filters) if self.check_filters else "all",
+        }
+        if isinstance(provider, AwsProviderInput):
+            info.update(account=provider.aws_account_id, region=provider.aws_region)
+        elif isinstance(provider, AzureProviderInput):
+            info.update(
+                subscription=provider.azure_subscription_id,
+                requested_provider=provider.azure_provider,
+            )
+        elif isinstance(provider, GcpProviderInput):
+            info["project"] = provider.gcp_project_id
+        elif isinstance(provider, KubernetesProviderInput):
+            info["context"] = provider.kubernetes_context
+        return info
+
+    def render_trace(
+        self,
+        provider: ProviderInput | None,
+        findings: Sequence[OpenAevFinding],
+        duration: int,
+        *,
+        is_error: bool = False,
+        error_message: str = "",
+    ) -> str:
+        """Render safe request context and flattened findings through Rich."""
+        return generate(
+            route_name=self.route_name,
+            provider_name=self.provider,
+            request_info=self.safe_request_info(provider),
+            findings=findings,
+            duration=duration,
+            trace_config=self.output_trace_config(),
+            is_error=is_error,
+            error_message=error_message,
+        )
 
     @staticmethod
     def _vulnerability(finding: OpenAevFinding) -> dict[str, str]:

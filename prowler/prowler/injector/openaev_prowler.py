@@ -7,7 +7,9 @@ from time import monotonic
 from pyoaev.helpers import OpenAEVInjectorHelper
 
 from prowler.contracts import DEFAULT_PROWLER_CONTRACTS, ProwlerContracts
+from prowler.contracts.base import BaseProwlerContract
 from prowler.models import ConfigLoader
+from prowler.models.provider_inputs import ProviderInput
 
 
 class ProwlerInjector:
@@ -42,6 +44,8 @@ class ProwlerInjector:
         self.helper.api.inject.execution_reception(
             inject_id=inject_id, data={"tracking_total_count": 1}
         )
+        contract: BaseProwlerContract | None = None
+        provider: ProviderInput | None = None
         try:
             contract_id = self._contract_id(injection)
             content = injection.get("inject_content")
@@ -52,22 +56,37 @@ class ProwlerInjector:
             outcome = contract.execute(self.config.prowler, provider)
             if outcome.error is not None or outcome.command_result.return_code != 0:
                 raise RuntimeError("Prowler assessment did not complete successfully")
+            duration = int(monotonic() - started)
             callback = {
-                "execution_message": contract.execution_trace(outcome.findings),
+                "execution_message": contract.render_trace(
+                    provider, outcome.findings, duration
+                ),
                 "execution_output_structured": json.dumps(
                     contract.output_payload(outcome.findings),
                     ensure_ascii=False,
                     separators=(",", ":"),
                 ),
                 "execution_status": "SUCCESS",
-                "execution_duration": int(monotonic() - started),
+                "execution_duration": duration,
                 "execution_action": "complete",
             }
         except Exception:
+            duration = int(monotonic() - started)
+            safe_message = "Prowler contract execution failed safely"
             callback = {
-                "execution_message": "Prowler contract execution failed safely",
+                "execution_message": (
+                    contract.render_trace(
+                        provider,
+                        (),
+                        duration,
+                        is_error=True,
+                        error_message=safe_message,
+                    )
+                    if contract is not None
+                    else safe_message
+                ),
                 "execution_status": "ERROR",
-                "execution_duration": int(monotonic() - started),
+                "execution_duration": duration,
                 "execution_action": "complete",
             }
         self.helper.api.inject.execution_callback(inject_id=inject_id, data=callback)

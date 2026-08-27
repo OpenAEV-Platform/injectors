@@ -134,7 +134,11 @@ def test_trace_limits_rows_cells_and_request_values() -> None:
         [
             {"value": "A" * 80, "expectation_result": "SUCCESS", "severity": "LOW"},
             {"value": "second", "expectation_result": "SUCCESS", "severity": "LOW"},
-            {"value": "third-hidden", "expectation_result": "SUCCESS", "severity": "LOW"},
+            {
+                "value": "third-hidden",
+                "expectation_result": "SUCCESS",
+                "severity": "LOW",
+            },
         ],
         trace_config=config,
     )
@@ -151,7 +155,7 @@ def test_renderer_only_displays_supplied_safe_inputs() -> None:
         "CANARY-SESSION",
         "CANARY-SERVICE-JSON",
         "CANARY-KUBECONFIG",
-        "/tmp/openaev-prowler-credential-canary",
+        "/tmp/openaev-prowler-credential-canary",  # noqa: S108 - leak canary
         "--aws-secret-access-key",
         "raw-stderr-canary",
     )

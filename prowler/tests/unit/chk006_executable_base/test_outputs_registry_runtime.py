@@ -192,10 +192,16 @@ class _RuntimeContract(BaseProwlerContract):
         self.events.append("execute")
         return self.outcome
 
-    def render_trace(self, provider: Any, findings: Any, duration: int, **kwargs: Any) -> str:
+    def render_trace(
+        self, provider: Any, findings: Any, duration: int, **kwargs: Any
+    ) -> str:
         del provider, findings, duration
-        self.events.append("render:error" if kwargs.get("is_error") else "render:success")
-        return "CONTRACT RICH ERROR" if kwargs.get("is_error") else "CONTRACT RICH SUCCESS"
+        self.events.append(
+            "render:error" if kwargs.get("is_error") else "render:success"
+        )
+        return (
+            "CONTRACT RICH ERROR" if kwargs.get("is_error") else "CONTRACT RICH SUCCESS"
+        )
 
 
 def _message(
