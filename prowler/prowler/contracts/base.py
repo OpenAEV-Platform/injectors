@@ -14,8 +14,6 @@ from pyoaev.contracts.contract_config import (
     Contract,
     ContractConfig,
     ContractElement,
-    ContractText,
-    ContractTextArea,
     SupportedLanguage,
 )
 
@@ -25,7 +23,19 @@ from prowler.models.configs.config_loader import ProwlerConfig
 from prowler.models.findings import OpenAevFinding, map_command_result
 from prowler.models.provider_inputs import PROVIDER_INPUT_ADAPTER, ProviderInput
 
-ProviderName = Literal["aws", "azure", "gcp", "kubernetes"]
+from .provider_fields import ProviderName as ProviderName
+from .provider_fields import build_provider_fields as _build_provider_fields
+
+__all__ = [
+    "BaseProwlerContract",
+    "ClientFactoryPort",
+    "ContractExecutionOutcome",
+    "ContractInputError",
+    "ContractInputIssue",
+    "ProviderName",
+    "RouteFamily",
+]
+
 RouteFamily = Literal["base", "service", "compliance"]
 
 
@@ -70,48 +80,6 @@ class ContractExecutionOutcome:
     findings: tuple[OpenAevFinding, ...] = ()
     error: Any | None = None
 
-
-@dataclass(frozen=True)
-class _FieldSpec:
-    key: str
-    label: str
-    mandatory: bool
-    multiline: bool = False
-
-
-_PROVIDER_FIELDS: dict[ProviderName, tuple[_FieldSpec, ...]] = {
-    "aws": (
-        _FieldSpec("aws_access_key_id", "AWS access key ID (plaintext)", True),
-        _FieldSpec("aws_secret_access_key", "AWS secret access key (plaintext)", True),
-        _FieldSpec("aws_account_id", "AWS account ID", True),
-        _FieldSpec("aws_region", "AWS region", True),
-        _FieldSpec(
-            "aws_session_token", "AWS session token (plaintext, optional)", False
-        ),
-    ),
-    "azure": (
-        _FieldSpec("azure_tenant_id", "Azure tenant ID", True),
-        _FieldSpec("azure_client_id", "Azure client ID", True),
-        _FieldSpec("azure_client_secret", "Azure client secret (plaintext)", True),
-        _FieldSpec("azure_subscription_id", "Azure subscription ID", True),
-        _FieldSpec("azure_provider", "Azure cloud environment", True),
-    ),
-    "gcp": (
-        _FieldSpec(
-            "gcp_service_account_json",
-            "GCP service-account JSON (plaintext)",
-            True,
-            True,
-        ),
-        _FieldSpec("gcp_project_id", "GCP project ID", True),
-    ),
-    "kubernetes": (
-        _FieldSpec(
-            "kubernetes_kubeconfig", "Kubernetes kubeconfig (plaintext)", True, True
-        ),
-        _FieldSpec("kubernetes_context", "Kubernetes context", True),
-    ),
-}
 
 _CONTRACT_CONFIG = ContractConfig(
     type="openaev_prowler",
@@ -160,17 +128,7 @@ class BaseProwlerContract(ABC):
 
     def build_provider_fields(self) -> list[ContractElement]:
         """Declare exact provider model fields using current plaintext controls."""
-        fields: list[ContractElement] = []
-        for specification in _PROVIDER_FIELDS[self.provider]:
-            field_type = ContractTextArea if specification.multiline else ContractText
-            fields.append(
-                field_type(
-                    key=specification.key,
-                    label=specification.label,
-                    mandatory=specification.mandatory,
-                )
-            )
-        return fields
+        return _build_provider_fields(self.provider)
 
     def parse_input(self, raw_input: Mapping[str, object]) -> ProviderInput:
         """Convert ephemeral form values immediately into the strict CHK.002 model."""
