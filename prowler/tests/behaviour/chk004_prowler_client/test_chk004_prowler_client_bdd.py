@@ -296,7 +296,10 @@ def test_creation_write_failure_removes_partial_file_and_directory(
     original_open = Path.open
 
     def fail_write(path: Path, *args: Any, **kwargs: Any) -> Any:
-        if "w" in args or kwargs.get("mode") == "w":
+        if any(mode in args for mode in ("w", "x")) or kwargs.get("mode") in {
+            "w",
+            "x",
+        }:
             raise OSError("safe write failure")
         return original_open(path, *args, **kwargs)
 
@@ -324,6 +327,8 @@ class _FailingCleanupFactory:
 
     def create(self, _content: SecretStr, *, suffix: str) -> _FailingCleanupLease:
         assert suffix in {".json", ".yaml"}
+        self.path.parent.mkdir(exist_ok=True)
+        self.path.write_text("non-secret fixture", encoding="utf-8")
         return _FailingCleanupLease(self.path)
 
 

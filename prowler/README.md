@@ -59,3 +59,33 @@ Kubernetes parser registers `--context` for selecting a kubeconfig context;
 `--kube-context` is not registered. The adapter therefore emits
 `--kubeconfig-file <temporary path> --context <name>`. This installed parser
 evidence supersedes the stale proof-of-concept/contract spelling.
+
+## Contract credential-file lifecycle
+
+AWS and Azure credentials remain `SecretStr` environment values and are not
+written to files. Prowler 5.36 requires filesystem paths for GCP service-account
+JSON and Kubernetes kubeconfig input. Immediately before launching Prowler, one
+contract execution therefore writes that plaintext credential to a randomly
+named file inside a unique OS temporary directory. The file is closed before
+the subprocess starts so native Windows can reopen it. It persists for the
+Prowler command runtime and is deleted in `finally`, followed by its private
+directory, whether execution returns or raises. The immutable command
+specification and result may retain the now-stale temporary path, but never the
+file content.
+
+On POSIX, the directory is mode `0700` and the file is mode `0600`. Native
+Windows relies on the current user's temp-directory ACL. Python `chmod` cannot
+guarantee POSIX-equivalent ACL semantics on Windows, so this injector does not
+claim that Windows permissions are owner-only. Docker and Kubernetes pod
+ephemeral storage can reduce exposure, but does not eliminate it.
+
+An abrupt interpreter crash, forced kill, host failure, or power loss can occur
+before `finally` and leave plaintext residue in the OS temp location. Operators
+must secure and preferably encrypt the temp volume and clean stale files under
+their own retention policy. The injector deliberately performs no broad stale
+cleanup that could delete unrelated files.
+
+Each created client is one-shot and releases its copied provider input on the
+first terminal run path. Python immutable strings and copies cannot be
+guaranteed to be zeroized; the upstream OpenAEV injection payload may retain
+credential values until `process_message` returns.

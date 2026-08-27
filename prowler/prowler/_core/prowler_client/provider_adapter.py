@@ -10,7 +10,7 @@ from prowler.models.provider_inputs import (
     ProviderInput,
 )
 
-from .contracts import CredentialFileFactoryPort, ProviderInvocation
+from .contracts import CredentialLeaseFactoryPort, ProviderInvocation
 
 _OCSF_OUTPUT_ARGUMENTS = ("-M", "json-ocsf")
 
@@ -18,8 +18,8 @@ _OCSF_OUTPUT_ARGUMENTS = ("-M", "json-ocsf")
 class ProviderInvocationAdapter:
     """Build credential-safe provider arguments and exact environments."""
 
-    def __init__(self, credential_files: CredentialFileFactoryPort) -> None:
-        self._credential_files = credential_files
+    def __init__(self, credential_leases: CredentialLeaseFactoryPort) -> None:
+        self._credential_leases = credential_leases
 
     def adapt(self, provider: ProviderInput) -> ProviderInvocation:
         """Return the invocation for one validated provider input."""
@@ -57,31 +57,35 @@ class ProviderInvocationAdapter:
                 ),
             )
         if isinstance(provider, GcpProviderInput):
-            path = self._credential_files.create(provider.gcp_service_account_json)
+            lease = self._credential_leases.create(
+                provider.gcp_service_account_json, suffix=".json"
+            )
             return ProviderInvocation(
                 arguments=(
                     "gcp",
                     "--credentials-file",
-                    str(path),
+                    str(lease.path),
                     "--project-id",
                     provider.gcp_project_id,
                     *_OCSF_OUTPUT_ARGUMENTS,
                 ),
                 environment=(),
-                temporary_files=(path,),
+                credential_leases=(lease,),
             )
         if isinstance(provider, KubernetesProviderInput):
-            path = self._credential_files.create(provider.kubernetes_kubeconfig)
+            lease = self._credential_leases.create(
+                provider.kubernetes_kubeconfig, suffix=".yaml"
+            )
             return ProviderInvocation(
                 arguments=(
                     "kubernetes",
                     "--kubeconfig-file",
-                    str(path),
+                    str(lease.path),
                     "--context",
                     provider.kubernetes_context,
                     *_OCSF_OUTPUT_ARGUMENTS,
                 ),
                 environment=(),
-                temporary_files=(path,),
+                credential_leases=(lease,),
             )
         raise TypeError("provider must be a supported provider input")

@@ -24,17 +24,28 @@ class CliEngineFactoryPort(Protocol):
         """Create one engine."""
 
 
-class CredentialFileFactoryPort(Protocol):
-    """Materialize one secret in an owner-only temporary file."""
+class CredentialLeasePort(Protocol):
+    """Own the lifecycle of one temporary credential resource."""
 
-    def create(self, content: SecretStr) -> Path:
-        """Return the path to a newly materialized secret."""
+    @property
+    def path(self) -> Path:
+        """Return the temporary credential path."""
+
+    def cleanup(self) -> None:
+        """Idempotently remove the owned credential resources."""
+
+
+class CredentialLeaseFactoryPort(Protocol):
+    """Materialize one secret as a cross-platform temporary lease."""
+
+    def create(self, content: SecretStr, *, suffix: str) -> CredentialLeasePort:
+        """Return a newly materialized credential lease."""
 
 
 @dataclass(frozen=True)
 class ProviderInvocation:
-    """Provider-specific command arguments, environment, and temporary files."""
+    """Provider-specific arguments, environment, and credential resources."""
 
     arguments: tuple[str, ...]
     environment: tuple[tuple[str, EnvironmentValue], ...]
-    temporary_files: tuple[Path, ...] = ()
+    credential_leases: tuple[CredentialLeasePort, ...] = ()
