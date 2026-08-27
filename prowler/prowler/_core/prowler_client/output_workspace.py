@@ -31,8 +31,11 @@ _ARTIFACT_MESSAGES: dict[OutputArtifactErrorKind, str] = {
 class OutputArtifactError(RuntimeError):
     """Report a closed artifact failure without filesystem details."""
 
-    def __init__(self, kind: OutputArtifactErrorKind) -> None:
+    def __init__(
+        self, kind: OutputArtifactErrorKind, *, command_result: object | None = None
+    ) -> None:
         self.kind = kind
+        self.command_result = command_result
         super().__init__(_ARTIFACT_MESSAGES[kind])
 
 
@@ -40,13 +43,15 @@ class OutputWorkspacePreparationError(RuntimeError):
     """Report output-workspace creation failure without filesystem details."""
 
     def __init__(self) -> None:
+        self.command_result: object | None = None
         super().__init__("temporary output workspace preparation failed")
 
 
 class OutputWorkspaceCleanupError(RuntimeError):
     """Report output-workspace cleanup failure without filesystem details."""
 
-    def __init__(self) -> None:
+    def __init__(self, *, command_result: object | None = None) -> None:
+        self.command_result = command_result
         super().__init__("temporary output workspace cleanup failed")
 
 

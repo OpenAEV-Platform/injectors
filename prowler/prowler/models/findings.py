@@ -69,6 +69,34 @@ class OpenAevFinding(BaseModel):
     description: str
 
 
+class OcsfPreviewRecord(BaseModel):
+    """Bounded allowlisted projection of one successfully mapped OCSF record."""
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    finding_title: str | None = None
+    finding_uid: str | None = None
+    status: str | None = None
+    status_code: str | None = None
+    severity: str | None = None
+    resource_name: str | None = None
+    resource_uid: str | None = None
+    cloud_provider: str | None = None
+    cloud_region: str | None = None
+    cloud_account: str | None = None
+    provider_uid: str | None = None
+
+
+@dataclass(frozen=True)
+class OcsfMappingResult:
+    """Mapped output and bounded artifact evidence, without decoded raw records."""
+
+    findings: tuple[OpenAevFinding, ...]
+    raw_record_count: int
+    raw_output_bytes: int
+    raw_preview: tuple[OcsfPreviewRecord, ...]
+
+
 _STATUS_CODE_MAP = {
     "PASS": "SUCCESS",
     "PASSED": "SUCCESS",
@@ -88,6 +116,7 @@ _SEVERITY_MAP = {
 
 _DECODE_MESSAGE = "unable to decode Prowler OCSF output"
 _MAPPING_MESSAGE = "unable to map Prowler OCSF record"
+_MAX_PREVIEW_VALUE_LENGTH = 512
 
 
 def _expectation_result(status: str, status_code: str) -> str:
@@ -229,6 +258,11 @@ def map_ocsf_finding(
 
 def map_command_result(result: CommandResult) -> tuple[OpenAevFinding, ...]:
     """Map one successful CHK.004 result without executing another command."""
+    return map_command_result_with_evidence(result).findings
+
+
+def map_command_result_with_evidence(result: CommandResult) -> OcsfMappingResult:
+    """Map an artifact once and retain only counts and safe bounded previews."""
     if result.error is not None or result.return_code != 0:
         raise OcsfMappingError(
             "command_not_successful",
@@ -238,10 +272,65 @@ def map_command_result(result: CommandResult) -> tuple[OpenAevFinding, ...]:
         result.parsed if isinstance(result.parsed, (bytes, str)) else result.stdout
     )
     records = decode_ocsf_output(payload)
-    return tuple(
-        map_ocsf_finding(record, record_index=index)
-        for index, record in enumerate(records)
+    findings: list[OpenAevFinding] = []
+    previews: list[OcsfPreviewRecord] = []
+    for index, record in enumerate(records):
+        findings.append(map_ocsf_finding(record, record_index=index))
+        if index < 10:
+            previews.append(_preview_record(record))
+    return OcsfMappingResult(
+        findings=tuple(findings),
+        raw_record_count=len(records),
+        raw_output_bytes=(
+            len(payload) if isinstance(payload, bytes) else len(payload.encode("utf-8"))
+        ),
+        raw_preview=tuple(previews),
     )
+
+
+def _preview_record(record: Mapping[str, Any]) -> OcsfPreviewRecord:
+    """Project only the approved OCSF paths from one already-mapped record."""
+    finding_value = record.get("finding_info", record.get("finding"))
+    finding = finding_value if isinstance(finding_value, Mapping) else {}
+    resources_value = record.get("resources")
+    resource_value = (
+        resources_value[0]
+        if isinstance(resources_value, Sequence)
+        and not isinstance(resources_value, (str, bytes))
+        and resources_value
+        else None
+    )
+    resource = resource_value if isinstance(resource_value, Mapping) else {}
+    cloud_value = record.get("cloud")
+    cloud = cloud_value if isinstance(cloud_value, Mapping) else {}
+    account_value = cloud.get("account")
+    account = account_value if isinstance(account_value, Mapping) else {}
+    unmapped_value = record.get("unmapped")
+    unmapped = unmapped_value if isinstance(unmapped_value, Mapping) else {}
+    return OcsfPreviewRecord(
+        finding_title=_optional_string(finding.get("title")),
+        finding_uid=_optional_string(finding.get("uid")),
+        status=_optional_string(record.get("status")),
+        status_code=_optional_string(record.get("status_code")),
+        severity=_optional_string(record.get("severity")),
+        resource_name=_optional_string(resource.get("name")),
+        resource_uid=_optional_string(resource.get("uid")),
+        cloud_provider=_optional_string(cloud.get("provider")),
+        cloud_region=_optional_string(cloud.get("region")),
+        cloud_account=_optional_string(account.get("uid")),
+        provider_uid=(
+            _optional_string(unmapped.get("provider_uid")) if not cloud else None
+        ),
+    )
+
+
+def _optional_string(value: object) -> str | None:
+    """Admit and bound only text at one statically selected preview path."""
+    if not isinstance(value, str):
+        return None
+    if len(value) <= _MAX_PREVIEW_VALUE_LENGTH:
+        return value
+    return f"{value[: _MAX_PREVIEW_VALUE_LENGTH - 3]}..."
 
 
 def _decode_json_lines(text: str) -> tuple[dict[str, Any], ...]:

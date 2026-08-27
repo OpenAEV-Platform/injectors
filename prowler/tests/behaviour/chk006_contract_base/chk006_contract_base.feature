@@ -67,10 +67,25 @@ Feature: Executable Prowler contract infrastructure and route catalog
     And mapping is not attempted
 
   Scenario: The base execution template maps successful raw output
-    Given a parsed provider and a successful raw Prowler result
+    Given a parsed provider and a successful Prowler result with separate console and OCSF artifact output
     When the AWS test subclass executes its route
     Then the injected factory runs exactly once with the route check filters
     And the typed outcome contains mapped CHK.005 findings
+    And it contains artifact byte and record counts plus at most ten allowlisted raw previews
+    But it does not retain the full decoded OCSF records
+
+  Scenario: Successful traces preserve mapped and bounded raw evidence
+    Given 2410 valid OCSF records containing safe fields and non-allowlisted canaries
+    When the base maps and renders the successful result
+    Then mapped findings are shown before a ruled raw OCSF evidence section
+    And the raw section shows total record and artifact byte counts
+    And its compact table contains at most ten allowlisted previews with an explicit omitted count
+    But arbitrary unmapped data, descriptions, remediation, resource data, console output, and credentials are absent
+
+  Scenario: Empty captured OCSF output is a valid successful result
+    Given a successful Prowler result with an empty OCSF artifact
+    When the base maps and renders the successful result
+    Then zero findings, records, bytes, previews, and omissions are reported without error
 
   Scenario: Contract outputs preserve findings and project vulnerabilities
     Given mapped SUCCESS, FAILED, and IGNORED findings
@@ -116,6 +131,7 @@ Feature: Executable Prowler contract infrastructure and route catalog
     And resolved events carry the canonical contract ID, route, provider, and approved provider context
     And AWS endpoint context contains only the normalized origin and override-presence boolean
     And successful terminal events include bounded finding and vulnerability counts
+    And successful terminal metadata includes mapper-produced raw record and artifact byte counts
     And malformed envelopes are rejected with a closed reason code and no payload
 
   Scenario: Runtime failures expose closed actionable diagnostics
@@ -129,6 +145,8 @@ Feature: Executable Prowler contract infrastructure and route catalog
     And known execution and output failures expose typed executable checks whenever command configuration is available
     And known engine failures expose only typed cause classes, limits, parser names, return codes, and captured byte counts applicable to their kind
     And OCSF decode and mapping failures are parsing failures with allowlisted code, bounded record index, and closed source path evidence
+    And artifact missing, nonregular, unreadable, oversized, workspace preparation, and workspace cleanup failures have distinct closed diagnostics
+    And real process return and byte-count evidence is retained for those failures when available
     And the OpenAEV trace shows the same code, reason, action, correlation, route context, and safe evidence as the log
     And unexpected exceptions collapse to unexpected_failure without exception details
     And no log contains form values, credentials, raw process output, exception details, callback data, finding content, or temporary credential paths

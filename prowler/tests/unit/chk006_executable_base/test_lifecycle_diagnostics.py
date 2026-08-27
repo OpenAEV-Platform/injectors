@@ -65,6 +65,7 @@ _RAW_CANARIES = (
     "STDIN-CANARY",
     "FINDING-CANARY",
     "CALLBACK-PAYLOAD-CANARY",
+    "CONSOLE-NON-JSON-CANARY",
 )
 
 
@@ -243,6 +244,8 @@ def test_success_lifecycle_has_ordered_correlated_context_and_safe_aws_facts(
     _DiagnosticContract.outcome = ContractExecutionOutcome(
         command_result=CommandResult(_specification(), return_code=0),
         findings=findings,
+        raw_record_count=3,
+        raw_output_bytes=4096,
     )
 
     injector.process_message(_message())
@@ -274,6 +277,10 @@ def test_success_lifecycle_has_ordered_correlated_context_and_safe_aws_facts(
     completed = calls[-2].args[1]
     assert completed["finding_count"] == 3
     assert completed["vulnerability_count"] == 1
+    assert completed["raw_record_count"] == 3
+    assert completed["raw_output_bytes"] == 4096
+    assert completed["artifact_capture_phase"] == "complete"
+    assert completed["ocsf_mapping_phase"] == "complete"
     assert completed["aws_account_id"] == "123456789012"
     assert completed["aws_region"] == "eu-west-1"
     assert completed["aws_endpoint_origin"] == (
@@ -640,19 +647,31 @@ def _write_executable(tmp_path: Path, body: str) -> Path:
 
 
 @pytest.mark.parametrize(
-    ("body", "expected_code", "expected_path"),
+    ("artifact", "expected_code", "expected_path"),
     (
-        ("printf '%s' '{\"broken\"'", "invalid_json", None),
-        ("printf '%s' '{}'", "missing_source_path", "finding_info|finding"),
+        ('{"broken"', "invalid_json", None),
+        ("{}", "missing_source_path", "finding_info|finding"),
     ),
 )
 def test_real_ocsf_failures_are_parsing_failures_with_closed_safe_evidence(
     tmp_path: Path,
-    body: str,
+    artifact: str,
     expected_code: str,
     expected_path: str | None,
 ) -> None:
     """Real successful processes retain typed OCSF decode/mapping diagnostics."""
+    body = (
+        'output_directory=""\n'
+        'while [ "$#" -gt 0 ]; do\n'
+        '  if [ "$1" = "--output-directory" ]; then\n'
+        "    shift\n"
+        '    output_directory="$1"\n'
+        "  fi\n"
+        "  shift\n"
+        "done\n"
+        f"printf '%s' '{artifact}' > \"$output_directory/findings.ocsf.json\"\n"
+        "printf '\033[31mCONSOLE-NON-JSON-CANARY\033[0m'"
+    )
     executable = _write_executable(tmp_path, body)
     injector, helper = _runtime(
         config=_config(str(executable)),

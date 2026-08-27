@@ -287,11 +287,13 @@ def test_execution_preserves_exact_command_error_without_mapping() -> None:
 def test_execution_maps_success_and_passes_route_filters_once(
     ocsf_record: dict[str, Any],
 ) -> None:
-    """Successful raw output is mapped after one filtered client run."""
+    """The captured artifact is mapped once while console output stays diagnostic."""
+    artifact = json.dumps([ocsf_record]).encode()
     result = CommandResult(
         specification=_specification(),
         return_code=0,
-        stdout=json.dumps([ocsf_record]).encode(),
+        stdout=b"\x1b[31mProwler console output is not JSON\x1b[0m",
+        parsed=artifact,
     )
     factory = _Factory(result)
     instance = _contract_class("aws")(client_factory=factory)
@@ -301,6 +303,10 @@ def test_execution_maps_success_and_passes_route_filters_once(
 
     assert outcome.error is None
     assert len(outcome.findings) == 1
+    assert outcome.raw_record_count == 1
+    assert outcome.raw_output_bytes == len(artifact)
+    assert len(outcome.raw_preview) == 1
+    assert outcome.raw_preview[0].finding_title == "Check title"
     assert factory.calls[0][2] == ("first-check", "second-check")
     assert len(factory.calls) == 1
 

@@ -132,6 +132,64 @@ def _summary(findings: Sequence[Mapping[str, Any]], field: str) -> str:
     return " ".join(f"{key}={counts[key]}" for key in sorted(counts)) or "none"
 
 
+def _joined_preview_cell(
+    preview: Mapping[str, Any], first: str, second: str, limit: int
+) -> str:
+    """Combine two statically allowlisted preview fields into one compact cell."""
+    first_value = _format_cell(preview.get(first, _MISSING), limit)
+    second_value = _format_cell(preview.get(second, _MISSING), limit)
+    if second_value == "-":
+        return first_value
+    if first_value == "-":
+        return second_value
+    return _format_cell(f"{first_value} [{second_value}]", limit)
+
+
+def _raw_preview_renderables(
+    raw_record_count: int,
+    raw_output_bytes: int,
+    raw_preview: Sequence[object],
+    max_cell_length: int,
+) -> list[RenderableType]:
+    """Render only the closed, already-projected raw OCSF evidence boundary."""
+    previews = [_display_mapping(item) for item in raw_preview[:10]]
+    table = Table(box=box.SIMPLE_HEAVY, show_lines=False, expand=True)
+    table.add_column("#", width=4)
+    for title in ("Finding", "Status", "Severity", "Resource", "Cloud / Provider UID"):
+        table.add_column(title, overflow="fold")
+    for index, preview in enumerate(previews, 1):
+        provider_uid = _format_cell(
+            preview.get("provider_uid", _MISSING), max_cell_length
+        )
+        cloud_parts = [
+            _format_cell(preview.get(key, _MISSING), max_cell_length)
+            for key in ("cloud_provider", "cloud_region", "cloud_account")
+        ]
+        usable_cloud = [part for part in cloud_parts if part != "-"]
+        cloud = " / ".join(usable_cloud) if usable_cloud else provider_uid
+        table.add_row(
+            str(index),
+            _joined_preview_cell(
+                preview, "finding_title", "finding_uid", max_cell_length
+            ),
+            _joined_preview_cell(preview, "status", "status_code", max_cell_length),
+            _format_cell(preview.get("severity", _MISSING), max_cell_length),
+            _joined_preview_cell(
+                preview, "resource_name", "resource_uid", max_cell_length
+            ),
+            _format_cell(cloud, max_cell_length),
+        )
+    omitted = max(0, raw_record_count - len(previews))
+    return [
+        Text(""),
+        Rule("[PROWLER] Raw OCSF evidence (bounded preview)", characters="─"),
+        Text(f"Total raw records: {raw_record_count}"),
+        Text(f"Artifact bytes: {raw_output_bytes}"),
+        table,
+        Text(f"Records omitted: {omitted}"),
+    ]
+
+
 def generate(
     route_name: str,
     provider_name: str,
@@ -141,6 +199,9 @@ def generate(
     trace_config: Mapping[str, Any] | None = None,
     is_error: bool = False,
     error_message: str = "",
+    raw_record_count: int = 0,
+    raw_output_bytes: int = 0,
+    raw_preview: Sequence[object] = (),
 ) -> str:
     """Capture one bounded Rich report from explicitly safe display inputs."""
     config = trace_config or {}
@@ -184,6 +245,8 @@ def generate(
         success = execution.add(Text("Call Success"))
         success.add(Text(f"Findings: {len(display_findings)}"))
         success.add(Text(f"Duration: {duration}s"))
+        success.add(Text(f"Artifact capture: complete ({raw_output_bytes} bytes)"))
+        success.add(Text(f"OCSF mapping: complete ({raw_record_count} raw records)"))
         success.add(
             Text(
                 "Status Summary: " f"{_summary(display_findings, 'expectation_result')}"
@@ -230,6 +293,14 @@ def generate(
                     *[Text("") for _ in columns[1:]],
                 )
             renderables.append(table)
+        renderables.extend(
+            _raw_preview_renderables(
+                raw_record_count,
+                raw_output_bytes,
+                raw_preview,
+                max_cell_length,
+            )
+        )
 
     console = Console(color_system=None, force_terminal=False, width=150)
     with console.capture() as capture:

@@ -15,6 +15,11 @@ from pyoaev.helpers import OpenAEVInjectorHelper
 from pyoaev.utils import AppLogger
 
 from prowler._core.cli_engine import CliEngineError, ExecutionError, ParsingError
+from prowler._core.prowler_client import (
+    OutputArtifactError,
+    OutputWorkspaceCleanupError,
+    OutputWorkspacePreparationError,
+)
 from prowler.contracts import DEFAULT_PROWLER_CONTRACTS, ProwlerContracts
 from prowler.contracts.base import (
     BaseProwlerContract,
@@ -178,6 +183,12 @@ _OCSF_SOURCE_PATHS = frozenset(
 _OCSF_INDEXED_SOURCE_PATH_PATTERN = re.compile(
     r"(?:compliance\.requirements|unmapped\.compliance)(?:\[[0-9]{1,6}\])+$"
 )
+_ARTIFACT_FAILURE_KIND = {
+    "missing": "output_artifact_missing",
+    "nonregular": "output_artifact_nonregular",
+    "unreadable": "output_artifact_unreadable",
+    "oversized": "output_artifact_oversized",
+}
 
 _GENERIC_INPUT_GUIDANCE = "Correct the listed assessment fields and retry."
 _GUIDANCE_BY_FAILURE_KIND = {
@@ -207,6 +218,24 @@ _GUIDANCE_BY_FAILURE_KIND = {
         "limit."
     ),
     "parsing_failed": "Verify Prowler emits valid JSON-OCSF output and retry.",
+    "output_artifact_missing": (
+        "Verify Prowler writes the expected OCSF artifact and retry."
+    ),
+    "output_artifact_nonregular": (
+        "Verify the Prowler OCSF output is a regular file and retry."
+    ),
+    "output_artifact_unreadable": (
+        "Verify the Prowler OCSF artifact is readable and retry."
+    ),
+    "output_artifact_oversized": (
+        "Reduce the assessment scope so the OCSF artifact stays within its limit."
+    ),
+    "output_workspace_preparation_failed": (
+        "Verify temporary output storage is available and retry."
+    ),
+    "output_workspace_cleanup_failed": (
+        "Review temporary output storage cleanup and retry the assessment."
+    ),
     "invalid_input": _GENERIC_INPUT_GUIDANCE,
     "rendering_failed": "Review injector trace rendering configuration and retry.",
     "reception_failed": "Check OpenAEV connectivity and retry assessment reception.",
@@ -226,6 +255,20 @@ _SUMMARY_BY_FAILURE_KIND = {
         "Captured Prowler output exceeded the injector safety limit."
     ),
     "parsing_failed": "Captured Prowler output could not be parsed safely.",
+    "output_artifact_missing": "The expected Prowler OCSF artifact was not created.",
+    "output_artifact_nonregular": (
+        "The Prowler OCSF artifact was not an accepted regular file."
+    ),
+    "output_artifact_unreadable": "The Prowler OCSF artifact could not be read.",
+    "output_artifact_oversized": (
+        "The Prowler OCSF artifact exceeded the accepted size limit."
+    ),
+    "output_workspace_preparation_failed": (
+        "The temporary Prowler output workspace could not be prepared."
+    ),
+    "output_workspace_cleanup_failed": (
+        "The temporary Prowler output workspace could not be cleaned."
+    ),
     "invalid_input": "The assessment input was invalid.",
     "rendering_failed": "The OpenAEV execution trace could not be rendered.",
     "reception_failed": "The assessment reception could not be acknowledged.",
@@ -458,7 +501,12 @@ class ProwlerInjector:
                         separators=(",", ":"),
                     )
                     execution_message = contract.render_trace(
-                        provider, outcome.findings, duration
+                        provider,
+                        outcome.findings,
+                        duration,
+                        raw_record_count=outcome.raw_record_count,
+                        raw_output_bytes=outcome.raw_output_bytes,
+                        raw_preview=outcome.raw_preview,
                     )
                 except Exception:
                     failure = self._classify_internal_failure(
@@ -689,6 +737,10 @@ class ProwlerInjector:
                     for finding in outcome.findings
                 )
             ),
+            raw_record_count=cls._bounded_count(outcome.raw_record_count),
+            raw_output_bytes=cls._bounded_bytes(outcome.raw_output_bytes),
+            artifact_capture_phase="complete",
+            ocsf_mapping_phase="complete",
         )
         return metadata
 
@@ -944,6 +996,15 @@ class ProwlerInjector:
                     else None
                 ),
             )
+        if stage == "assessment_execution" and isinstance(
+            error,
+            (
+                OutputArtifactError,
+                OutputWorkspacePreparationError,
+                OutputWorkspaceCleanupError,
+            ),
+        ):
+            return cls._classify_artifact_failure(error, configured_executable)
         executable = (
             cls._executable_evidence(configured_executable, None)
             if stage in {"assessment_execution", "output_preparation"}
@@ -960,6 +1021,62 @@ class ProwlerInjector:
             executable_exists=executable.executable_exists,
             executable_is_file=executable.executable_is_file,
             executable_is_executable=executable.executable_is_executable,
+        )
+
+    @classmethod
+    def _classify_artifact_failure(
+        cls,
+        error: (
+            OutputArtifactError
+            | OutputWorkspacePreparationError
+            | OutputWorkspaceCleanupError
+        ),
+        configured_executable: object | None,
+    ) -> _FailurePresentation:
+        """Classify typed artifact lifecycle errors without reading error text."""
+        if isinstance(error, OutputArtifactError):
+            failure_kind = _ARTIFACT_FAILURE_KIND.get(error.kind, "unexpected_failure")
+            failure_stage = "artifact_capture"
+        elif isinstance(error, OutputWorkspacePreparationError):
+            failure_kind = "output_workspace_preparation_failed"
+            failure_stage = "output_workspace_preparation"
+        else:
+            failure_kind = "output_workspace_cleanup_failed"
+            failure_stage = "output_workspace_cleanup"
+
+        result = getattr(error, "command_result", None)
+        specification = getattr(result, "specification", None)
+        executable = cls._executable_evidence(configured_executable, specification)
+        return_code: int | None = None
+        stdout_bytes: int | None = None
+        stderr_bytes: int | None = None
+        result_return_code = getattr(result, "return_code", None)
+        if isinstance(result_return_code, int) and not isinstance(
+            result_return_code, bool
+        ):
+            return_code = cls._bounded_return_code(result_return_code)
+            stdout = getattr(result, "stdout", b"")
+            stderr = getattr(result, "stderr", b"")
+            stdout_bytes = cls._bounded_bytes(
+                len(stdout) if isinstance(stdout, bytes) else 0
+            )
+            stderr_bytes = cls._bounded_bytes(
+                len(stderr) if isinstance(stderr, bytes) else 0
+            )
+        return _FailurePresentation(
+            stage=failure_stage,
+            failure_kind=failure_kind,
+            failure_summary=_SUMMARY_BY_FAILURE_KIND[failure_kind],
+            operator_guidance=_GUIDANCE_BY_FAILURE_KIND[failure_kind],
+            return_code=return_code,
+            configured_executable_path=executable.configured_executable_path,
+            actual_executable_path=executable.actual_executable_path,
+            executable_is_absolute=executable.executable_is_absolute,
+            executable_exists=executable.executable_exists,
+            executable_is_file=executable.executable_is_file,
+            executable_is_executable=executable.executable_is_executable,
+            stdout_bytes=stdout_bytes,
+            stderr_bytes=stderr_bytes,
         )
 
     @classmethod

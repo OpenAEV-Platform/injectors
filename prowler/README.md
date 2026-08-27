@@ -54,6 +54,15 @@ numeric-index, wildcard, and fallback display paths. Missing and empty results
 remain valid display states, while row and cell limits prevent oversized
 callbacks.
 
+On success, the mapped findings section remains first. A separate ruled
+`[PROWLER] Raw OCSF evidence (bounded preview)` section follows it with the
+artifact byte count, total decoded record count, no more than ten compact rows,
+and an explicit omitted-record count. Those rows are projected only from finding
+title/UID, status/code, severity, first-resource name/UID, cloud
+provider/region/account, or the legacy provider UID. Descriptions, remediation,
+resource data, arbitrary `unmapped` content, credentials, and console output do
+not enter the preview. Empty artifacts report zero counts and remain successful.
+
 The trace is presentation only. It is separate from registered contract outputs
 and does not alter `execution_output_structured`. The renderer receives an
 explicit allowlist built from the parsed provider model (route, filters, and
@@ -108,6 +117,13 @@ paths are never logged or added to error traces. ERROR logging keeps
 they cannot gate assessment delivery. Callback events distinguish
 `assessment_status` from `delivery_status`; a failed reception stops before any
 terminal callback is attempted.
+
+Artifact lifecycle failures are also closed and actionable. Missing, nonregular,
+unreadable, and oversized artifacts, plus output-workspace preparation and cleanup
+failures, each have a distinct failure code, fixed summary, and fixed action in
+both ERROR metadata and the OpenAEV trace. When the process already returned, its
+return code and stdout/stderr byte counts are retained as typed evidence; raw
+output, exception text, and temporary paths remain excluded.
 
 ## Provider input boundary
 
@@ -188,7 +204,10 @@ single expected artifact as `findings.ocsf.json` (`--output-filename findings`
 with `-M json-ocsf`). Console stdout and stderr remain bounded diagnostics; the
 artifact is opened only at its exact path as a regular, non-symlink file and is
 read incrementally to its separate 100 MiB limit. CHK.004 debug metadata reports
-only the artifact byte size; record counting belongs to the downstream mapper.
+only the artifact byte size. The downstream mapper decodes the captured artifact
+once, maps every record once, computes byte/record counts during that pass, retains
+only the mapped findings and ten field-allowlisted preview rows, and releases the
+full decoded records. Console stdout remains separate and is never parsed as OCSF.
 
 On Linux/POSIX, a writable directory at `/dev/shm` is preferred and labelled
 `memory_tmpfs`, keeping normal output in memory-backed temporary storage. It is

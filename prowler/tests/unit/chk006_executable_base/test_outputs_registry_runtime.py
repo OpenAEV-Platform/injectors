@@ -32,7 +32,7 @@ from prowler.models.configs.config_loader import (
     InjectorConfig,
     ProwlerConfig,
 )
-from prowler.models.findings import OpenAevFinding
+from prowler.models.findings import OcsfPreviewRecord, OpenAevFinding
 
 
 def _config() -> ConfigLoader:
@@ -284,6 +284,8 @@ def _runtime(findings: tuple[OpenAevFinding, ...]) -> tuple[Any, Mock]:
             return_code=0,
         ),
         findings=findings,
+        raw_record_count=3,
+        raw_output_bytes=4096,
     )
     helper = Mock()
     helper.api.inject.execution_reception.side_effect = (
@@ -441,6 +443,10 @@ def test_runtime_logs_fixed_safe_success_lifecycle(
     assert success_meta["status"] == "SUCCESS"
     assert success_meta["finding_count"] == 3
     assert success_meta["vulnerability_count"] == 1
+    assert success_meta["raw_record_count"] == 3
+    assert success_meta["raw_output_bytes"] == 4096
+    assert success_meta["artifact_capture_phase"] == "complete"
+    assert success_meta["ocsf_mapping_phase"] == "complete"
     assert success_meta["aws_account_id"] == "123456789012"
     assert success_meta["aws_region"] == "eu-west-1"
     callback_meta = calls[-1].args[1]
@@ -462,6 +468,51 @@ def test_runtime_logs_fixed_safe_success_lifecycle(
         "failed finding",
         "ignored finding",
     )
+
+
+def test_runtime_success_callback_bounds_raw_preview_without_structured_raw_data(
+    findings: tuple[OpenAevFinding, ...],
+) -> None:
+    """The real success callback carries only mapped output and a bounded raw trace."""
+    identifier = str(_subject().stable_contract_id("aws"))
+    injector, helper = _runtime(findings[:1])
+    _RuntimeContract.use_base_renderer = True
+    _RuntimeContract.outcome = replace(
+        _RuntimeContract.outcome,
+        raw_record_count=2410,
+        raw_output_bytes=987_654,
+        raw_preview=tuple(
+            OcsfPreviewRecord(
+                finding_title=f"safe-check-{index}",
+                finding_uid=f"safe-uid-{index}",
+                status="New",
+                status_code="PASS",
+                severity="High",
+                resource_name=f"safe-resource-{index}",
+                resource_uid=f"safe-resource-uid-{index}",
+                cloud_provider="aws",
+                cloud_region="eu-west-1",
+                cloud_account="safe-account",
+            )
+            for index in range(20)
+        ),
+    )
+    assert len(_RuntimeContract.outcome.raw_preview) == 10
+
+    injector.process_message(_message(identifier))
+
+    callback = helper.api.inject.execution_callback.call_args.kwargs["data"]
+    trace = callback["execution_message"]
+    structured = json.loads(callback["execution_output_structured"])
+    assert callback["execution_status"] == "SUCCESS"
+    assert tuple(structured) == ("findings", "vulnerabilities")
+    assert "raw_preview" not in structured
+    assert "raw_records" not in structured
+    assert "Total raw records: 2410" in trace
+    assert "Records omitted: 2400" in trace
+    assert "safe-check-9" in trace
+    assert "safe-check-10" not in trace
+    assert len(trace) < 20_000
 
 
 def test_runtime_logs_bounded_value_free_contract_input_issues(

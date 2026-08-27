@@ -26,8 +26,9 @@ from prowler.models.configs.config_loader import ProwlerConfig
 from prowler.models.findings import (
     OcsfDecodeError,
     OcsfMappingError,
+    OcsfPreviewRecord,
     OpenAevFinding,
-    map_command_result,
+    map_command_result_with_evidence,
 )
 from prowler.models.provider_inputs import (
     PROVIDER_INPUT_ADAPTER,
@@ -103,11 +104,18 @@ class ContractInputError(ValueError):
 
 @dataclass(frozen=True)
 class ContractExecutionOutcome:
-    """Typed findings plus the unchanged CHK.003/CHK.004 result boundary."""
+    """Typed findings and bounded evidence plus the unchanged command result."""
 
     command_result: CommandResult
     findings: tuple[OpenAevFinding, ...] = ()
+    raw_record_count: int = 0
+    raw_output_bytes: int = 0
+    raw_preview: tuple[OcsfPreviewRecord, ...] = ()
     error: Any | None = None
+
+    def __post_init__(self) -> None:
+        """Enforce the preview-count boundary even for custom contract outcomes."""
+        object.__setattr__(self, "raw_preview", tuple(self.raw_preview[:10]))
 
 
 _CONTRACT_CONFIG = ContractConfig(
@@ -239,6 +247,9 @@ class BaseProwlerContract(ABC):
         findings: Sequence[OpenAevFinding],
         duration: int,
         *,
+        raw_record_count: int = 0,
+        raw_output_bytes: int = 0,
+        raw_preview: Sequence[OcsfPreviewRecord] = (),
         is_error: bool = False,
         error_message: str = "",
     ) -> str:
@@ -248,6 +259,9 @@ class BaseProwlerContract(ABC):
             provider_name=self.provider,
             request_info=self.safe_request_info(provider),
             findings=findings,
+            raw_record_count=raw_record_count,
+            raw_output_bytes=raw_output_bytes,
+            raw_preview=raw_preview,
             duration=duration,
             trace_config=self.output_trace_config(),
             is_error=is_error,
@@ -317,7 +331,13 @@ class BaseProwlerContract(ABC):
         if result.error is not None or result.return_code != 0:
             return ContractExecutionOutcome(command_result=result, error=result.error)
         try:
-            findings = map_command_result(result)
+            mapping = map_command_result_with_evidence(result)
         except (OcsfDecodeError, OcsfMappingError) as error:
             return ContractExecutionOutcome(command_result=result, error=error)
-        return ContractExecutionOutcome(command_result=result, findings=findings)
+        return ContractExecutionOutcome(
+            command_result=result,
+            findings=mapping.findings,
+            raw_record_count=mapping.raw_record_count,
+            raw_output_bytes=mapping.raw_output_bytes,
+            raw_preview=mapping.raw_preview,
+        )
