@@ -7,6 +7,7 @@ from .client import (
     ProwlerClient,
     ProwlerClientConsumedError,
 )
+from .contracts import AwsServiceSelector
 from .credentials import (
     CredentialCleanupError,
     TemporaryCredentialLease,
@@ -37,6 +38,7 @@ __all__ = [
     "OutputArtifactError",
     "OutputWorkspaceCleanupError",
     "OutputWorkspacePreparationError",
+    "AwsServiceSelector",
     "ProwlerClient",
     "ProwlerClientConsumedError",
     "ProwlerClientFactory",
