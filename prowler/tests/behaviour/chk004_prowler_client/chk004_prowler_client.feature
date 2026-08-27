@@ -32,6 +32,12 @@ Feature: Synchronous Prowler CLI assessments
       | GCP        |
       | Kubernetes |
 
+  Scenario: Kubernetes selects a kubeconfig context with Prowler 5.36 syntax
+    Given a Kubernetes provider input with a named context
+    When the client runs the provider assessment
+    Then Prowler receives the context through --context
+    And the stale --kube-context option is absent
+
   # ---- Constraints identified ----
 
   Scenario: Blank check filters are rejected before execution

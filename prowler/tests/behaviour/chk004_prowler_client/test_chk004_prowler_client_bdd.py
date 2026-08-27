@@ -121,7 +121,7 @@ def test_check_filters_are_separate_ordered_tokens(
                 "kubernetes",
                 "--kubeconfig-file",
                 "<temporary>",
-                "--kube-context",
+                "--context",
                 "cluster-context",
                 "-M",
                 "json-ocsf",
@@ -156,6 +156,17 @@ def test_provider_invocation_is_explicit_and_secret_safe(
         secret not in rendered
         for secret in ("aws-secret", "azure-secret", "gcp-secret", "kube-secret")
     )
+
+
+def test_kubernetes_uses_prowler_536_context_flag_not_stale_alias(
+    recording_engine: RecordingEngine, provider_inputs: dict[str, Any]
+) -> None:
+    _factory(recording_engine).run(_config(), provider_inputs["Kubernetes"])
+
+    arguments = recording_engine.requests[0].arguments
+    assert "--context" in arguments
+    assert arguments[arguments.index("--context") + 1] == "cluster-context"
+    assert "--kube-context" not in arguments
 
 
 @pytest.mark.parametrize("filters", [("",), ("  ",), ("ok", "\t")])
