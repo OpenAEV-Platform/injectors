@@ -171,7 +171,10 @@ def generate(
     renderables.append(request_tree)
     renderables.extend((Text(""), Rule(characters="─")))
 
-    execution = Tree(Text("[PROWLER] Assessment completed"), guide_style="bold")
+    heading = (
+        "[PROWLER] Assessment failed" if is_error else "[PROWLER] Assessment completed"
+    )
+    execution = Tree(Text(heading), guide_style="bold")
     if is_error:
         failure = execution.add(Text("Call Failed"))
         failure.add(Text(f"Error: {_format_cell(error_message, max_cell_length)}"))

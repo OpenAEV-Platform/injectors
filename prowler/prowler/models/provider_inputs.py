@@ -23,6 +23,9 @@ def _reject_blank(value: object) -> object:
 
 NonBlankStr = Annotated[str, BeforeValidator(_reject_blank)]
 NonBlankSecretStr = Annotated[SecretStr, BeforeValidator(_reject_blank)]
+AwsAccountId = Annotated[
+    str, BeforeValidator(_reject_blank), Field(pattern=r"^[0-9]{12}$")
+]
 
 
 class ImmutableProviderInput(BaseModel):
@@ -47,7 +50,7 @@ class AwsProviderInput(ImmutableProviderInput):
     provider: Literal["aws"]
     aws_access_key_id: NonBlankStr
     aws_secret_access_key: NonBlankSecretStr
-    aws_account_id: NonBlankStr
+    aws_account_id: AwsAccountId
     aws_region: NonBlankStr
     aws_session_token: NonBlankSecretStr | None = None
     aws_endpoint_url: str | None = None

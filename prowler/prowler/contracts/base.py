@@ -74,13 +74,26 @@ class ContractInputIssue:
 class ContractInputError(ValueError):
     """Safe structured failure at the OpenAEV form boundary."""
 
-    def __init__(self, issues: tuple[ContractInputIssue, ...]) -> None:
+    def __init__(
+        self,
+        issues: tuple[ContractInputIssue, ...],
+        *,
+        _trusted_issues: bool = False,
+    ) -> None:
         """Retain only safe structural issues."""
         self.issues = issues
+        self.issues_are_trusted = _trusted_issues
         summary = ", ".join(
             f"{'.'.join(issue.location)}:{issue.error_type}" for issue in issues
         )
         super().__init__(f"Invalid Prowler contract input ({summary})")
+
+    @classmethod
+    def from_validation(
+        cls, issues: tuple[ContractInputIssue, ...]
+    ) -> ContractInputError:
+        """Mark issues produced by this contract's strict validation boundary."""
+        return cls(issues, _trusted_issues=True)
 
 
 @dataclass(frozen=True)
@@ -265,7 +278,7 @@ class BaseProwlerContract(ABC):
     def parse_input(self, raw_input: Mapping[str, object]) -> ProviderInput:
         """Convert ephemeral form values immediately into the strict CHK.002 model."""
         if "provider" in raw_input:
-            raise ContractInputError(
+            raise ContractInputError.from_validation(
                 (ContractInputIssue(("provider",), "extra_forbidden"),)
             )
         candidate = dict(raw_input)
@@ -287,7 +300,7 @@ class BaseProwlerContract(ABC):
                     include_url=False, include_context=False, include_input=False
                 )
             )
-            raise ContractInputError(issues) from None
+            raise ContractInputError.from_validation(issues) from None
 
     def execute(
         self, config: ProwlerConfig, provider: ProviderInput

@@ -201,6 +201,7 @@ class _RuntimeContract(BaseProwlerContract):
     outcome: ClassVar[ContractExecutionOutcome]
     parse_failure: ClassVar[Exception | None] = None
     render_failure: ClassVar[bool] = False
+    use_base_renderer: ClassVar[bool] = False
 
     def parse_input(self, raw_input: Any) -> Any:
         self.events.append(f"parse:{tuple(raw_input)}")
@@ -216,15 +217,16 @@ class _RuntimeContract(BaseProwlerContract):
     def render_trace(
         self, provider: Any, findings: Any, duration: int, **kwargs: Any
     ) -> str:
-        del provider, findings, duration
         self.events.append(
             "render:error" if kwargs.get("is_error") else "render:success"
         )
         if self.render_failure:
             raise RuntimeError("RENDERER-EXCEPTION-CANARY")
-        return (
-            "CONTRACT RICH ERROR" if kwargs.get("is_error") else "CONTRACT RICH SUCCESS"
-        )
+        if self.use_base_renderer:
+            return super().render_trace(provider, findings, duration, **kwargs)
+        if kwargs.get("is_error"):
+            return f"CONTRACT RICH ERROR\n{kwargs['error_message']}"
+        return "CONTRACT RICH SUCCESS"
 
 
 def _message(
@@ -266,6 +268,7 @@ def _runtime(findings: tuple[OpenAevFinding, ...]) -> tuple[Any, Mock]:
     _RuntimeContract.events = []
     _RuntimeContract.parse_failure = None
     _RuntimeContract.render_failure = False
+    _RuntimeContract.use_base_renderer = False
     _RuntimeContract.outcome = ContractExecutionOutcome(
         command_result=CommandResult(
             specification=ExecutionSpecification(
@@ -300,6 +303,35 @@ _EXECUTION_STARTED = "[PROWLER_INJECTOR] - Assessment execution started"
 _ASSESSMENT_SUCCEEDED = "[PROWLER_INJECTOR] - Assessment completed"
 _ASSESSMENT_FAILED = "[PROWLER_INJECTOR] - Assessment failed safely"
 _CALLBACK_COMPLETED = "[PROWLER_INJECTOR] - Assessment callback completed"
+
+_GUIDANCE = {
+    "cli_engine_error": "Review the injector configuration and retry the assessment.",
+    "policy_rejected": (
+        "Correct the assessment request to satisfy the execution policy."
+    ),
+    "policy_evaluation_failed": "Review the injector policy configuration and retry.",
+    "resolution_failed": (
+        "Check that prowler.executable_path points to an available executable."
+    ),
+    "execution_failed": (
+        "Verify the Prowler runtime is available and retry the assessment."
+    ),
+    "timeout": "Increase the configured timeout or reduce the assessment scope.",
+    "process_start_failed": (
+        "Verify the Prowler process can start with the configured executable."
+    ),
+    "unsuccessful_process": (
+        "Review the Prowler configuration and retry the assessment."
+    ),
+    "output_too_large_after_capture": (
+        "Reduce the assessment scope or increase the configured output limit."
+    ),
+    "parsing_failed": "Verify Prowler emits valid JSON-OCSF output and retry.",
+    "invalid_input": "Correct the listed assessment fields and retry.",
+    "rendering_failed": "Review injector trace rendering configuration and retry.",
+    "callback_failed": "Check OpenAEV connectivity and retry callback delivery.",
+    "unexpected_failure": "Review injector configuration and retry the assessment.",
+}
 
 
 def _assert_logger_excludes(helper: Mock, *markers: str) -> None:
@@ -433,6 +465,7 @@ def test_runtime_logs_bounded_value_free_contract_input_issues(
         "duration_seconds": error_meta["duration_seconds"],
         "stage": "input_validation",
         "failure_kind": "invalid_input",
+        "operator_guidance": _GUIDANCE["invalid_input"],
         "issues": [
             {
                 "location": ["aws_secret_access_key"],
@@ -462,6 +495,181 @@ def test_runtime_logs_bounded_value_free_contract_input_issues(
         "Invalid Prowler contract input",
         "SECRET-MARKER",
     )
+
+
+def test_runtime_guides_a_real_invalid_aws_account_without_echoing_it(
+    findings: tuple[OpenAevFinding, ...],
+) -> None:
+    """A real contract pattern failure receives its exact bounded guidance."""
+    identifier = str(_subject().stable_contract_id("aws"))
+    injector, helper = _runtime(findings)
+    invalid_account = "１２３４５６７８９０１２-ACCOUNT-CANARY"
+
+    injector.process_message(
+        _message(
+            identifier,
+            content={
+                "aws_access_key_id": "runtime-access",
+                "aws_secret_access_key": "runtime-secret",
+                "aws_account_id": invalid_account,
+                "aws_region": "eu-west-1",
+            },
+        )
+    )
+
+    error_meta = helper.injector_logger.local_logger.error.call_args.kwargs["extra"][
+        "attributes"
+    ]
+    expected = "AWS account ID must contain exactly 12 ASCII digits."
+    assert error_meta["failure_kind"] == "invalid_input"
+    assert error_meta["operator_guidance"] == expected
+    assert error_meta["issues"] == [
+        {
+            "location": ["aws", "aws_account_id"],
+            "type": "string_pattern_mismatch",
+        }
+    ]
+    callback = helper.api.inject.execution_callback.call_args.kwargs["data"]
+    assert "Error code: invalid_input" in callback["execution_message"]
+    assert callback["execution_message"].count(expected) == 1
+    assert invalid_account not in callback["execution_message"]
+    _assert_logger_excludes(helper, invalid_account)
+
+
+def test_runtime_guides_a_real_known_field_with_allowlisted_words(
+    findings: tuple[OpenAevFinding, ...],
+) -> None:
+    """Known field and issue allowlists form one bounded correction sentence."""
+    identifier = str(_subject().stable_contract_id("aws"))
+    injector, helper = _runtime(findings)
+    invalid_region = {"REGION-CANARY": "FORM-VALUE-CANARY"}
+
+    injector.process_message(
+        _message(
+            identifier,
+            content={
+                "aws_access_key_id": "runtime-access",
+                "aws_secret_access_key": "runtime-secret",
+                "aws_account_id": "123456789012",
+                "aws_region": invalid_region,
+            },
+        )
+    )
+
+    error_meta = helper.injector_logger.local_logger.error.call_args.kwargs["extra"][
+        "attributes"
+    ]
+    expected = "AWS region must be text."
+    assert error_meta["operator_guidance"] == expected
+    assert len(expected) <= 100
+    callback = helper.api.inject.execution_callback.call_args.kwargs["data"]
+    assert callback["execution_message"].count(expected) == 1
+    assert "REGION-CANARY" not in callback["execution_message"]
+    _assert_logger_excludes(helper, "REGION-CANARY", "FORM-VALUE-CANARY")
+
+
+@pytest.mark.parametrize(
+    "issues",
+    (
+        (ContractInputIssue(("aws", "aws_account_id"), "string_pattern_mismatch"),),
+        (ContractInputIssue(("unknown-canary",), "missing"),),
+        (
+            ContractInputIssue(
+                ("aws", "aws_account_id", "aws", "aws_account_id"),
+                "string_pattern_mismatch",
+            ),
+        ),
+    ),
+)
+def test_runtime_gives_forged_or_untrusted_issues_only_generic_guidance(
+    findings: tuple[OpenAevFinding, ...],
+    issues: tuple[ContractInputIssue, ...],
+) -> None:
+    """Untrusted issue structures cannot select field-specific guidance."""
+    identifier = str(_subject().stable_contract_id("aws"))
+    injector, helper = _runtime(findings)
+    _RuntimeContract.parse_failure = ContractInputError(issues)
+
+    injector.process_message(_message(identifier))
+
+    error_meta = helper.injector_logger.local_logger.error.call_args.kwargs["extra"][
+        "attributes"
+    ]
+    assert error_meta["operator_guidance"] == _GUIDANCE["invalid_input"]
+    callback = helper.api.inject.execution_callback.call_args.kwargs["data"]
+    assert callback["execution_message"].count(_GUIDANCE["invalid_input"]) == 1
+    assert "AWS account ID must contain" not in callback["execution_message"]
+
+
+def test_runtime_resolution_guidance_ignores_all_process_canaries(
+    findings: tuple[OpenAevFinding, ...],
+) -> None:
+    """Resolution guidance is fixed independently of command and error internals."""
+    identifier = str(_subject().stable_contract_id("aws"))
+    injector, helper = _runtime(findings)
+    command_result = replace(
+        _RuntimeContract.outcome.command_result,
+        stdout=b"STDOUT-RESOLUTION-CANARY",
+        stderr=b"STDERR-RESOLUTION-CANARY",
+        error=ResolutionError("MESSAGE-RESOLUTION-CANARY"),
+    )
+    _RuntimeContract.outcome = ContractExecutionOutcome(
+        command_result=command_result,
+        error=command_result.error,
+    )
+
+    injector.process_message(_message(identifier))
+
+    expected = _GUIDANCE["resolution_failed"]
+    error_meta = helper.injector_logger.local_logger.error.call_args.kwargs["extra"][
+        "attributes"
+    ]
+    callback = helper.api.inject.execution_callback.call_args.kwargs["data"]
+    assert error_meta["operator_guidance"] == expected
+    assert callback["execution_message"].count(expected) == 1
+    for canary in (
+        "MESSAGE-RESOLUTION-CANARY",
+        "TEMP-CREDENTIAL-PATH-CANARY",
+        "ARG-CANARY",
+        "ENV-CANARY",
+        "STDIN-CANARY",
+        "STDOUT-RESOLUTION-CANARY",
+        "STDERR-RESOLUTION-CANARY",
+    ):
+        assert canary not in callback["execution_message"]
+        _assert_logger_excludes(helper, canary)
+
+
+def test_real_error_renderer_receives_no_form_values_or_findings(
+    findings: tuple[OpenAevFinding, ...],
+) -> None:
+    """The actual Rich error trace receives no parsed form or finding content."""
+    identifier = str(_subject().stable_contract_id("aws"))
+    injector, helper = _runtime(findings)
+    _RuntimeContract.use_base_renderer = True
+    _RuntimeContract.outcome = ContractExecutionOutcome(
+        command_result=_RuntimeContract.outcome.command_result,
+        findings=findings,
+        error=ResolutionError("ERROR-MESSAGE-CANARY"),
+    )
+
+    injector.process_message(_message(identifier))
+
+    callback = helper.api.inject.execution_callback.call_args.kwargs["data"]
+    trace = callback["execution_message"]
+    assert "Error code: resolution_failed" in trace
+    assert _GUIDANCE["resolution_failed"] in trace
+    for canary in (
+        "runtime-access",
+        "runtime-secret",
+        "123456789012",
+        "eu-west-1",
+        "success finding",
+        "failed finding",
+        "ignored finding",
+        "ERROR-MESSAGE-CANARY",
+    ):
+        assert canary not in trace
 
 
 @pytest.mark.parametrize(
@@ -580,16 +788,20 @@ def test_runtime_logs_only_allowlisted_assessment_failure_metadata(
         "duration_seconds": error_meta["duration_seconds"],
         "stage": "assessment_execution",
         "failure_kind": expected_kind,
+        "operator_guidance": _GUIDANCE[expected_kind],
     }
     if expected_return_code is not None:
         expected_meta["return_code"] = expected_return_code
     assert error_meta == expected_meta
+    assert len(error_meta["operator_guidance"]) <= 100
     assert (
         helper.injector_logger.local_logger.error.call_args.kwargs["exc_info"] is False
     )
     callback = helper.api.inject.execution_callback.call_args.kwargs["data"]
     assert callback["execution_status"] == "ERROR"
-    assert callback["execution_message"] == "CONTRACT RICH ERROR"
+    assert f"Error code: {expected_kind}" in callback["execution_message"]
+    assert _GUIDANCE[expected_kind] in callback["execution_message"]
+    assert callback["execution_message"].count(_GUIDANCE[expected_kind]) == 1
     assert "execution_output_structured" not in callback
     _assert_logger_excludes(
         helper,
@@ -623,7 +835,11 @@ def test_runtime_collapses_unexpected_exception_without_exception_details(
     ]
     assert error_meta["stage"] == "input_validation"
     assert error_meta["failure_kind"] == "unexpected_failure"
+    assert error_meta["operator_guidance"] == _GUIDANCE["unexpected_failure"]
     assert "issues" not in error_meta
+    callback = helper.api.inject.execution_callback.call_args.kwargs["data"]
+    assert "Error code: unexpected_failure" in callback["execution_message"]
+    assert _GUIDANCE["unexpected_failure"] in callback["execution_message"]
     _assert_logger_excludes(
         helper, "EXCEPTION-STRING-CANARY", "TEMP-CREDENTIAL-PATH-CANARY"
     )
@@ -690,6 +906,7 @@ def test_runtime_caps_and_normalizes_attacker_controlled_input_issues(
         "attributes"
     ]
     assert error_meta["failure_kind"] == "invalid_input"
+    assert error_meta["operator_guidance"] == _GUIDANCE["invalid_input"]
     assert 0 < len(error_meta["issues"]) <= 16
     assert error_meta["issues_omitted"] == 284
     assert error_meta["issues_truncated"] is True
@@ -712,6 +929,10 @@ def test_runtime_caps_and_normalizes_attacker_controlled_input_issues(
     assert "ATTACKER-KEY" not in rendered
     assert "ATTACKER-TYPE" not in rendered
     assert "TYPE-CANARY" not in rendered
+    callback = helper.api.inject.execution_callback.call_args.kwargs["data"]
+    assert len(callback["execution_message"]) <= 2_000
+    assert "Error code: invalid_input" in callback["execution_message"]
+    assert callback["execution_message"].count(_GUIDANCE["invalid_input"]) == 1
 
 
 @pytest.mark.parametrize("content", (None, "RAW-CONTENT-CANARY", ("tuple",)))
@@ -731,6 +952,7 @@ def test_runtime_classifies_missing_or_non_mapping_content_as_invalid_input(
     ]
     assert error_meta["stage"] == "input_validation"
     assert error_meta["failure_kind"] == "invalid_input"
+    assert error_meta["operator_guidance"] == _GUIDANCE["invalid_input"]
     assert error_meta["issues"] == []
     _assert_logger_excludes(helper, "RAW-CONTENT-CANARY", "tuple")
 
@@ -778,8 +1000,6 @@ def test_runtime_renderer_failure_falls_back_without_a_second_render(
     findings: tuple[OpenAevFinding, ...],
 ) -> None:
     """A broken success renderer yields one fixed safe terminal callback."""
-    from prowler.injector.openaev_prowler import _SAFE_EXECUTION_ERROR
-
     identifier = str(_subject().stable_contract_id("aws"))
     injector, helper = _runtime(findings)
     _RuntimeContract.render_failure = True
@@ -791,12 +1011,41 @@ def test_runtime_renderer_failure_falls_back_without_a_second_render(
     helper.api.inject.execution_callback.assert_called_once()
     callback = helper.api.inject.execution_callback.call_args.kwargs["data"]
     assert callback["execution_status"] == "ERROR"
-    assert callback["execution_message"] == _SAFE_EXECUTION_ERROR
+    assert callback["execution_message"] == (
+        "Error code: rendering_failed\n" + _GUIDANCE["rendering_failed"]
+    )
     error_meta = helper.injector_logger.local_logger.error.call_args.kwargs["extra"][
         "attributes"
     ]
     assert error_meta["stage"] == "output_preparation"
     assert error_meta["failure_kind"] == "rendering_failed"
+    assert error_meta["operator_guidance"] == _GUIDANCE["rendering_failed"]
+    assert len(error_meta["operator_guidance"]) <= 100
+    _assert_logger_excludes(helper, "RENDERER-EXCEPTION-CANARY")
+
+
+def test_runtime_error_renderer_failure_keeps_the_classified_code_and_guidance(
+    findings: tuple[OpenAevFinding, ...],
+) -> None:
+    """A broken error renderer falls back after its one permitted render attempt."""
+    identifier = str(_subject().stable_contract_id("aws"))
+    injector, helper = _runtime(findings)
+    _RuntimeContract.parse_failure = ContractInputError(())
+    _RuntimeContract.render_failure = True
+
+    injector.process_message(_message(identifier))
+
+    assert _RuntimeContract.events.count("render:error") == 1
+    assert "render:success" not in _RuntimeContract.events
+    callback = helper.api.inject.execution_callback.call_args.kwargs["data"]
+    assert callback["execution_status"] == "ERROR"
+    assert callback["execution_message"] == (
+        "Error code: invalid_input\n" + _GUIDANCE["invalid_input"]
+    )
+    error_meta = helper.injector_logger.local_logger.error.call_args.kwargs["extra"][
+        "attributes"
+    ]
+    assert error_meta["operator_guidance"] == _GUIDANCE["invalid_input"]
     _assert_logger_excludes(helper, "RENDERER-EXCEPTION-CANARY")
 
 
@@ -821,6 +1070,8 @@ def test_runtime_callback_failure_is_contained_and_logged_once(
     assert len(callback_errors) == 1
     callback_meta = callback_errors[0].kwargs["extra"]["attributes"]
     assert callback_meta["failure_kind"] == "callback_failed"
+    assert callback_meta["operator_guidance"] == _GUIDANCE["callback_failed"]
+    assert len(callback_meta["operator_guidance"]) <= 100
     assert callback_errors[0].kwargs["exc_info"] is False
     _assert_logger_excludes(
         helper, "CALLBACK-EXCEPTION-CANARY", "RESPONSE-PAYLOAD-CANARY"
@@ -895,7 +1146,8 @@ def test_runtime_resolved_contract_uses_renderer_for_safe_error(
     ]
     callback = helper.api.inject.execution_callback.call_args.kwargs["data"]
     assert callback["execution_status"] == "ERROR"
-    assert callback["execution_message"] == "CONTRACT RICH ERROR"
+    assert "Error code: unexpected_failure" in callback["execution_message"]
+    assert _GUIDANCE["unexpected_failure"] in callback["execution_message"]
     assert "SECRET-MARKER" not in callback["execution_message"]
 
 

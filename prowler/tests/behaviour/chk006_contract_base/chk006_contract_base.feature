@@ -116,7 +116,10 @@ Feature: Executable Prowler contract infrastructure and route catalog
     When the runtime prepares the existing safe ERROR callback
     Then missing or non-mapping form content is invalid input with no issues
     And input diagnostics contain only capped, normalized, value-free issue locations and types
-    And assessment diagnostics use only allowlisted CLI failure kinds and an optional return code
+    And a real malformed AWS account receives exact bounded account guidance
+    And forged or unknown input issues receive generic bounded guidance
+    And assessment diagnostics use only allowlisted CLI failure kinds, fixed operator guidance, and an optional return code
+    And the OpenAEV trace shows the same failure kind and operator guidance as the log
     And unexpected exceptions collapse to unexpected_failure without exception details
     And no log contains form values, credentials, process internals, callback data, finding content, or temporary paths
 
@@ -124,9 +127,16 @@ Feature: Executable Prowler contract infrastructure and route catalog
     Given a supplied registry with one concrete test contract
     When lifecycle logging, trace rendering, or callback delivery raises
     Then logging failures do not prevent parsing, execution, or the terminal callback attempt
-    And a renderer failure uses the fixed safe execution error without a second render attempt
+    And a renderer failure uses a plain bounded code-and-guidance fallback without a second render attempt
     And callback delivery is attempted once without retrying or exposing exception details
     And ERROR records explicitly disable exception information
+
+  Scenario: Error traces identify failed assessments
+    Given a terminal assessment failure with a closed failure presentation
+    When the base renders the OpenAEV trace
+    Then its heading says the assessment failed
+    And its error text contains the safe failure code and one matching guidance string
+    But a successful assessment heading still says the assessment completed
 
   Scenario: Stable route identities are deterministic and unique
     When platform identifiers are derived for the canonical routes

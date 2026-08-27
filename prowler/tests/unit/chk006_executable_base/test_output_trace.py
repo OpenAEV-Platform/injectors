@@ -118,10 +118,13 @@ def test_defaults_summaries_empty_state_and_error_are_deterministic() -> None:
 
     assert "No findings to display" in _generate([])
     error = _generate(
-        [], is_error=True, error_message="Prowler contract execution failed safely"
+        [], is_error=True, error_message="Error code: timeout\nRetry safely."
     )
     assert "Call Failed" in error
-    assert "Prowler contract execution failed safely" in error
+    assert "[PROWLER] Assessment failed" in error
+    assert "Error code: timeout" in error
+    assert "Retry safely." in error
+    assert "[PROWLER] Assessment completed" in trace
 
 
 def test_trace_limits_rows_cells_and_request_values() -> None:

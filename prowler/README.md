@@ -60,18 +60,23 @@ explicit allowlist built from the parsed provider model (route, filters, and
 non-secret account, subscription, project, context, region, or requested-provider
 context). It never receives the raw form payload, credential fields, command
 environment or arguments, temporary credential paths, or raw stderr. Runtime
-errors use a fixed safe message rather than exception or command internals.
+errors use a closed failure code and one bounded operator-guidance sentence rather
+than exception, form, finding, callback, or command internals. The same guidance
+appears in both ERROR log metadata and the OpenAEV error trace. If Rich rendering
+fails, the callback falls back to the same plain code and guidance without a
+second render attempt.
 
 The runtime emits fixed `[PROWLER_INJECTOR]` lifecycle diagnostics through the
 injector logger. Valid assessments identify only the canonical route and
 provider plus bounded status, duration, and result counts. Malformed envelopes
 receive a fixed warning without payload data. Input rejection reports only a
-controlled stage and failure kind plus `ContractInputError` field locations and
-error types; assessment failures expose only an allowlisted CLI error kind and,
-when present, its numeric return code. Raw form values, injection identifiers,
-credentials, arguments, environment values, process output, exception text or
-traceback, callback payloads, finding content, and temporary credential paths
-are not logged.
+controlled stage and failure kind, bounded `operator_guidance`, and
+`ContractInputError` field locations and error types; assessment failures expose
+only an allowlisted CLI error kind, fixed guidance, and, when present, its numeric
+return code. Raw form values, injection identifiers, credentials, arguments,
+environment values, process output, exception text or traceback, callback
+payloads, finding content, and temporary credential paths are not logged or
+rendered into error traces.
 
 ## Provider input boundary
 
@@ -99,6 +104,12 @@ host and must not contain user information, a query, a fragment, or whitespace.
 Paths and valid ports are allowed, including endpoints on localhost, private
 networks, and container services. The accepted value remains an ordinary string,
 and validation does not check network reachability.
+
+AWS account IDs contain exactly 12 ASCII digits. Contract validation reports the
+safe field/type structure and gives operators a fixed correction sentence without
+echoing the rejected value. Empty OpenAEV controls for `aws_session_token` and
+`aws_endpoint_url` are treated as omitted only at the AWS contract boundary;
+direct provider-model validation remains strict.
 
 ## Prowler 5.36 CLI compatibility
 
