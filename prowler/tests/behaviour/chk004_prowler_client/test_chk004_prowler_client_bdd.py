@@ -141,16 +141,21 @@ def test_provider_invocation_is_explicit_and_secret_safe(
 
     request = recording_engine.requests[0]
     arguments = tuple(
-        "<temporary>" if index in {2} and provider_name in {"GCP", "Kubernetes"} else item
+        (
+            "<temporary>"
+            if index in {2} and provider_name in {"GCP", "Kubernetes"}
+            else item
+        )
         for index, item in enumerate(request.arguments)
     )
     assert arguments == expected_arguments
     assert set(_environment(request)) == expected_environment
-    assert all(
-        isinstance(value, SecretStr) for value in _environment(request).values()
-    )
+    assert all(isinstance(value, SecretStr) for value in _environment(request).values())
     rendered = repr(request.arguments)
-    assert all(secret not in rendered for secret in ("aws-secret", "azure-secret", "gcp-secret", "kube-secret"))
+    assert all(
+        secret not in rendered
+        for secret in ("aws-secret", "azure-secret", "gcp-secret", "kube-secret")
+    )
 
 
 @pytest.mark.parametrize("filters", [("",), ("  ",), ("ok", "\t")])

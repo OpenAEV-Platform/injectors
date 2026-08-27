@@ -20,6 +20,8 @@ from prowler.models.provider_inputs import (
 
 @dataclass
 class RecordingEngine:
+    """Record requests and inspect temporary files during synchronous runs."""
+
     requests: list[Any] = field(default_factory=list)
     result: Any = None
     raised: BaseException | None = None
@@ -51,6 +53,8 @@ class RecordingEngine:
 
 @dataclass
 class RecordingEngineFactory:
+    """Return an injected recording engine."""
+
     engine: RecordingEngine
     create_calls: int = 0
 

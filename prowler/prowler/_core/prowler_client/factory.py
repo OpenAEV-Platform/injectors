@@ -1,0 +1,40 @@
+"""Composition root and quick-access API for synchronous Prowler clients."""
+
+from collections.abc import Sequence
+from dataclasses import dataclass
+
+from prowler._core.cli_engine import CliEngineFactory, CommandResult
+from prowler.models.configs.config_loader import ProwlerConfig
+from prowler.models.provider_inputs import ProviderInput
+
+from .client import ProwlerClient
+from .contracts import CliEngineFactoryPort, CredentialFileFactoryPort
+from .credentials import SecureCredentialFileFactory
+from .provider_adapter import ProviderInvocationAdapter
+
+
+@dataclass(frozen=True)
+class ProwlerClientFactory:
+    """Create clients from safe defaults or explicitly injected test ports."""
+
+    engine_factory: CliEngineFactoryPort = CliEngineFactory()
+    credential_file_factory: CredentialFileFactoryPort = SecureCredentialFileFactory()
+
+    def create(self, config: ProwlerConfig, provider: ProviderInput) -> ProwlerClient:
+        """Create a client without executing Prowler."""
+        return ProwlerClient(
+            config=config,
+            provider=provider,
+            engine=self.engine_factory.create(),
+            provider_adapter=ProviderInvocationAdapter(self.credential_file_factory),
+        )
+
+    def run(
+        self,
+        config: ProwlerConfig,
+        provider: ProviderInput,
+        *,
+        check_filters: Sequence[str] = (),
+    ) -> CommandResult:
+        """Create a client and synchronously run one assessment."""
+        return self.create(config, provider).run(check_filters)
