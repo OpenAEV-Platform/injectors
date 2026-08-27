@@ -29,9 +29,28 @@ class RecordingEngine:
     observed_modes: list[int] = field(default_factory=list)
     observed_directory_modes: list[int] = field(default_factory=list)
     observed_contents: list[str] = field(default_factory=list)
+    artifact_bytes: bytes = b'{"raw":"artifact-ocsf"}\n'
+    console_stdout: bytes = b"\x1b[32mProwler completed\x1b[0m\n"
+    console_stderr: bytes = b""
+    write_artifact: bool = True
+    create_nested_output: bool = False
+    observed_output_directories: list[Path] = field(default_factory=list)
 
     def run(self, request: Any) -> Any:
         self.requests.append(request)
+        if "--output-directory" in request.arguments:
+            output_directory = Path(
+                request.arguments[request.arguments.index("--output-directory") + 1]
+            )
+            self.observed_output_directories.append(output_directory)
+            if self.create_nested_output:
+                nested = output_directory / "compliance" / "nested"
+                nested.mkdir(parents=True)
+                (nested / "summary.json").write_text("fixture", encoding="utf-8")
+            if self.write_artifact:
+                (output_directory / "findings.ocsf.json").write_bytes(
+                    self.artifact_bytes
+                )
         paths = list(self.inspect_paths)
         for flag in ("--credentials-file", "--kubeconfig-file"):
             if flag in request.arguments:
@@ -46,9 +65,10 @@ class RecordingEngine:
             specification = ExecutionSpecification.from_request(request)
             self.result = CommandResult(
                 specification=specification,
-                stdout=b'{"raw":"ocsf"}\n',
+                stdout=self.console_stdout,
+                stderr=self.console_stderr,
                 return_code=0,
-                parsed=b'{"raw":"ocsf"}\n',
+                parsed=self.console_stdout,
             )
         return self.result
 

@@ -13,8 +13,6 @@ from prowler.models.provider_inputs import (
 
 from .contracts import CredentialLeaseFactoryPort, ProviderInvocation
 
-_OCSF_OUTPUT_ARGUMENTS = ("-M", "json-ocsf")
-
 
 class ProviderInvocationAdapter:
     """Build credential-safe provider arguments and exact environments."""
@@ -38,7 +36,6 @@ class ProviderInvocationAdapter:
                     "aws",
                     "--region",
                     provider.aws_region,
-                    *_OCSF_OUTPUT_ARGUMENTS,
                 ),
                 environment=tuple(environment),
             )
@@ -51,7 +48,6 @@ class ProviderInvocationAdapter:
                     provider.azure_subscription_id,
                     "--azure-region",
                     provider.azure_provider,
-                    *_OCSF_OUTPUT_ARGUMENTS,
                 ),
                 environment=(
                     ("AZURE_TENANT_ID", SecretStr(provider.azure_tenant_id)),
@@ -70,7 +66,6 @@ class ProviderInvocationAdapter:
                     str(lease.path),
                     "--project-id",
                     provider.gcp_project_id,
-                    *_OCSF_OUTPUT_ARGUMENTS,
                 ),
                 environment=(),
                 credential_leases=(lease,),
@@ -86,7 +81,6 @@ class ProviderInvocationAdapter:
                     str(lease.path),
                     "--context",
                     provider.kubernetes_context,
-                    *_OCSF_OUTPUT_ARGUMENTS,
                 ),
                 environment=(),
                 credential_leases=(lease,),

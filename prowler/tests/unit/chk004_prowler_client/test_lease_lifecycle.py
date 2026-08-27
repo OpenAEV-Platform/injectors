@@ -11,6 +11,11 @@ import pytest
 from pydantic import SecretStr
 
 import prowler._core.prowler_client.client as client_module
+from prowler._core.cli_engine import (
+    CommandResult,
+    ExecutionSpecification,
+    OutputSpecification,
+)
 from prowler._core.prowler_client import (
     CredentialCleanupError,
     ProwlerClient,
@@ -45,13 +50,52 @@ class _Adapter:
 
 @dataclass
 class _Engine:
-    result: Any = None
+    result: CommandResult | None = None
     failure: BaseException | None = None
 
-    def run(self, _request: Any) -> Any:
+    def run(self, _request: Any) -> CommandResult:
         if self.failure is not None:
             raise self.failure
+        assert self.result is not None
         return self.result
+
+
+@dataclass
+class _Workspace:
+    directory: Path = Path("/controlled-workspace")
+    backend: str = "filesystem_temp"
+    cleanup_calls: int = 0
+
+    def read_artifact(self, *, maximum_bytes: int) -> bytes:
+        assert maximum_bytes > 0
+        return b'{"artifact":"ocsf"}'
+
+    def cleanup(self) -> None:
+        self.cleanup_calls += 1
+
+
+@dataclass(frozen=True)
+class _WorkspaceFactory:
+    workspace: _Workspace
+
+    def create(self) -> _Workspace:
+        return self.workspace
+
+
+def _result() -> CommandResult:
+    return CommandResult(
+        specification=ExecutionSpecification(
+            executable="/opt/prowler/bin/prowler",
+            arguments=(),
+            environment=(),
+            working_directory=None,
+            input_bytes=b"",
+            output=OutputSpecification(parser="raw"),
+            timeout_seconds=1,
+            maximum_accepted_output_bytes=1,
+        ),
+        return_code=0,
+    )
 
 
 def _provider() -> AwsProviderInput:
@@ -64,12 +108,16 @@ def _provider() -> AwsProviderInput:
     )
 
 
-def _client(lease: _Lease, engine: _Engine) -> ProwlerClient:
+def _client(
+    lease: _Lease, engine: _Engine, workspace: _Workspace | None = None
+) -> ProwlerClient:
+    selected_workspace = workspace or _Workspace()
     return ProwlerClient(
         config=ProwlerConfig(executable_path="/opt/prowler/bin/prowler"),
         provider=_provider(),
         engine=engine,
         provider_adapter=cast(Any, _Adapter(lease)),
+        output_workspace_factory=cast(Any, _WorkspaceFactory(selected_workspace)),
     )
 
 
@@ -99,9 +147,11 @@ def test_cleanup_removes_file_and_directory_idempotently(tmp_path: Path) -> None
 
 def test_lease_is_released_when_engine_succeeds() -> None:
     lease = _Lease()
-    result = object()
+    result = _result()
 
-    assert _client(lease, _Engine(result=result)).run() is result
+    captured = _client(lease, _Engine(result=result)).run()
+    assert captured.parsed == b'{"artifact":"ocsf"}'
+    assert captured.return_code == result.return_code
     assert lease.cleanup_calls == 1
 
 
@@ -126,19 +176,21 @@ def test_lease_is_released_when_request_construction_fails(
         raise primary
 
     monkeypatch.setattr(client_module, "ValidatedCommandRequest", fail_construction)
+    workspace = _Workspace()
 
     with pytest.raises(RuntimeError) as caught:
-        _client(lease, _Engine()).run()
+        _client(lease, _Engine(result=_result()), workspace).run()
 
     assert caught.value is primary
     assert lease.cleanup_calls == 1
+    assert workspace.cleanup_calls == 1
 
 
 def test_cleanup_failure_without_primary_error_is_safe() -> None:
     lease = _Lease(failure=OSError("unsafe cleanup detail"))
 
     with pytest.raises(CredentialCleanupError) as caught:
-        _client(lease, _Engine(result=object())).run()
+        _client(lease, _Engine(result=_result())).run()
 
     assert str(caught.value) == "temporary credential cleanup failed"
 

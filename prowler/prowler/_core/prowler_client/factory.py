@@ -8,8 +8,13 @@ from prowler.models.configs.config_loader import ProwlerConfig
 from prowler.models.provider_inputs import ProviderInput
 
 from .client import ProwlerClient
-from .contracts import CliEngineFactoryPort, CredentialLeaseFactoryPort
+from .contracts import (
+    CliEngineFactoryPort,
+    CredentialLeaseFactoryPort,
+    OutputWorkspaceFactoryPort,
+)
 from .credentials import TemporaryCredentialLeaseFactory
+from .output_workspace import TemporaryOutputWorkspaceFactory
 from .provider_adapter import ProviderInvocationAdapter
 
 
@@ -21,6 +26,9 @@ class ProwlerClientFactory:
     credential_lease_factory: CredentialLeaseFactoryPort = (
         TemporaryCredentialLeaseFactory()
     )
+    output_workspace_factory: OutputWorkspaceFactoryPort = (
+        TemporaryOutputWorkspaceFactory()
+    )
 
     def create(self, config: ProwlerConfig, provider: ProviderInput) -> ProwlerClient:
         """Create a client without executing Prowler."""
@@ -29,6 +37,7 @@ class ProwlerClientFactory:
             provider=provider,
             engine=self.engine_factory.create(),
             provider_adapter=ProviderInvocationAdapter(self.credential_lease_factory),
+            output_workspace_factory=self.output_workspace_factory,
         )
 
     def run(

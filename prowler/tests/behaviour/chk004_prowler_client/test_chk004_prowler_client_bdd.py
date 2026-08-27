@@ -10,7 +10,11 @@ from typing import Any
 import pytest
 from pydantic import SecretStr
 
-from prowler._core.cli_engine import CommandResult
+from prowler._core.cli_engine import (
+    CommandResult,
+    ExecutionSpecification,
+    OutputSpecification,
+)
 from prowler.models.configs.config_loader import ProwlerConfig
 
 from .conftest import RecordingEngine, RecordingEngineFactory
@@ -35,6 +39,23 @@ def _environment(request: Any) -> dict[str, Any]:
     return dict(request.environment)
 
 
+def _failed_result() -> CommandResult:
+    return CommandResult(
+        specification=ExecutionSpecification(
+            executable="/opt/prowler/bin/prowler",
+            arguments=(),
+            environment=(),
+            working_directory=None,
+            input_bytes=b"",
+            output=OutputSpecification(parser="raw"),
+            timeout_seconds=1,
+            maximum_accepted_output_bytes=1,
+        ),
+        return_code=1,
+        error="safe engine error",
+    )
+
+
 def test_create_does_not_execute(
     recording_engine: RecordingEngine, provider_inputs: dict[str, Any]
 ) -> None:
@@ -46,15 +67,21 @@ def test_create_does_not_execute(
     assert recording_engine.requests == []
 
 
-def test_full_assessment_returns_exact_result_without_check_selector(
+def test_full_assessment_preserves_result_and_captures_artifact_without_check_selector(
     recording_engine: RecordingEngine, provider_inputs: dict[str, Any]
 ) -> None:
     client = _factory(recording_engine).create(_config(), provider_inputs["AWS"])
 
     result = client.run()
 
-    assert result is recording_engine.result
+    assert recording_engine.result is not None
+    assert result is not recording_engine.result
     assert isinstance(result, CommandResult)
+    assert result.stdout == recording_engine.result.stdout
+    assert result.stderr == recording_engine.result.stderr
+    assert result.return_code == recording_engine.result.return_code
+    assert result.specification == recording_engine.result.specification
+    assert result.parsed == recording_engine.artifact_bytes
     assert "-c" not in recording_engine.requests[0].arguments
 
 
@@ -66,8 +93,15 @@ def test_factory_run_matches_created_client_request(
     direct = factory.create(_config(), provider_inputs["AWS"]).run(("one", "two"))
     quick = factory.run(_config(), provider_inputs["AWS"], check_filters=("one", "two"))
 
-    assert direct is quick
-    assert recording_engine.requests[0] == recording_engine.requests[1]
+    assert direct.parsed == quick.parsed == recording_engine.artifact_bytes
+    first = recording_engine.requests[0]
+    second = recording_engine.requests[1]
+    first_arguments = list(first.arguments)
+    second_arguments = list(second.arguments)
+    first_arguments[first_arguments.index("--output-directory") + 1] = "<workspace>"
+    second_arguments[second_arguments.index("--output-directory") + 1] = "<workspace>"
+    assert tuple(first_arguments) == tuple(second_arguments)
+    assert first.environment == second.environment
 
 
 def test_check_filters_are_separate_ordered_tokens(
@@ -78,7 +112,14 @@ def test_check_filters_are_separate_ordered_tokens(
     client.run(("check-z", "check-a", "check-z"))
 
     arguments = recording_engine.requests[0].arguments
-    assert arguments[-4:] == ("-c", "check-z", "check-a", "check-z")
+    selector_index = arguments.index("-c")
+    assert arguments[selector_index : selector_index + 4] == (
+        "-c",
+        "check-z",
+        "check-a",
+        "check-z",
+    )
+    assert selector_index < arguments.index("--output-directory")
 
 
 @pytest.mark.parametrize(
@@ -86,7 +127,7 @@ def test_check_filters_are_separate_ordered_tokens(
     [
         (
             "AWS",
-            ("aws", "--region", "eu-west-1", "-M", "json-ocsf"),
+            ("aws", "--region", "eu-west-1"),
             {"AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY", "AWS_SESSION_TOKEN"},
         ),
         (
@@ -98,8 +139,6 @@ def test_check_filters_are_separate_ordered_tokens(
                 "subscription-id",
                 "--azure-region",
                 "AzureUSGovernment",
-                "-M",
-                "json-ocsf",
             ),
             {"AZURE_TENANT_ID", "AZURE_CLIENT_ID", "AZURE_CLIENT_SECRET"},
         ),
@@ -111,8 +150,6 @@ def test_check_filters_are_separate_ordered_tokens(
                 "<temporary>",
                 "--project-id",
                 "project-id",
-                "-M",
-                "json-ocsf",
             ),
             set(),
         ),
@@ -124,8 +161,6 @@ def test_check_filters_are_separate_ordered_tokens(
                 "<temporary>",
                 "--context",
                 "cluster-context",
-                "-M",
-                "json-ocsf",
             ),
             set(),
         ),
@@ -149,7 +184,8 @@ def test_provider_invocation_is_explicit_and_secret_safe(
         )
         for index, item in enumerate(request.arguments)
     )
-    assert arguments == expected_arguments
+    assert arguments[: len(expected_arguments)] == expected_arguments
+    assert arguments[-2:] == ("-M", "json-ocsf")
     assert set(_environment(request)) == expected_environment
     assert all(isinstance(value, SecretStr) for value in _environment(request).values())
     rendered = repr(request.arguments)
@@ -261,7 +297,7 @@ def test_temporary_credentials_are_private_unique_and_always_removed(
     outcome: str,
 ) -> None:
     if outcome == "result_error":
-        recording_engine.result = object()
+        recording_engine.result = _failed_result()
     elif outcome == "exception":
         recording_engine.raised = RuntimeError("safe execution failure")
     factory = _factory(recording_engine)

@@ -42,6 +42,31 @@ class CredentialLeaseFactoryPort(Protocol):
         """Return a newly materialized credential lease."""
 
 
+class OutputWorkspacePort(Protocol):
+    """Own one controlled Prowler output directory and artifact."""
+
+    @property
+    def directory(self) -> Path:
+        """Return the workspace directory supplied to Prowler."""
+
+    @property
+    def backend(self) -> str:
+        """Return the closed storage-backend label."""
+
+    def read_artifact(self, *, maximum_bytes: int) -> bytes:
+        """Securely read the exact bounded output artifact."""
+
+    def cleanup(self) -> None:
+        """Idempotently remove the recursively owned workspace."""
+
+
+class OutputWorkspaceFactoryPort(Protocol):
+    """Create controlled Prowler output workspaces without executing Prowler."""
+
+    def create(self) -> OutputWorkspacePort:
+        """Return one unique output workspace."""
+
+
 @dataclass(frozen=True)
 class ProviderInvocation:
     """Provider-specific arguments, environment, and credential resources."""

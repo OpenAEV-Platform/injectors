@@ -89,3 +89,28 @@ Each created client is one-shot and releases its copied provider input on the
 first terminal run path. Python immutable strings and copies cannot be
 guaranteed to be zeroized; the upstream OpenAEV injection payload may retain
 credential values until `process_message` returns.
+
+## Assessment output storage
+
+CHK.004 does not parse Prowler's console stream as OCSF. Each assessment owns a
+unique controlled temporary output directory and tells Prowler to write the
+single expected artifact as `findings.ocsf.json` (`--output-filename findings`
+with `-M json-ocsf`). Console stdout and stderr remain bounded diagnostics; the
+artifact is opened only at its exact path as a regular, non-symlink file and is
+read incrementally to its separate 100 MiB limit.
+
+On Linux/POSIX, a writable directory at `/dev/shm` is preferred and labelled
+`memory_tmpfs`, keeping normal output in memory-backed temporary storage. If
+`/dev/shm` is absent, not a directory, or not writable, the injector uses the
+portable system temporary location labelled `filesystem_temp`, which may be
+disk-backed. Windows always uses that system-temp fallback and relies on its
+native temporary-directory ACL rather than making a POSIX permission claim.
+Owned output directories use mode `0700` on POSIX.
+
+The complete owned output tree, including any nested compliance output, is
+recursively removed on every normal success or failure path. Cleanup is
+idempotent and never scans or deletes sibling temporary paths. An abrupt crash,
+forced kill, host failure, or power loss can still bypass controlled cleanup and
+leave output residue. Operators must protect both `/dev/shm` and the portable
+disk fallback according to the sensitivity of assessment findings and apply
+their own stale-file policy after abnormal termination.
