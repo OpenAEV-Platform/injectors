@@ -222,9 +222,7 @@ def test_missing_flat_remediation_everywhere_reports_union_path() -> None:
             "title": "Root user access keys should be removed.",
             "desc": "The root user has active access keys.",
         },
-        "resources": [
-            {"uid": "arn:aws:iam::123456789012:root", "name": "root"}
-        ],
+        "resources": [{"uid": "arn:aws:iam::123456789012:root", "name": "root"}],
         "cloud": {
             "provider": "aws",
             "region": "eu-west-1",

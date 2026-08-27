@@ -1,17 +1,18 @@
 """Local fixtures for CHK.005 mapping units."""
 
 from copy import deepcopy
-from typing import Any
+from typing import Any, Callable
 
 import pytest
 
 
 @pytest.fixture
-def copy_record():
+def copy_record() -> Callable[[], dict[str, Any]]:
     """Return isolated representative Prowler 5.36 records."""
     record: dict[str, Any] = {
         "finding_info": {"uid": "uid", "title": "title", "desc": "description"},
-        "status": "PASS",
+        "status": "New",
+        "status_code": "PASS",
         "severity": "high",
         "resources": [{"uid": "resource", "name": "resource name"}],
         "cloud": {

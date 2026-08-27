@@ -96,6 +96,7 @@ def test_normalizes_prowler_3x_status_rows(
 ) -> None:
     """Additive 3.x status rows; all existing status rows stay unchanged."""
     record = copy_record()
+    del record["status_code"]
     record["status"] = source
 
     assert _mapped(record, record_index=7).expectation_result == expected
@@ -142,7 +143,7 @@ def test_unmapped_compliance_wins_over_erroring_top_level_compliance(
 
     finding = _mapped(record)
 
-    assert finding.compliance_tags == ("1.1", "1.2")
+    assert finding.compliance_tags == ("CIS-1.5:1.1", "CIS-1.5:1.2")
 
 
 def test_block_remediation_references_precede_kb_articles(

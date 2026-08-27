@@ -13,26 +13,23 @@ Feature: Map raw Prowler OCSF output to OpenAEV findings
     Then each object becomes one finding in source order
 
   Scenario Outline: Normalize finding status
-    Given an OCSF finding with status "<source_status>"
+    Given an OCSF finding with lifecycle status "<status>" and result status code "<status_code>"
     When the finding is mapped
     Then expectation_result is "<result_status>"
 
     Examples:
-      | source_status | result_status |
-      | PASS          | SUCCESS       |
-      | passed        | SUCCESS       |
-      | FAIL          | FAILED        |
-      | failed        | FAILED        |
-      | MUTED         | IGNORED       |
-      | manual        | IGNORED       |
-      | SUPPRESSED    | IGNORED       |
-      | ERROR         | MUTED         |
-      | UNKNOWN       | MUTED         |
-      | FAILURE       | FAILED        |
-      | failure       | FAILED        |
-      | Muted         | IGNORED       |
-      | Manual        | IGNORED       |
-      | Suppressed    | IGNORED       |
+      | status     | status_code | result_status |
+      | New        | PASS        | SUCCESS       |
+      | New        | pass        | SUCCESS       |
+      | New        | FAIL        | FAILED        |
+      | New        | failed      | FAILED        |
+      | Suppressed | FAIL        | IGNORED       |
+      | suppressed | PASS        | IGNORED       |
+      | MUTED      | FAIL        | IGNORED       |
+      | manual     | PASS        | IGNORED       |
+      | New        | ERROR       | IGNORED       |
+      | New        | UNKNOWN     | IGNORED       |
+      | New        |  PASS       | IGNORED       |
 
   Scenario Outline: Normalize finding severity
     Given an OCSF finding with severity "<source_severity>"
@@ -61,6 +58,11 @@ Feature: Map raw Prowler OCSF output to OpenAEV findings
     And compliance_tags is empty
     And remediation_url is absent
 
+  Scenario: Map a cloudless Kubernetes finding
+    Given an OCSF finding without cloud and with provider identity under unmapped
+    When the finding is mapped
+    Then provider and account come from unmapped and region comes from the resource namespace
+
   # ---- Constraints identified ----
 
   Scenario: Reject malformed raw output without disclosing it
@@ -78,10 +80,10 @@ Feature: Map raw Prowler OCSF output to OpenAEV findings
     When the finding is mapped
     Then a structured mapping error identifies resources[0]
 
-  Scenario: Reject whitespace-padded status rather than silently normalizing it
-    Given an OCSF finding with whitespace around a recognized status
+  Scenario: Reject whitespace-padded status code rather than silently normalizing it
+    Given an OCSF finding with whitespace around a recognized status code
     When the finding is mapped
-    Then expectation_result is MUTED
+    Then expectation_result is IGNORED
 
   # ---- Prowler 3.x nested dual-shape contract ----
 
@@ -92,6 +94,11 @@ Feature: Map raw Prowler OCSF output to OpenAEV findings
     And compliance_tags keeps the compound requirement strings in order without splitting or deduplication
     And remediation_url is the first kb_articles entry without URL validation
     And unmapped nested fields such as severity_id, status_detail, and state have no effect
+
+  Scenario: Preserve a nested Prowler 3.x result when status_code is absent
+    Given a nested OCSF finding whose legacy result is carried by status
+    When the finding is mapped
+    Then the legacy status vocabulary maps without changing the nested field shape
 
   Scenario: Select the present finding block by precedence
     Given an OCSF finding with both finding_info and finding blocks
@@ -112,7 +119,7 @@ Feature: Map raw Prowler OCSF output to OpenAEV findings
   Scenario: Resolve compliance across unmapped and top level
     Given an OCSF finding with top-level compliance requirements
     When the finding is mapped
-    Then a present non-null unmapped.compliance always wins with its flat flattening
+    Then a present non-null unmapped.compliance always wins with framework-preserving flattening
     And a null unmapped.compliance defers to top-level compliance requirements
     And a present empty unmapped.compliance wins with empty tags
     And string or list requirements become tags in encounter order without splitting or deduplication

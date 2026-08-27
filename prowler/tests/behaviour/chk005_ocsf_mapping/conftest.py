@@ -1,7 +1,7 @@
 """Local fixtures for CHK.005 behaviour."""
 
 from copy import deepcopy
-from typing import Any
+from typing import Any, Callable
 
 import pytest
 
@@ -15,7 +15,8 @@ def ocsf_record() -> dict[str, Any]:
             "title": "Root user access keys should be removed",
             "desc": "The root user has active access keys.",
         },
-        "status": "PASS",
+        "status": "New",
+        "status_code": "PASS",
         "severity": "High",
         "resources": [{"uid": "arn:aws:iam::123456789012:root", "name": "root"}],
         "cloud": {
@@ -37,7 +38,9 @@ def ocsf_record() -> dict[str, Any]:
 
 
 @pytest.fixture
-def copy_record(ocsf_record: dict[str, Any]):
+def copy_record(
+    ocsf_record: dict[str, Any],
+) -> Callable[[], dict[str, Any]]:
     """Return a factory that isolates mutable source records."""
 
     def factory() -> dict[str, Any]:
@@ -56,7 +59,8 @@ def ocsf_nested_record() -> dict[str, Any]:
                 "desc": "Check S3 Account Level Public Access Block.",
                 "supporting_data": {
                     "Risk": (
-                        "Public access policies may be applied to sensitive data buckets."
+                        "Public access policies may be applied to sensitive "
+                        "data buckets."
                     ),
                     "Notes": "",
                 },
@@ -99,8 +103,7 @@ def ocsf_nested_record() -> dict[str, Any]:
                 }
             ],
             "status_detail": (
-                "Block Public Access is not configured for the account "
-                "123456789012."
+                "Block Public Access is not configured for the account " "123456789012."
             ),
             "compliance": {
                 "status": "Failure",
@@ -134,8 +137,7 @@ def ocsf_nested_record() -> dict[str, Any]:
                 ),
             },
             "message": (
-                "Block Public Access is not configured for the account "
-                "123456789012."
+                "Block Public Access is not configured for the account " "123456789012."
             ),
             "severity_id": 4,
             "severity": "High",

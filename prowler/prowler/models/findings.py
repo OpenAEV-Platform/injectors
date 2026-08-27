@@ -69,16 +69,14 @@ class OpenAevFinding(BaseModel):
     description: str
 
 
-_STATUS_MAP = {
+_STATUS_CODE_MAP = {
     "PASS": "SUCCESS",
     "PASSED": "SUCCESS",
     "FAIL": "FAILED",
     "FAILED": "FAILED",
     "FAILURE": "FAILED",
-    "MUTED": "IGNORED",
-    "MANUAL": "IGNORED",
-    "SUPPRESSED": "IGNORED",
 }
+_IGNORED_LIFECYCLE_STATUSES = {"SUPPRESSED", "MUTED", "MANUAL"}
 
 _SEVERITY_MAP = {
     "CRITICAL": ("CRITICAL", 4),
@@ -90,6 +88,13 @@ _SEVERITY_MAP = {
 
 _DECODE_MESSAGE = "unable to decode Prowler OCSF output"
 _MAPPING_MESSAGE = "unable to map Prowler OCSF record"
+
+
+def _expectation_result(status: str, status_code: str) -> str:
+    """Keep lifecycle suppression separate from the check result code."""
+    if status.upper() in _IGNORED_LIFECYCLE_STATUSES:
+        return "IGNORED"
+    return _STATUS_CODE_MAP.get(status_code.upper(), "IGNORED")
 
 
 def decode_ocsf_output(payload: bytes | str) -> tuple[dict[str, Any], ...]:
@@ -128,8 +133,27 @@ def map_ocsf_finding(
     if not resources:
         raise _mapping_error("missing_source_path", record_index, "resources[0]")
     resource = _mapping_value(resources[0], "resources[0]", record_index)
-    cloud = _required_mapping(record, "cloud", record_index)
-    account = _required_mapping(cloud, "cloud.account", record_index, key="account")
+    if "cloud" in record:
+        cloud = _required_mapping(record, "cloud", record_index)
+        account = _required_mapping(cloud, "cloud.account", record_index, key="account")
+        cloud_provider = _required_string(
+            cloud, "cloud.provider", record_index, key="provider"
+        )
+        region = _required_string(cloud, "cloud.region", record_index, key="region")
+        cloud_account = _required_string(
+            account, "cloud.account.uid", record_index, key="uid"
+        )
+    else:
+        unmapped = _required_mapping(record, "unmapped", record_index)
+        cloud_provider = _required_string(
+            unmapped, "unmapped.provider", record_index, key="provider"
+        )
+        cloud_account = _required_string(
+            unmapped, "unmapped.provider_uid", record_index, key="provider_uid"
+        )
+        region = _required_string(
+            resource, "resources[0].namespace", record_index, key="namespace"
+        )
     if "remediation" in record:
         remediation: Mapping[str, Any] | None = _required_mapping(
             record, "remediation", record_index
@@ -138,6 +162,11 @@ def map_ocsf_finding(
         remediation = None
 
     status = _required_string(record, "status", record_index)
+    status_code = (
+        _required_string(record, "status_code", record_index)
+        if "status_code" in record
+        else status
+    )
     severity_value = record.get("severity")
     if severity_value is None:
         severity = ("INFO", 0)
@@ -169,7 +198,7 @@ def map_ocsf_finding(
         value=_required_string(
             finding_block, f"{block_key}.title", record_index, key="title"
         ),
-        expectation_result=_STATUS_MAP.get(status.upper(), "MUTED"),
+        expectation_result=_expectation_result(status, status_code),
         severity=severity[0],
         severity_weight=severity[1],
         asset_reference=_required_string(
@@ -178,13 +207,9 @@ def map_ocsf_finding(
         asset_name=_required_string(
             resource, "resources[0].name", record_index, key="name"
         ),
-        cloud_provider=_required_string(
-            cloud, "cloud.provider", record_index, key="provider"
-        ),
-        region=_required_string(cloud, "cloud.region", record_index, key="region"),
-        cloud_account=_required_string(
-            account, "cloud.account.uid", record_index, key="uid"
-        ),
+        cloud_provider=cloud_provider,
+        region=region,
+        cloud_account=cloud_account,
         compliance_tags=_compliance_tags(record, record_index),
         remediation=(
             _required_string(remediation, "remediation.desc", record_index, key="desc")
@@ -393,9 +418,17 @@ def _flatten_compliance(
     if isinstance(value, Mapping):
         flattened = []
         for key, nested in value.items():
-            flattened.extend(
-                _flatten_compliance(nested, f"{source_path}.{key}", record_index)
-            )
+            if nested is True:
+                flattened.append(str(key))
+            elif nested is False or nested is None:
+                continue
+            else:
+                flattened.extend(
+                    f"{key}:{tag}"
+                    for tag in _flatten_compliance(
+                        nested, f"{source_path}.{key}", record_index
+                    )
+                )
         return flattened
     if isinstance(value, Sequence) and not isinstance(value, (str, bytes)):
         flattened = []

@@ -62,10 +62,11 @@ def test_command_result_must_be_success() -> None:
 @pytest.mark.parametrize(
     ("compliance", "expected"),
     [
-        ({"A": "x", "B": ["y", "x"]}, ("x", "y", "x")),
+        ({"A": "x", "B": ["y", "x"]}, ("A:x", "B:y", "B:x")),
         (["a", "b"], ("a", "b")),
         ("one", ("one",)),
-        ({"A": {"first": "x", "second": ["y"]}}, ("x", "y")),
+        ({"A": {"first": "x", "second": ["y"]}}, ("A:first:x", "A:second:y")),
+        ({"A": True, "B": False, "C": None}, ("A",)),
     ],
 )
 def test_supported_compliance_shapes_preserve_values_and_duplicates(

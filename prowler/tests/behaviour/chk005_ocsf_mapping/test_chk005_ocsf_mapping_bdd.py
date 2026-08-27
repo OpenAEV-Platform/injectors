@@ -94,26 +94,31 @@ def test_maps_json_lines_and_ignores_blank_lines(
 
 
 @pytest.mark.parametrize(
-    ("source", "expected"),
+    ("status", "status_code", "expected"),
     [
-        ("PASS", "SUCCESS"),
-        ("passed", "SUCCESS"),
-        ("FAIL", "FAILED"),
-        ("failed", "FAILED"),
-        ("MUTED", "IGNORED"),
-        ("manual", "IGNORED"),
-        ("SUPPRESSED", "IGNORED"),
-        ("ERROR", "MUTED"),
-        ("UNKNOWN", "MUTED"),
-        (" PASS ", "MUTED"),
+        ("New", "PASS", "SUCCESS"),
+        ("New", "pass", "SUCCESS"),
+        ("New", "FAIL", "FAILED"),
+        ("New", "failed", "FAILED"),
+        ("Suppressed", "FAIL", "IGNORED"),
+        ("suppressed", "PASS", "IGNORED"),
+        ("MUTED", "FAIL", "IGNORED"),
+        ("manual", "PASS", "IGNORED"),
+        ("New", "ERROR", "IGNORED"),
+        ("New", "UNKNOWN", "IGNORED"),
+        ("New", " PASS ", "IGNORED"),
     ],
 )
 def test_normalizes_status_without_trimming(
-    copy_record: Callable[[], dict[str, Any]], source: str, expected: str
+    copy_record: Callable[[], dict[str, Any]],
+    status: str,
+    status_code: str,
+    expected: str,
 ) -> None:
     """Normalize status case but not unapproved surrounding whitespace."""
     record = copy_record()
-    record["status"] = source
+    record["status"] = status
+    record["status_code"] = status_code
 
     assert map_ocsf_finding(record, record_index=7).expectation_result == expected
 
@@ -161,7 +166,11 @@ def test_maps_all_fields_and_preserves_compliance_values(
         "cloud_provider": "aws",
         "region": "eu-west-1",
         "cloud_account": "123456789012",
-        "compliance_tags": ("1.1", "1.2", "op.acc.6"),
+        "compliance_tags": (
+            "CIS-1.5:1.1",
+            "CIS-1.5:1.2",
+            "ENS-RD2022:op.acc.6",
+        ),
         "remediation": "Delete the root user access keys.",
         "remediation_url": "https://example.test/remediation",
         "description": "The root user has active access keys.",
@@ -182,6 +191,24 @@ def test_optional_values_have_safe_fallbacks(
     assert (finding.severity, finding.severity_weight) == ("INFO", 0)
     assert finding.compliance_tags == ()
     assert finding.remediation_url is None
+
+
+def test_cloudless_finding_uses_unmapped_provider_and_resource_namespace(
+    copy_record: Callable[[], dict[str, Any]],
+) -> None:
+    """Map Kubernetes/provider identity when the OCSF cloud object is absent."""
+    record = copy_record()
+    del record["cloud"]
+    record["unmapped"].update(provider="kubernetes", provider_uid="cluster-production")
+    record["resources"][0]["namespace"] = "payments"
+
+    finding = map_ocsf_finding(record)
+
+    assert (
+        finding.cloud_provider,
+        finding.cloud_account,
+        finding.region,
+    ) == ("kubernetes", "cluster-production", "payments")
 
 
 @pytest.mark.parametrize("payload", [b"\xffsecret", b'[{"token":"secret"}'])
