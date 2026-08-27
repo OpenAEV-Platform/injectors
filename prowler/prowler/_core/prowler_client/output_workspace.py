@@ -2,6 +2,7 @@
 
 import errno
 import os
+import shutil
 import stat
 import tempfile
 from dataclasses import dataclass, field
@@ -12,6 +13,8 @@ from typing import Literal
 OUTPUT_ARTIFACT_BASENAME = "findings"
 OUTPUT_ARTIFACT_FILENAME = "findings.ocsf.json"
 DEFAULT_MAXIMUM_ARTIFACT_BYTES = 100 * 1024 * 1024
+# Reserve space for Prowler's nested/temporary output beyond the accepted artifact.
+DEFAULT_MEMORY_TMPFS_SAFETY_MARGIN_BYTES = 16 * 1024 * 1024
 _READ_CHUNK_BYTES = 64 * 1024
 
 OutputBackend = Literal["memory_tmpfs", "filesystem_temp"]
@@ -153,7 +156,15 @@ class TemporaryOutputWorkspaceFactory:
                 prefix="openaev-prowler-output-", dir=root
             )
         except BaseException:
-            raise OutputWorkspacePreparationError() from None
+            if backend != "memory_tmpfs":
+                raise OutputWorkspacePreparationError() from None
+            root, backend = self.temporary_root, "filesystem_temp"
+            try:
+                temporary_directory = tempfile.TemporaryDirectory(
+                    prefix="openaev-prowler-output-", dir=root
+                )
+            except BaseException:
+                raise OutputWorkspacePreparationError() from None
 
         directory = Path(temporary_directory.name)
         try:
@@ -174,12 +185,17 @@ class TemporaryOutputWorkspaceFactory:
     def _select_root(self) -> tuple[Path | None, OutputBackend]:
         if self.platform_name != "nt":
             try:
+                required_capacity = (
+                    DEFAULT_MAXIMUM_ARTIFACT_BYTES
+                    + DEFAULT_MEMORY_TMPFS_SAFETY_MARGIN_BYTES
+                )
                 memory_is_usable = (
                     self.memory_root.exists()
                     and self.memory_root.is_dir()
                     and os.access(self.memory_root, os.W_OK)
+                    and shutil.disk_usage(self.memory_root).free >= required_capacity
                 )
-            except OSError:
+            except Exception:
                 memory_is_usable = False
             if memory_is_usable:
                 return self.memory_root, "memory_tmpfs"

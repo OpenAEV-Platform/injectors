@@ -3,8 +3,11 @@
 # ruff: noqa: D101, D102, D103
 
 import os
+import shutil
+import stat
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
+from types import SimpleNamespace
 from typing import Any
 
 import pytest
@@ -22,6 +25,16 @@ def test_posix_prefers_writable_dev_shm_equivalent(
     memory_root = tmp_path / "dev-shm"
     memory_root.mkdir()
     monkeypatch.setattr(os, "access", lambda path, mode: path == memory_root)
+    api = _api()
+    required_capacity = (
+        api.DEFAULT_MAXIMUM_ARTIFACT_BYTES
+        + api.DEFAULT_MEMORY_TMPFS_SAFETY_MARGIN_BYTES
+    )
+    monkeypatch.setattr(
+        shutil,
+        "disk_usage",
+        lambda _path: SimpleNamespace(free=required_capacity),
+    )
 
     workspace = (
         _api()
@@ -37,6 +50,105 @@ def test_posix_prefers_writable_dev_shm_equivalent(
         assert workspace.directory.parent == memory_root
         assert workspace.directory.stat().st_mode & 0o777 == 0o700
         assert workspace.artifact_path.name == "findings.ocsf.json"
+    finally:
+        workspace.cleanup()
+
+
+def test_posix_rejects_tmpfs_without_artifact_capacity_plus_safety_margin(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    api = _api()
+    memory_root = tmp_path / "dev-shm"
+    memory_root.mkdir()
+    disk_root = tmp_path / "disk"
+    disk_root.mkdir()
+    monkeypatch.setattr(os, "access", lambda path, mode: path == memory_root)
+    required_capacity = (
+        api.DEFAULT_MAXIMUM_ARTIFACT_BYTES
+        + api.DEFAULT_MEMORY_TMPFS_SAFETY_MARGIN_BYTES
+    )
+    monkeypatch.setattr(
+        shutil,
+        "disk_usage",
+        lambda _path: SimpleNamespace(free=required_capacity - 1),
+    )
+
+    workspace = api.TemporaryOutputWorkspaceFactory(
+        platform_name="posix",
+        memory_root=memory_root,
+        temporary_root=disk_root,
+    ).create()
+    try:
+        assert workspace.backend == "filesystem_temp"
+        assert workspace.directory.parent == disk_root
+    finally:
+        workspace.cleanup()
+
+
+def test_tmpfs_capacity_probe_failure_falls_back_to_system_temp(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    memory_root = tmp_path / "dev-shm"
+    memory_root.mkdir()
+    disk_root = tmp_path / "disk"
+    disk_root.mkdir()
+    monkeypatch.setattr(os, "access", lambda path, mode: path == memory_root)
+    monkeypatch.setattr(
+        shutil,
+        "disk_usage",
+        lambda _path: (_ for _ in ()).throw(OSError("probe failed")),
+    )
+
+    workspace = (
+        _api()
+        .TemporaryOutputWorkspaceFactory(
+            platform_name="posix",
+            memory_root=memory_root,
+            temporary_root=disk_root,
+        )
+        .create()
+    )
+    try:
+        assert workspace.backend == "filesystem_temp"
+        assert workspace.directory.parent == disk_root
+    finally:
+        workspace.cleanup()
+
+
+def test_tmpfs_creation_failure_falls_back_once_to_system_temp(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    api = _api()
+    memory_root = tmp_path / "dev-shm"
+    memory_root.mkdir()
+    disk_root = tmp_path / "disk"
+    disk_root.mkdir()
+    monkeypatch.setattr(os, "access", lambda path, mode: path == memory_root)
+    monkeypatch.setattr(
+        shutil,
+        "disk_usage",
+        lambda _path: SimpleNamespace(free=1024 * 1024 * 1024),
+    )
+    original_temporary_directory = __import__("tempfile").TemporaryDirectory
+    creation_roots: list[Path | None] = []
+
+    def create_with_tmpfs_failure(*, prefix: str, dir: Path | None) -> Any:
+        creation_roots.append(dir)
+        if dir == memory_root:
+            raise OSError("tmpfs creation failed")
+        return original_temporary_directory(prefix=prefix, dir=dir)
+
+    monkeypatch.setattr("tempfile.TemporaryDirectory", create_with_tmpfs_failure)
+
+    workspace = api.TemporaryOutputWorkspaceFactory(
+        platform_name="posix",
+        memory_root=memory_root,
+        temporary_root=disk_root,
+    ).create()
+    try:
+        assert workspace.backend == "filesystem_temp"
+        assert workspace.directory.parent == disk_root
+        assert creation_roots == [memory_root, disk_root]
     finally:
         workspace.cleanup()
 
@@ -201,3 +313,46 @@ def test_artifact_read_failure_is_typed_and_closed(
         assert "unsafe-canary" not in repr(caught.value)
     finally:
         workspace.cleanup()
+
+
+def test_artifact_reader_preserves_preopen_and_opened_file_identity_check(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    workspace = (
+        _api()
+        .TemporaryOutputWorkspaceFactory(platform_name="nt", temporary_root=tmp_path)
+        .create()
+    )
+    workspace.artifact_path.write_bytes(b"{}")
+    path_status = workspace.artifact_path.lstat()
+    try:
+        with monkeypatch.context() as identity_patch:
+            identity_patch.setattr(
+                os,
+                "fstat",
+                lambda _descriptor: SimpleNamespace(
+                    st_mode=stat.S_IFREG,
+                    st_dev=path_status.st_dev,
+                    st_ino=path_status.st_ino + 1,
+                ),
+            )
+            with pytest.raises(_api().OutputArtifactError) as caught:
+                workspace.read_artifact(maximum_bytes=4)
+        assert caught.value.kind == "nonregular"
+    finally:
+        workspace.cleanup()
+
+
+def test_windows_reparse_safety_is_documented_without_false_atomic_claim() -> None:
+    repository_root = Path(__file__).parents[3]
+    output_storage = (
+        (repository_root / "README.md")
+        .read_text(encoding="utf-8")
+        .split("## Assessment output storage", maxsplit=1)[1]
+    )
+    windows_safety = output_storage.lower()
+
+    assert "best-effort" in windows_safety
+    assert "controlled directory" in windows_safety
+    assert "identity checks" in windows_safety
+    assert "does not claim atomic reparse-point exclusion" in windows_safety

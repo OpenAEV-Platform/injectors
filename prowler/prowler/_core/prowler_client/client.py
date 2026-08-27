@@ -1,12 +1,10 @@
 """Synchronous Prowler client over the safe CLI engine."""
 
-import json
 import logging
 from collections.abc import Sequence
 from dataclasses import replace
 from threading import Lock
 from time import monotonic
-from typing import Any
 
 from prowler._core.cli_engine import (
     CommandResult,
@@ -44,7 +42,7 @@ _ALL_SEVERITIES = (
 _OUTPUT_ARGUMENTS_PREFIX = (
     "--output-filename",
     OUTPUT_ARTIFACT_BASENAME,
-    "--ignore-exit-code-3",
+    "-z",
     "--only-logs",
     "--no-color",
 )
@@ -69,27 +67,6 @@ def _safe_log(level: int, message: str, **metadata: object) -> None:
         _LOGGER.log(level, message, extra={"prowler_metadata": metadata})
     except BaseException:
         return
-
-
-def _safe_record_count(payload: bytes) -> int | None:
-    """Derive only an aggregate record count when JSON shape makes it safe."""
-    try:
-        decoded = json.loads(payload)
-    except (json.JSONDecodeError, UnicodeDecodeError):
-        return None
-    if isinstance(decoded, list):
-        return len(decoded)
-    if isinstance(decoded, dict):
-        return 1
-    return None
-
-
-def _safe_debug_enabled() -> bool:
-    """Check debug level without allowing a logger failure into execution."""
-    try:
-        return _LOGGER.isEnabledFor(logging.DEBUG)
-    except BaseException:
-        return False
 
 
 class ProwlerClientConsumedError(RuntimeError):
@@ -204,15 +181,10 @@ class ProwlerClient:
                 )
                 raise
             _safe_log(logging.INFO, "Prowler output artifact captured")
-            artifact_metadata: dict[str, Any] = {"artifact_bytes": len(artifact)}
-            if _safe_debug_enabled():
-                record_count = _safe_record_count(artifact)
-                if record_count is not None:
-                    artifact_metadata["record_count"] = record_count
             _safe_log(
                 logging.DEBUG,
                 "Prowler output artifact metadata",
-                **artifact_metadata,
+                artifact_bytes=len(artifact),
             )
             return replace(result, parsed=artifact)
         except BaseException as error:

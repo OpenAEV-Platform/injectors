@@ -2,6 +2,7 @@
 
 # ruff: noqa: D101, D102, D103
 
+import json
 import logging
 from dataclasses import dataclass
 from pathlib import Path
@@ -97,14 +98,14 @@ class _CleanupReportingWorkspace:
 
     @property
     def directory(self) -> Path:
-        return self.wrapped.directory
+        return cast(Path, self.wrapped.directory)
 
     @property
     def backend(self) -> str:
-        return self.wrapped.backend
+        return cast(str, self.wrapped.backend)
 
     def read_artifact(self, *, maximum_bytes: int) -> bytes:
-        return self.wrapped.read_artifact(maximum_bytes=maximum_bytes)
+        return cast(bytes, self.wrapped.read_artifact(maximum_bytes=maximum_bytes))
 
     def cleanup(self) -> None:
         self.wrapped.cleanup()
@@ -229,14 +230,15 @@ def test_request_has_small_console_limit_and_exact_ordered_output_controls(
     assert arguments[output_index + 2 :] == (
         "--output-filename",
         "findings",
-        "--ignore-exit-code-3",
+        "-z",
         "--only-logs",
         "--no-color",
         "-M",
         "json-ocsf",
     )
     assert arguments[-2:] == ("-M", "json-ocsf")
-    assert "--ignore-exit-code-3" in arguments
+    assert "-z" in arguments
+    assert "--ignore-exit-code-3" not in arguments
 
 
 @pytest.mark.parametrize(
@@ -297,6 +299,12 @@ def test_logs_are_fixed_phased_and_exclude_sensitive_canaries(
     assert "console-stderr-canary" not in rendered
     assert str(tmp_path) not in rendered
     assert any(record.levelno == logging.DEBUG for record in caplog.records)
+    artifact_metadata = next(
+        cast(Any, record).prowler_metadata
+        for record in caplog.records
+        if record.getMessage() == "Prowler output artifact metadata"
+    )
+    assert artifact_metadata == {"artifact_bytes": len(engine.artifact)}
 
 
 def test_logging_failure_cannot_change_success(
@@ -312,6 +320,38 @@ def test_logging_failure_cannot_change_success(
         ProwlerConfig(executable_path="/opt/prowler/bin/prowler"), _provider()
     )
     assert captured.parsed == engine.artifact
+
+
+@pytest.mark.parametrize("failure_type", [MemoryError, RecursionError])
+def test_debug_logging_never_decodes_artifact_or_changes_success(
+    caplog: pytest.LogCaptureFixture,
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    failure_type: type[BaseException],
+) -> None:
+    caplog.set_level(logging.DEBUG)
+    engine = _Engine(_result())
+    decode_calls = 0
+
+    def fail_if_decoded(_payload: object, *_args: object, **_kwargs: object) -> object:
+        nonlocal decode_calls
+        decode_calls += 1
+        raise failure_type("debug decoding must not run")
+
+    monkeypatch.setattr(json, "loads", fail_if_decoded)
+
+    captured = _factory(engine, tmp_path).run(
+        ProwlerConfig(executable_path="/opt/prowler/bin/prowler"), _provider()
+    )
+
+    assert captured.parsed == engine.artifact
+    assert decode_calls == 0
+    artifact_metadata = next(
+        cast(Any, record).prowler_metadata
+        for record in caplog.records
+        if record.getMessage() == "Prowler output artifact metadata"
+    )
+    assert artifact_metadata == {"artifact_bytes": len(engine.artifact)}
 
 
 def test_cleanup_failure_after_success_surfaces_only_safe_cleanup_error(

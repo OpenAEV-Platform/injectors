@@ -97,15 +97,27 @@ unique controlled temporary output directory and tells Prowler to write the
 single expected artifact as `findings.ocsf.json` (`--output-filename findings`
 with `-M json-ocsf`). Console stdout and stderr remain bounded diagnostics; the
 artifact is opened only at its exact path as a regular, non-symlink file and is
-read incrementally to its separate 100 MiB limit.
+read incrementally to its separate 100 MiB limit. CHK.004 debug metadata reports
+only the artifact byte size; record counting belongs to the downstream mapper.
 
 On Linux/POSIX, a writable directory at `/dev/shm` is preferred and labelled
-`memory_tmpfs`, keeping normal output in memory-backed temporary storage. If
-`/dev/shm` is absent, not a directory, or not writable, the injector uses the
-portable system temporary location labelled `filesystem_temp`, which may be
-disk-backed. Windows always uses that system-temp fallback and relies on its
-native temporary-directory ACL rather than making a POSIX permission claim.
-Owned output directories use mode `0700` on POSIX.
+`memory_tmpfs`, keeping normal output in memory-backed temporary storage. It is
+selected only when a safe free-capacity probe reports at least the 100 MiB
+artifact limit plus a 16 MiB safety margin for Prowler's additional temporary or
+nested output. If `/dev/shm` is absent, unsuitable, undersized, cannot be probed,
+or fails workspace creation, the injector makes one attempt in the portable
+system temporary location labelled `filesystem_temp`, which may be disk-backed.
+Windows always uses that system-temp fallback and relies on its native
+temporary-directory ACL rather than making a POSIX permission claim. Owned
+output directories use mode `0700` on POSIX.
+
+On native Windows, Python does not expose the POSIX `O_NOFOLLOW` guarantee used
+to reject symlink substitution at open time. Regular-file checks before and
+after open, plus device/inode identity checks, are therefore a best-effort
+reparse-point defence inside the randomly named controlled directory. This
+fallback does not claim atomic reparse-point exclusion on native Windows;
+operators must secure the system temporary-directory ACL against untrusted
+writers.
 
 The complete owned output tree, including any nested compliance output, is
 recursively removed on every normal success or failure path. Cleanup is
