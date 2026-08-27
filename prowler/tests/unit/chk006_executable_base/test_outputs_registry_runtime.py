@@ -97,19 +97,34 @@ def test_registered_outputs_and_payload_preserve_and_project(
     assert "asset_id" not in payload["vulnerabilities"][0]
 
 
-def test_trace_is_deterministic_flattened_and_secret_safe(
+def test_contract_forwards_dynamic_trace_config_and_safe_request_info(
     findings: tuple[OpenAevFinding, ...],
 ) -> None:
-    """Trace reports flattened context and exact counts without sensitive values."""
-    contract = _concrete_contract_class()()
-    first = contract.execution_trace(findings)
-    assert first == contract.execution_trace(findings)
-    assert "Route: aws" in first
-    assert "SUCCESS=1 FAILED=1 IGNORED=1" in first
-    for field in OpenAevFinding.model_fields:
-        assert f"{field}=" in first
-    assert "credential" not in first.lower()
-    assert "openaev-prowler-credential-" not in first
+    """Subclass columns and allowlisted model context reach the renderer."""
+    contract_class = _concrete_contract_class()
+    contract_class.output_trace_config = staticmethod(
+        lambda: {"columns": [{"title": "Description", "path": "description"}]}
+    )
+    contract = contract_class()
+    provider = contract.parse_input(
+        {
+            "aws_access_key_id": "CANARY-ACCESS-KEY",
+            "aws_secret_access_key": "CANARY-SECRET",
+            "aws_account_id": "123456789012",
+            "aws_region": "eu-west-1",
+            "aws_session_token": "CANARY-SESSION",
+        }
+    )
+    first = contract.render_trace(provider, findings, 4)
+    assert first == contract.render_trace(provider, findings, 4)
+    assert "Description" in first
+    assert "Description failed" in first
+    assert "account" in first and "123456789012" in first
+    assert "region" in first and "eu-west-1" in first
+    assert all(
+        marker not in first
+        for marker in ("CANARY-ACCESS-KEY", "CANARY-SECRET", "CANARY-SESSION")
+    )
 
 
 def test_route_uuid_strategy_is_stable_unique_and_version_five() -> None:
@@ -164,17 +179,23 @@ class _RuntimeContract(BaseProwlerContract):
     label = "Runtime test"
     events: ClassVar[list[str]] = []
     outcome: ClassVar[ContractExecutionOutcome]
+    fail_parse: ClassVar[bool] = False
 
     def parse_input(self, raw_input: Any) -> Any:
         self.events.append(f"parse:{tuple(raw_input)}")
-        if "secret_marker" in raw_input:
+        if self.fail_parse:
             raise ValueError("unsafe exception contains SECRET-MARKER")
-        return object()
+        return super().parse_input(raw_input)
 
     def execute(self, config: Any, provider: Any) -> ContractExecutionOutcome:
         del config, provider
         self.events.append("execute")
         return self.outcome
+
+    def render_trace(self, provider: Any, findings: Any, duration: int, **kwargs: Any) -> str:
+        del provider, findings, duration
+        self.events.append("render:error" if kwargs.get("is_error") else "render:success")
+        return "CONTRACT RICH ERROR" if kwargs.get("is_error") else "CONTRACT RICH SUCCESS"
 
 
 def _message(
@@ -186,7 +207,13 @@ def _message(
     injection: dict[str, Any] = {
         "inject_id": "inject-test",
         "injector_contract_id": identifier,
-        "inject_content": content or {"aws_region": "eu-west-1"},
+        "inject_content": content
+        or {
+            "aws_access_key_id": "runtime-access",
+            "aws_secret_access_key": "runtime-secret",
+            "aws_account_id": "123456789012",
+            "aws_region": "eu-west-1",
+        },
     }
     if fallback is not None:
         injection["convertedContent"] = {
@@ -208,6 +235,7 @@ def _runtime(findings: tuple[OpenAevFinding, ...]) -> tuple[Any, Mock]:
     identifier = str(subject.stable_contract_id("aws"))
     _RuntimeContract.contract_id = identifier
     _RuntimeContract.events = []
+    _RuntimeContract.fail_parse = False
     _RuntimeContract.outcome = ContractExecutionOutcome(
         command_result=CommandResult(
             specification=ExecutionSpecification(
@@ -246,14 +274,19 @@ def test_runtime_accepts_both_id_shapes_and_calls_success_once(
     if not primary:
         del message["injection"]["injector_contract_id"]
     injector.process_message(message)
-    assert _RuntimeContract.events == ["reception", "parse:('aws_region',)", "execute"]
+    assert _RuntimeContract.events == [
+        "reception",
+        "parse:('aws_access_key_id', 'aws_secret_access_key', 'aws_account_id', 'aws_region')",
+        "execute",
+        "render:success",
+    ]
     helper.api.inject.execution_callback.assert_called_once()
     callback = helper.api.inject.execution_callback.call_args.kwargs["data"]
     assert callback["execution_status"] == "SUCCESS"
     assert callback["execution_action"] == "complete"
     assert isinstance(callback["execution_duration"], int)
     assert json.loads(callback["execution_output_structured"])["findings"]
-    assert callback["execution_message"].startswith("Route: aws")
+    assert callback["execution_message"] == "CONTRACT RICH SUCCESS"
 
 
 @pytest.mark.parametrize("unknown", (False, True))
@@ -266,17 +299,35 @@ def test_runtime_conflict_or_unknown_is_one_safe_error_without_execution(
     injector, helper = _runtime(findings)
     selected = str(subject.stable_contract_id("gcp")) if unknown else identifier
     fallback = None if unknown else str(subject.stable_contract_id("gcp"))
-    injector.process_message(
-        _message(
-            selected, fallback=fallback, content={"secret_marker": "SECRET-MARKER"}
-        )
-    )
+    injector.process_message(_message(selected, fallback=fallback))
     assert _RuntimeContract.events == ["reception"]
     callback = helper.api.inject.execution_callback.call_args.kwargs["data"]
     assert callback["execution_status"] == "ERROR"
     assert "execution_output_structured" not in callback
     assert "SECRET-MARKER" not in callback["execution_message"]
     helper.api.inject.execution_callback.assert_called_once()
+
+
+def test_runtime_resolved_contract_uses_renderer_for_safe_error(
+    findings: tuple[OpenAevFinding, ...],
+) -> None:
+    """A resolved parse failure is represented by the contract's safe renderer."""
+    subject = _subject()
+    identifier = str(subject.stable_contract_id("aws"))
+    injector, helper = _runtime(findings)
+    _RuntimeContract.fail_parse = True
+
+    injector.process_message(_message(identifier))
+
+    assert _RuntimeContract.events == [
+        "reception",
+        "parse:('aws_access_key_id', 'aws_secret_access_key', 'aws_account_id', 'aws_region')",
+        "render:error",
+    ]
+    callback = helper.api.inject.execution_callback.call_args.kwargs["data"]
+    assert callback["execution_status"] == "ERROR"
+    assert callback["execution_message"] == "CONTRACT RICH ERROR"
+    assert "SECRET-MARKER" not in callback["execution_message"]
 
 
 def test_default_registry_and_daemon_config_remain_empty() -> None:

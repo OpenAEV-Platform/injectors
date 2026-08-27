@@ -50,11 +50,30 @@ Feature: Executable Prowler contract infrastructure and route catalog
     And only FAILED findings become platform vulnerabilities
     And cloud resource identifiers are not projected as OpenAEV asset identifiers
 
-  Scenario: The execution trace is deterministic and secret-safe
+  Scenario: The execution trace is deterministic, dynamic, and secret-safe
     Given mapped SUCCESS, FAILED, and IGNORED findings
     When the base prepares its execution trace
-    Then it reports the route and each expectation-result count
-    And it contains flattened finding context without credentials or temporary paths
+    Then Rich reports the route, execution status, and status and severity summaries
+    And contract-specific columns read flattened finding fields
+    And allowlisted request context excludes credentials and temporary paths
+
+  Scenario: Trace extraction tolerates heterogeneous display data
+    Given model and dictionary findings with nested lists and missing values
+    When configured columns use numeric, wildcard, and fallback paths
+    Then available display values are rendered without changing structured output
+    And missing values use a stable placeholder
+
+  Scenario: Trace output remains bounded and useful at result boundaries
+    Given no findings or more findings and cell content than display limits
+    When the base prepares its execution trace
+    Then empty results show a no-data panel
+    And large results and cells are deterministically truncated
+
+  Scenario: Runtime callbacks use the contract renderer on every terminal path
+    Given a supplied registry with one concrete test contract
+    When that contract succeeds or fails safely
+    Then SUCCESS and ERROR execution messages come from its renderer
+    And structured success output remains unchanged and errors expose no command internals
 
   Scenario: Stable route identities are deterministic and unique
     When platform identifiers are derived for the canonical routes
