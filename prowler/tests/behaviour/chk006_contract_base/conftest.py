@@ -14,7 +14,8 @@ def ocsf_record() -> dict[str, Any]:
             "title": "Check title",
             "desc": "Description",
         },
-        "status": "PASS",
+        "status": "New",
+        "status_code": "PASS",
         "severity": "High",
         "resources": [{"uid": "asset-id", "name": "asset-name"}],
         "cloud": {
