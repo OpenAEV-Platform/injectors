@@ -62,6 +62,17 @@ context). It never receives the raw form payload, credential fields, command
 environment or arguments, temporary credential paths, or raw stderr. Runtime
 errors use a fixed safe message rather than exception or command internals.
 
+The runtime emits fixed `[PROWLER_INJECTOR]` lifecycle diagnostics through the
+injector logger. Valid assessments identify only the canonical route and
+provider plus bounded status, duration, and result counts. Malformed envelopes
+receive a fixed warning without payload data. Input rejection reports only a
+controlled stage and failure kind plus `ContractInputError` field locations and
+error types; assessment failures expose only an allowlisted CLI error kind and,
+when present, its numeric return code. Raw form values, injection identifiers,
+credentials, arguments, environment values, process output, exception text or
+traceback, callback payloads, finding content, and temporary credential paths
+are not logged.
+
 ## Provider input boundary
 
 Provider selection, account or target values, and credentials are not injector
@@ -76,7 +87,8 @@ inputs**; this implementation does not claim masking or secret-field protection.
 Credential fields have no defaults, are never intentionally logged or echoed,
 and are converted immediately to `SecretStr`-backed provider models after form
 submission. This limits handling inside the injector but does not remove the
-plaintext platform-boundary exposure.
+plaintext platform-boundary exposure. Value-free validation diagnostics may name
+the rejected credential field and error type, but never its submitted value.
 
 A future iteration will migrate these fields to credential references. CHK.006
 does not extend pyoaev or the platform with a new secret-field mechanism.

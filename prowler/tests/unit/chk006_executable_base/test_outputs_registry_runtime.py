@@ -1,15 +1,31 @@
 """Executable expectations for CHK.006 shared infrastructure."""
 
 import json
-from typing import Any, ClassVar
-from unittest.mock import Mock
+import sys
+from dataclasses import replace
+from typing import Any, ClassVar, cast
+from unittest.mock import Mock, call
 from uuid import UUID
 
 import pytest
-from pyoaev.configuration import ConfigLoaderOAEV
-from pyoaev.contracts.contract_config import ContractOutputType
+from pyoaev.configuration import ConfigLoaderOAEV  # type: ignore[import-untyped]
+from pyoaev.contracts.contract_config import (  # type: ignore[import-untyped]
+    ContractOutputType,
+)
 
-from prowler.contracts import BaseProwlerContract, ContractExecutionOutcome
+from prowler._core.cli_engine import (
+    CliEngineError,
+    ExecutionError,
+    ParsingError,
+    PolicyError,
+    ResolutionError,
+)
+from prowler.contracts import (
+    BaseProwlerContract,
+    ContractExecutionOutcome,
+    ContractInputError,
+    ContractInputIssue,
+)
 from prowler.models.configs.config_loader import (
     ConfigLoader,
     InjectorConfig,
@@ -19,12 +35,15 @@ from prowler.models.findings import OpenAevFinding
 
 
 def _config() -> ConfigLoader:
-    return ConfigLoader.model_construct(
-        openaev=ConfigLoaderOAEV(
-            url="http://127.0.0.1:8080", token="runtime-test-token"
+    return cast(
+        ConfigLoader,
+        ConfigLoader.model_construct(
+            openaev=ConfigLoaderOAEV(
+                url="http://127.0.0.1:8080", token="runtime-test-token"
+            ),
+            injector=InjectorConfig(id="injector-test"),
+            prowler=ProwlerConfig(),
         ),
-        injector=InjectorConfig(id="injector-test"),
-        prowler=ProwlerConfig(),
     )
 
 
@@ -179,12 +198,12 @@ class _RuntimeContract(BaseProwlerContract):
     label = "Runtime test"
     events: ClassVar[list[str]] = []
     outcome: ClassVar[ContractExecutionOutcome]
-    fail_parse: ClassVar[bool] = False
+    parse_failure: ClassVar[Exception | None] = None
 
     def parse_input(self, raw_input: Any) -> Any:
         self.events.append(f"parse:{tuple(raw_input)}")
-        if self.fail_parse:
-            raise ValueError("unsafe exception contains SECRET-MARKER")
+        if self.parse_failure is not None:
+            raise self.parse_failure
         return super().parse_input(raw_input)
 
     def execute(self, config: Any, provider: Any) -> ContractExecutionOutcome:
@@ -241,15 +260,15 @@ def _runtime(findings: tuple[OpenAevFinding, ...]) -> tuple[Any, Mock]:
     identifier = str(subject.stable_contract_id("aws"))
     _RuntimeContract.contract_id = identifier
     _RuntimeContract.events = []
-    _RuntimeContract.fail_parse = False
+    _RuntimeContract.parse_failure = None
     _RuntimeContract.outcome = ContractExecutionOutcome(
         command_result=CommandResult(
             specification=ExecutionSpecification(
-                executable="/bin/true",
-                arguments=(),
-                environment=(),
-                working_directory=None,
-                input_bytes=b"",
+                executable="/TEMP-CREDENTIAL-PATH-CANARY/prowler",
+                arguments=("--ARG-CANARY", "FORM-VALUE-CANARY"),
+                environment=(("ENV-CANARY", "ACCESS-KEY-CANARY"),),
+                working_directory="/TEMP-CREDENTIAL-PATH-CANARY",
+                input_bytes=b"STDIN-CANARY",
                 output=OutputSpecification(),
                 timeout_seconds=1,
                 maximum_accepted_output_bytes=1,
@@ -266,6 +285,289 @@ def _runtime(findings: tuple[OpenAevFinding, ...]) -> tuple[Any, Mock]:
         _config(), helper, registry=subject.ProwlerContracts((_RuntimeContract,))
     )
     return injector, helper
+
+
+_LISTENER_START = "[PROWLER_INJECTOR] - Listener starting"
+_INVALID_MESSAGE = "[PROWLER_INJECTOR] - Invalid injection message rejected"
+_ASSESSMENT_RECEIVED = "[PROWLER_INJECTOR] - Assessment received"
+_ASSESSMENT_VALIDATED = "[PROWLER_INJECTOR] - Assessment validated"
+_EXECUTION_STARTED = "[PROWLER_INJECTOR] - Assessment execution started"
+_ASSESSMENT_SUCCEEDED = "[PROWLER_INJECTOR] - Assessment completed"
+_ASSESSMENT_FAILED = "[PROWLER_INJECTOR] - Assessment failed safely"
+_CALLBACK_COMPLETED = "[PROWLER_INJECTOR] - Assessment callback completed"
+
+
+def _assert_logger_excludes(helper: Mock, *markers: str) -> None:
+    rendered_calls = repr(helper.injector_logger.method_calls)
+    assert all(marker not in rendered_calls for marker in markers)
+
+
+def test_runtime_start_logs_one_fixed_listener_event() -> None:
+    """Listener startup is observable without serializing daemon configuration."""
+    from prowler.injector import ProwlerInjector
+
+    config = Mock()
+    helper = Mock()
+    registry = Mock()
+    injector = ProwlerInjector(config, helper, registry=registry)
+
+    injector.start()
+
+    config.to_daemon_config.assert_called_once_with(registry)
+    helper.listen.assert_called_once_with(message_callback=injector.process_message)
+    helper.injector_logger.info.assert_called_once_with(_LISTENER_START)
+
+
+@pytest.mark.parametrize(
+    "message",
+    (
+        {},
+        {"injection": "RAW-INJECTION-CANARY"},
+        {"injection": {"inject_id": "", "inject_content": "FORM-VALUE-CANARY"}},
+    ),
+)
+def test_runtime_rejects_invalid_envelope_with_fixed_value_free_warning(
+    findings: tuple[OpenAevFinding, ...], message: dict[str, Any]
+) -> None:
+    """An unusable envelope or inject ID is warned about without payload data."""
+    injector, helper = _runtime(findings)
+
+    injector.process_message(message)
+
+    helper.injector_logger.warning.assert_called_once_with(_INVALID_MESSAGE)
+    helper.injector_logger.error.assert_not_called()
+    helper.api.inject.execution_reception.assert_not_called()
+    helper.api.inject.execution_callback.assert_not_called()
+    _assert_logger_excludes(
+        helper, "RAW-INJECTION-CANARY", "FORM-VALUE-CANARY", "inject_content"
+    )
+
+
+def test_runtime_logs_fixed_safe_success_lifecycle(
+    findings: tuple[OpenAevFinding, ...],
+) -> None:
+    """A successful assessment logs fixed events and closed scalar metadata only."""
+    identifier = str(_subject().stable_contract_id("aws"))
+    injector, helper = _runtime(findings)
+
+    injector.process_message(_message(identifier))
+
+    calls = helper.injector_logger.method_calls
+    assert calls[:3] == [
+        call.info(_ASSESSMENT_RECEIVED),
+        call.debug(_ASSESSMENT_VALIDATED, {"route": "aws", "provider": "aws"}),
+        call.info(_EXECUTION_STARTED, {"route": "aws", "provider": "aws"}),
+    ]
+    assert calls[3].args[0] == _ASSESSMENT_SUCCEEDED
+    success_meta = calls[3].args[1]
+    assert success_meta == {
+        "route": "aws",
+        "provider": "aws",
+        "status": "SUCCESS",
+        "duration_seconds": success_meta["duration_seconds"],
+        "finding_count": 3,
+        "vulnerability_count": 1,
+    }
+    assert isinstance(success_meta["duration_seconds"], int)
+    assert 0 <= success_meta["duration_seconds"] <= 86_400
+    assert calls[4].args[0] == _CALLBACK_COMPLETED
+    callback_meta = calls[4].args[1]
+    assert callback_meta == {
+        "route": "aws",
+        "provider": "aws",
+        "status": "SUCCESS",
+        "duration_seconds": success_meta["duration_seconds"],
+    }
+    assert calls[4] == call.debug(_CALLBACK_COMPLETED, callback_meta)
+    _assert_logger_excludes(
+        helper,
+        "inject-test",
+        "runtime-access",
+        "runtime-secret",
+        "123456789012",
+        "eu-west-1",
+        "ARG-CANARY",
+        "ENV-CANARY",
+        "STDIN-CANARY",
+        "TEMP-CREDENTIAL-PATH-CANARY",
+        "CONTRACT RICH SUCCESS",
+        "success finding",
+        "failed finding",
+        "ignored finding",
+    )
+
+
+def test_runtime_logs_value_free_contract_input_issues_after_except(
+    findings: tuple[OpenAevFinding, ...],
+) -> None:
+    """Emit one value-free input ERROR outside the active except suite."""
+    identifier = str(_subject().stable_contract_id("aws"))
+    injector, helper = _runtime(findings)
+    _RuntimeContract.parse_failure = ContractInputError(
+        (
+            ContractInputIssue(("aws_secret_access_key",), "string_too_short"),
+            ContractInputIssue(("unexpected",), "extra_forbidden"),
+        )
+    )
+
+    def assert_no_active_exception(*_: Any, **__: Any) -> None:
+        assert sys.exc_info() == (None, None, None)
+
+    helper.injector_logger.error.side_effect = assert_no_active_exception
+    injector.process_message(_message(identifier))
+
+    helper.injector_logger.error.assert_called_once()
+    error_message, error_meta = helper.injector_logger.error.call_args.args
+    assert error_message == _ASSESSMENT_FAILED
+    assert error_meta == {
+        "route": "aws",
+        "provider": "aws",
+        "status": "ERROR",
+        "duration_seconds": error_meta["duration_seconds"],
+        "stage": "input_validation",
+        "failure_kind": "invalid_input",
+        "issues": [
+            {
+                "location": ["aws_secret_access_key"],
+                "type": "string_too_short",
+            },
+            {"location": ["unexpected"], "type": "extra_forbidden"},
+        ],
+    }
+    assert helper.injector_logger.method_calls[-1] == call.debug(
+        _CALLBACK_COMPLETED,
+        {
+            "route": "aws",
+            "provider": "aws",
+            "status": "ERROR",
+            "duration_seconds": error_meta["duration_seconds"],
+        },
+    )
+    _assert_logger_excludes(
+        helper,
+        "FORM-VALUE-CANARY",
+        "runtime-access",
+        "runtime-secret",
+        "Invalid Prowler contract input",
+        "SECRET-MARKER",
+    )
+
+
+@pytest.mark.parametrize(
+    ("error", "return_code", "expected_kind", "expected_return_code"),
+    (
+        (PolicyError("EXCEPTION-STRING-CANARY"), 0, "policy_rejected", None),
+        (
+            ResolutionError("EXCEPTION-STRING-CANARY"),
+            0,
+            "resolution_failed",
+            None,
+        ),
+        (
+            ExecutionError(
+                "EXCEPTION-STRING-CANARY",
+                stdout=b"STDOUT-BYTES-CANARY",
+                stderr=b"STDERR-BYTES-CANARY",
+                return_code=23,
+                cause="EXCEPTION-CAUSE-CANARY",
+            ),
+            23,
+            "execution_failed",
+            23,
+        ),
+        (
+            ParsingError(
+                "EXCEPTION-STRING-CANARY",
+                stdout=b"STDOUT-BYTES-CANARY",
+                stderr=b"STDERR-BYTES-CANARY",
+                context=(("temporary_path", "/TEMP-CREDENTIAL-PATH-CANARY"),),
+                cause="EXCEPTION-CAUSE-CANARY",
+            ),
+            0,
+            "parsing_failed",
+            None,
+        ),
+        (
+            CliEngineError("EXCEPTION-STRING-CANARY", kind="ATTACKER-KIND-CANARY"),
+            0,
+            "unexpected_failure",
+            None,
+        ),
+        (RuntimeError("EXCEPTION-STRING-CANARY"), 19, "unexpected_failure", 19),
+    ),
+)
+def test_runtime_logs_only_allowlisted_assessment_failure_metadata(
+    findings: tuple[OpenAevFinding, ...],
+    error: Any,
+    return_code: int,
+    expected_kind: str,
+    expected_return_code: int | None,
+) -> None:
+    """Assessment results expose a closed failure kind and optional return code."""
+    identifier = str(_subject().stable_contract_id("aws"))
+    injector, helper = _runtime(findings)
+    command_result = replace(
+        _RuntimeContract.outcome.command_result, return_code=return_code
+    )
+    _RuntimeContract.outcome = ContractExecutionOutcome(
+        command_result=command_result,
+        findings=findings,
+        error=error,
+    )
+
+    injector.process_message(_message(identifier))
+
+    helper.injector_logger.error.assert_called_once()
+    error_message, error_meta = helper.injector_logger.error.call_args.args
+    assert error_message == _ASSESSMENT_FAILED
+    expected_meta = {
+        "route": "aws",
+        "provider": "aws",
+        "status": "ERROR",
+        "duration_seconds": error_meta["duration_seconds"],
+        "stage": "assessment_execution",
+        "failure_kind": expected_kind,
+    }
+    if expected_return_code is not None:
+        expected_meta["return_code"] = expected_return_code
+    assert error_meta == expected_meta
+    callback = helper.api.inject.execution_callback.call_args.kwargs["data"]
+    assert callback["execution_status"] == "ERROR"
+    assert callback["execution_message"] == "CONTRACT RICH ERROR"
+    assert "execution_output_structured" not in callback
+    _assert_logger_excludes(
+        helper,
+        "EXCEPTION-STRING-CANARY",
+        "EXCEPTION-CAUSE-CANARY",
+        "STDOUT-BYTES-CANARY",
+        "STDERR-BYTES-CANARY",
+        "ATTACKER-KIND-CANARY",
+        "TEMP-CREDENTIAL-PATH-CANARY",
+        "CONTRACT RICH ERROR",
+        "failed finding",
+    )
+
+
+def test_runtime_collapses_unexpected_exception_without_exception_details(
+    findings: tuple[OpenAevFinding, ...],
+) -> None:
+    """An unexpected raised exception is classified without its string or repr."""
+    identifier = str(_subject().stable_contract_id("aws"))
+    injector, helper = _runtime(findings)
+    _RuntimeContract.parse_failure = RuntimeError(
+        "EXCEPTION-STRING-CANARY /TEMP-CREDENTIAL-PATH-CANARY"
+    )
+
+    injector.process_message(_message(identifier))
+
+    helper.injector_logger.error.assert_called_once()
+    _, error_meta = helper.injector_logger.error.call_args.args
+    assert error_meta["stage"] == "input_validation"
+    assert error_meta["failure_kind"] == "unexpected_failure"
+    assert "issues" not in error_meta
+    _assert_logger_excludes(
+        helper, "EXCEPTION-STRING-CANARY", "TEMP-CREDENTIAL-PATH-CANARY"
+    )
 
 
 @pytest.mark.parametrize("primary", (True, False))
@@ -322,7 +624,9 @@ def test_runtime_resolved_contract_uses_renderer_for_safe_error(
     subject = _subject()
     identifier = str(subject.stable_contract_id("aws"))
     injector, helper = _runtime(findings)
-    _RuntimeContract.fail_parse = True
+    _RuntimeContract.parse_failure = ValueError(
+        "unsafe exception contains SECRET-MARKER"
+    )
 
     injector.process_message(_message(identifier))
 

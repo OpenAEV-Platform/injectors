@@ -83,6 +83,21 @@ Feature: Executable Prowler contract infrastructure and route catalog
     Then SUCCESS and ERROR execution messages come from its renderer
     And structured success output remains unchanged and errors expose no command internals
 
+  Scenario: Runtime lifecycle diagnostics are fixed and value-free
+    Given a supplied registry with one concrete test contract
+    When the listener starts or an assessment reaches a terminal callback
+    Then fixed prefixed lifecycle events report only canonical route and provider metadata
+    And terminal events contain only bounded status, duration, and finding counts
+    And malformed envelopes are rejected with a fixed warning that contains no payload
+
+  Scenario: Runtime failures expose only closed diagnostic metadata
+    Given invalid form input or a failed assessment result containing sensitive internals
+    When the runtime prepares the existing safe ERROR callback
+    Then input diagnostics contain only the controlled stage, invalid-input kind, and value-free issue locations and types
+    And assessment diagnostics use only allowlisted CLI failure kinds and an optional return code
+    And unexpected exceptions collapse to unexpected_failure without exception details
+    And no log contains form values, credentials, process internals, callback data, finding content, or temporary paths
+
   Scenario: Stable route identities are deterministic and unique
     When platform identifiers are derived for the canonical routes
     Then repeated derivation is stable
