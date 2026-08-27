@@ -362,7 +362,7 @@ class _FailurePresentation:
 
 
 class ProwlerInjector:
-    """Register the foundation injector without assessment contracts."""
+    """Register and execute the available Prowler assessment contracts."""
 
     def __init__(
         self,

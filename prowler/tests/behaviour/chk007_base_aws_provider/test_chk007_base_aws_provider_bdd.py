@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Any
 from uuid import UUID
 
@@ -16,7 +17,10 @@ from prowler._core.cli_engine import (
     ExecutionSpecification,
     ValidatedCommandRequest,
 )
-from prowler._core.prowler_client import ProwlerClientFactory
+from prowler._core.prowler_client import (
+    OUTPUT_ARTIFACT_FILENAME,
+    ProwlerClientFactory,
+)
 from prowler.contracts import DEFAULT_PROWLER_CONTRACTS, stable_contract_id
 from prowler.models.configs.config_loader import (
     ConfigLoader,
@@ -145,10 +149,12 @@ def test_valid_request_invokes_client_once_without_narrowing(
     aws_form: dict[str, object], ocsf_record_factory: Any
 ) -> None:
     """The concrete base route passes the complete AWS scope once."""
+    artifact = json.dumps([ocsf_record_factory("one")]).encode()
     result = CommandResult(
         specification=_specification(),
         return_code=0,
-        stdout=json.dumps([ocsf_record_factory("one")]).encode(),
+        stdout=b"\x1b[32mconsole output is not OCSF JSON\x1b[0m",
+        parsed=artifact,
     )
     factory = _ClientFactory(result)
     contract = _contract()
@@ -159,6 +165,9 @@ def test_valid_request_invokes_client_once_without_narrowing(
     assert len(factory.calls) == 1
     assert factory.calls[0][2] == ()
     assert len(outcome.findings) == 1
+    assert outcome.raw_record_count == 1
+    assert outcome.raw_output_bytes == len(artifact)
+    assert len(outcome.raw_preview) == 1
 
 
 @dataclass
@@ -168,10 +177,13 @@ class _Engine:
 
     def run(self, request: ValidatedCommandRequest) -> CommandResult:
         self.requests.append(request)
+        arguments = tuple(request.arguments)
+        output_directory = Path(arguments[arguments.index("--output-directory") + 1])
+        (output_directory / OUTPUT_ARTIFACT_FILENAME).write_bytes(self.payload)
         return CommandResult(
             specification=ExecutionSpecification.from_request(request),
             return_code=0,
-            stdout=self.payload,
+            stdout=b"\x1b[32mconsole output is not OCSF JSON\x1b[0m",
         )
 
 
@@ -216,6 +228,19 @@ def test_fake_engine_proves_exact_aws_subprocess_arguments(
         "aws",
         "--region",
         "eu-west-1",
+        "--severity",
+        "critical",
+        "high",
+        "medium",
+        "low",
+        "informational",
+        "--output-directory",
+        request.arguments[request.arguments.index("--output-directory") + 1],
+        "--output-filename",
+        "findings",
+        "-z",
+        "--only-logs",
+        "--no-color",
         "-M",
         "json-ocsf",
     )
@@ -238,11 +263,13 @@ def test_mapping_filters_normalizes_and_preserves_all_fields_in_order(
         ocsf_record_factory("excluded", provider="Azure", status="FAIL"),
         ocsf_record_factory("second", provider="aws", status="MUTED"),
     ]
+    artifact = json.dumps(records).encode()
     factory = _ClientFactory(
         CommandResult(
             specification=_specification(),
             return_code=0,
-            stdout=json.dumps(records).encode(),
+            stdout=b"\x1b[32mconsole output is not OCSF JSON\x1b[0m",
+            parsed=artifact,
         )
     )
     contract = _contract()
@@ -298,14 +325,19 @@ def test_runtime_success_and_safe_error_are_end_to_end(
         "CANARY-ACCESS-KEY",
         "CANARY-SECRET-KEY",
         "CANARY-SESSION-TOKEN",
-        "/tmp/credential-canary",
+        "/tmp/credential-canary",  # noqa: S108 - deliberate leak canary
         "STDERR-CANARY",
+        "CONSOLE-NON-JSON-CANARY",
     )
+    artifact = json.dumps([ocsf_record_factory("runtime")]).encode()
     result = CommandResult(
-        specification=_specification(("/tmp/credential-canary",)),
+        specification=_specification(
+            ("/tmp/credential-canary",)  # noqa: S108 - deliberate leak canary
+        ),
         return_code=0,
-        stdout=json.dumps([ocsf_record_factory("runtime")]).encode(),
+        stdout=b"\x1b[31mCONSOLE-NON-JSON-CANARY\x1b[0m",
         stderr=b"STDERR-CANARY",
+        parsed=artifact,
     )
     factory = _ClientFactory(result)
     contract = _contract()
@@ -325,6 +357,11 @@ def test_runtime_success_and_safe_error_are_end_to_end(
     mapped = json.loads(structured["findings"][0])
     assert mapped["value"] == "runtime"
     assert "runtime" in callback["execution_message"]
+    assert callback["execution_message"].index("Prowler Findings") < callback[
+        "execution_message"
+    ].index("[PROWLER] Raw OCSF evidence (bounded preview)")
+    assert "Total raw records: 1" in callback["execution_message"]
+    assert f"Artifact bytes: {len(artifact)}" in callback["execution_message"]
     assert all(marker not in json.dumps(callback) for marker in canaries)
     assert len(factory.calls) == 1
     logs = helper.injector_logger.events
@@ -376,6 +413,8 @@ def test_runtime_success_and_safe_error_are_end_to_end(
     assert success_metadata["status"] == "SUCCESS"
     assert success_metadata["finding_count"] == 1
     assert success_metadata["vulnerability_count"] == 1
+    assert success_metadata["raw_record_count"] == 1
+    assert success_metadata["raw_output_bytes"] == len(artifact)
     callback_metadata = logs[6].metadata
     assert callback_metadata is not None
     assert callback_metadata["assessment_status"] == "SUCCESS"
