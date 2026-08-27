@@ -7,10 +7,25 @@ from uuid import UUID
 
 import pytest
 from pyoaev.contracts.contract_config import ContractOutputType
+from pyoaev.configuration import ConfigLoaderOAEV
 
 from prowler.contracts import BaseProwlerContract, ContractExecutionOutcome
-from prowler.models.configs.config_loader import ConfigLoader
+from prowler.models.configs.config_loader import (
+    ConfigLoader,
+    InjectorConfig,
+    ProwlerConfig,
+)
 from prowler.models.findings import OpenAevFinding
+
+
+def _config() -> ConfigLoader:
+    return ConfigLoader.model_construct(
+        openaev=ConfigLoaderOAEV(
+            url="http://127.0.0.1:8080", token="runtime-test-token"
+        ),
+        injector=InjectorConfig(id="injector-test"),
+        prowler=ProwlerConfig(),
+    )
 
 
 def _subject() -> Any:
@@ -184,7 +199,9 @@ def _runtime(findings: tuple[OpenAevFinding, ...]) -> tuple[Any, Mock]:
     )
     helper = Mock()
     helper.api.inject.execution_reception.side_effect = lambda **_: _RuntimeContract.events.append("reception")
-    injector = ProwlerInjector(ConfigLoader(), helper, registry=subject.ProwlerContracts((_RuntimeContract,)))
+    injector = ProwlerInjector(
+        _config(), helper, registry=subject.ProwlerContracts((_RuntimeContract,))
+    )
     return injector, helper
 
 
@@ -233,5 +250,5 @@ def test_default_registry_and_daemon_config_remain_empty() -> None:
     """CHK.006 defaults to no executable contract until CHK.007 registers one."""
     subject = _subject()
     assert subject.DEFAULT_PROWLER_CONTRACTS.contracts() == []
-    daemon = ConfigLoader().to_daemon_config()
-    assert daemon.config_hints["injector_contracts"]["data"] == []
+    daemon = _config().to_daemon_config()
+    assert daemon.get("injector_contracts") == []

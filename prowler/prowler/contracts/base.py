@@ -5,6 +5,7 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
+import json
 from typing import Any, ClassVar, Literal, Protocol
 from uuid import UUID
 
@@ -14,6 +15,8 @@ from pyoaev.contracts.contract_config import (
     Contract,
     ContractConfig,
     ContractElement,
+    ContractOutputElement,
+    ContractOutputType,
     SupportedLanguage,
 )
 
@@ -122,13 +125,113 @@ class BaseProwlerContract(ABC):
             fields=ContractBuilder()
             .add_fields(self.build_provider_fields())
             .build_fields(),
-            outputs=ContractBuilder().add_outputs([]).build_outputs(),
+            outputs=ContractBuilder()
+            .add_outputs(self.build_outputs())
+            .build_outputs(),
             manual=False,
         )
 
     def build_provider_fields(self) -> list[ContractElement]:
         """Declare exact provider model fields using current plaintext controls."""
         return _build_provider_fields(self.provider)
+
+    def build_outputs(self) -> list[ContractOutputElement]:
+        """Declare preserved text findings and FAILED vulnerability projections."""
+        labels = list(dict.fromkeys(("prowler", self.provider, self.route_name)))
+        return [
+            ContractOutputElement(
+                type=ContractOutputType.Text.value,
+                field="findings",
+                labels=labels,
+                isFindingCompatible=False,
+                isMultiple=True,
+            ),
+            ContractOutputElement(
+                type=ContractOutputType.Vulnerability.value,
+                field="vulnerabilities",
+                labels=labels,
+                isFindingCompatible=True,
+                isMultiple=True,
+            ),
+        ]
+
+    def output_payload(
+        self, findings: Sequence[OpenAevFinding]
+    ) -> dict[str, list[Any]]:
+        """Serialize every finding and project only failed findings."""
+        return {
+            "findings": [
+                json.dumps(
+                    finding.model_dump(mode="json"),
+                    ensure_ascii=False,
+                    separators=(",", ":"),
+                )
+                for finding in findings
+            ],
+            "vulnerabilities": [
+                self._vulnerability(finding)
+                for finding in findings
+                if finding.expectation_result == "FAILED"
+            ],
+        }
+
+    def execution_trace(self, findings: Sequence[OpenAevFinding]) -> str:
+        """Render a deterministic plain-text summary of flattened findings."""
+        counts = {
+            status: sum(
+                finding.expectation_result == status for finding in findings
+            )
+            for status in ("SUCCESS", "FAILED", "IGNORED")
+        }
+        lines = [
+            f"Route: {self.route_name}",
+            (
+                f"Findings: {len(findings)} "
+                f"(SUCCESS={counts['SUCCESS']} FAILED={counts['FAILED']} "
+                f"IGNORED={counts['IGNORED']})"
+            ),
+        ]
+        for index, finding in enumerate(findings, start=1):
+            flattened = finding.model_dump(mode="json")
+            rendered = " | ".join(
+                f"{field}={self._trace_value(flattened[field])}"
+                for field in OpenAevFinding.model_fields
+            )
+            lines.append(f"{index}. {rendered}")
+        return "\n".join(lines)
+
+    @staticmethod
+    def _trace_value(value: object) -> str:
+        """Render one flattened model value without terminal styling."""
+        if isinstance(value, list):
+            return ", ".join(str(item) for item in value)
+        return "" if value is None else str(value)
+
+    @staticmethod
+    def _vulnerability(finding: OpenAevFinding) -> dict[str, str]:
+        """Project one failed finding without claiming an OpenAEV asset UUID."""
+        remediation = f"Remediation: {finding.remediation}"
+        if finding.remediation_url is not None:
+            remediation += f" ({finding.remediation_url})"
+        compliance = ", ".join(finding.compliance_tags)
+        details = "\n".join(
+            (
+                finding.description,
+                remediation,
+                f"Severity: {finding.severity} ({finding.severity_weight})",
+                (
+                    f"Cloud: provider={finding.cloud_provider}; "
+                    f"account={finding.cloud_account}; region={finding.region}; "
+                    f"resource={finding.asset_name} [{finding.asset_reference}]; "
+                    f"compliance={compliance}"
+                ),
+            )
+        )
+        return {
+            "name": finding.value,
+            "status": "VULNERABLE",
+            "details": details,
+        }
 
     def parse_input(self, raw_input: Mapping[str, object]) -> ProviderInput:
         """Convert ephemeral form values immediately into the strict CHK.002 model."""

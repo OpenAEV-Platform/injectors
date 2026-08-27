@@ -46,8 +46,13 @@ class ConfigLoader(SettingsLoader):
     injector: InjectorConfig = Field(default_factory=InjectorConfig)
     prowler: ProwlerConfig = Field(default_factory=ProwlerConfig)
 
-    def to_daemon_config(self) -> Configuration:
+    def to_daemon_config(self, registry: object | None = None) -> Configuration:
         """Translate settings into the OpenAEV daemon configuration."""
+        if registry is None:
+            from prowler.contracts import DEFAULT_PROWLER_CONTRACTS
+
+            registry = DEFAULT_PROWLER_CONTRACTS
+        contracts = registry.contracts()  # type: ignore[attr-defined]
         return Configuration(
             config_hints={
                 "openaev_url": {"data": str(self.openaev.url)},
@@ -56,7 +61,7 @@ class ConfigLoader(SettingsLoader):
                 "injector_id": {"data": self.injector.id},
                 "injector_name": {"data": self.injector.name},
                 "injector_type": {"data": "openaev_prowler"},
-                "injector_contracts": {"data": []},
+                "injector_contracts": {"data": contracts},
                 "injector_log_level": {"data": self.injector.log_level},
                 "injector_icon_filepath": {"data": self.injector.icon_filepath},
             },
