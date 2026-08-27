@@ -7,116 +7,205 @@ from pathlib import Path
 from typing import Any
 
 import pytest
+from pydantic import SecretStr
 
+from prowler._core.cli_engine import CommandResult
 from prowler.models.configs.config_loader import ProwlerConfig
-from prowler.models.provider_inputs import AwsProviderInput
+
+from .conftest import RecordingEngine, RecordingEngineFactory
 
 
 def _api() -> Any:
     try:
-        return importlib.import_module("prowler._core.client")
+        return importlib.import_module("prowler._core.prowler_client")
     except ModuleNotFoundError:
-        pytest.fail("canonical prowler._core.client API is absent")
+        return importlib.import_module("prowler._core.client")
 
 
-def _client(api: Any, provider_input: AwsProviderInput) -> tuple[Any, Any]:
-    backend = api.InMemoryAssessmentBackend()
-    client = api.ProwlerClient(
-        provider=provider_input,
-        config=ProwlerConfig(executable_path="/opt/prowler/bin/prowler"),
-        backend=backend,
-    )
-    return client, backend
+def _factory(engine: RecordingEngine) -> Any:
+    return _api().ProwlerClientFactory(engine_factory=RecordingEngineFactory(engine))
 
 
-def test_start_returns_handle_and_preserves_filters(
-    provider_input: AwsProviderInput,
+def _config() -> ProwlerConfig:
+    return ProwlerConfig(executable_path="/opt/prowler/bin/prowler")
+
+
+def _environment(request: Any) -> dict[str, Any]:
+    return dict(request.environment)
+
+
+def test_create_does_not_execute(
+    recording_engine: RecordingEngine, provider_inputs: dict[str, Any]
 ) -> None:
-    api = _api()
-    client, backend = _client(api, provider_input)
+    factory = _factory(recording_engine)
 
-    handle = client.start_scan(("check-z", "check-a", "check-z"))
+    client = factory.create(_config(), provider_inputs["AWS"])
 
-    assert isinstance(handle, api.AssessmentHandle)
-    assert handle.value
-    assert backend.request_for(handle).check_filters == (
-        "check-z",
-        "check-a",
-        "check-z",
-    )
-    assert client.executable_path == Path("/opt/prowler/bin/prowler")
+    assert client is not None
+    assert recording_engine.requests == []
+
+
+def test_full_assessment_returns_exact_result_without_check_selector(
+    recording_engine: RecordingEngine, provider_inputs: dict[str, Any]
+) -> None:
+    client = _factory(recording_engine).create(_config(), provider_inputs["AWS"])
+
+    result = client.run()
+
+    assert result is recording_engine.result
+    assert isinstance(result, CommandResult)
+    assert "-c" not in recording_engine.requests[0].arguments
+
+
+def test_factory_run_matches_created_client_request(
+    recording_engine: RecordingEngine, provider_inputs: dict[str, Any]
+) -> None:
+    factory = _factory(recording_engine)
+
+    direct = factory.create(_config(), provider_inputs["AWS"]).run(("one", "two"))
+    quick = factory.run(_config(), provider_inputs["AWS"], check_filters=("one", "two"))
+
+    assert direct is quick
+    assert recording_engine.requests[0] == recording_engine.requests[1]
+
+
+def test_check_filters_are_separate_ordered_tokens(
+    recording_engine: RecordingEngine, provider_inputs: dict[str, Any]
+) -> None:
+    client = _factory(recording_engine).create(_config(), provider_inputs["AWS"])
+
+    client.run(("check-z", "check-a", "check-z"))
+
+    arguments = recording_engine.requests[0].arguments
+    assert arguments[-4:] == ("-c", "check-z", "check-a", "check-z")
 
 
 @pytest.mark.parametrize(
-    "state", ["queued", "running", "succeeded", "failed", "cancelled"]
+    ("provider_name", "expected_arguments", "expected_environment"),
+    [
+        (
+            "AWS",
+            ("aws", "--region", "eu-west-1", "-M", "json-ocsf"),
+            {"AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY", "AWS_SESSION_TOKEN"},
+        ),
+        (
+            "Azure",
+            (
+                "azure",
+                "--sp-env-auth",
+                "--subscription-id",
+                "subscription-id",
+                "--azure-region",
+                "AzureUSGovernment",
+                "-M",
+                "json-ocsf",
+            ),
+            {"AZURE_TENANT_ID", "AZURE_CLIENT_ID", "AZURE_CLIENT_SECRET"},
+        ),
+        (
+            "GCP",
+            (
+                "gcp",
+                "--credentials-file",
+                "<temporary>",
+                "--project-id",
+                "project-id",
+                "-M",
+                "json-ocsf",
+            ),
+            set(),
+        ),
+        (
+            "Kubernetes",
+            (
+                "kubernetes",
+                "--kubeconfig-file",
+                "<temporary>",
+                "--kube-context",
+                "cluster-context",
+                "-M",
+                "json-ocsf",
+            ),
+            set(),
+        ),
+    ],
 )
-def test_poll_reports_each_explicit_state(
-    provider_input: AwsProviderInput, state: str
+def test_provider_invocation_is_explicit_and_secret_safe(
+    recording_engine: RecordingEngine,
+    provider_inputs: dict[str, Any],
+    provider_name: str,
+    expected_arguments: tuple[str, ...],
+    expected_environment: set[str],
 ) -> None:
-    api = _api()
-    client, backend = _client(api, provider_input)
-    handle = client.start_scan(("check-1",))
-    error = api.ProwlerClientError("assessment_failed", "failed", {"exit_code": 2})
-    backend.set_state(handle, state, error=error if state == "failed" else None)
+    _factory(recording_engine).run(_config(), provider_inputs[provider_name])
 
-    status = client.poll_scan(handle)
-
-    assert status.state == state
-    assert (status.error is error) is (state == "failed")
-
-
-def test_invalid_filters_are_structured(provider_input: AwsProviderInput) -> None:
-    api = _api()
-    client, _ = _client(api, provider_input)
-
-    for filters in ((), ("",), ("  ",), ("ok", 7)):
-        with pytest.raises(api.ProwlerClientError) as raised:
-            client.start_scan(filters)
-        assert raised.value.code == "invalid_check_filters"
-        assert raised.value.message
-        assert raised.value.details
+    request = recording_engine.requests[0]
+    arguments = tuple(
+        "<temporary>" if index in {2} and provider_name in {"GCP", "Kubernetes"} else item
+        for index, item in enumerate(request.arguments)
+    )
+    assert arguments == expected_arguments
+    assert set(_environment(request)) == expected_environment
+    assert all(
+        isinstance(value, SecretStr) for value in _environment(request).values()
+    )
+    rendered = repr(request.arguments)
+    assert all(secret not in rendered for secret in ("aws-secret", "azure-secret", "gcp-secret", "kube-secret"))
 
 
-def test_unknown_and_malformed_handles_are_structured(
-    provider_input: AwsProviderInput,
+@pytest.mark.parametrize("filters", [("",), ("  ",), ("ok", "\t")])
+def test_blank_filters_are_rejected_without_execution(
+    recording_engine: RecordingEngine,
+    provider_inputs: dict[str, Any],
+    filters: tuple[str, ...],
 ) -> None:
-    api = _api()
-    client, _ = _client(api, provider_input)
+    client = _factory(recording_engine).create(_config(), provider_inputs["AWS"])
 
-    for handle in (
-        "not-a-handle",
-        api.AssessmentHandle(""),
-        api.AssessmentHandle("other"),
-    ):
-        with pytest.raises(api.ProwlerClientError) as raised:
-            client.poll_scan(handle)
-        assert raised.value.code in {"invalid_assessment_handle", "unknown_assessment"}
-        assert raised.value.details
+    with pytest.raises(ValueError, match="check filters must be nonblank strings"):
+        client.run(filters)
+
+    assert recording_engine.requests == []
 
 
-def test_parser_accepts_json_array_and_json_lines_in_order(
-    provider_input: AwsProviderInput,
+def test_request_uses_exact_bounded_raw_execution_contract(
+    recording_engine: RecordingEngine, provider_inputs: dict[str, Any]
 ) -> None:
-    api = _api()
-    client, _ = _client(api, provider_input)
-    expected = [{"id": 2}, {"id": 1}]
+    _factory(recording_engine).run(_config(), provider_inputs["AWS"])
 
-    assert client.parse_ocsf_output('[{"id": 2}, {"id": 1}]') == expected
-    assert client.parse_ocsf_output(b'{"id": 2}\n\n{"id": 1}\n') == expected
+    request = recording_engine.requests[0]
+    assert request.executable == "/opt/prowler/bin/prowler"
+    assert request.output.parser == "raw"
+    assert request.input_bytes == b""
+    assert request.working_directory is None
+    assert request.timeout_seconds == _api().DEFAULT_TIMEOUT_SECONDS
+    assert (
+        request.maximum_accepted_output_bytes
+        == _api().DEFAULT_MAXIMUM_ACCEPTED_OUTPUT_BYTES
+    )
 
 
-@pytest.mark.parametrize("payload", ["{secret-token", '[{"ok": true}, 3]'])
-def test_parser_errors_do_not_echo_payload_or_credentials(
-    provider_input: AwsProviderInput, payload: str
+@pytest.mark.parametrize("provider_name", ["GCP", "Kubernetes"])
+@pytest.mark.parametrize("outcome", ["success", "result_error", "exception"])
+def test_temporary_credentials_are_owner_only_and_always_removed(
+    recording_engine: RecordingEngine,
+    provider_inputs: dict[str, Any],
+    provider_name: str,
+    outcome: str,
 ) -> None:
-    api = _api()
-    client, _ = _client(api, provider_input)
+    if outcome == "result_error":
+        recording_engine.result = object()
+    elif outcome == "exception":
+        recording_engine.raised = RuntimeError("safe execution failure")
+    factory = _factory(recording_engine)
 
-    with pytest.raises(api.ProwlerClientError) as raised:
-        client.parse_ocsf_output(payload)
+    try:
+        factory.run(_config(), provider_inputs[provider_name])
+    except RuntimeError as error:
+        assert "secret" not in repr(error)
 
-    rendered = repr(raised.value)
-    assert raised.value.code == "invalid_ocsf_output"
-    assert payload not in rendered
-    assert "secret-token" not in rendered
-    assert "do-not-leak" not in rendered
+    request = recording_engine.requests[0]
+    path = Path(request.arguments[2])
+    assert recording_engine.observed_modes == [0o600]
+    assert recording_engine.observed_contents
+    assert not path.exists()
+    assert recording_engine.observed_contents[0] not in repr(request.arguments)
