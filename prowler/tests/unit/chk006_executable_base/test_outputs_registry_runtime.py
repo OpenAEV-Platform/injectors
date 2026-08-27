@@ -272,7 +272,7 @@ def _runtime(findings: tuple[OpenAevFinding, ...]) -> tuple[Any, Mock]:
     _RuntimeContract.outcome = ContractExecutionOutcome(
         command_result=CommandResult(
             specification=ExecutionSpecification(
-                executable="/TEMP-CREDENTIAL-PATH-CANARY/prowler",
+                executable="/opt/prowler/bin/prowler",
                 arguments=("--ARG-CANARY", "FORM-VALUE-CANARY"),
                 environment=(("ENV-CANARY", "ACCESS-KEY-CANARY"),),
                 working_directory="/TEMP-CREDENTIAL-PATH-CANARY",
@@ -298,10 +298,12 @@ def _runtime(findings: tuple[OpenAevFinding, ...]) -> tuple[Any, Mock]:
 _LISTENER_START = "[PROWLER_INJECTOR] - Listener starting"
 _INVALID_MESSAGE = "[PROWLER_INJECTOR] - Invalid injection message rejected"
 _ASSESSMENT_RECEIVED = "[PROWLER_INJECTOR] - Assessment received"
-_ASSESSMENT_VALIDATED = "[PROWLER_INJECTOR] - Assessment validated"
-_EXECUTION_STARTED = "[PROWLER_INJECTOR] - Assessment execution started"
+_RECEPTION_ACKNOWLEDGED = "[PROWLER_INJECTOR] - Reception acknowledged"
+_CONTRACT_RESOLVED = "[PROWLER_INJECTOR] - Contract resolved"
+_ASSESSMENT_VALIDATED = "[PROWLER_INJECTOR] - Assessment input validated"
+_EXECUTION_STARTED = "[PROWLER_INJECTOR] - Assessment execution starting"
 _ASSESSMENT_SUCCEEDED = "[PROWLER_INJECTOR] - Assessment completed"
-_ASSESSMENT_FAILED = "[PROWLER_INJECTOR] - Assessment failed safely"
+_ASSESSMENT_FAILED = "[PROWLER_INJECTOR] - Assessment failed"
 _CALLBACK_COMPLETED = "[PROWLER_INJECTOR] - Assessment callback completed"
 
 _GUIDANCE = {
@@ -316,7 +318,10 @@ _GUIDANCE = {
     "execution_failed": (
         "Verify the Prowler runtime is available and retry the assessment."
     ),
-    "timeout": "Increase the configured timeout or reduce the assessment scope.",
+    "timeout": (
+        "Reduce the assessment scope or investigate Prowler runtime performance "
+        "before retrying."
+    ),
     "process_start_failed": (
         "Verify the Prowler process can start with the configured executable."
     ),
@@ -324,7 +329,8 @@ _GUIDANCE = {
         "Review the Prowler configuration and retry the assessment."
     ),
     "output_too_large_after_capture": (
-        "Reduce the assessment scope or increase the configured output limit."
+        "Reduce the assessment scope so captured output stays within the injector "
+        "limit."
     ),
     "parsing_failed": "Verify Prowler emits valid JSON-OCSF output and retry.",
     "invalid_input": "Correct the listed assessment fields and retry.",
@@ -342,19 +348,33 @@ def _assert_logger_excludes(helper: Mock, *markers: str) -> None:
 
 
 def test_runtime_start_logs_one_fixed_listener_event() -> None:
-    """Listener startup is observable without serializing daemon configuration."""
+    """Listener startup exposes bounded injector and executable facts."""
     from prowler.injector import ProwlerInjector
 
-    config = Mock()
+    config = _config()
     helper = Mock()
-    registry = Mock()
+    registry = _subject().DEFAULT_PROWLER_CONTRACTS
     injector = ProwlerInjector(config, helper, registry=registry)
 
     injector.start()
 
-    config.to_daemon_config.assert_called_once_with(registry)
     helper.listen.assert_called_once_with(message_callback=injector.process_message)
-    helper.injector_logger.info.assert_called_once_with(_LISTENER_START)
+    message, metadata = helper.injector_logger.info.call_args.args
+    assert message == _LISTENER_START
+    assert metadata["injector_id"] == "injector-test"
+    assert metadata["injector_name"] == "Prowler"
+    assert metadata["registered_contract_count"] == 0
+    assert metadata["configured_executable_path"] == "/usr/local/bin/prowler"
+    assert set(metadata) == {
+        "injector_id",
+        "injector_name",
+        "registered_contract_count",
+        "configured_executable_path",
+        "executable_is_absolute",
+        "executable_exists",
+        "executable_is_file",
+        "executable_is_executable",
+    }
 
 
 @pytest.mark.parametrize(
@@ -373,7 +393,18 @@ def test_runtime_rejects_invalid_envelope_with_fixed_value_free_warning(
 
     injector.process_message(message)
 
-    helper.injector_logger.warning.assert_called_once_with(_INVALID_MESSAGE)
+    expected_reason = (
+        "missing_injection"
+        if "injection" not in message
+        else (
+            "invalid_injection"
+            if not isinstance(message["injection"], dict)
+            else "missing_inject_id"
+        )
+    )
+    helper.injector_logger.warning.assert_called_once_with(
+        _INVALID_MESSAGE, {"reason_code": expected_reason}
+    )
     helper.injector_logger.error.assert_not_called()
     helper.api.inject.execution_reception.assert_not_called()
     helper.api.inject.execution_callback.assert_not_called()
@@ -385,46 +416,40 @@ def test_runtime_rejects_invalid_envelope_with_fixed_value_free_warning(
 def test_runtime_logs_fixed_safe_success_lifecycle(
     findings: tuple[OpenAevFinding, ...],
 ) -> None:
-    """A successful assessment logs fixed events and closed scalar metadata only."""
+    """A successful assessment logs every fixed correlated lifecycle stage."""
     identifier = str(_subject().stable_contract_id("aws"))
     injector, helper = _runtime(findings)
 
     injector.process_message(_message(identifier))
 
     calls = helper.injector_logger.method_calls
-    assert calls[:3] == [
-        call.info(_ASSESSMENT_RECEIVED),
-        call.debug(_ASSESSMENT_VALIDATED, {"route": "aws", "provider": "aws"}),
-        call.info(_EXECUTION_STARTED, {"route": "aws", "provider": "aws"}),
+    assert [item.args[0] for item in calls] == [
+        _ASSESSMENT_RECEIVED,
+        _RECEPTION_ACKNOWLEDGED,
+        _CONTRACT_RESOLVED,
+        _ASSESSMENT_VALIDATED,
+        _EXECUTION_STARTED,
+        _ASSESSMENT_SUCCEEDED,
+        _CALLBACK_COMPLETED,
     ]
-    assert calls[3].args[0] == _ASSESSMENT_SUCCEEDED
-    success_meta = calls[3].args[1]
-    assert success_meta == {
-        "route": "aws",
-        "provider": "aws",
-        "status": "SUCCESS",
-        "duration_seconds": success_meta["duration_seconds"],
-        "finding_count": 3,
-        "vulnerability_count": 1,
-    }
-    assert isinstance(success_meta["duration_seconds"], int)
-    assert 0 <= success_meta["duration_seconds"] <= 86_400
-    assert calls[4].args[0] == _CALLBACK_COMPLETED
-    callback_meta = calls[4].args[1]
-    assert callback_meta == {
-        "route": "aws",
-        "provider": "aws",
-        "status": "SUCCESS",
-        "duration_seconds": success_meta["duration_seconds"],
-    }
-    assert calls[4] == call.debug(_CALLBACK_COMPLETED, callback_meta)
+    assert all(item.args[1]["inject_id"] == "inject-test" for item in calls)
+    assert all(0 <= item.args[1]["elapsed_ms"] <= 86_400_000 for item in calls)
+    success_meta = calls[-2].args[1]
+    assert success_meta["contract_id"] == identifier
+    assert success_meta["route"] == "aws"
+    assert success_meta["provider"] == "aws"
+    assert success_meta["status"] == "SUCCESS"
+    assert success_meta["finding_count"] == 3
+    assert success_meta["vulnerability_count"] == 1
+    assert success_meta["aws_account_id"] == "123456789012"
+    assert success_meta["aws_region"] == "eu-west-1"
+    callback_meta = calls[-1].args[1]
+    assert callback_meta["attempted_status"] == "SUCCESS"
+    assert calls[-1] == call.debug(_CALLBACK_COMPLETED, callback_meta)
     _assert_logger_excludes(
         helper,
-        "inject-test",
         "runtime-access",
         "runtime-secret",
-        "123456789012",
-        "eu-west-1",
         "ARG-CANARY",
         "ENV-CANARY",
         "STDIN-CANARY",
@@ -458,35 +483,30 @@ def test_runtime_logs_bounded_value_free_contract_input_issues(
         "attributes"
     ]
     assert error_message == _ASSESSMENT_FAILED
-    assert error_meta == {
-        "route": "aws",
-        "provider": "aws",
-        "status": "ERROR",
-        "duration_seconds": error_meta["duration_seconds"],
-        "stage": "input_validation",
-        "failure_kind": "invalid_input",
-        "operator_guidance": _GUIDANCE["invalid_input"],
-        "issues": [
-            {
-                "location": ["aws_secret_access_key"],
-                "type": "string_too_short",
-            },
-            {"location": ["unrecognized_field"], "type": "extra_forbidden"},
-        ],
-        "issues_truncated": True,
-    }
+    assert error_meta["inject_id"] == "inject-test"
+    assert error_meta["contract_id"] == identifier
+    assert error_meta["route"] == "aws"
+    assert error_meta["provider"] == "aws"
+    assert error_meta["status"] == "ERROR"
+    assert error_meta["stage"] == "input_validation"
+    assert error_meta["failure_kind"] == "invalid_input"
+    assert error_meta["failure_summary"] == "The assessment input was invalid."
+    assert error_meta["operator_guidance"] == _GUIDANCE["invalid_input"]
+    assert error_meta["issues"] == [
+        {
+            "location": ["aws_secret_access_key"],
+            "type": "string_too_short",
+        },
+        {"location": ["unrecognized_field"], "type": "extra_forbidden"},
+    ]
+    assert error_meta["issues_truncated"] is True
+    assert 0 <= error_meta["elapsed_ms"] <= 86_400_000
     assert (
         helper.injector_logger.local_logger.error.call_args.kwargs["exc_info"] is False
     )
-    assert helper.injector_logger.method_calls[-1] == call.debug(
-        _CALLBACK_COMPLETED,
-        {
-            "route": "aws",
-            "provider": "aws",
-            "status": "ERROR",
-            "duration_seconds": error_meta["duration_seconds"],
-        },
-    )
+    callback_meta = helper.injector_logger.method_calls[-1].args[1]
+    assert callback_meta["attempted_status"] == "ERROR"
+    assert callback_meta["inject_id"] == "inject-test"
     _assert_logger_excludes(
         helper,
         "FORM-VALUE-CANARY",
@@ -750,7 +770,7 @@ def test_real_error_renderer_receives_no_form_values_or_findings(
             "unexpected_failure",
             None,
         ),
-        (RuntimeError("EXCEPTION-STRING-CANARY"), 19, "unexpected_failure", 19),
+        (RuntimeError("EXCEPTION-STRING-CANARY"), 19, "unexpected_failure", None),
     ),
 )
 def test_runtime_logs_only_allowlisted_assessment_failure_metadata(
@@ -781,18 +801,20 @@ def test_runtime_logs_only_allowlisted_assessment_failure_metadata(
         "attributes"
     ]
     assert error_message == _ASSESSMENT_FAILED
-    expected_meta = {
-        "route": "aws",
-        "provider": "aws",
-        "status": "ERROR",
-        "duration_seconds": error_meta["duration_seconds"],
-        "stage": "assessment_execution",
-        "failure_kind": expected_kind,
-        "operator_guidance": _GUIDANCE[expected_kind],
-    }
+    assert error_meta["inject_id"] == "inject-test"
+    assert error_meta["contract_id"] == identifier
+    assert error_meta["route"] == "aws"
+    assert error_meta["provider"] == "aws"
+    assert error_meta["status"] == "ERROR"
+    assert error_meta["stage"] == "assessment_execution"
+    assert error_meta["failure_kind"] == expected_kind
+    assert error_meta["failure_summary"]
+    assert error_meta["operator_guidance"] == _GUIDANCE[expected_kind]
+    assert 0 <= error_meta["elapsed_ms"] <= 86_400_000
     if expected_return_code is not None:
-        expected_meta["return_code"] = expected_return_code
-    assert error_meta == expected_meta
+        assert error_meta["return_code"] == expected_return_code
+    else:
+        assert "return_code" not in error_meta
     assert len(error_meta["operator_guidance"]) <= 100
     assert (
         helper.injector_logger.local_logger.error.call_args.kwargs["exc_info"] is False
@@ -1011,9 +1033,13 @@ def test_runtime_renderer_failure_falls_back_without_a_second_render(
     helper.api.inject.execution_callback.assert_called_once()
     callback = helper.api.inject.execution_callback.call_args.kwargs["data"]
     assert callback["execution_status"] == "ERROR"
-    assert callback["execution_message"] == (
-        "Error code: rendering_failed\n" + _GUIDANCE["rendering_failed"]
-    )
+    message = callback["execution_message"]
+    assert "Error code: rendering_failed" in message
+    assert "Reason: The OpenAEV execution trace could not be rendered." in message
+    assert f"Action: {_GUIDANCE['rendering_failed']}" in message
+    assert "Inject ID: inject-test" in message
+    assert f"Contract: {identifier}" in message
+    assert "Route: aws" in message and "Provider: aws" in message
     error_meta = helper.injector_logger.local_logger.error.call_args.kwargs["extra"][
         "attributes"
     ]
@@ -1039,9 +1065,12 @@ def test_runtime_error_renderer_failure_keeps_the_classified_code_and_guidance(
     assert "render:success" not in _RuntimeContract.events
     callback = helper.api.inject.execution_callback.call_args.kwargs["data"]
     assert callback["execution_status"] == "ERROR"
-    assert callback["execution_message"] == (
-        "Error code: invalid_input\n" + _GUIDANCE["invalid_input"]
-    )
+    message = callback["execution_message"]
+    assert "Error code: invalid_input" in message
+    assert "Reason: The assessment input was invalid." in message
+    assert f"Action: {_GUIDANCE['invalid_input']}" in message
+    assert "Inject ID: inject-test" in message
+    assert f"Contract: {identifier}" in message
     error_meta = helper.injector_logger.local_logger.error.call_args.kwargs["extra"][
         "attributes"
     ]

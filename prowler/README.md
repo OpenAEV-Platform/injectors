@@ -60,23 +60,46 @@ explicit allowlist built from the parsed provider model (route, filters, and
 non-secret account, subscription, project, context, region, or requested-provider
 context). It never receives the raw form payload, credential fields, command
 environment or arguments, temporary credential paths, or raw stderr. Runtime
-errors use a closed failure code and one bounded operator-guidance sentence rather
-than exception, form, finding, callback, or command internals. The same guidance
-appears in both ERROR log metadata and the OpenAEV error trace. If Rich rendering
-fails, the callback falls back to the same plain code and guidance without a
-second render attempt.
+errors use one closed failure classification with a fixed `failure_summary` that
+says what happened and why, plus separate fixed `operator_guidance` that says what
+to do next. ERROR metadata and the OpenAEV trace share the same code, reason,
+action, sanitized inject correlation, canonical contract/route/provider identity,
+and applicable typed evidence. The trace never receives parsed provider input, so
+account, subscription, project, and Kubernetes context do not appear in an error
+unless the contract already rendered them from its existing safe request summary.
+If Rich rendering fails, the callback falls back to the same bounded plain
+diagnostics without a second render attempt.
 
 The runtime emits fixed `[PROWLER_INJECTOR]` lifecycle diagnostics through the
-injector logger. Valid assessments identify only the canonical route and
-provider plus bounded status, duration, and result counts. Malformed envelopes
-receive a fixed warning without payload data. Input rejection reports only a
-controlled stage and failure kind, bounded `operator_guidance`, and
-`ContractInputError` field locations and error types; assessment failures expose
-only an allowlisted CLI error kind, fixed guidance, and, when present, its numeric
-return code. Raw form values, injection identifiers, credentials, arguments,
-environment values, process output, exception text or traceback, callback
-payloads, finding content, and temporary credential paths are not logged or
-rendered into error traces.
+injector logger. Startup INFO identifies the configured injector, registered
+contract count, executable path, and whether that path is absolute, exists, is a
+regular file, and is executable. Assessment events distinguish received,
+reception acknowledged, contract resolved, input validated, execution starting,
+terminal completion/failure, and callback completion/failure. Every usable-inject
+event carries a log-safe inject ID (`[A-Za-z0-9._:-]`, at most 128 characters, or
+the fixed `invalid-inject-id` sentinel), a controlled stage, and bounded monotonic
+`elapsed_ms`; the logger supplies wall-clock timestamps. Once resolution succeeds,
+the canonical contract ID, route, and provider accompany every later event.
+Malformed envelopes receive a closed reason code without payload data.
+
+Successful and callback diagnostics also include approved provider facts: AWS
+account, region, endpoint URL, and session-token/endpoint-override presence;
+Azure subscription and provider with credential-presence booleans; GCP project
+with a credential-presence boolean; or Kubernetes context with a
+credential-presence boolean. AWS access keys, Azure tenant/client ID values, and
+all credential material remain excluded.
+
+Known failures add only evidence derived from the typed command specification,
+engine error, or result: configured/actual executable paths and stat checks;
+allowlisted process-start cause classes; configured timeout or output limit;
+parser name; return code; and captured stdout/stderr byte counts. Input rejection
+uses only bounded field locations and issue types. The operational executable path
+is intentionally visible, but raw form values, credentials, arguments,
+environment values, stdin, stdout/stderr contents, exception text or traceback,
+callback payloads, finding content, GCP JSON, kubeconfig, and temporary credential
+paths are never logged or added to error traces. ERROR logging keeps
+`exc_info=False`, and all logging remains best-effort so it cannot gate assessment
+delivery.
 
 ## Provider input boundary
 

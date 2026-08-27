@@ -104,31 +104,42 @@ Feature: Executable Prowler contract infrastructure and route catalog
     Then SUCCESS and ERROR execution messages come from its renderer
     And structured success output remains unchanged and errors expose no command internals
 
-  Scenario: Runtime lifecycle diagnostics are fixed and value-free
+  Scenario: Runtime lifecycle diagnostics identify every assessment stage
     Given a supplied registry with one concrete test contract
     When the listener starts or an assessment reaches a terminal callback
-    Then fixed prefixed lifecycle events report only canonical route and provider metadata
-    And terminal events contain only bounded status, duration, and finding counts
-    And malformed envelopes are rejected with a fixed warning that contains no payload
+    Then listener INFO identifies the injector, registered contracts, configured executable, and executable checks
+    And fixed prefixed events distinguish reception acknowledgement, contract resolution, input validation, execution start, terminal result, and callback result
+    And every usable-inject event carries a sanitized inject ID, controlled stage, and bounded elapsed milliseconds
+    And resolved events carry the canonical contract ID, route, provider, and approved provider context
+    And successful terminal events include bounded finding and vulnerability counts
+    And malformed envelopes are rejected with a closed reason code and no payload
 
-  Scenario: Runtime failures expose only closed diagnostic metadata
+  Scenario: Runtime failures expose closed actionable diagnostics
     Given invalid form input or a failed assessment result containing sensitive internals
     When the runtime prepares the existing safe ERROR callback
     Then missing or non-mapping form content is invalid input with no issues
     And input diagnostics contain only capped, normalized, value-free issue locations and types
     And a real malformed AWS account receives exact bounded account guidance
     And forged or unknown input issues receive generic bounded guidance
-    And assessment diagnostics use only allowlisted CLI failure kinds, fixed operator guidance, and an optional return code
-    And the OpenAEV trace shows the same failure kind and operator guidance as the log
+    And assessment diagnostics classify once with a fixed failure summary distinct from fixed operator guidance
+    And known engine failures expose only typed executable checks, cause classes, limits, parser names, return codes, and captured byte counts applicable to their kind
+    And the OpenAEV trace shows the same code, reason, action, correlation, route context, and safe evidence as the log
     And unexpected exceptions collapse to unexpected_failure without exception details
-    And no log contains form values, credentials, process internals, callback data, finding content, or temporary paths
+    And no log contains form values, credentials, raw process output, exception details, callback data, finding content, or temporary credential paths
+
+  Scenario: A missing configured executable is obvious to an operator
+    Given an assessment uses a real nonexistent configured Prowler executable path
+    When executable resolution fails
+    Then ERROR metadata and the OpenAEV trace contain that exact configured and actual path
+    And both surfaces report whether it is absolute, exists, is a regular file, and is executable
+    And both surfaces retain the inject ID and canonical contract, route, and provider correlation
 
   Scenario: Runtime observability cannot change assessment delivery semantics
     Given a supplied registry with one concrete test contract
     When lifecycle logging, trace rendering, or callback delivery raises
     Then logging failures do not prevent parsing, execution, or the terminal callback attempt
-    And a renderer failure uses a plain bounded code-and-guidance fallback without a second render attempt
-    And callback delivery is attempted once without retrying or exposing exception details
+    And a renderer failure uses a plain bounded code, reason, action, correlation, and evidence fallback without a second render attempt
+    And callback delivery is attempted once and callback failure logs its attempted terminal status without exposing exception details
     And ERROR records explicitly disable exception information
 
   Scenario: Error traces identify failed assessments

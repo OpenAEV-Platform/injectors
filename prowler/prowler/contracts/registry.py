@@ -63,6 +63,10 @@ class ProwlerContracts:
         except KeyError:
             raise LookupError("selected Prowler contract is not registered") from None
 
+    def __len__(self) -> int:
+        """Return the number of registered concrete contracts."""
+        return len(self._by_id)
+
     def contracts(self) -> list[dict[str, object]]:
         """Prepare only explicitly registered concrete contracts for configuration."""
         return cast(

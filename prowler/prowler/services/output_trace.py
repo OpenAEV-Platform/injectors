@@ -177,7 +177,9 @@ def generate(
     execution = Tree(Text(heading), guide_style="bold")
     if is_error:
         failure = execution.add(Text("Call Failed"))
-        failure.add(Text(f"Error: {_format_cell(error_message, max_cell_length)}"))
+        diagnostics = failure.add(Text("Error diagnostics"))
+        for line in error_message.splitlines()[:32]:
+            diagnostics.add(Text(_format_cell(line, 600)))
     else:
         success = execution.add(Text("Call Success"))
         success.add(Text(f"Findings: {len(display_findings)}"))
