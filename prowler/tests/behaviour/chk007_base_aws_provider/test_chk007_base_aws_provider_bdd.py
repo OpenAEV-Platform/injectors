@@ -94,6 +94,7 @@ def test_default_registration_identity_fields_and_outputs() -> None:
         str(stable_contract_id("aws")),
         str(stable_contract_id("azure")),
         str(stable_contract_id("gcp")),
+        str(stable_contract_id("kubernetes")),
     ]
     assert UUID(serialized[0]["contract_id"]) == expected_id
     assert expected_id.version == 5
