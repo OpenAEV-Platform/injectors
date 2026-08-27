@@ -77,7 +77,7 @@ class ProviderInvocationAdapter:
                     "kubernetes",
                     "--kubeconfig-file",
                     str(path),
-                    "--kube-context",
+                    "--context",
                     provider.kubernetes_context,
                     *_OCSF_OUTPUT_ARGUMENTS,
                 ),

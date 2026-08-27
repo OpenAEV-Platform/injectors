@@ -51,3 +51,11 @@ host and must not contain user information, a query, a fragment, or whitespace.
 Paths and valid ports are allowed, including endpoints on localhost, private
 networks, and container services. The accepted value remains an ordinary string,
 and validation does not check network reachability.
+
+## Prowler 5.36 CLI compatibility
+
+CHK.004 targets the installed `prowler` distribution version 5.36.0. Its
+Kubernetes parser registers `--context` for selecting a kubeconfig context;
+`--kube-context` is not registered. The adapter therefore emits
+`--kubeconfig-file <temporary path> --context <name>`. This installed parser
+evidence supersedes the stale proof-of-concept/contract spelling.
