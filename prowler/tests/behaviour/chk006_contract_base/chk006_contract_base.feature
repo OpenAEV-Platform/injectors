@@ -5,8 +5,10 @@ Feature: Executable Prowler contract infrastructure and route catalog
   Scenario: A minimal subclass builds one provider-specific OpenAEV contract
     Given a concrete AWS test subclass with fixed identifiers
     When it builds its OpenAEV contract
-    Then the contract uses the subclass identifiers and only AWS input fields
+    Then the contract uses the subclass identifiers and exact ordered AWS input fields
     And credential labels state that their current boundary is plaintext
+    And the endpoint URL is an optional single-line field with a clear label
+    And the session token remains optional while all other AWS fields are mandatory
     And no credential field has a default
 
   Scenario Outline: Provider form input becomes the exact strict provider model
@@ -22,6 +24,12 @@ Feature: Executable Prowler contract infrastructure and route catalog
       | azure      |
       | gcp        |
       | kubernetes |
+
+  Scenario: The AWS endpoint URL is validated by the strict provider model
+    Given a concrete AWS test subclass
+    When it parses form input with a valid endpoint URL
+    Then the endpoint URL is preserved in the AWS provider model
+    But an invalid endpoint URL is rejected with a structured contract input error
 
   # ---- Constraints identified ----
 

@@ -10,6 +10,9 @@ from typing import Any
 
 import pytest
 from pydantic import SecretStr
+from pyoaev.contracts.contract_config import (
+    ContractText,  # type: ignore[import-untyped]
+)
 
 from prowler._core.cli_engine import (
     CommandResult,
@@ -70,6 +73,15 @@ PROVIDER_CASES = {
     ),
 }
 
+AWS_FIELD_KEYS = (
+    "aws_access_key_id",
+    "aws_secret_access_key",
+    "aws_account_id",
+    "aws_region",
+    "aws_endpoint_url",
+    "aws_session_token",
+)
+
 
 def _contract_class(provider: str, **overrides: Any) -> type[Any]:
     subject = _subject()
@@ -121,13 +133,18 @@ def test_minimal_subclass_builds_provider_specific_openaev_contract() -> None:
     assert contract.contract_id == "9d5b71f8-f36f-50ee-a896-d7ff41f541f9"
     assert contract.external_id == "CHK.006.TEST"
     fields = {item.key: item for item in contract.fields}
-    assert tuple(fields) == tuple(PROVIDER_CASES["aws"][1]) + ("aws_session_token",)
+    assert tuple(fields) == AWS_FIELD_KEYS
     assert "plaintext" in fields["aws_secret_access_key"].label.lower()
     assert "plaintext" in fields["aws_session_token"].label.lower()
     assert all(field.defaultValue == "" for field in fields.values())
+    assert type(fields["aws_endpoint_url"]) is ContractText
+    assert fields["aws_endpoint_url"].label == "AWS endpoint URL (optional)"
+    assert fields["aws_endpoint_url"].mandatory is False
     assert fields["aws_session_token"].mandatory is False
     assert all(
-        field.mandatory for key, field in fields.items() if key != "aws_session_token"
+        field.mandatory
+        for key, field in fields.items()
+        if key not in {"aws_endpoint_url", "aws_session_token"}
     )
 
 
@@ -146,6 +163,27 @@ def test_provider_input_is_converted_immediately_to_strict_model(provider: str) 
         "kubernetes": ("kubernetes_kubeconfig",),
     }[provider]
     assert all(isinstance(getattr(parsed, key), SecretStr) for key in secret_fields)
+
+
+def test_aws_endpoint_url_is_validated_by_strict_provider_model() -> None:
+    """The contract parser preserves valid endpoints and rejects invalid ones."""
+    subject = _subject()
+    endpoint_url = "https://localhost.localstack.cloud:4566"
+    raw = {**PROVIDER_CASES["aws"][1], "aws_endpoint_url": endpoint_url}
+
+    parsed = _contract_class("aws")().parse_input(raw)
+
+    assert type(parsed) is AwsProviderInput
+    assert parsed.aws_endpoint_url == endpoint_url
+
+    with pytest.raises(subject.ContractInputError) as raised:
+        _contract_class("aws")().parse_input(
+            {**raw, "aws_endpoint_url": "ftp://invalid.example"}
+        )
+
+    assert any(
+        issue.location[-1] == "aws_endpoint_url" for issue in raised.value.issues
+    )
 
 
 def test_invalid_input_error_contains_structure_but_not_raw_values() -> None:

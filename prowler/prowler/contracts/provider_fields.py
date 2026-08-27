@@ -26,6 +26,7 @@ _PROVIDER_FIELDS: dict[ProviderName, tuple[_FieldSpec, ...]] = {
         _FieldSpec("aws_secret_access_key", "AWS secret access key (plaintext)", True),
         _FieldSpec("aws_account_id", "AWS account ID", True),
         _FieldSpec("aws_region", "AWS region", True),
+        _FieldSpec("aws_endpoint_url", "AWS endpoint URL (optional)", False),
         _FieldSpec(
             "aws_session_token", "AWS session token (plaintext, optional)", False
         ),
