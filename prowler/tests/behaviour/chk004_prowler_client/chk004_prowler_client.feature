@@ -49,8 +49,41 @@ Feature: Synchronous Prowler CLI assessments
     Then the request uses the exact configured executable and raw byte parser
     And stdin and working directory are empty with explicit resource limits
 
-  Scenario: File-backed credentials are owner-only and short-lived
+  Scenario: File-backed credentials are private and scoped to one run
     Given a GCP or Kubernetes provider input
     When the synchronous assessment succeeds, fails, or raises
-    Then the credential file exists with owner-only permissions only during execution
+    Then the credential file exists in a unique private temporary directory only during execution
     And the credential content is absent from command arguments and errors
+
+  Scenario: Native platforms apply their available temporary-file protection
+    Given a GCP or Kubernetes provider input
+    When its credential lease is created on POSIX or Windows
+    Then POSIX applies directory mode 0700 and file mode 0600
+    And Windows relies on the current user's temporary-directory ACL without claiming POSIX-equivalent permissions
+
+  Scenario: Credential resources close before execution and clean deterministically
+    Given a file-backed provider input
+    When Prowler returns, rejects a result, fails to start, or times out
+    Then the closed credential file remains readable for the command runtime
+    And the file and its private directory are removed afterward
+
+  Scenario: Credential creation cannot strand a partial lease
+    Given a credential file write fails
+    When the factory abandons the lease creation
+    Then its partial file and private directory are removed
+
+  Scenario: Cleanup failure preserves a safe deterministic outcome
+    Given credential cleanup fails without exposing credential material
+    When command execution otherwise returns
+    Then a safe credential cleanup error is raised
+    But when command execution raises its primary exception is preserved with a safe cleanup note
+
+  Scenario: A created client consumes its credential input once
+    Given a client retains a copied provider input before its first run
+    When the first run reaches any terminal path
+    Then the client releases its provider reference
+    And a second run is rejected with a safe consumed-client error
+
+  Scenario: Operators are told the residual plaintext-file risk
+    When an operator reads the injector documentation
+    Then contract-runtime persistence and crash residue are disclosed for containers, pods, POSIX, and Windows

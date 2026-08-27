@@ -27,6 +27,7 @@ class RecordingEngine:
     raised: BaseException | None = None
     inspect_paths: tuple[Path, ...] = ()
     observed_modes: list[int] = field(default_factory=list)
+    observed_directory_modes: list[int] = field(default_factory=list)
     observed_contents: list[str] = field(default_factory=list)
 
     def run(self, request: Any) -> Any:
@@ -37,6 +38,7 @@ class RecordingEngine:
                 paths.append(Path(request.arguments[request.arguments.index(flag) + 1]))
         for path in paths:
             self.observed_modes.append(path.stat().st_mode & 0o777)
+            self.observed_directory_modes.append(path.parent.stat().st_mode & 0o777)
             self.observed_contents.append(path.read_text(encoding="utf-8"))
         if self.raised is not None:
             raise self.raised

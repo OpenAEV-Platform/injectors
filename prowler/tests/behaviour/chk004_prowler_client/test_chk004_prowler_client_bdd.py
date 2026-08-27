@@ -3,6 +3,7 @@
 # ruff: noqa: D103
 
 import importlib
+import os
 from pathlib import Path
 from typing import Any
 
@@ -202,7 +203,7 @@ def test_request_uses_exact_bounded_raw_execution_contract(
 
 @pytest.mark.parametrize("provider_name", ["GCP", "Kubernetes"])
 @pytest.mark.parametrize("outcome", ["success", "result_error", "exception"])
-def test_temporary_credentials_are_owner_only_and_always_removed(
+def test_temporary_credentials_are_private_unique_and_always_removed(
     recording_engine: RecordingEngine,
     provider_inputs: dict[str, Any],
     provider_name: str,
@@ -222,6 +223,187 @@ def test_temporary_credentials_are_owner_only_and_always_removed(
     request = recording_engine.requests[0]
     path = Path(request.arguments[2])
     assert recording_engine.observed_modes == [0o600]
+    assert recording_engine.observed_directory_modes == [0o700]
     assert recording_engine.observed_contents
     assert not path.exists()
+    assert not path.parent.exists()
+    expected_suffix = ".json" if provider_name == "GCP" else ".yaml"
+    assert path.suffix == expected_suffix
     assert recording_engine.observed_contents[0] not in repr(request.arguments)
+
+
+def test_each_file_backed_run_uses_a_unique_private_directory(
+    recording_engine: RecordingEngine, provider_inputs: dict[str, Any]
+) -> None:
+    factory = _factory(recording_engine)
+
+    factory.run(_config(), provider_inputs["GCP"])
+    factory.run(_config(), provider_inputs["GCP"])
+
+    paths = [Path(request.arguments[2]) for request in recording_engine.requests]
+    assert paths[0].parent != paths[1].parent
+    assert all(not path.parent.exists() for path in paths)
+
+
+def test_windows_lease_uses_temp_acl_without_posix_permission_claim(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    api = _api()
+    chmod_calls: list[tuple[object, object]] = []
+    monkeypatch.setattr(
+        os,
+        "chmod",
+        lambda path, mode: chmod_calls.append((path, mode)),
+    )
+    factory = api.TemporaryCredentialLeaseFactory(
+        platform_name="nt", temporary_root=tmp_path
+    )
+
+    lease = factory.create(SecretStr("credential"), suffix=".json")
+    try:
+        assert lease.path.read_text(encoding="utf-8") == "credential"
+        assert chmod_calls == []
+    finally:
+        lease.cleanup()
+
+
+def test_credential_file_is_closed_before_engine_execution(
+    recording_engine: RecordingEngine, provider_inputs: dict[str, Any]
+) -> None:
+    _factory(recording_engine).run(_config(), provider_inputs["Kubernetes"])
+
+    # Reading in RecordingEngine proves the writer released its handle before run().
+    assert recording_engine.observed_contents == ["kube-secret"]
+
+
+def test_credential_lease_cleanup_is_idempotent(tmp_path: Path) -> None:
+    factory_class = _api().TemporaryCredentialLeaseFactory
+    lease = factory_class(temporary_root=tmp_path).create(
+        SecretStr("credential"), suffix=".json"
+    )
+
+    lease.cleanup()
+    lease.cleanup()
+
+    assert not lease.path.exists()
+    assert not lease.directory.exists()
+
+
+def test_creation_write_failure_removes_partial_file_and_directory(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    factory_class = _api().TemporaryCredentialLeaseFactory
+    original_open = Path.open
+
+    def fail_write(path: Path, *args: Any, **kwargs: Any) -> Any:
+        if "w" in args or kwargs.get("mode") == "w":
+            raise OSError("safe write failure")
+        return original_open(path, *args, **kwargs)
+
+    monkeypatch.setattr(Path, "open", fail_write)
+
+    with pytest.raises(OSError, match="safe write failure"):
+        factory_class(temporary_root=tmp_path).create(
+            SecretStr("credential"), suffix=".json"
+        )
+
+    assert list(tmp_path.iterdir()) == []
+
+
+class _FailingCleanupLease:
+    def __init__(self, path: Path) -> None:
+        self.path = path
+
+    def cleanup(self) -> None:
+        raise OSError("cleanup failure without path")
+
+
+class _FailingCleanupFactory:
+    def __init__(self, path: Path) -> None:
+        self.path = path
+
+    def create(self, _content: SecretStr, *, suffix: str) -> _FailingCleanupLease:
+        assert suffix in {".json", ".yaml"}
+        return _FailingCleanupLease(self.path)
+
+
+def test_cleanup_failure_after_success_raises_safe_cleanup_error(
+    recording_engine: RecordingEngine,
+    provider_inputs: dict[str, Any],
+    tmp_path: Path,
+) -> None:
+    api = _api()
+    factory = api.ProwlerClientFactory(
+        engine_factory=RecordingEngineFactory(recording_engine),
+        credential_lease_factory=_FailingCleanupFactory(tmp_path / "credential.json"),
+    )
+
+    with pytest.raises(api.CredentialCleanupError) as caught:
+        factory.run(_config(), provider_inputs["GCP"])
+
+    rendered = repr(caught.value)
+    assert "credential.json" not in rendered
+    assert "gcp-secret" not in rendered
+
+
+def test_cleanup_failure_preserves_primary_exception_with_safe_note(
+    recording_engine: RecordingEngine,
+    provider_inputs: dict[str, Any],
+    tmp_path: Path,
+) -> None:
+    api = _api()
+    primary = RuntimeError("safe primary execution failure")
+    recording_engine.raised = primary
+    factory = api.ProwlerClientFactory(
+        engine_factory=RecordingEngineFactory(recording_engine),
+        credential_lease_factory=_FailingCleanupFactory(tmp_path / "credential.yaml"),
+    )
+
+    with pytest.raises(RuntimeError) as caught:
+        factory.run(_config(), provider_inputs["Kubernetes"])
+
+    assert caught.value is primary
+    assert caught.value.__notes__ == ["temporary credential cleanup also failed"]
+    assert "credential.yaml" not in repr(caught.value)
+    assert "kube-secret" not in repr(caught.value)
+
+
+@pytest.mark.parametrize("terminal", ["success", "invalid_filter", "engine_error"])
+def test_client_releases_provider_and_rejects_second_run(
+    recording_engine: RecordingEngine,
+    provider_inputs: dict[str, Any],
+    terminal: str,
+) -> None:
+    api = _api()
+    client = _factory(recording_engine).create(_config(), provider_inputs["AWS"])
+    if terminal == "engine_error":
+        recording_engine.raised = RuntimeError("safe engine error")
+
+    try:
+        client.run(("",) if terminal == "invalid_filter" else ())
+    except (RuntimeError, ValueError):
+        pass
+
+    assert client._provider is None
+    with pytest.raises(api.ProwlerClientConsumedError, match="already been consumed"):
+        client.run()
+    assert "aws-secret" not in repr(client)
+
+
+def test_readme_discloses_plaintext_runtime_and_residual_risk() -> None:
+    readme = (Path(__file__).parents[3] / "README.md").read_text(encoding="utf-8")
+    required_phrases = (
+        "plaintext",
+        "command runtime",
+        "deleted in `finally`",
+        "crash",
+        "power loss",
+        "ephemeral storage",
+        "Windows",
+        "ACL",
+        "encrypt",
+        "stale",
+        "zeroiz",
+    )
+
+    assert all(phrase.lower() in readme.lower() for phrase in required_phrases)
