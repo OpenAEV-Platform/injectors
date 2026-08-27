@@ -16,16 +16,19 @@ from prowler.models.findings import (
 
 
 def test_empty_json_array_and_blank_json_lines_are_empty() -> None:
+    """Decode valid empty representations to an empty immutable collection."""
     assert decode_ocsf_output(b"[]") == ()
     assert decode_ocsf_output(b" \n\n\t") == ()
 
 
 def test_single_json_line_object_is_accepted() -> None:
+    """Accept one object as a one-record JSON Lines document."""
     assert decode_ocsf_output('{"finding_info": {}}') == ({"finding_info": {}},)
 
 
 @pytest.mark.parametrize("payload", [b"null", b"42", b'"text"', b"{}\n[]"])
 def test_top_level_or_jsonl_non_objects_are_rejected(payload: bytes) -> None:
+    """Reject scalar top levels and non-object JSONL records."""
     with pytest.raises(OcsfDecodeError) as caught:
         decode_ocsf_output(payload)
 
@@ -33,6 +36,7 @@ def test_top_level_or_jsonl_non_objects_are_rejected(payload: bytes) -> None:
 
 
 def test_command_result_must_be_success() -> None:
+    """Reject a CHK.004 error envelope without exposing its details."""
     result = CommandResult(
         specification=ExecutionSpecification(
             executable="prowler",
@@ -69,6 +73,7 @@ def test_supported_compliance_shapes_preserve_values_and_duplicates(
     compliance: object,
     expected: tuple[str, ...],
 ) -> None:
+    """Flatten evidenced compliance forms in order without deduplication."""
     record = copy_record()
     record["unmapped"]["compliance"] = compliance
 
@@ -78,6 +83,7 @@ def test_supported_compliance_shapes_preserve_values_and_duplicates(
 def test_invalid_compliance_leaf_has_structured_error(
     copy_record: Callable[[], dict[str, Any]],
 ) -> None:
+    """Report the exact unsupported compliance leaf path."""
     record = copy_record()
     record["unmapped"]["compliance"] = {"CIS": ["1.1", 42]}
 
@@ -102,6 +108,7 @@ def test_wrong_source_types_are_structured_errors(
     copy_record: Callable[[], dict[str, Any]],
     path_mutation: Callable[[dict[str, Any]], None],
 ) -> None:
+    """Convert wrong source container and scalar types to safe errors."""
     record = copy_record()
     path_mutation(record)
 

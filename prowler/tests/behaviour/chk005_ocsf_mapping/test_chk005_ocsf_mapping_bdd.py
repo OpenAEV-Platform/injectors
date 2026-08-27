@@ -44,6 +44,7 @@ def _success(payload: bytes) -> CommandResult:
 def test_maps_json_array_to_exact_immutable_findings_in_order(
     copy_record: Callable[[], dict[str, Any]],
 ) -> None:
+    """Map each array object to one frozen 14-field finding in order."""
     first = copy_record()
     second = copy_record()
     second["finding_info"]["uid"] = "second"
@@ -78,6 +79,7 @@ def test_maps_json_array_to_exact_immutable_findings_in_order(
 def test_maps_json_lines_and_ignores_blank_lines(
     copy_record: Callable[[], dict[str, Any]],
 ) -> None:
+    """Ignore blank JSONL lines without disturbing record order."""
     first = copy_record()
     second = copy_record()
     second["finding_info"]["uid"] = "second"
@@ -109,6 +111,7 @@ def test_maps_json_lines_and_ignores_blank_lines(
 def test_normalizes_status_without_trimming(
     copy_record: Callable[[], dict[str, Any]], source: str, expected: str
 ) -> None:
+    """Normalize status case but not unapproved surrounding whitespace."""
     record = copy_record()
     record["status"] = source
 
@@ -132,6 +135,7 @@ def test_normalizes_severity_case_insensitively(
     label: str,
     weight: int,
 ) -> None:
+    """Normalize declared severity labels and weights without case sensitivity."""
     record = copy_record()
     record["severity"] = source
 
@@ -143,6 +147,7 @@ def test_normalizes_severity_case_insensitively(
 def test_maps_all_fields_and_preserves_compliance_values(
     ocsf_record: dict[str, Any],
 ) -> None:
+    """Map every authoritative path and retain compliance encounter order."""
     finding = map_ocsf_finding(ocsf_record)
 
     assert finding.model_dump() == {
@@ -166,6 +171,7 @@ def test_maps_all_fields_and_preserves_compliance_values(
 def test_optional_values_have_safe_fallbacks(
     copy_record: Callable[[], dict[str, Any]],
 ) -> None:
+    """Use approved fallbacks for absent severity, compliance, and URL."""
     record = copy_record()
     del record["severity"]
     del record["unmapped"]["compliance"]
@@ -180,6 +186,7 @@ def test_optional_values_have_safe_fallbacks(
 
 @pytest.mark.parametrize("payload", [b"\xffsecret", b'[{"token":"secret"}'])
 def test_decode_errors_do_not_echo_sensitive_payload(payload: bytes) -> None:
+    """Keep malformed payload content out of structured decode errors."""
     with pytest.raises(OcsfDecodeError) as caught:
         decode_ocsf_output(payload)
 
@@ -189,6 +196,7 @@ def test_decode_errors_do_not_echo_sensitive_payload(payload: bytes) -> None:
 
 
 def test_non_object_record_has_safe_index() -> None:
+    """Identify a non-object array member by index without echoing it."""
     with pytest.raises(OcsfDecodeError) as caught:
         decode_ocsf_output(b'[{"ok": true}, "sensitive"]')
 
@@ -200,6 +208,7 @@ def test_non_object_record_has_safe_index() -> None:
 def test_missing_required_path_has_structured_mapping_error(
     copy_record: Callable[[], dict[str, Any]],
 ) -> None:
+    """Report the missing required path and source record index."""
     record = copy_record()
     del record["cloud"]["account"]["uid"]
 
@@ -215,6 +224,7 @@ def test_missing_required_path_has_structured_mapping_error(
 def test_empty_resources_has_structured_mapping_error(
     copy_record: Callable[[], dict[str, Any]],
 ) -> None:
+    """Treat the required first resource as a path-aware mapping failure."""
     record = copy_record()
     record["resources"] = []
 
