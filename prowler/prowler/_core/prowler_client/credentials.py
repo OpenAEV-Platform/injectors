@@ -67,9 +67,12 @@ class TemporaryCredentialLeaseFactory:
         try:
             if self.platform_name != "nt":
                 os.chmod(directory, 0o700)
-            with path.open("x", encoding="utf-8") as credential_file:
-                if self.platform_name != "nt":
-                    os.chmod(path, 0o600)
+            flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL
+            if self.platform_name == "nt":
+                descriptor = os.open(path, flags)
+            else:
+                descriptor = os.open(path, flags, 0o600)
+            with os.fdopen(descriptor, "w", encoding="utf-8") as credential_file:
                 credential_file.write(content.get_secret_value())
         except BaseException:
             try:

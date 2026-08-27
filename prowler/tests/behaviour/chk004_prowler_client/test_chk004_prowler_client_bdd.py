@@ -362,17 +362,24 @@ def test_creation_write_failure_removes_partial_file_and_directory(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
     factory_class = _api().TemporaryCredentialLeaseFactory
-    original_open = Path.open
+    original_fdopen = os.fdopen
 
-    def fail_write(path: Path, *args: Any, **kwargs: Any) -> Any:
-        if any(mode in args for mode in ("w", "x")) or kwargs.get("mode") in {
-            "w",
-            "x",
-        }:
+    class PartialWriteFailure:
+        def __init__(self, descriptor: int, *args: Any, **kwargs: Any) -> None:
+            self.wrapped = original_fdopen(descriptor, *args, **kwargs)
+
+        def __enter__(self) -> "PartialWriteFailure":
+            return self
+
+        def write(self, content: str) -> None:
+            self.wrapped.write(content[:1])
+            self.wrapped.flush()
             raise OSError("safe write failure")
-        return original_open(path, *args, **kwargs)
 
-    monkeypatch.setattr(Path, "open", fail_write)
+        def __exit__(self, *_args: Any) -> None:
+            self.wrapped.close()
+
+    monkeypatch.setattr(os, "fdopen", PartialWriteFailure)
 
     with pytest.raises(OSError, match="safe write failure"):
         factory_class(temporary_root=tmp_path).create(

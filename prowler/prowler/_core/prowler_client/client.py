@@ -59,20 +59,23 @@ class ProwlerClient:
                 raise ValueError("check filters must be nonblank strings")
 
             invocation = self._provider_adapter.adapt(provider)
-            filter_arguments = ("-c", *filters) if filters else ()
-            request = ValidatedCommandRequest(
-                executable=str(self._config.executable_path),
-                arguments=(*invocation.arguments, *filter_arguments),
-                environment=invocation.environment,
-                working_directory=None,
-                input_bytes=b"",
-                output=OutputSpecification(parser="raw"),
-                timeout_seconds=DEFAULT_TIMEOUT_SECONDS,
-                maximum_accepted_output_bytes=DEFAULT_MAXIMUM_ACCEPTED_OUTPUT_BYTES,
-            )
             primary_error: BaseException | None = None
             try:
-                return self._engine.run(request)
+                filter_arguments = ("-c", *filters) if filters else ()
+                request = ValidatedCommandRequest(
+                    executable=str(self._config.executable_path),
+                    arguments=(*invocation.arguments, *filter_arguments),
+                    environment=invocation.environment,
+                    working_directory=None,
+                    input_bytes=b"",
+                    output=OutputSpecification(parser="raw"),
+                    timeout_seconds=DEFAULT_TIMEOUT_SECONDS,
+                    maximum_accepted_output_bytes=DEFAULT_MAXIMUM_ACCEPTED_OUTPUT_BYTES,
+                )
+                try:
+                    return self._engine.run(request)
+                finally:
+                    del request
             except BaseException as error:
                 primary_error = error
                 raise
@@ -87,7 +90,6 @@ class ProwlerClient:
                     if primary_error is None:
                         raise CredentialCleanupError() from None
                     primary_error.add_note("temporary credential cleanup also failed")
-                del request
         finally:
             del provider
             if invocation is not None:
