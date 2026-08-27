@@ -1,6 +1,6 @@
-Feature: Inheritable Prowler contract base and route catalog
-  CHK.006 gives later provider contracts a synchronous, secret-safe boundary
-  without registering any future assessment contract.
+Feature: Executable Prowler contract infrastructure and route catalog
+  CHK.006 gives later provider contracts a registered-output, registry, and
+  synchronous runtime boundary without registering a future assessment contract.
 
   Scenario: A minimal subclass builds one provider-specific OpenAEV contract
     Given a concrete AWS test subclass with fixed identifiers
@@ -42,6 +42,45 @@ Feature: Inheritable Prowler contract base and route catalog
     When the AWS test subclass executes its route
     Then the injected factory runs exactly once with the route check filters
     And the typed outcome contains mapped CHK.005 findings
+
+  Scenario: Contract outputs preserve findings and project vulnerabilities
+    Given mapped SUCCESS, FAILED, and IGNORED findings
+    When the base prepares registered outputs and an execution payload
+    Then every finding is a deterministic full JSON text value
+    And only FAILED findings become platform vulnerabilities
+    And cloud resource identifiers are not projected as OpenAEV asset identifiers
+
+  Scenario: The execution trace is deterministic and secret-safe
+    Given mapped SUCCESS, FAILED, and IGNORED findings
+    When the base prepares its execution trace
+    Then it reports the route and each expectation-result count
+    And it contains flattened finding context without credentials or temporary paths
+
+  Scenario: Stable route identities are deterministic and unique
+    When platform identifiers are derived for the canonical routes
+    Then repeated derivation is stable
+    And every canonical route has a distinct UUIDv5 and external identifier
+
+  Scenario: Only concrete coherent contracts enter the registry
+    Given a concrete contract whose identifier, route, and provider agree
+    When it is added to a registry
+    Then the registry resolves it and serializes only that contract
+
+  Scenario: Invalid registry entries are rejected
+    Then abstract, duplicate, unstable, and provider-mismatched entries cannot register
+
+  Scenario: Runtime dispatch accepts either observed contract identifier shape
+    Given a supplied registry with one concrete test contract
+    When an inject identifies that contract using either supported shape
+    Then reception occurs before parse and dispatch
+    And inject_content alone is parsed and executed exactly once
+    And one SUCCESS callback separates structured output from its trace
+
+  Scenario: Conflicting or unknown contract identifiers fail safely
+    Given an inject with conflicting or unknown contract identity
+    When the runtime processes it
+    Then no client execution occurs
+    And exactly one ERROR callback contains no raw form values or success output
 
   Scenario: The canonical catalog is immutable and ordered
     Then exactly 25 route descriptors exist in canonical order
