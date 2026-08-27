@@ -339,6 +339,46 @@ def test_malformed_correlations_are_distinct_bounded_hashes_without_raw_ids() ->
     assert observed[0] != observed[1]
 
 
+def test_unpaired_surrogate_correlations_are_safely_hashed_and_transported() -> None:
+    """Malformed Unicode IDs remain transportable without reaching logs or UI."""
+    unsafe_ids = (
+        "\ud800UNPAIRED-SURROGATE-CANARY-A",
+        "UNPAIRED-SURROGATE-CANARY-B\udfff",
+    )
+    injector, helper = _runtime()
+    _DiagnosticContract.parse_failure = ContractInputError(())
+
+    observed = []
+    for unsafe_id in unsafe_ids:
+        helper.reset_mock()
+
+        injector.process_message(_message(inject_id=unsafe_id))
+
+        expected = (
+            "invalid:"
+            + hashlib.sha256(
+                unsafe_id.encode("utf-8", errors="surrogatepass")
+            ).hexdigest()[:16]
+        )
+        safe_id = injector._safe_inject_id(unsafe_id)
+        assert safe_id == expected
+        assert injector._safe_inject_id(unsafe_id) == safe_id
+        assert len(safe_id) == 24
+        observed.append(safe_id)
+
+        logged = _all_logged(helper)
+        callback_call = helper.api.inject.execution_callback.call_args
+        callback = callback_call.kwargs["data"]
+        assert unsafe_id not in logged
+        assert "UNPAIRED-SURROGATE-CANARY" not in logged
+        assert unsafe_id not in repr(callback)
+        assert "UNPAIRED-SURROGATE-CANARY" not in repr(callback)
+        assert safe_id in callback["execution_message"]
+        assert callback_call.kwargs["inject_id"] == unsafe_id
+
+    assert observed[0] != observed[1]
+
+
 def test_input_failure_has_summary_action_issues_and_full_correlation() -> None:
     """Invalid input is actionable without retaining rejected values."""
     injector, helper = _runtime()

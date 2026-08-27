@@ -1268,7 +1268,7 @@ class ProwlerInjector:
         """Allow only bounded log-safe correlation syntax."""
         if _INJECT_ID_PATTERN.fullmatch(value):
             return value
-        digest = sha256(value.encode("utf-8")).hexdigest()
+        digest = sha256(value.encode("utf-8", errors="surrogatepass")).hexdigest()
         return f"invalid:{digest[:_INVALID_INJECT_ID_DIGEST_LENGTH]}"
 
     @staticmethod
