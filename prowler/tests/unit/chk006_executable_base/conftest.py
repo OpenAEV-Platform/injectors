@@ -8,6 +8,7 @@ from prowler.models.findings import OpenAevFinding
 @pytest.fixture
 def findings() -> tuple[OpenAevFinding, ...]:
     """Return one finding for every projected expectation result."""
+
     def finding(name: str, result: str) -> OpenAevFinding:
         return OpenAevFinding(
             type=f"check-{name}",

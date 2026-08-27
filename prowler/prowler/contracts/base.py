@@ -2,10 +2,10 @@
 
 from __future__ import annotations
 
+import json
 from abc import ABC, abstractmethod
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
-import json
 from typing import Any, ClassVar, Literal, Protocol
 from uuid import UUID
 
@@ -125,9 +125,7 @@ class BaseProwlerContract(ABC):
             fields=ContractBuilder()
             .add_fields(self.build_provider_fields())
             .build_fields(),
-            outputs=ContractBuilder()
-            .add_outputs(self.build_outputs())
-            .build_outputs(),
+            outputs=ContractBuilder().add_outputs(self.build_outputs()).build_outputs(),
             manual=False,
         )
 
@@ -178,9 +176,7 @@ class BaseProwlerContract(ABC):
     def execution_trace(self, findings: Sequence[OpenAevFinding]) -> str:
         """Render a deterministic plain-text summary of flattened findings."""
         counts = {
-            status: sum(
-                finding.expectation_result == status for finding in findings
-            )
+            status: sum(finding.expectation_result == status for finding in findings)
             for status in ("SUCCESS", "FAILED", "IGNORED")
         }
         lines = [

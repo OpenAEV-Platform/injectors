@@ -1,8 +1,9 @@
 # OpenAEV Prowler Injector
 
 The Prowler injector foundation registers Prowler with OpenAEV. CHK.006 adds
-reusable contract declarations and the canonical route catalog, but does not
-register the future concrete assessment contracts.
+reusable contract declarations, output projection, a validated concrete-contract
+registry, runtime dispatch, and the canonical route catalog. It does not register
+the future concrete assessment contracts.
 
 ## Configuration
 
@@ -34,9 +35,14 @@ the generic engine does not hardcode a Prowler binary location.
 python -m prowler
 ```
 
-The injector still starts with zero assessment contracts. CHK.006 describes
-routes and an inheritable contract boundary only; CHK.007–CHK.016 will supply
-and register concrete contracts.
+The injector still starts with zero assessment contracts. CHK.006 provides the
+shared executable boundary; CHK.007–CHK.016 will supply and register concrete
+contracts directly in the validated registry.
+
+Every future contract preserves each mapped CHK.005 finding as deterministic
+JSON text. FAILED findings are additionally projected as OpenAEV vulnerability
+outputs. SUCCESS and IGNORED findings are not projected as vulnerabilities, and
+Prowler cloud resource identifiers are not claimed to be OpenAEV asset UUIDs.
 
 ## Provider input boundary
 

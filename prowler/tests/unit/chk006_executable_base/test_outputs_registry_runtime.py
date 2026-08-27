@@ -6,8 +6,8 @@ from unittest.mock import Mock
 from uuid import UUID
 
 import pytest
-from pyoaev.contracts.contract_config import ContractOutputType
 from pyoaev.configuration import ConfigLoaderOAEV
+from pyoaev.contracts.contract_config import ContractOutputType
 
 from prowler.contracts import BaseProwlerContract, ContractExecutionOutcome
 from prowler.models.configs.config_loader import (
@@ -65,7 +65,10 @@ def test_registered_outputs_and_payload_preserve_and_project(
     """All findings remain JSON text while FAILED alone becomes Vulnerability."""
     contract = _concrete_contract_class()()
     outputs = contract.build_contract().outputs
-    assert [(item.type, item.field, item.isMultiple, item.isFindingCompatible) for item in outputs] == [
+    assert [
+        (item.type, item.field, item.isMultiple, item.isFindingCompatible)
+        for item in outputs
+    ] == [
         (ContractOutputType.Text.value, "findings", True, False),
         (ContractOutputType.Vulnerability.value, "vulnerabilities", True, True),
     ]
@@ -75,7 +78,10 @@ def test_registered_outputs_and_payload_preserve_and_project(
     assert tuple(payload) == ("findings", "vulnerabilities")
     assert len(payload["findings"]) == 3
     assert list(json.loads(payload["findings"][0])) == list(OpenAevFinding.model_fields)
-    assert json.dumps(json.loads(payload["findings"][0]), separators=(",", ":")) == payload["findings"][0]
+    assert (
+        json.dumps(json.loads(payload["findings"][0]), separators=(",", ":"))
+        == payload["findings"][0]
+    )
     assert payload["vulnerabilities"] == [
         {
             "name": "failed finding",
@@ -109,8 +115,12 @@ def test_trace_is_deterministic_flattened_and_secret_safe(
 def test_route_uuid_strategy_is_stable_unique_and_version_five() -> None:
     """The committed namespace deterministically owns all canonical route IDs."""
     subject = _subject()
-    first = tuple(subject.stable_contract_id(route.route_name) for route in subject.ROUTE_CATALOG)
-    second = tuple(subject.stable_contract_id(route.route_name) for route in subject.ROUTE_CATALOG)
+    first = tuple(
+        subject.stable_contract_id(route.route_name) for route in subject.ROUTE_CATALOG
+    )
+    second = tuple(
+        subject.stable_contract_id(route.route_name) for route in subject.ROUTE_CATALOG
+    )
     assert first == second
     assert len(first) == len(set(first)) == 25
     assert all(isinstance(value, UUID) and value.version == 5 for value in first)
@@ -167,19 +177,31 @@ class _RuntimeContract(BaseProwlerContract):
         return self.outcome
 
 
-def _message(identifier: str, *, fallback: str | None = None, content: dict[str, Any] | None = None) -> dict[str, Any]:
+def _message(
+    identifier: str,
+    *,
+    fallback: str | None = None,
+    content: dict[str, Any] | None = None,
+) -> dict[str, Any]:
     injection: dict[str, Any] = {
         "inject_id": "inject-test",
         "injector_contract_id": identifier,
         "inject_content": content or {"aws_region": "eu-west-1"},
     }
     if fallback is not None:
-        injection["convertedContent"] = {"contract_id": fallback, "ignored": "not-input"}
+        injection["convertedContent"] = {
+            "contract_id": fallback,
+            "ignored": "not-input",
+        }
     return {"injection": injection, "ignored": {"secret_marker": "SECRET-MARKER"}}
 
 
 def _runtime(findings: tuple[OpenAevFinding, ...]) -> tuple[Any, Mock]:
-    from prowler._core.cli_engine import CommandResult, ExecutionSpecification, OutputSpecification
+    from prowler._core.cli_engine import (
+        CommandResult,
+        ExecutionSpecification,
+        OutputSpecification,
+    )
     from prowler.injector import ProwlerInjector
 
     subject = _subject()
@@ -189,8 +211,13 @@ def _runtime(findings: tuple[OpenAevFinding, ...]) -> tuple[Any, Mock]:
     _RuntimeContract.outcome = ContractExecutionOutcome(
         command_result=CommandResult(
             specification=ExecutionSpecification(
-                executable="/bin/true", arguments=(), environment=(), working_directory=None,
-                input_bytes=b"", output=OutputSpecification(), timeout_seconds=1,
+                executable="/bin/true",
+                arguments=(),
+                environment=(),
+                working_directory=None,
+                input_bytes=b"",
+                output=OutputSpecification(),
+                timeout_seconds=1,
                 maximum_accepted_output_bytes=1,
             ),
             return_code=0,
@@ -198,7 +225,9 @@ def _runtime(findings: tuple[OpenAevFinding, ...]) -> tuple[Any, Mock]:
         findings=findings,
     )
     helper = Mock()
-    helper.api.inject.execution_reception.side_effect = lambda **_: _RuntimeContract.events.append("reception")
+    helper.api.inject.execution_reception.side_effect = (
+        lambda **_: _RuntimeContract.events.append("reception")
+    )
     injector = ProwlerInjector(
         _config(), helper, registry=subject.ProwlerContracts((_RuntimeContract,))
     )
@@ -237,7 +266,11 @@ def test_runtime_conflict_or_unknown_is_one_safe_error_without_execution(
     injector, helper = _runtime(findings)
     selected = str(subject.stable_contract_id("gcp")) if unknown else identifier
     fallback = None if unknown else str(subject.stable_contract_id("gcp"))
-    injector.process_message(_message(selected, fallback=fallback, content={"secret_marker": "SECRET-MARKER"}))
+    injector.process_message(
+        _message(
+            selected, fallback=fallback, content={"secret_marker": "SECRET-MARKER"}
+        )
+    )
     assert _RuntimeContract.events == ["reception"]
     callback = helper.api.inject.execution_callback.call_args.kwargs["data"]
     assert callback["execution_status"] == "ERROR"

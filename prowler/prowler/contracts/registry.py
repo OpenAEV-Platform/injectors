@@ -1,7 +1,8 @@
 """Explicit registry and stable identity strategy for concrete contracts."""
 
-from collections.abc import Iterable
 import inspect
+from collections.abc import Iterable
+from typing import cast
 from uuid import UUID, uuid5
 
 from pyoaev.contracts.contract_config import prepare_contracts
@@ -24,6 +25,7 @@ class ProwlerContracts:
     def __init__(
         self, contract_classes: Iterable[type[BaseProwlerContract]] = ()
     ) -> None:
+        """Build an isolated registry from explicitly supplied classes."""
         self._by_id: dict[str, BaseProwlerContract] = {}
         self._routes: set[str] = set()
         catalog = {route.route_name: route for route in ROUTE_CATALOG}
@@ -39,12 +41,16 @@ class ProwlerContracts:
             if route is None:
                 raise ValueError("registered route is not canonical")
             if route.provider != instance.provider or route.family != instance.family:
-                raise ValueError("registered route metadata does not agree with catalog")
+                raise ValueError(
+                    "registered route metadata does not agree with catalog"
+                )
             expected_id = str(stable_contract_id(instance.route_name))
             if instance.contract_id != expected_id:
                 raise ValueError("registered contract ID is not the stable route UUID")
             if instance.external_id != f"prowler:{instance.route_name}":
-                raise ValueError("registered external ID is not the stable route identity")
+                raise ValueError(
+                    "registered external ID is not the stable route identity"
+                )
             if expected_id in self._by_id or instance.route_name in self._routes:
                 raise ValueError("duplicate Prowler contract ID or route")
             self._by_id[expected_id] = instance
@@ -59,8 +65,11 @@ class ProwlerContracts:
 
     def contracts(self) -> list[dict[str, object]]:
         """Prepare only explicitly registered concrete contracts for configuration."""
-        return prepare_contracts(
-            [contract.build_contract() for contract in self._by_id.values()]
+        return cast(
+            list[dict[str, object]],
+            prepare_contracts(
+                [contract.build_contract() for contract in self._by_id.values()]
+            ),
         )
 
 

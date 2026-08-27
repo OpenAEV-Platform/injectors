@@ -84,7 +84,9 @@ class ProwlerInjector:
             if primary is None:
                 primary = nested_id
         converted = injection.get("convertedContent")
-        fallback = converted.get("contract_id") if isinstance(converted, Mapping) else None
+        fallback = (
+            converted.get("contract_id") if isinstance(converted, Mapping) else None
+        )
         if primary is not None and fallback is not None and primary != fallback:
             raise ValueError("conflicting Prowler contract identifiers")
         selected = primary if primary is not None else fallback
