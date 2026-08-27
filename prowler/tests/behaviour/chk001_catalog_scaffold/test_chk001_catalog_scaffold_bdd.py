@@ -75,10 +75,13 @@ def _when_injector_starts() -> tuple[ConfigLoader, Mock]:
     return config, helper
 
 
-def _then_aws_contract_is_registered(config: ConfigLoader, helper: Mock) -> None:
+def _then_base_contracts_are_registered(config: ConfigLoader, helper: Mock) -> None:
     contracts = config.to_daemon_config().get("injector_contracts")
-    assert isinstance(contracts, list) and len(contracts) == 1
-    assert contracts[0]["contract_id"] == str(stable_contract_id("aws"))
+    assert isinstance(contracts, list)
+    assert [item["contract_id"] for item in contracts] == [
+        str(stable_contract_id("aws")),
+        str(stable_contract_id("azure")),
+    ]
     callback = helper.listen.call_args.kwargs["message_callback"]
     assert callable(callback)
 
@@ -141,13 +144,13 @@ def test_foundation_configuration_excludes_future_provider_settings() -> None:
     _then_only_standard_and_prowler_settings_are_available(settings)
 
 
-def test_startup_registers_the_aws_assessment_contract(
+def test_startup_registers_the_base_assessment_contracts(
     standard_injector_environment: None,
 ) -> None:
-    """CHK.007 starts its listener with the AWS base contract."""
+    """CHK.008 starts its listener with canonical AWS and Azure contracts."""
     _given_the_prowler_project()
     config, helper = _when_injector_starts()
-    _then_aws_contract_is_registered(config, helper)
+    _then_base_contracts_are_registered(config, helper)
 
 
 @pytest.mark.parametrize(

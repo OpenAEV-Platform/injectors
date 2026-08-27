@@ -86,11 +86,14 @@ class _ClientFactory:
 
 
 def test_default_registration_identity_fields_and_outputs() -> None:
-    """The executable default surface is exactly the canonical AWS base route."""
+    """The canonical AWS base route remains first in the executable surface."""
     serialized = DEFAULT_PROWLER_CONTRACTS.contracts()
     expected_id = stable_contract_id("aws")
 
-    assert len(serialized) == 1
+    assert [item["contract_id"] for item in serialized] == [
+        str(stable_contract_id("aws")),
+        str(stable_contract_id("azure")),
+    ]
     assert UUID(serialized[0]["contract_id"]) == expected_id
     assert expected_id.version == 5
     content = json.loads(serialized[0]["contract_content"])

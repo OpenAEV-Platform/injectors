@@ -1316,11 +1316,13 @@ def test_runtime_resolved_contract_uses_renderer_for_safe_error(
     assert "SECRET-MARKER" not in callback["execution_message"]
 
 
-def test_default_registry_and_daemon_config_register_aws_only() -> None:
-    """CHK.007 makes AWS the sole default executable contract."""
+def test_default_registry_and_daemon_config_register_base_routes() -> None:
+    """CHK.008 makes AWS and Azure the canonical executable contracts."""
     subject = _subject()
     contracts = subject.DEFAULT_PROWLER_CONTRACTS.contracts()
-    assert len(contracts) == 1
-    assert contracts[0]["contract_id"] == str(subject.stable_contract_id("aws"))
+    assert [item["contract_id"] for item in contracts] == [
+        str(subject.stable_contract_id("aws")),
+        str(subject.stable_contract_id("azure")),
+    ]
     daemon = _config().to_daemon_config()
     assert daemon.get("injector_contracts") == contracts
