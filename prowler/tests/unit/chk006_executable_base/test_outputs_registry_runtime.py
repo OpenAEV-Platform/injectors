@@ -1,7 +1,7 @@
 """Executable expectations for CHK.006 shared infrastructure."""
 
 import json
-import sys
+import logging
 from dataclasses import replace
 from typing import Any, ClassVar, cast
 from unittest.mock import Mock, call
@@ -12,6 +12,7 @@ from pyoaev.configuration import ConfigLoaderOAEV  # type: ignore[import-untyped
 from pyoaev.contracts.contract_config import (  # type: ignore[import-untyped]
     ContractOutputType,
 )
+from pyoaev.utils import AppLogger  # type: ignore[import-untyped]
 
 from prowler._core.cli_engine import (
     CliEngineError,
@@ -199,6 +200,7 @@ class _RuntimeContract(BaseProwlerContract):
     events: ClassVar[list[str]] = []
     outcome: ClassVar[ContractExecutionOutcome]
     parse_failure: ClassVar[Exception | None] = None
+    render_failure: ClassVar[bool] = False
 
     def parse_input(self, raw_input: Any) -> Any:
         self.events.append(f"parse:{tuple(raw_input)}")
@@ -218,6 +220,8 @@ class _RuntimeContract(BaseProwlerContract):
         self.events.append(
             "render:error" if kwargs.get("is_error") else "render:success"
         )
+        if self.render_failure:
+            raise RuntimeError("RENDERER-EXCEPTION-CANARY")
         return (
             "CONTRACT RICH ERROR" if kwargs.get("is_error") else "CONTRACT RICH SUCCESS"
         )
@@ -261,6 +265,7 @@ def _runtime(findings: tuple[OpenAevFinding, ...]) -> tuple[Any, Mock]:
     _RuntimeContract.contract_id = identifier
     _RuntimeContract.events = []
     _RuntimeContract.parse_failure = None
+    _RuntimeContract.render_failure = False
     _RuntimeContract.outcome = ContractExecutionOutcome(
         command_result=CommandResult(
             specification=ExecutionSpecification(
@@ -298,7 +303,9 @@ _CALLBACK_COMPLETED = "[PROWLER_INJECTOR] - Assessment callback completed"
 
 
 def _assert_logger_excludes(helper: Mock, *markers: str) -> None:
-    rendered_calls = repr(helper.injector_logger.method_calls)
+    rendered_calls = repr(helper.injector_logger.method_calls) + repr(
+        helper.injector_logger.local_logger.method_calls
+    )
     assert all(marker not in rendered_calls for marker in markers)
 
 
@@ -397,10 +404,10 @@ def test_runtime_logs_fixed_safe_success_lifecycle(
     )
 
 
-def test_runtime_logs_value_free_contract_input_issues_after_except(
+def test_runtime_logs_bounded_value_free_contract_input_issues(
     findings: tuple[OpenAevFinding, ...],
 ) -> None:
-    """Emit one value-free input ERROR outside the active except suite."""
+    """Emit one bounded value-free input ERROR through the safe logger boundary."""
     identifier = str(_subject().stable_contract_id("aws"))
     injector, helper = _runtime(findings)
     _RuntimeContract.parse_failure = ContractInputError(
@@ -410,14 +417,14 @@ def test_runtime_logs_value_free_contract_input_issues_after_except(
         )
     )
 
-    def assert_no_active_exception(*_: Any, **__: Any) -> None:
-        assert sys.exc_info() == (None, None, None)
-
-    helper.injector_logger.error.side_effect = assert_no_active_exception
     injector.process_message(_message(identifier))
 
-    helper.injector_logger.error.assert_called_once()
-    error_message, error_meta = helper.injector_logger.error.call_args.args
+    helper.injector_logger.error.assert_not_called()
+    helper.injector_logger.local_logger.error.assert_called_once()
+    error_message = helper.injector_logger.local_logger.error.call_args.args[0]
+    error_meta = helper.injector_logger.local_logger.error.call_args.kwargs["extra"][
+        "attributes"
+    ]
     assert error_message == _ASSESSMENT_FAILED
     assert error_meta == {
         "route": "aws",
@@ -431,9 +438,13 @@ def test_runtime_logs_value_free_contract_input_issues_after_except(
                 "location": ["aws_secret_access_key"],
                 "type": "string_too_short",
             },
-            {"location": ["unexpected"], "type": "extra_forbidden"},
+            {"location": ["unrecognized_field"], "type": "extra_forbidden"},
         ],
+        "issues_truncated": True,
     }
+    assert (
+        helper.injector_logger.local_logger.error.call_args.kwargs["exc_info"] is False
+    )
     assert helper.injector_logger.method_calls[-1] == call.debug(
         _CALLBACK_COMPLETED,
         {
@@ -456,7 +467,14 @@ def test_runtime_logs_value_free_contract_input_issues_after_except(
 @pytest.mark.parametrize(
     ("error", "return_code", "expected_kind", "expected_return_code"),
     (
+        (CliEngineError("EXCEPTION-STRING-CANARY"), 0, "cli_engine_error", None),
         (PolicyError("EXCEPTION-STRING-CANARY"), 0, "policy_rejected", None),
+        (
+            PolicyError("EXCEPTION-STRING-CANARY", kind="policy_evaluation_failed"),
+            0,
+            "policy_evaluation_failed",
+            None,
+        ),
         (
             ResolutionError("EXCEPTION-STRING-CANARY"),
             0,
@@ -474,6 +492,37 @@ def test_runtime_logs_value_free_contract_input_issues_after_except(
             23,
             "execution_failed",
             23,
+        ),
+        (
+            ExecutionError("EXCEPTION-STRING-CANARY", kind="timeout"),
+            0,
+            "timeout",
+            None,
+        ),
+        (
+            ExecutionError("EXCEPTION-STRING-CANARY", kind="process_start_failed"),
+            0,
+            "process_start_failed",
+            None,
+        ),
+        (
+            ExecutionError(
+                "EXCEPTION-STRING-CANARY",
+                kind="unsuccessful_process",
+                return_code=31,
+            ),
+            31,
+            "unsuccessful_process",
+            31,
+        ),
+        (
+            ExecutionError(
+                "EXCEPTION-STRING-CANARY",
+                kind="output_too_large_after_capture",
+            ),
+            0,
+            "output_too_large_after_capture",
+            None,
         ),
         (
             ParsingError(
@@ -517,8 +566,12 @@ def test_runtime_logs_only_allowlisted_assessment_failure_metadata(
 
     injector.process_message(_message(identifier))
 
-    helper.injector_logger.error.assert_called_once()
-    error_message, error_meta = helper.injector_logger.error.call_args.args
+    helper.injector_logger.error.assert_not_called()
+    helper.injector_logger.local_logger.error.assert_called_once()
+    error_message = helper.injector_logger.local_logger.error.call_args.args[0]
+    error_meta = helper.injector_logger.local_logger.error.call_args.kwargs["extra"][
+        "attributes"
+    ]
     assert error_message == _ASSESSMENT_FAILED
     expected_meta = {
         "route": "aws",
@@ -531,6 +584,9 @@ def test_runtime_logs_only_allowlisted_assessment_failure_metadata(
     if expected_return_code is not None:
         expected_meta["return_code"] = expected_return_code
     assert error_meta == expected_meta
+    assert (
+        helper.injector_logger.local_logger.error.call_args.kwargs["exc_info"] is False
+    )
     callback = helper.api.inject.execution_callback.call_args.kwargs["data"]
     assert callback["execution_status"] == "ERROR"
     assert callback["execution_message"] == "CONTRACT RICH ERROR"
@@ -560,13 +616,214 @@ def test_runtime_collapses_unexpected_exception_without_exception_details(
 
     injector.process_message(_message(identifier))
 
-    helper.injector_logger.error.assert_called_once()
-    _, error_meta = helper.injector_logger.error.call_args.args
+    helper.injector_logger.error.assert_not_called()
+    helper.injector_logger.local_logger.error.assert_called_once()
+    error_meta = helper.injector_logger.local_logger.error.call_args.kwargs["extra"][
+        "attributes"
+    ]
     assert error_meta["stage"] == "input_validation"
     assert error_meta["failure_kind"] == "unexpected_failure"
     assert "issues" not in error_meta
     _assert_logger_excludes(
         helper, "EXCEPTION-STRING-CANARY", "TEMP-CREDENTIAL-PATH-CANARY"
+    )
+
+
+def test_runtime_error_record_never_inherits_an_outer_active_exception(
+    findings: tuple[OpenAevFinding, ...],
+) -> None:
+    """The real ERROR LogRecord has no traceback even inside an outer except."""
+    identifier = str(_subject().stable_contract_id("aws"))
+    injector, helper = _runtime(findings)
+    _RuntimeContract.parse_failure = ContractInputError(())
+    records: list[logging.LogRecord] = []
+
+    class RecordHandler(logging.Handler):
+        def emit(self, record: logging.LogRecord) -> None:
+            records.append(record)
+
+    local_logger = logging.getLogger("tests.prowler.safe-error-record")
+    local_logger.handlers = [RecordHandler()]
+    local_logger.propagate = False
+    local_logger.setLevel(logging.ERROR)
+    app_logger = AppLogger.__new__(AppLogger)
+    app_logger.local_logger = local_logger
+    helper.injector_logger = app_logger
+
+    try:
+        raise RuntimeError("OUTER-EXCEPTION-CANARY")
+    except RuntimeError:
+        injector.process_message(_message(identifier))
+
+    assert len(records) == 1
+    record = records[0]
+    formatted = logging.Formatter("%(levelname)s %(message)s %(attributes)s").format(
+        record
+    )
+    assert not record.exc_info
+    assert "OUTER-EXCEPTION-CANARY" not in formatted
+    assert "Traceback" not in formatted
+    assert "NoneType: None" not in formatted
+
+
+def test_runtime_caps_and_normalizes_attacker_controlled_input_issues(
+    findings: tuple[OpenAevFinding, ...],
+) -> None:
+    """Attacker keys and error types cannot leak or amplify ERROR metadata."""
+    identifier = str(_subject().stable_contract_id("aws"))
+    injector, helper = _runtime(findings)
+    attacker_key = "SECRET-KEY-CANARY\nFORGED-LOG-LINE"
+    oversized_key = "OVERSIZED-KEY-CANARY" * 100
+    _RuntimeContract.parse_failure = ContractInputError(
+        tuple(
+            ContractInputIssue(
+                (attacker_key, oversized_key, f"ATTACKER-KEY-{index}", "too-deep"),
+                f"ATTACKER-TYPE-{index}\nTYPE-CANARY",
+            )
+            for index in range(300)
+        )
+    )
+
+    injector.process_message(_message(identifier))
+
+    error_meta = helper.injector_logger.local_logger.error.call_args.kwargs["extra"][
+        "attributes"
+    ]
+    assert error_meta["failure_kind"] == "invalid_input"
+    assert 0 < len(error_meta["issues"]) <= 16
+    assert error_meta["issues_omitted"] == 284
+    assert error_meta["issues_truncated"] is True
+    assert all(
+        issue
+        == {
+            "location": [
+                "unrecognized_field",
+                "unrecognized_field",
+                "unrecognized_field",
+            ],
+            "type": "invalid",
+        }
+        for issue in error_meta["issues"]
+    )
+    rendered = repr(error_meta)
+    assert "SECRET-KEY-CANARY" not in rendered
+    assert "FORGED-LOG-LINE" not in rendered
+    assert "OVERSIZED-KEY-CANARY" not in rendered
+    assert "ATTACKER-KEY" not in rendered
+    assert "ATTACKER-TYPE" not in rendered
+    assert "TYPE-CANARY" not in rendered
+
+
+@pytest.mark.parametrize("content", (None, "RAW-CONTENT-CANARY", ("tuple",)))
+def test_runtime_classifies_missing_or_non_mapping_content_as_invalid_input(
+    findings: tuple[OpenAevFinding, ...], content: object
+) -> None:
+    """Missing or non-mapping form content is invalid input with no issues."""
+    identifier = str(_subject().stable_contract_id("aws"))
+    injector, helper = _runtime(findings)
+    message = _message(identifier)
+    message["injection"]["inject_content"] = content
+
+    injector.process_message(message)
+
+    error_meta = helper.injector_logger.local_logger.error.call_args.kwargs["extra"][
+        "attributes"
+    ]
+    assert error_meta["stage"] == "input_validation"
+    assert error_meta["failure_kind"] == "invalid_input"
+    assert error_meta["issues"] == []
+    _assert_logger_excludes(helper, "RAW-CONTENT-CANARY", "tuple")
+
+
+def test_runtime_logger_failures_do_not_prevent_execution_or_callback(
+    findings: tuple[OpenAevFinding, ...],
+) -> None:
+    """Best-effort lifecycle logs cannot interrupt the assessment lifecycle."""
+    identifier = str(_subject().stable_contract_id("aws"))
+    injector, helper = _runtime(findings)
+    helper.injector_logger.info.side_effect = RuntimeError("LOGGER-INFO-CANARY")
+    helper.injector_logger.debug.side_effect = RuntimeError("LOGGER-DEBUG-CANARY")
+
+    injector.process_message(_message(identifier))
+
+    assert "execute" in _RuntimeContract.events
+    helper.api.inject.execution_callback.assert_called_once()
+    assert (
+        helper.api.inject.execution_callback.call_args.kwargs["data"][
+            "execution_status"
+        ]
+        == "SUCCESS"
+    )
+
+
+def test_runtime_error_logger_failure_does_not_prevent_terminal_callback(
+    findings: tuple[OpenAevFinding, ...],
+) -> None:
+    """A failed safe ERROR logger is suppressed rather than retried unsafely."""
+    identifier = str(_subject().stable_contract_id("aws"))
+    injector, helper = _runtime(findings)
+    _RuntimeContract.parse_failure = ContractInputError(())
+    helper.injector_logger.local_logger.error.side_effect = RuntimeError(
+        "LOGGER-ERROR-CANARY"
+    )
+
+    injector.process_message(_message(identifier))
+
+    helper.injector_logger.error.assert_not_called()
+    helper.injector_logger.local_logger.error.assert_called_once()
+    helper.api.inject.execution_callback.assert_called_once()
+
+
+def test_runtime_renderer_failure_falls_back_without_a_second_render(
+    findings: tuple[OpenAevFinding, ...],
+) -> None:
+    """A broken success renderer yields one fixed safe terminal callback."""
+    from prowler.injector.openaev_prowler import _SAFE_EXECUTION_ERROR
+
+    identifier = str(_subject().stable_contract_id("aws"))
+    injector, helper = _runtime(findings)
+    _RuntimeContract.render_failure = True
+
+    injector.process_message(_message(identifier))
+
+    assert _RuntimeContract.events.count("render:success") == 1
+    assert "render:error" not in _RuntimeContract.events
+    helper.api.inject.execution_callback.assert_called_once()
+    callback = helper.api.inject.execution_callback.call_args.kwargs["data"]
+    assert callback["execution_status"] == "ERROR"
+    assert callback["execution_message"] == _SAFE_EXECUTION_ERROR
+    error_meta = helper.injector_logger.local_logger.error.call_args.kwargs["extra"][
+        "attributes"
+    ]
+    assert error_meta["stage"] == "output_preparation"
+    assert error_meta["failure_kind"] == "rendering_failed"
+    _assert_logger_excludes(helper, "RENDERER-EXCEPTION-CANARY")
+
+
+def test_runtime_callback_failure_is_contained_and_logged_once(
+    findings: tuple[OpenAevFinding, ...],
+) -> None:
+    """Callback delivery is attempted once and failure diagnostics stay fixed."""
+    identifier = str(_subject().stable_contract_id("aws"))
+    injector, helper = _runtime(findings)
+    helper.api.inject.execution_callback.side_effect = RuntimeError(
+        "CALLBACK-EXCEPTION-CANARY RESPONSE-PAYLOAD-CANARY"
+    )
+
+    injector.process_message(_message(identifier))
+
+    helper.api.inject.execution_callback.assert_called_once()
+    callback_errors = [
+        item
+        for item in helper.injector_logger.local_logger.error.call_args_list
+        if item.kwargs["extra"]["attributes"].get("stage") == "callback"
+    ]
+    assert len(callback_errors) == 1
+    callback_meta = callback_errors[0].kwargs["extra"]["attributes"]
+    assert callback_meta["failure_kind"] == "callback_failed"
+    assert callback_errors[0].kwargs["exc_info"] is False
+    _assert_logger_excludes(
+        helper, "CALLBACK-EXCEPTION-CANARY", "RESPONSE-PAYLOAD-CANARY"
     )
 
 

@@ -93,10 +93,19 @@ Feature: Executable Prowler contract infrastructure and route catalog
   Scenario: Runtime failures expose only closed diagnostic metadata
     Given invalid form input or a failed assessment result containing sensitive internals
     When the runtime prepares the existing safe ERROR callback
-    Then input diagnostics contain only the controlled stage, invalid-input kind, and value-free issue locations and types
+    Then missing or non-mapping form content is invalid input with no issues
+    And input diagnostics contain only capped, normalized, value-free issue locations and types
     And assessment diagnostics use only allowlisted CLI failure kinds and an optional return code
     And unexpected exceptions collapse to unexpected_failure without exception details
     And no log contains form values, credentials, process internals, callback data, finding content, or temporary paths
+
+  Scenario: Runtime observability cannot change assessment delivery semantics
+    Given a supplied registry with one concrete test contract
+    When lifecycle logging, trace rendering, or callback delivery raises
+    Then logging failures do not prevent parsing, execution, or the terminal callback attempt
+    And a renderer failure uses the fixed safe execution error without a second render attempt
+    And callback delivery is attempted once without retrying or exposing exception details
+    And ERROR records explicitly disable exception information
 
   Scenario: Stable route identities are deterministic and unique
     When platform identifiers are derived for the canonical routes
