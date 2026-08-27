@@ -31,7 +31,28 @@ Feature: Executable Prowler contract infrastructure and route catalog
     Then the endpoint URL is preserved in the AWS provider model
     But an invalid endpoint URL is rejected with a structured contract input error
 
+  Scenario Outline: Empty optional AWS form controls are omitted
+    Given a concrete AWS test subclass
+    And its form input contains an empty "<field>" control
+    When the subclass parses the form input
+    Then the optional value is absent from the strict AWS provider model
+    And client adaptation omits its environment variable
+    And the original form mapping remains unchanged
+
+    Examples:
+      | field                |
+      | aws_session_token    |
+      | aws_endpoint_url     |
+      | both optional fields |
+
   # ---- Constraints identified ----
+
+  Scenario: Empty optional AWS normalization is limited to the form boundary
+    Given direct strict-model input and AWS form input with non-empty invalid values
+    When those inputs are validated
+    Then direct model validation still rejects empty optional strings
+    And whitespace-only, malformed non-string, and required blank form values remain invalid
+    And valid non-empty optional values are preserved exactly
 
   Scenario: Invalid form input reports only safe structure
     Given form input containing a credential marker and a cross-provider field

@@ -268,7 +268,13 @@ class BaseProwlerContract(ABC):
             raise ContractInputError(
                 (ContractInputIssue(("provider",), "extra_forbidden"),)
             )
-        candidate = {"provider": self.provider, **raw_input}
+        candidate = dict(raw_input)
+        if self.provider == "aws":
+            for field in ("aws_session_token", "aws_endpoint_url"):
+                value = candidate.get(field)
+                if type(value) is str and value == "":
+                    candidate[field] = None
+        candidate["provider"] = self.provider
         try:
             return PROVIDER_INPUT_ADAPTER.validate_python(candidate)
         except ValidationError as error:

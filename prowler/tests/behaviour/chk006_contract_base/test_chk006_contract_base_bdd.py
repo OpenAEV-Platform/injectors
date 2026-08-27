@@ -7,9 +7,10 @@ import inspect
 import json
 from dataclasses import dataclass, field
 from typing import Any
+from unittest.mock import Mock
 
 import pytest
-from pydantic import SecretStr
+from pydantic import SecretStr, ValidationError
 from pyoaev.contracts.contract_config import (
     ContractText,  # type: ignore[import-untyped]
 )
@@ -19,8 +20,10 @@ from prowler._core.cli_engine import (
     ExecutionSpecification,
     OutputSpecification,
 )
+from prowler._core.prowler_client.provider_adapter import ProviderInvocationAdapter
 from prowler.models.configs.config_loader import ProwlerConfig
 from prowler.models.provider_inputs import (
+    PROVIDER_INPUT_ADAPTER,
     AwsProviderInput,
     AzureProviderInput,
     GcpProviderInput,
@@ -184,6 +187,68 @@ def test_aws_endpoint_url_is_validated_by_strict_provider_model() -> None:
     assert any(
         issue.location[-1] == "aws_endpoint_url" for issue in raised.value.issues
     )
+
+
+@pytest.mark.parametrize(
+    ("empty_controls", "omitted_environment"),
+    (
+        ({"aws_session_token": ""}, {"AWS_SESSION_TOKEN"}),
+        ({"aws_endpoint_url": ""}, {"AWS_ENDPOINT_URL"}),
+        (
+            {"aws_session_token": "", "aws_endpoint_url": ""},
+            {"AWS_SESSION_TOKEN", "AWS_ENDPOINT_URL"},
+        ),
+    ),
+)
+def test_empty_optional_aws_form_controls_are_omitted_without_mutation(
+    empty_controls: dict[str, str], omitted_environment: set[str]
+) -> None:
+    """Empty optional controls become absence without changing submitted form data."""
+    raw: dict[str, object] = {**PROVIDER_CASES["aws"][1], **empty_controls}
+    original = dict(raw)
+
+    parsed = _contract_class("aws")().parse_input(raw)
+    invocation = ProviderInvocationAdapter(Mock()).adapt(parsed)
+
+    if "aws_session_token" in empty_controls:
+        assert parsed.aws_session_token is None
+    if "aws_endpoint_url" in empty_controls:
+        assert parsed.aws_endpoint_url is None
+    assert omitted_environment.isdisjoint(dict(invocation.environment))
+    assert raw == original
+
+
+def test_empty_optional_aws_normalization_is_limited_to_form_boundary() -> None:
+    """Only exact empty optional form strings receive boundary normalization."""
+    subject = _subject()
+    base = dict(PROVIDER_CASES["aws"][1])
+
+    for field_name in ("aws_session_token", "aws_endpoint_url"):
+        with pytest.raises(ValidationError):
+            PROVIDER_INPUT_ADAPTER.validate_python(
+                {"provider": "aws", **base, field_name: ""}
+            )
+
+    invalid_values: tuple[tuple[str, object], ...] = (
+        ("aws_session_token", " \t "),
+        ("aws_session_token", 123),
+        ("aws_endpoint_url", " \t "),
+        ("aws_endpoint_url", "ftp://invalid.example"),
+        ("aws_endpoint_url", 4566),
+        ("aws_region", ""),
+    )
+    for field_name, value in invalid_values:
+        with pytest.raises(subject.ContractInputError):
+            _contract_class("aws")().parse_input({**base, field_name: value})
+
+    token = " token-with-spaces-preserved "  # noqa: S105 - validation fixture
+    endpoint = "https://localhost.localstack.cloud:4566/path"
+    parsed = _contract_class("aws")().parse_input(
+        {**base, "aws_session_token": token, "aws_endpoint_url": endpoint}
+    )
+    assert parsed.aws_session_token is not None
+    assert parsed.aws_session_token.get_secret_value() == token
+    assert parsed.aws_endpoint_url == endpoint
 
 
 def test_invalid_input_error_contains_structure_but_not_raw_values() -> None:
