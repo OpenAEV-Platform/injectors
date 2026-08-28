@@ -23,7 +23,7 @@ from .base import (
 )
 from .catalog import ROUTE_CATALOG, RouteDescriptor
 from .dispatcher import ContractDispatcher, RouteHandler, RouteNotFoundError
-from .gcp import GcpBaseContract
+from .gcp import GcpBaseContract, GcpComputeContract, GcpIamContract, GcpServiceContract
 from .kubernetes import KubernetesBaseContract
 from .registry import (
     DEFAULT_PROWLER_CONTRACTS,
@@ -44,6 +44,9 @@ __all__ = [
     "AzureServiceContract",
     "AzureStorageContract",
     "GcpBaseContract",
+    "GcpComputeContract",
+    "GcpIamContract",
+    "GcpServiceContract",
     "KubernetesBaseContract",
     "ContractDispatcher",
     "ContractExecutionOutcome",
