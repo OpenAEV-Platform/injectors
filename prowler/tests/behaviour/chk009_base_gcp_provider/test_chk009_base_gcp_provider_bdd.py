@@ -89,11 +89,11 @@ class _ClientFactory:
 
 
 def test_default_registration_identity_fields_and_outputs() -> None:
-    """GCP remains third as the canonical registry grows through CHK.013."""
+    """GCP remains third as the canonical registry grows through CHK.014."""
     serialized = DEFAULT_PROWLER_CONTRACTS.contracts()
     expected_id = stable_contract_id("gcp")
 
-    assert len(serialized) == 11
+    assert len(serialized) == 15
     assert [item["contract_id"] for item in serialized] == [
         str(stable_contract_id("aws")),
         str(stable_contract_id("azure")),
@@ -106,6 +106,10 @@ def test_default_registration_identity_fields_and_outputs() -> None:
         str(stable_contract_id("azure/storage")),
         str(stable_contract_id("gcp/iam")),
         str(stable_contract_id("gcp/compute")),
+        str(stable_contract_id("cis/aws")),
+        str(stable_contract_id("cis/azure")),
+        str(stable_contract_id("cis/gcp")),
+        str(stable_contract_id("cis/kubernetes")),
     ]
     assert UUID(serialized[2]["contract_id"]) == expected_id
     assert expected_id.version == 5
