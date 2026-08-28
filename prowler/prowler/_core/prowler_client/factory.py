@@ -10,6 +10,7 @@ from prowler.models.provider_inputs import ProviderInput
 from .client import ProwlerClient
 from .contracts import (
     CliEngineFactoryPort,
+    ComplianceSelector,
     CredentialLeaseFactoryPort,
     OutputWorkspaceFactoryPort,
     ServiceSelector,
@@ -48,8 +49,11 @@ class ProwlerClientFactory:
         *,
         check_filters: Sequence[str] = (),
         service_selector: ServiceSelector | None = None,
+        compliance_selector: ComplianceSelector | None = None,
     ) -> CommandResult:
         """Create a client and synchronously run one assessment."""
         return self.create(config, provider).run(
-            check_filters, service_selector=service_selector
+            check_filters,
+            service_selector=service_selector,
+            compliance_selector=compliance_selector,
         )
