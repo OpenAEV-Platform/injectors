@@ -157,9 +157,7 @@ def test_registry_retains_cis_contracts_without_selector_fields() -> None:
     assert [item["contract_id"] for item in serialized] == [
         str(stable_contract_id(route)) for route in routes
     ]
-    for item, (route, provider_name, _) in zip(
-        serialized[11:15], _ROUTES, strict=True
-    ):
+    for item, (route, provider_name, _) in zip(serialized[11:15], _ROUTES, strict=True):
         content = json.loads(item["contract_content"])
         assert "cis" in content["label"]["en"].casefold()
         keys = tuple(field["key"] for field in content["fields"])
