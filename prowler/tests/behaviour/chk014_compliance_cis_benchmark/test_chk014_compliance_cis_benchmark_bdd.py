@@ -37,6 +37,15 @@ _ROUTES = (
     ("cis/gcp", "gcp", "cis_3.0_gcp"),
     ("cis/kubernetes", "kubernetes", "cis_1.12_kubernetes"),
 )
+_CHK015_ROUTES = (
+    "nis2/aws",
+    "nis2/azure",
+    "nis2/gcp",
+    "iso27001/aws",
+    "iso27001/azure",
+    "iso27001/gcp",
+    "iso27001/kubernetes",
+)
 _TEMP_PATHS = {
     "gcp": Path("/tmp/CANARY-GCP-CREDENTIAL.json"),  # noqa: S108
     "kubernetes": Path("/tmp/CANARY-KUBE-CREDENTIAL.yaml"),  # noqa: S108
@@ -116,19 +125,17 @@ def test_route_selects_exact_typed_compliance_once(
     assert factory.calls[0][2:] == ((), None, compliance)
 
 
-def test_compliance_selector_type_contains_only_supported_cis_values() -> None:
-    """The internal typed seam admits only the four evidenced Prowler values."""
+def test_compliance_selector_type_retains_exact_supported_cis_values() -> None:
+    """The expanded internal typed seam retains all four exact CIS values."""
     import prowler._core.prowler_client as client_api
 
     selector_type = client_api.__dict__.get("ComplianceSelector")
 
     assert selector_type is not None
-    assert get_args(selector_type) == tuple(item[2] for item in _ROUTES)
+    assert get_args(selector_type)[:4] == tuple(item[2] for item in _ROUTES)
 
 
-def test_registry_has_exact_fifteen_canonical_contracts_without_selector_fields() -> (
-    None
-):
+def test_registry_retains_cis_contracts_without_selector_fields() -> None:
     """The executable public surface is stable, ordered, and not user-selectable."""
     serialized = DEFAULT_PROWLER_CONTRACTS.contracts()
     routes = (
@@ -144,12 +151,15 @@ def test_registry_has_exact_fifteen_canonical_contracts_without_selector_fields(
         "gcp/iam",
         "gcp/compute",
         *(item[0] for item in _ROUTES),
+        *_CHK015_ROUTES,
     )
 
     assert [item["contract_id"] for item in serialized] == [
         str(stable_contract_id(route)) for route in routes
     ]
-    for item, (route, provider_name, _) in zip(serialized[11:], _ROUTES, strict=True):
+    for item, (route, provider_name, _) in zip(
+        serialized[11:15], _ROUTES, strict=True
+    ):
         content = json.loads(item["contract_content"])
         assert "cis" in content["label"]["en"].casefold()
         keys = tuple(field["key"] for field in content["fields"])
