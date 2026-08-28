@@ -95,15 +95,23 @@ def test_route_selects_exact_service_once(
     assert factory.calls[0][2:] == ((), service)
 
 
-def test_registry_has_exact_seven_canonical_contracts_without_selector_fields() -> None:
+def test_registry_has_exact_nine_canonical_contracts_without_selector_fields() -> None:
     """The public surface is ordered, stable, labelled, and not user-selectable."""
     serialized = DEFAULT_PROWLER_CONTRACTS.contracts()
-    routes = ("aws", "azure", "gcp", "kubernetes", *(item[0] for item in _ROUTES))
+    routes = (
+        "aws",
+        "azure",
+        "gcp",
+        "kubernetes",
+        *(item[0] for item in _ROUTES),
+        "azure/iam",
+        "azure/storage",
+    )
 
     assert [item["contract_id"] for item in serialized] == [
         str(stable_contract_id(route)) for route in routes
     ]
-    for item, (route, service) in zip(serialized[4:], _ROUTES, strict=True):
+    for item, (route, service) in zip(serialized[4:7], _ROUTES, strict=True):
         content = json.loads(item["contract_content"])
         assert service.upper() in content["label"]["en"]
         assert tuple(field["key"] for field in content["fields"]) == (
@@ -570,7 +578,7 @@ def test_existing_check_filter_argv_is_unchanged(
     assert "--services" not in engine.requests[0].arguments
 
 
-def test_service_selector_rejects_non_aws_before_engine() -> None:
+def test_aws_service_selector_rejects_azure_before_engine() -> None:
     """Provider/selector combinations are validated before any CLI call."""
     engine = _Engine(b"[]")
     factory = ProwlerClientFactory(_EngineFactory(engine), _NoLeaseFactory())
@@ -584,6 +592,6 @@ def test_service_selector_rejects_non_aws_before_engine() -> None:
     )
 
     with pytest.raises(ValueError, match="AWS service selector"):
-        factory.run(ProwlerConfig(), provider, service_selector="iam")
+        factory.run(ProwlerConfig(), provider, service_selector="s3")
 
     assert engine.requests == []

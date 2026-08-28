@@ -12,12 +12,16 @@ from prowler._core.cli_engine import (
     ValidatedCommandRequest,
 )
 from prowler.models.configs.config_loader import ProwlerConfig
-from prowler.models.provider_inputs import AwsProviderInput, ProviderInput
+from prowler.models.provider_inputs import (
+    AwsProviderInput,
+    AzureProviderInput,
+    ProviderInput,
+)
 
 from .contracts import (
-    AwsServiceSelector,
     CliEnginePort,
     OutputWorkspaceFactoryPort,
+    ServiceSelector,
 )
 from .credentials import CredentialCleanupError
 from .output_workspace import (
@@ -101,7 +105,7 @@ class ProwlerClient:
         self,
         check_filters: Sequence[str] = (),
         *,
-        service_selector: AwsServiceSelector | None = None,
+        service_selector: ServiceSelector | None = None,
     ) -> CommandResult:
         """Run one assessment and capture its controlled OCSF artifact."""
         with self._consumption_lock:
@@ -120,12 +124,22 @@ class ProwlerClient:
             filters = tuple(check_filters)
             if any(not isinstance(item, str) or not item.strip() for item in filters):
                 raise ValueError("check filters must be nonblank strings")
-            if service_selector not in (None, "iam", "s3", "ec2"):
-                raise ValueError("unsupported AWS service selector")
-            if service_selector is not None and not isinstance(
+            if service_selector not in (None, "iam", "s3", "ec2", "storage"):
+                raise ValueError("unsupported service selector")
+            if service_selector in ("s3", "ec2") and not isinstance(
                 provider, AwsProviderInput
             ):
                 raise ValueError("AWS service selector requires an AWS provider")
+            if service_selector == "storage" and not isinstance(
+                provider, AzureProviderInput
+            ):
+                raise ValueError("Azure service selector requires an Azure provider")
+            if service_selector == "iam" and not isinstance(
+                provider, AwsProviderInput | AzureProviderInput
+            ):
+                raise ValueError(
+                    "IAM service selector requires an AWS or Azure provider"
+                )
 
             _safe_log(logging.INFO, "Preparing Prowler output workspace")
             try:

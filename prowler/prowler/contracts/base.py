@@ -21,7 +21,7 @@ from pyoaev.contracts.contract_config import (
 )
 
 from prowler._core.cli_engine import CommandResult
-from prowler._core.prowler_client import AwsServiceSelector, ProwlerClientFactory
+from prowler._core.prowler_client import ProwlerClientFactory, ServiceSelector
 from prowler.models.configs.config_loader import ProwlerConfig
 from prowler.models.findings import (
     OcsfDecodeError,
@@ -65,7 +65,7 @@ class ClientFactoryPort(Protocol):
         provider: ProviderInput,
         *,
         check_filters: Sequence[str] = (),
-        service_selector: AwsServiceSelector | None = None,
+        service_selector: ServiceSelector | None = None,
     ) -> CommandResult:
         """Run one assessment and return the exact command result."""
 
@@ -207,6 +207,16 @@ class BaseProwlerContract(ABC):
                 if finding.expectation_result == "FAILED"
             ],
         }
+
+    def _provider_findings(
+        self, findings: Sequence[OpenAevFinding]
+    ) -> tuple[OpenAevFinding, ...]:
+        """Retain source order and normalize findings for this contract provider."""
+        return tuple(
+            finding.model_copy(update={"cloud_provider": self.provider})
+            for finding in findings
+            if finding.cloud_provider.casefold() == self.provider
+        )
 
     @staticmethod
     def output_trace_config() -> dict[str, object]:
