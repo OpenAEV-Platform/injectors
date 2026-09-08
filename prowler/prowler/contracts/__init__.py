@@ -32,6 +32,12 @@ from .cis import (
 from .dispatcher import ContractDispatcher, RouteHandler, RouteNotFoundError
 from .gcp import GcpBaseContract, GcpComputeContract, GcpIamContract, GcpServiceContract
 from .kubernetes import KubernetesBaseContract
+from .mitre import (
+    AwsMitreContract,
+    AzureMitreContract,
+    GcpMitreContract,
+    MitreComplianceContract,
+)
 from .nis2_iso27001 import (
     AwsIso27001Contract,
     AwsNis2Contract,
@@ -64,9 +70,11 @@ __all__ = [
     "AwsCisContract",
     "AwsIso27001Contract",
     "AwsNis2Contract",
+    "AwsMitreContract",
     "AzureCisContract",
     "AzureIso27001Contract",
     "AzureNis2Contract",
+    "AzureMitreContract",
     "CisComplianceContract",
     "GcpBaseContract",
     "GcpComputeContract",
@@ -75,11 +83,13 @@ __all__ = [
     "GcpCisContract",
     "GcpIso27001Contract",
     "GcpNis2Contract",
+    "GcpMitreContract",
     "Iso27001ComplianceContract",
     "KubernetesBaseContract",
     "KubernetesCisContract",
     "KubernetesIso27001Contract",
     "Nis2ComplianceContract",
+    "MitreComplianceContract",
     "ContractDispatcher",
     "ContractExecutionOutcome",
     "ContractInputError",
