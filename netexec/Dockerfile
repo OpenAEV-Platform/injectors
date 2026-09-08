@@ -54,7 +54,7 @@ RUN if [[ ${PYOAEV_GIT_BRANCH_OVERRIDE} ]] ; then \
     fi
 
 # Install netexec
-RUN CFLAGS="-Wno-int-conversion"  \
+RUN CFLAGS="${CFLAGS:-} -Wno-error=int-conversion" \
     pip install --no-cache-dir git+https://github.com/Pennyw0rth/NetExec.git
 
 CMD ["python3", "-m", "netexec.openaev_netexec"]
