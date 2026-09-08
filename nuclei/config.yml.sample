@@ -11,9 +11,9 @@ injector:
 
 nuclei:
   scan_strategy: "host-spray" # Available values: auto / host-spray / template-spray
-  templates_parallelism: 5 # (concurrency)
-  hosts_parallelism_per_template: 5 # (bulk_size)
-  max_requests_per_second: 50 # (rate_limit)
+  templates_parallelism: 2 # (concurrency)
+  hosts_parallelism_per_template: 2 # (bulk_size)
+  max_requests_per_second: 25 # (rate_limit)
   timeout: 10
   scan_timeout: 540 # hard ceiling (seconds) for a whole scan; keep below the platform inject execution threshold (default 10 min)
   template_update_timeout: 300 # hard ceiling (seconds) for a template refresh; a hung update cannot block scans or startup, it degrades to best-effort
