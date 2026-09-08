@@ -20,7 +20,7 @@ class ConfigLoaderNuclei(BaseSettings):
     )
 
     templates_parallelism: PositiveInt = Field(
-        default=5,
+        default=2,
         description=(
             "Maximum number of templates to be executed in parallel. "
             "Nuclei Flags: -c, -concurrency"
@@ -28,7 +28,7 @@ class ConfigLoaderNuclei(BaseSettings):
     )
 
     hosts_parallelism_per_template: PositiveInt = Field(
-        default=5,
+        default=2,
         description=(
             "Maximum number of hosts to be analyzed in parallel per template. "
             "Nuclei Flags: -bs, -bulk-size"
@@ -36,7 +36,7 @@ class ConfigLoaderNuclei(BaseSettings):
     )
 
     max_requests_per_second: PositiveInt = Field(
-        default=50,
+        default=25,
         description=(
             "Maximum number of requests to send per second. "
             "Nuclei Flags: -rl, -rate-limit"
