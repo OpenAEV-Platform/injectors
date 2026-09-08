@@ -1317,7 +1317,7 @@ def test_runtime_resolved_contract_uses_renderer_for_safe_error(
 
 
 def test_default_registry_and_daemon_config_register_executable_routes() -> None:
-    """The daemon registers all executable routes through CHK.015."""
+    """The daemon registers all 25 executable routes through CHK.016."""
     subject = _subject()
     contracts = subject.DEFAULT_PROWLER_CONTRACTS.contracts()
     assert [item["contract_id"] for item in contracts] == [
@@ -1343,6 +1343,9 @@ def test_default_registry_and_daemon_config_register_executable_routes() -> None
         str(subject.stable_contract_id("iso27001/azure")),
         str(subject.stable_contract_id("iso27001/gcp")),
         str(subject.stable_contract_id("iso27001/kubernetes")),
+        str(subject.stable_contract_id("mitre/aws")),
+        str(subject.stable_contract_id("mitre/azure")),
+        str(subject.stable_contract_id("mitre/gcp")),
     ]
     daemon = _config().to_daemon_config()
     assert daemon.get("injector_contracts") == contracts

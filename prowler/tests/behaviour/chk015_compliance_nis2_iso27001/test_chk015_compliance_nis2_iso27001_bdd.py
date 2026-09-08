@@ -46,6 +46,11 @@ _EXISTING_COMPLIANCE = (
     ("cis/gcp", "gcp", "cis_3.0_gcp"),
     ("cis/kubernetes", "kubernetes", "cis_1.12_kubernetes"),
 )
+_CHK016_COMPLIANCE = (
+    ("mitre/aws", "aws", "mitre_attack_aws"),
+    ("mitre/azure", "azure", "mitre_attack_azure"),
+    ("mitre/gcp", "gcp", "mitre_attack_gcp"),
+)
 _TEMP_PATHS = {
     "gcp": Path("/tmp/CANARY-GCP-CREDENTIAL.json"),  # noqa: S108
     "kubernetes": Path("/tmp/CANARY-KUBE-CREDENTIAL.yaml"),  # noqa: S108
@@ -133,11 +138,11 @@ def test_compliance_selector_type_contains_exact_supported_values() -> None:
 
     assert selector_type is not None
     assert get_args(selector_type) == tuple(
-        item[2] for item in (*_EXISTING_COMPLIANCE, *_ROUTES)
+        item[2] for item in (*_EXISTING_COMPLIANCE, *_ROUTES, *_CHK016_COMPLIANCE)
     )
 
 
-def test_registry_has_22_canonical_contracts_without_selector_fields() -> None:
+def test_registry_has_25_canonical_contracts_without_selector_fields() -> None:
     """The executable public surface is stable, ordered, and not user-selectable."""
     serialized = DEFAULT_PROWLER_CONTRACTS.contracts()
     routes = (
@@ -154,12 +159,13 @@ def test_registry_has_22_canonical_contracts_without_selector_fields() -> None:
         "gcp/compute",
         *(item[0] for item in _EXISTING_COMPLIANCE),
         *(item[0] for item in _ROUTES),
+        *(item[0] for item in _CHK016_COMPLIANCE),
     )
 
     assert [item["contract_id"] for item in serialized] == [
         str(stable_contract_id(route)) for route in routes
     ]
-    for item, (route, provider_name, _) in zip(serialized[15:], _ROUTES, strict=True):
+    for item, (route, provider_name, _) in zip(serialized[15:22], _ROUTES, strict=True):
         content = json.loads(item["contract_content"])
         assert route.split("/", maxsplit=1)[0] in content["label"]["en"].casefold()
         keys = tuple(field["key"] for field in content["fields"])
