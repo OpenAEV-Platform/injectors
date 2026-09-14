@@ -66,8 +66,16 @@ _PRE_EXISTING_31 = (
     "gcp/select-compliance",
 )
 _SELECT_TOKENS = ("select-service", "select-compliance")
-_SNAPSHOT_PATH = Path(
+_LOCAL_SNAPSHOT_PATH = Path(
     "/tmp/opencode/chk017-universal-pre-change-contracts.json"  # noqa: S108
+)
+_REPO_SNAPSHOT_PATH = (
+    Path(__file__).resolve().parent.parent.parent
+    / "fixtures"
+    / "chk017-universal-pre-change-contracts.json"
+)
+_SNAPSHOT_PATH = (
+    _LOCAL_SNAPSHOT_PATH if _LOCAL_SNAPSHOT_PATH.exists() else _REPO_SNAPSHOT_PATH
 )
 
 

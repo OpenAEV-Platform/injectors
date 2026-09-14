@@ -46,7 +46,13 @@ _NEW_6 = (
     "gcp/select-service",
     "gcp/select-compliance",
 )
-_SNAPSHOT = Path("/tmp/opencode/chk017-pre-change-contracts.json")  # noqa: S108
+_LOCAL_SNAPSHOT = Path("/tmp/opencode/chk017-pre-change-contracts.json")  # noqa: S108
+_REPO_SNAPSHOT = (
+    Path(__file__).resolve().parent.parent.parent
+    / "fixtures"
+    / "chk017-pre-change-contracts.json"
+)
+_SNAPSHOT = _LOCAL_SNAPSHOT if _LOCAL_SNAPSHOT.exists() else _REPO_SNAPSHOT
 
 
 def test_catalog_appends_exactly_six_descriptors_in_order() -> None:
