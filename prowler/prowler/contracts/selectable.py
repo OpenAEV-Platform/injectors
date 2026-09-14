@@ -143,11 +143,14 @@ class SelectableProwlerContract(BaseProwlerContract):
                 (ContractInputIssue(("provider",), "extra_forbidden"),)
             )
         submitted = raw_input.get(self.select_key)
-        if not isinstance(submitted, list) or not submitted:
+        if submitted is None or submitted == "" or submitted == []:
             raise self._select_input_error("select_missing")
-        if len(submitted) > 1:
-            raise self._select_input_error("select_multiple")
-        element = submitted[0]
+        if isinstance(submitted, list):
+            if len(submitted) > 1:
+                raise self._select_input_error("select_multiple")
+            element = submitted[0]
+        else:
+            element = submitted
         if type(element) is not str or element not in self.select_values:
             raise self._select_input_error("select_unknown_value")
         self._selection.selected = element

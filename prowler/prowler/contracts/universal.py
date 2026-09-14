@@ -49,9 +49,15 @@ __all__ = [
 ]
 
 PROVIDER_KEY = "prowler_provider"
-SERVICE_KEY = "prowler_service"
+SERVICE_KEYS: Mapping[str, str] = {
+    "aws": "prowler_service_aws",
+    "azure": "prowler_service_azure",
+    "gcp": "prowler_service_gcp",
+}
 COMPLIANCE_KEY = "prowler_compliance"
-_SELECT_KEYS = (PROVIDER_KEY, SERVICE_KEY, COMPLIANCE_KEY)
+_SELECT_KEYS = (PROVIDER_KEY, *SERVICE_KEYS.values(), COMPLIANCE_KEY)
+NONE_SCOPE = "__none__"
+NONE_SCOPE_LABEL = "None (base scan)"
 PROVIDER_SELECT_VALUES = ("aws", "azure", "gcp", "kubernetes")
 
 # Human labels for the provider select and the two literals that
@@ -192,28 +198,36 @@ class UniversalProwlerContract(BaseProwlerContract):
                     element.mandatoryConditionFields = []
                     element.mandatoryConditionValues = {}
                 fields.append(element)
-        fields.append(
-            ContractSelect(
-                key=SERVICE_KEY,
-                label="Service (select one)",
-                mandatory=False,
-                cardinality=ContractCardinality.One.value,
-                defaultValue=[],
-                choices=dict(SERVICE_SCOPE_CHOICES),
-                visibleConditionFields=[],
-                visibleConditionValues={},
-                mandatoryConditionFields=[],
-                mandatoryConditionValues={},
+        for service_provider, service_key in SERVICE_KEYS.items():
+            fields.append(
+                ContractSelect(
+                    key=service_key,
+                    label="Service (select one)",
+                    mandatory=False,
+                    cardinality=ContractCardinality.One.value,
+                    defaultValue=[NONE_SCOPE],
+                    choices={
+                        NONE_SCOPE: NONE_SCOPE_LABEL,
+                        **{
+                            option.route: SERVICE_SCOPE_CHOICES[option.route]
+                            for option in SERVICE_SCOPE_OPTIONS
+                            if option.provider == service_provider
+                        },
+                    },
+                    visibleConditionFields=[PROVIDER_KEY],
+                    visibleConditionValues={PROVIDER_KEY: service_provider},
+                    mandatoryConditionFields=[],
+                    mandatoryConditionValues={},
+                )
             )
-        )
         fields.append(
             ContractSelect(
                 key=COMPLIANCE_KEY,
                 label="Compliance framework (select one)",
                 mandatory=False,
                 cardinality=ContractCardinality.One.value,
-                defaultValue=[],
-                choices=dict(COMPLIANCE_SCOPE_CHOICES),
+                defaultValue=[NONE_SCOPE],
+                choices={NONE_SCOPE: NONE_SCOPE_LABEL, **COMPLIANCE_SCOPE_CHOICES},
                 visibleConditionFields=[],
                 visibleConditionValues={},
                 mandatoryConditionFields=[],
@@ -232,19 +246,28 @@ class UniversalProwlerContract(BaseProwlerContract):
         if "provider" in raw_input:
             raise _select_input_error(("provider",), "extra_forbidden")
         selected_provider = self._parse_provider_select(raw_input)
+        service_key = SERVICE_KEYS.get(selected_provider)
         service_route = self._parse_scope_select(
-            raw_input, SERVICE_KEY, SERVICE_SCOPE_BY_ROUTE
+            raw_input,
+            service_key,
+            SERVICE_SCOPE_BY_ROUTE,
         )
         compliance_route = self._parse_scope_select(
             raw_input, COMPLIANCE_KEY, COMPLIANCE_SCOPE_BY_ROUTE
         )
         if service_route is not None and compliance_route is not None:
-            raise _select_input_error((SERVICE_KEY, COMPLIANCE_KEY), "scope_conflict")
+            if service_key is None:
+                raise RuntimeError("a selected service route requires a service key")
+            raise _select_input_error((service_key, COMPLIANCE_KEY), "scope_conflict")
         for key, route, options in (
-            (SERVICE_KEY, service_route, SERVICE_SCOPE_BY_ROUTE),
+            (service_key, service_route, SERVICE_SCOPE_BY_ROUTE),
             (COMPLIANCE_KEY, compliance_route, COMPLIANCE_SCOPE_BY_ROUTE),
         ):
-            if route is not None and options[route].provider != selected_provider:
+            if (
+                key is not None
+                and route is not None
+                and options[route].provider != selected_provider
+            ):
                 raise _select_input_error((key,), "scope_provider_mismatch")
         foreign_keys = {
             key
@@ -285,11 +308,14 @@ class UniversalProwlerContract(BaseProwlerContract):
     def _parse_provider_select(raw_input: Mapping[str, object]) -> str:
         """Validate the mandatory closed provider select."""
         submitted = raw_input.get(PROVIDER_KEY)
-        if not isinstance(submitted, list) or not submitted:
+        if submitted is None or submitted == "" or submitted == []:
             raise _select_input_error((PROVIDER_KEY,), "select_missing")
-        if len(submitted) > 1:
-            raise _select_input_error((PROVIDER_KEY,), "select_multiple")
-        element = submitted[0]
+        if isinstance(submitted, list):
+            if len(submitted) > 1:
+                raise _select_input_error((PROVIDER_KEY,), "select_multiple")
+            element = submitted[0]
+        else:
+            element = submitted
         if type(element) is not str or element not in PROVIDER_SELECT_VALUES:
             raise _select_input_error((PROVIDER_KEY,), "select_unknown_value")
         return element
@@ -297,20 +323,23 @@ class UniversalProwlerContract(BaseProwlerContract):
     @staticmethod
     def _parse_scope_select(
         raw_input: Mapping[str, object],
-        key: str,
+        key: str | None,
         options: Mapping[str, ScopeOption],
     ) -> str | None:
         """Validate one optional closed scope select, reporting None when empty."""
-        if key not in raw_input:
+        if key is None or key not in raw_input:
             return None
         submitted = raw_input[key]
-        if not isinstance(submitted, list):
-            raise _select_input_error((key,), "select_unknown_value")
-        if not submitted:
+        if submitted is None or submitted == "" or submitted == []:
             return None
-        if len(submitted) > 1:
-            raise _select_input_error((key,), "select_multiple")
-        element = submitted[0]
+        if isinstance(submitted, list):
+            if len(submitted) > 1:
+                raise _select_input_error((key,), "select_multiple")
+            element = submitted[0]
+        else:
+            element = submitted
+        if element == NONE_SCOPE:
+            return None
         if type(element) is not str or element not in options:
             raise _select_input_error((key,), "select_unknown_value")
         return element

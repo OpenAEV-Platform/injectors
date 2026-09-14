@@ -149,6 +149,34 @@ def test_base_scope_runs_provider_base_once_and_filters_findings(
     assert contract.safe_request_info(parsed)["selected_provider"] == provider
 
 
+def test_none_sentinels_never_reach_the_client_seam(
+    provider_forms: dict[str, dict[str, str]],
+) -> None:
+    """Assert explicit UI none values execute as a selector-free base scan."""
+    result = CommandResult(
+        specification=_specification(),
+        return_code=0,
+        parsed=b"[]",
+    )
+    factory = _ClientFactory(result)
+    contract = _contract()
+    contract._client_factory = factory
+    parsed = contract.parse_input(
+        {
+            **provider_forms["aws"],
+            "prowler_provider": "aws",
+            "prowler_service_aws": "__none__",
+            "prowler_compliance": ["__none__"],
+        }
+    )
+
+    contract.execute(ProwlerConfig(), parsed)
+
+    assert len(factory.calls) == 1
+    assert factory.calls[0][3:] == (None, None)
+    assert contract.safe_request_info(parsed)["filters"] == "base"
+
+
 @pytest.mark.parametrize(
     ("provider", "service_route", "service"),
     (
@@ -180,7 +208,7 @@ def test_service_scope_runs_exactly_that_service_once(
         {
             **provider_forms[provider],
             "prowler_provider": [provider],
-            "prowler_service": [service_route],
+            f"prowler_service_{provider}": [service_route],
         }
     )
     outcome = contract.execute(ProwlerConfig(), parsed)
@@ -302,7 +330,7 @@ def test_failed_run_preserves_error_and_empty_findings(
         {
             **provider_forms["gcp"],
             "prowler_provider": ["gcp"],
-            "prowler_service": ["gcp/compute"],
+            "prowler_service_gcp": ["gcp/compute"],
         }
     )
     outcome = universal.execute(ProwlerConfig(), parsed)

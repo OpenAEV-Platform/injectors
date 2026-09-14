@@ -14,7 +14,11 @@ from prowler.contracts import (
 from prowler.models.provider_inputs import AwsProviderInput
 
 PROVIDER_KEY = "prowler_provider"
-SERVICE_KEY = "prowler_service"
+SERVICE_KEYS = {
+    "aws": "prowler_service_aws",
+    "azure": "prowler_service_azure",
+    "gcp": "prowler_service_gcp",
+}
 COMPLIANCE_KEY = "prowler_compliance"
 PROVIDERS = ("aws", "azure", "gcp", "kubernetes")
 SERVICE_ROUTES = (
@@ -42,7 +46,10 @@ COMPLIANCE_ROUTES = (
     "mitre/azure",
     "mitre/gcp",
 )
-_SCOPE_KEYS = ((SERVICE_KEY, SERVICE_ROUTES), (COMPLIANCE_KEY, COMPLIANCE_ROUTES))
+_SCOPE_CASES = (
+    *((provider, key, SERVICE_ROUTES) for provider, key in SERVICE_KEYS.items()),
+    *((provider, COMPLIANCE_KEY, COMPLIANCE_ROUTES) for provider in PROVIDERS),
+)
 # One offered service and compliance route for each provider that offers both.
 _BOTH_SCOPE_PROVIDERS = {
     "aws": ("aws/iam", "cis/aws"),
@@ -50,9 +57,9 @@ _BOTH_SCOPE_PROVIDERS = {
     "gcp": ("gcp/iam", "cis/gcp"),
 }
 _MISMATCH_CASES = (
-    ("azure", SERVICE_KEY, "aws/iam"),
-    ("aws", SERVICE_KEY, "azure/storage"),
-    ("gcp", SERVICE_KEY, "aws/s3"),
+    ("azure", SERVICE_KEYS["azure"], "aws/iam"),
+    ("aws", SERVICE_KEYS["aws"], "azure/storage"),
+    ("gcp", SERVICE_KEYS["gcp"], "aws/s3"),
     ("aws", COMPLIANCE_KEY, "cis/gcp"),
     ("kubernetes", COMPLIANCE_KEY, "cis/aws"),
     ("gcp", COMPLIANCE_KEY, "iso27001/aws"),
@@ -82,19 +89,22 @@ def test_provider_select_parses_each_provider_to_strict_model(
     assert type(parsed) is type(expected)
     assert parsed == expected
     # Explicit empty scope selects mean the same "none" scope.
-    parsed_empty = contract.parse_input({**form, SERVICE_KEY: [], COMPLIANCE_KEY: []})
+    empty_scopes: dict[str, list[str]] = {COMPLIANCE_KEY: []}
+    if provider in SERVICE_KEYS:
+        empty_scopes[SERVICE_KEYS[provider]] = []
+    parsed_empty = contract.parse_input({**form, **empty_scopes})
     assert parsed_empty == expected
 
 
 @pytest.mark.parametrize("provider", PROVIDERS)
-def test_missing_or_nonlist_provider_select_reports_select_missing(
+def test_missing_or_empty_provider_select_reports_select_missing(
     provider: str, provider_forms: dict[str, dict[str, str]]
 ) -> None:
-    """Assert a missing, non-list, or empty provider select reports select_missing."""
+    """Assert a missing or empty provider select reports select_missing."""
     contract = _contract()
     cases = (
         dict(provider_forms[provider]),
-        {**provider_forms[provider], PROVIDER_KEY: "provider-canary-raw"},
+        {**provider_forms[provider], PROVIDER_KEY: ""},
         {**provider_forms[provider], PROVIDER_KEY: []},
         {**provider_forms[provider], PROVIDER_KEY: None},
     )
@@ -104,7 +114,6 @@ def test_missing_or_nonlist_provider_select_reports_select_missing(
         assert excinfo.value.issues == (
             ContractInputIssue((PROVIDER_KEY,), "select_missing"),
         )
-        assert "provider-canary-raw" not in str(excinfo.value)
 
 
 @pytest.mark.parametrize("provider", PROVIDERS)
@@ -154,17 +163,16 @@ def test_unknown_provider_value_reports_select_unknown_value(
                 assert element.strip() not in message
 
 
-@pytest.mark.parametrize(("key", "routes"), _SCOPE_KEYS, ids=("service", "compliance"))
-@pytest.mark.parametrize("provider", PROVIDERS)
-def test_scope_select_present_nonlist_reports_unknown_value(
+@pytest.mark.parametrize(("provider", "key", "routes"), _SCOPE_CASES)
+def test_scope_select_malformed_or_unknown_scalar_reports_unknown_value(
     provider: str,
     key: str,
     routes: tuple[str, ...],
     provider_forms: dict[str, dict[str, str]],
 ) -> None:
-    """Assert a present non-list scope select reports select_unknown_value."""
+    """Assert malformed or unknown scalar scope values report unknown value."""
     contract = _contract()
-    for submitted in ("scope-canary-raw", None, 42):
+    for submitted in ("scope-canary-raw", 42):
         form = {
             **provider_forms[provider],
             PROVIDER_KEY: [provider],
@@ -178,8 +186,7 @@ def test_scope_select_present_nonlist_reports_unknown_value(
         assert "scope-canary-raw" not in str(excinfo.value)
 
 
-@pytest.mark.parametrize(("key", "routes"), _SCOPE_KEYS, ids=("service", "compliance"))
-@pytest.mark.parametrize("provider", PROVIDERS)
+@pytest.mark.parametrize(("provider", "key", "routes"), _SCOPE_CASES)
 def test_scope_select_multiple_reports_select_multiple(
     provider: str,
     key: str,
@@ -204,8 +211,7 @@ def test_scope_select_multiple_reports_select_multiple(
         assert "scope-canary-a" not in str(excinfo.value)
 
 
-@pytest.mark.parametrize(("key", "routes"), _SCOPE_KEYS, ids=("service", "compliance"))
-@pytest.mark.parametrize("provider", PROVIDERS)
+@pytest.mark.parametrize(("provider", "key", "routes"), _SCOPE_CASES)
 def test_scope_unknown_value_reports_select_unknown_value(
     provider: str,
     key: str,
@@ -264,13 +270,13 @@ def test_both_scopes_set_reports_single_scope_conflict(
     form = {
         **provider_forms[provider],
         PROVIDER_KEY: [provider],
-        SERVICE_KEY: [service],
+        SERVICE_KEYS[provider]: [service],
         COMPLIANCE_KEY: [compliance],
     }
     with pytest.raises(ContractInputError) as excinfo:
         contract.parse_input(form)
     assert excinfo.value.issues == (
-        ContractInputIssue((SERVICE_KEY, COMPLIANCE_KEY), "scope_conflict"),
+        ContractInputIssue((SERVICE_KEYS[provider], COMPLIANCE_KEY), "scope_conflict"),
     )
     message = str(excinfo.value)
     assert service not in message
@@ -307,7 +313,7 @@ def test_provider_key_rejected_first_even_with_invalid_selects(
     form = {
         **provider_forms["aws"],
         PROVIDER_KEY: ["provider-canary-bad"],
-        SERVICE_KEY: ["scope-canary-bad"],
+        SERVICE_KEYS["aws"]: ["scope-canary-bad"],
         "provider": "aws",
     }
     with pytest.raises(ContractInputError) as excinfo:
@@ -331,12 +337,12 @@ def test_select_validation_precedes_provider_model_validation(
             if key != "aws_region"
         },
         PROVIDER_KEY: ["aws"],
-        SERVICE_KEY: ["scope-canary-bad"],
+        SERVICE_KEYS["aws"]: ["scope-canary-bad"],
     }
     with pytest.raises(ContractInputError) as excinfo:
         contract.parse_input(form)
     assert excinfo.value.issues == (
-        ContractInputIssue((SERVICE_KEY,), "select_unknown_value"),
+        ContractInputIssue((SERVICE_KEYS["aws"],), "select_unknown_value"),
     )
     assert "scope-canary-bad" not in str(excinfo.value)
 
@@ -349,13 +355,13 @@ def test_conflict_precedes_mismatch(
     form = {
         **provider_forms["azure"],
         PROVIDER_KEY: ["azure"],
-        SERVICE_KEY: ["aws/iam"],
+        SERVICE_KEYS["azure"]: ["aws/iam"],
         COMPLIANCE_KEY: ["iso27001/aws"],
     }
     with pytest.raises(ContractInputError) as excinfo:
         contract.parse_input(form)
     assert excinfo.value.issues == (
-        ContractInputIssue((SERVICE_KEY, COMPLIANCE_KEY), "scope_conflict"),
+        ContractInputIssue((SERVICE_KEYS["azure"], COMPLIANCE_KEY), "scope_conflict"),
     )
 
 
@@ -367,13 +373,13 @@ def test_structural_issues_precede_conflict(
     form = {
         **provider_forms["gcp"],
         PROVIDER_KEY: ["gcp"],
-        SERVICE_KEY: ["gcp/iam", "gcp/compute"],
+        SERVICE_KEYS["gcp"]: ["gcp/iam", "gcp/compute"],
         COMPLIANCE_KEY: ["iso27001/gcp"],
     }
     with pytest.raises(ContractInputError) as excinfo:
         contract.parse_input(form)
     assert excinfo.value.issues == (
-        ContractInputIssue((SERVICE_KEY,), "select_multiple"),
+        ContractInputIssue((SERVICE_KEYS["gcp"],), "select_multiple"),
     )
 
 

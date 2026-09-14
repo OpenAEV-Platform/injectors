@@ -26,9 +26,12 @@ from prowler.models.configs.config_loader import ProwlerConfig
 from .conftest import PROVIDER_FORMS
 
 PROVIDER_KEY = "prowler_provider"
-SERVICE_KEY = "prowler_service"
+SERVICE_KEYS = {
+    "aws": "prowler_service_aws",
+    "azure": "prowler_service_azure",
+    "gcp": "prowler_service_gcp",
+}
 COMPLIANCE_KEY = "prowler_compliance"
-_SELECT_KEYS = (PROVIDER_KEY, SERVICE_KEY, COMPLIANCE_KEY)
 _PRE_EXISTING_31 = (
     "aws",
     "azure",
@@ -144,11 +147,11 @@ def test_form_conditions_every_credential_field_on_provider_select() -> None:
     content = json.loads(str(item["contract_content"]))
     fields = content["fields"]
     expected_credential = _expected_credential_fields()
-    assert len(fields) == 18
+    assert len(fields) == 20
     assert [f["key"] for f in fields] == [
         PROVIDER_KEY,
         *(key for _provider, key, _mandatory in expected_credential),
-        SERVICE_KEY,
+        *SERVICE_KEYS.values(),
         COMPLIANCE_KEY,
     ]
     provider_select = fields[0]
@@ -179,13 +182,33 @@ def test_form_conditions_every_credential_field_on_provider_select() -> None:
             assert field_entry["mandatoryConditionFields"] == []
             assert field_entry["mandatoryConditionValues"] == {}
     assert mandatory_count == 13
-    for select in (fields[16], fields[17]):
+    for provider, select in zip(("aws", "azure", "gcp"), fields[16:19], strict=True):
         assert select["type"] == "select"
         assert select["mandatory"] is False
         assert select["cardinality"] == "1"
-        assert select["defaultValue"] == []
-    assert len(fields[16]["choices"]) == 7
-    assert len(fields[17]["choices"]) == 14
+        assert select["defaultValue"] == ["__none__"]
+        assert select["visibleConditionFields"] == [PROVIDER_KEY]
+        assert select["visibleConditionValues"] == {PROVIDER_KEY: provider}
+        assert set(select["choices"]) == {
+            "__none__",
+            *(
+                route
+                for route in (
+                    "aws/iam",
+                    "aws/s3",
+                    "aws/ec2",
+                    "azure/iam",
+                    "azure/storage",
+                    "gcp/iam",
+                    "gcp/compute",
+                )
+                if route.startswith(f"{provider}/")
+            ),
+        }
+    compliance = fields[19]
+    assert compliance["defaultValue"] == ["__none__"]
+    assert compliance["visibleConditionFields"] == []
+    assert len(compliance["choices"]) == 15
     assert {o["type"] for o in content["outputs"]} == {"text", "vulnerability"}
     assert {o["field"] for o in content["outputs"]} == {"findings", "vulnerabilities"}
     assert all(
@@ -216,9 +239,7 @@ def test_empty_scope_selects_run_provider_base_once(
     contract = _contract("universal")
     contract._client_factory = factory
 
-    parsed = contract.parse_input(
-        {**PROVIDER_FORMS[provider], PROVIDER_KEY: [provider]}
-    )
+    parsed = contract.parse_input({**PROVIDER_FORMS[provider], PROVIDER_KEY: provider})
     outcome = contract.execute(ProwlerConfig(), parsed)
 
     assert len(factory.calls) == 1
@@ -270,8 +291,8 @@ def test_service_scope_runs_exactly_that_service_once(ocsf_record_factory: Any) 
     parsed = contract.parse_input(
         {
             **PROVIDER_FORMS["aws"],
-            PROVIDER_KEY: ["aws"],
-            SERVICE_KEY: ["aws/s3"],
+            PROVIDER_KEY: "aws",
+            SERVICE_KEYS["aws"]: "aws/s3",
         }
     )
     outcome = contract.execute(ProwlerConfig(), parsed)
@@ -320,7 +341,7 @@ def test_compliance_scope_runs_exactly_that_framework_once(
     parsed = contract.parse_input(
         {
             **PROVIDER_FORMS["kubernetes"],
-            PROVIDER_KEY: ["kubernetes"],
+            PROVIDER_KEY: "kubernetes",
             COMPLIANCE_KEY: ["cis/kubernetes"],
         }
     )
@@ -358,14 +379,14 @@ def test_both_scope_selects_rejected_before_any_client_call() -> None:
     contract._client_factory = factory
     form = {
         **PROVIDER_FORMS["gcp"],
-        PROVIDER_KEY: ["gcp"],
-        SERVICE_KEY: ["gcp/iam"],
-        COMPLIANCE_KEY: ["iso27001/gcp"],
+        PROVIDER_KEY: "gcp",
+        SERVICE_KEYS["gcp"]: "gcp/iam",
+        COMPLIANCE_KEY: "iso27001/gcp",
     }
     with pytest.raises(ContractInputError) as excinfo:
         contract.parse_input(form)
     assert excinfo.value.issues == (
-        ContractInputIssue((SERVICE_KEY, COMPLIANCE_KEY), "scope_conflict"),
+        ContractInputIssue((SERVICE_KEYS["gcp"], COMPLIANCE_KEY), "scope_conflict"),
     )
     message = str(excinfo.value)
     assert "gcp/iam" not in message
@@ -373,26 +394,15 @@ def test_both_scope_selects_rejected_before_any_client_call() -> None:
     assert factory.calls == []
 
 
-def test_scope_provider_mismatch_rejected_before_any_client_call() -> None:
-    """Verify a scope whose provider disagrees is rejected value-free."""
+def test_global_compliance_provider_mismatch_rejected_before_any_client_call() -> None:
+    """Verify global compliance whose provider disagrees is rejected value-free."""
     factory = _ClientFactory(CommandResult(specification=_specification()))
     contract = _contract("universal")
     contract._client_factory = factory
-    service_mismatch = {
-        **PROVIDER_FORMS["azure"],
-        PROVIDER_KEY: ["azure"],
-        SERVICE_KEY: ["aws/iam"],
-    }
-    with pytest.raises(ContractInputError) as excinfo:
-        contract.parse_input(service_mismatch)
-    assert excinfo.value.issues == (
-        ContractInputIssue((SERVICE_KEY,), "scope_provider_mismatch"),
-    )
-    assert "aws/iam" not in str(excinfo.value)
     compliance_mismatch = {
         **PROVIDER_FORMS["azure"],
-        PROVIDER_KEY: ["azure"],
-        COMPLIANCE_KEY: ["mitre/aws"],
+        PROVIDER_KEY: "azure",
+        COMPLIANCE_KEY: "mitre/aws",
     }
     with pytest.raises(ContractInputError) as excinfo:
         contract.parse_input(compliance_mismatch)
@@ -408,7 +418,7 @@ def test_wrong_provider_fields_cannot_satisfy_selected_provider() -> None:
     factory = _ClientFactory(CommandResult(specification=_specification()))
     universal = _contract("universal")
     universal._client_factory = factory
-    form = {**PROVIDER_FORMS["azure"], PROVIDER_KEY: ["aws"]}
+    form = {**PROVIDER_FORMS["azure"], PROVIDER_KEY: "aws"}
     with pytest.raises(ContractInputError) as universal_error:
         universal.parse_input(form)
     fixed = _contract("aws")
@@ -434,7 +444,7 @@ def test_missing_provider_select_rejected_before_any_client_call() -> None:
     assert factory.calls == []
     provider_first = {
         **PROVIDER_FORMS["aws"],
-        PROVIDER_KEY: ["provider-canary-bad"],
+        PROVIDER_KEY: "provider-canary-bad",
         "provider": "aws",
     }
     with pytest.raises(ContractInputError) as excinfo:
@@ -462,8 +472,8 @@ def test_failed_universal_run_preserves_error_unchanged() -> None:
     parsed = universal.parse_input(
         {
             **PROVIDER_FORMS["gcp"],
-            PROVIDER_KEY: ["gcp"],
-            SERVICE_KEY: ["gcp/compute"],
+            PROVIDER_KEY: "gcp",
+            SERVICE_KEYS["gcp"]: "gcp/compute",
         }
     )
     outcome = universal.execute(ProwlerConfig(), parsed)

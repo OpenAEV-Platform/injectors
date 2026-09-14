@@ -1,4 +1,6 @@
 Feature: CHK.017 selectable service and compliance contracts
+  Cardinality-one selects arrive from the OpenAEV form as scalar strings,
+  while singleton lists remain accepted for compatibility.
   CHK.017 adds six additive single-selection routes over the unchanged
   CHK.004 seam: one service select and one compliance select per supported
   cloud provider. The dropdown choices are derived from the CHK.004 selector

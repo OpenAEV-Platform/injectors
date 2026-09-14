@@ -44,33 +44,34 @@ def test_valid_single_selection_parses_to_strict_provider_model(
     """Assert a valid selection parses to the exact strict provider model."""
     contract = _contract(route)
     value = _first_choice(route)
-    parsed = contract.parse_input({**provider_forms[provider], key: [value]})
     fixed = _contract(provider)
     expected = fixed.parse_input(dict(provider_forms[provider]))
-    assert type(parsed) is type(expected)
-    assert parsed == expected
+    for submitted in (value, [value]):
+        parsed = contract.parse_input({**provider_forms[provider], key: submitted})
+        assert type(parsed) is type(expected)
+        assert parsed == expected
 
 
 @pytest.mark.parametrize(("route", "provider", "key"), _ROUTES, ids=_IDS)
-def test_missing_or_nonlist_select_reports_select_missing(
+def test_empty_required_select_reports_select_missing(
     route: str,
     provider: str,
     key: str,
     provider_forms: dict[str, dict[str, str]],
 ) -> None:
-    """Assert missing or non-list selects report select_missing."""
+    """Assert every empty wire shape for a required select reports missing."""
     contract = _contract(route)
     cases = (
         dict(provider_forms[provider]),
-        {**provider_forms[provider], key: "select-canary-raw"},
         {**provider_forms[provider], key: []},
         {**provider_forms[provider], key: None},
+        {**provider_forms[provider], key: ""},
     )
     for form in cases:
         with pytest.raises(ContractInputError) as excinfo:
             contract.parse_input(form)
         assert excinfo.value.issues == (ContractInputIssue((key,), "select_missing"),)
-        assert "select-canary-raw" not in str(excinfo.value)
+        assert excinfo.value.issues == (ContractInputIssue((key,), "select_missing"),)
 
 
 @pytest.mark.parametrize(("route", "provider", "key"), _ROUTES, ids=_IDS)
@@ -105,6 +106,11 @@ def test_unknown_single_value_reports_select_unknown_value(
     contract = _contract(route)
     valid = _first_choice(route)
     cases = (
+        "select-canary-unknown",
+        valid.upper(),
+        f" {valid}",
+        f"{valid} ",
+        valid + "-x",
         ["select-canary-unknown"],
         [valid.upper()],
         [f" {valid}"],
@@ -121,7 +127,8 @@ def test_unknown_single_value_reports_select_unknown_value(
             ContractInputIssue((key,), "select_unknown_value"),
         )
         message = str(excinfo.value)
-        for element in submitted:
+        elements = submitted if isinstance(submitted, list) else [submitted]
+        for element in elements:
             if isinstance(element, str) and element.strip():
                 assert element.strip() not in message
 

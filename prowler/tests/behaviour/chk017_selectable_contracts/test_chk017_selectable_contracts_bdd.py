@@ -188,7 +188,7 @@ def test_selectable_service_executes_chosen_service_once(
     contract = _contract(route)
     contract._client_factory = factory
 
-    parsed = contract.parse_input({**_FORMS[provider], "prowler_service": [service]})
+    parsed = contract.parse_input({**_FORMS[provider], "prowler_service": service})
     outcome = contract.execute(ProwlerConfig(), parsed)
 
     assert len(factory.calls) == 1
@@ -236,9 +236,7 @@ def test_selectable_compliance_executes_chosen_framework_once(
     contract = _contract(route)
     contract._client_factory = factory
 
-    parsed = contract.parse_input(
-        {**_FORMS[provider], "prowler_compliance": [framework]}
-    )
+    parsed = contract.parse_input({**_FORMS[provider], "prowler_compliance": framework})
     outcome = contract.execute(ProwlerConfig(), parsed)
 
     assert len(factory.calls) == 1
@@ -302,15 +300,19 @@ def test_select_field_is_closed_single_selection(
 @pytest.mark.parametrize(
     ("route", "provider", "_value"), _SELECT_ROUTES, ids=_ROUTE_IDS
 )
-@pytest.mark.parametrize("mutation", ("omit", "not_a_list", "empty_list", "null_value"))
+@pytest.mark.parametrize(
+    "mutation", ("omit", "unknown_scalar", "empty_string", "empty_list", "null_value")
+)
 def test_missing_select_value_rejected_before_client(
     route: str, provider: str, _value: str, mutation: str
 ) -> None:
-    """Assert a missing or non-list select is rejected value-free."""
+    """Assert empty required values and unknown scalars are rejected value-free."""
     key = _SELECT_KEY[route]
     form: dict[str, object] = dict(_FORMS[provider])
-    if mutation == "not_a_list":
+    if mutation == "unknown_scalar":
         form[key] = "select-canary-raw"
+    elif mutation == "empty_string":
+        form[key] = ""
     elif mutation == "empty_list":
         form[key] = []
     elif mutation == "null_value":
@@ -322,7 +324,10 @@ def test_missing_select_value_rejected_before_client(
     with pytest.raises(ContractInputError) as excinfo:
         contract.parse_input(form)
 
-    assert excinfo.value.issues == (ContractInputIssue((key,), "select_missing"),)
+    expected = (
+        "select_unknown_value" if mutation == "unknown_scalar" else "select_missing"
+    )
+    assert excinfo.value.issues == (ContractInputIssue((key,), expected),)
     assert factory.calls == []
     assert "select-canary-raw" not in str(excinfo.value)
 

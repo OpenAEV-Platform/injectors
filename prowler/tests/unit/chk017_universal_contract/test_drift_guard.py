@@ -150,13 +150,21 @@ def test_serialized_choices_key_derived_routes_in_order() -> None:
     )
     content: dict[str, Any] = json.loads(str(item["contract_content"]))
     fields = {field["key"]: field for field in content["fields"]}
-    service_choices = fields["prowler_service"]["choices"]
     compliance_choices = fields["prowler_compliance"]["choices"]
-    assert list(service_choices) == [option.route for option in SERVICE_SCOPE_OPTIONS]
     assert list(compliance_choices) == [
-        option.route for option in COMPLIANCE_SCOPE_OPTIONS
+        "__none__",
+        *(option.route for option in COMPLIANCE_SCOPE_OPTIONS),
     ]
     for option in SERVICE_SCOPE_OPTIONS:
+        service_choices = fields[f"prowler_service_{option.provider}"]["choices"]
+        assert list(service_choices) == [
+            "__none__",
+            *(
+                item.route
+                for item in SERVICE_SCOPE_OPTIONS
+                if item.provider == option.provider
+            ),
+        ]
         literal = option.literal
         provider_label = PROVIDER_LABELS[option.provider]
         assert service_choices[option.route] == (
@@ -186,7 +194,7 @@ def test_single_derivation_site_feeds_form_and_parse(
             {
                 **provider_forms[option.provider],
                 "prowler_provider": [option.provider],
-                "prowler_service": [option.route],
+                f"prowler_service_{option.provider}": [option.route],
             }
         )
     for option in COMPLIANCE_SCOPE_OPTIONS:

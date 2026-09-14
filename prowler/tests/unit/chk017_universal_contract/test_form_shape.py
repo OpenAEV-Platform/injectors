@@ -12,7 +12,11 @@ from prowler.contracts import (
 )
 
 PROVIDER_KEY = "prowler_provider"
-SERVICE_KEY = "prowler_service"
+SERVICE_KEYS = {
+    "aws": "prowler_service_aws",
+    "azure": "prowler_service_azure",
+    "gcp": "prowler_service_gcp",
+}
 COMPLIANCE_KEY = "prowler_compliance"
 PROVIDERS = ("aws", "azure", "gcp", "kubernetes")
 
@@ -23,15 +27,25 @@ _EXPECTED_PROVIDER_CHOICES = {
     "kubernetes": "Kubernetes",
 }
 _EXPECTED_SERVICE_CHOICES = {
-    "aws/iam": "IAM (AWS)",
-    "aws/s3": "S3 (AWS)",
-    "aws/ec2": "EC2 (AWS)",
-    "azure/iam": "IAM (Azure)",
-    "azure/storage": "Storage (Azure)",
-    "gcp/iam": "IAM (GCP)",
-    "gcp/compute": "Compute (GCP)",
+    "aws": {
+        "__none__": "None (base scan)",
+        "aws/iam": "IAM (AWS)",
+        "aws/s3": "S3 (AWS)",
+        "aws/ec2": "EC2 (AWS)",
+    },
+    "azure": {
+        "__none__": "None (base scan)",
+        "azure/iam": "IAM (Azure)",
+        "azure/storage": "Storage (Azure)",
+    },
+    "gcp": {
+        "__none__": "None (base scan)",
+        "gcp/iam": "IAM (GCP)",
+        "gcp/compute": "Compute (GCP)",
+    },
 }
 _EXPECTED_COMPLIANCE_CHOICES = {
+    "__none__": "None (base scan)",
     "cis/aws": "CIS 3.0 (AWS)",
     "cis/azure": "CIS 3.0 (Azure)",
     "cis/gcp": "CIS 3.0 (GCP)",
@@ -87,16 +101,16 @@ def test_route_table_metadata() -> None:
     assert contract.check_filters == ()
 
 
-def test_serialized_form_has_18_fields_in_exact_order() -> None:
-    """Assert exactly the 18 fields of the contract, in that exact order."""
+def test_serialized_form_has_20_fields_in_exact_order() -> None:
+    """Assert exactly the 20 fields of the contract, in that exact order."""
     content = _serialized()
     fields = content["fields"]
     expected_credential = _expected_credential_fields()
-    assert len(fields) == 18
+    assert len(fields) == 20
     assert [f["key"] for f in fields] == [
         PROVIDER_KEY,
         *(key for _provider, key, _label, _type, _mandatory in expected_credential),
-        SERVICE_KEY,
+        *SERVICE_KEYS.values(),
         COMPLIANCE_KEY,
     ]
     assert [f["label"] for f in fields[1:16]] == [
@@ -152,26 +166,29 @@ def test_credential_fields_carry_exact_condition_attributes() -> None:
     assert mandatory_count == 13
 
 
-def test_scope_selects_are_optional_single_with_empty_defaults() -> None:
-    """Assert both scope selects: optional, single, empty default, closed choices."""
+def test_scope_selects_are_conditioned_single_with_explicit_none_defaults() -> None:
+    """Assert provider services and global compliance use an explicit none choice."""
     fields = _serialized()["fields"]
-    service = fields[16]
-    compliance = fields[17]
-    assert service["key"] == SERVICE_KEY
+    services = fields[16:19]
+    compliance = fields[19]
+    assert [service["key"] for service in services] == list(SERVICE_KEYS.values())
     assert compliance["key"] == COMPLIANCE_KEY
-    for select in (service, compliance):
+    for select in (*services, compliance):
         assert select["type"] == "select"
         assert select["mandatory"] is False
         assert select["cardinality"] == "1"
-        assert select["defaultValue"] == []
-        assert select["visibleConditionFields"] == []
-        assert select["visibleConditionValues"] == {}
+        assert select["defaultValue"] == ["__none__"]
         assert select["mandatoryConditionFields"] == []
         assert select["mandatoryConditionValues"] == {}
-    assert service["choices"] == _EXPECTED_SERVICE_CHOICES
+    for provider, service in zip(("aws", "azure", "gcp"), services, strict=True):
+        assert service["visibleConditionFields"] == [PROVIDER_KEY]
+        assert service["visibleConditionValues"] == {PROVIDER_KEY: provider}
+        assert service["choices"] == _EXPECTED_SERVICE_CHOICES[provider]
+    assert compliance["visibleConditionFields"] == []
+    assert compliance["visibleConditionValues"] == {}
     assert compliance["choices"] == _EXPECTED_COMPLIANCE_CHOICES
-    assert len(service["choices"]) == 7
-    assert len(compliance["choices"]) == 14
+    assert [len(service["choices"]) for service in services] == [4, 3, 3]
+    assert len(compliance["choices"]) == 15
 
 
 def test_outputs_and_manual_unchanged() -> None:

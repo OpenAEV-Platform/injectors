@@ -4,10 +4,12 @@ Feature: CHK.017 universal selectable contract
 
   Scenario: The form conditions every credential field on the provider select
     Given the universal contract is serialized
-    Then it declares 18 fields in order: provider select, fifteen credential fields, service select, compliance select
+    Then it declares 20 fields in order: provider select, fifteen credential fields, three provider service selects, compliance select
     And the provider select is mandatory single-valued with default ["aws"] and the four provider choices
     And every credential field is visible and (for the thirteen required ones) mandatory only when prowler_provider equals its own provider
-    And both scope selects are optional single-valued with empty defaults and 7 and 14 choices
+    And each provider service select is visible only for its scalar provider and contains only that provider's routes plus "None (base scan)"
+    And no Kubernetes service select exists
+    And all four optional scope selects default to ["__none__"] and compliance remains global with fourteen routes plus none
     And outputs and manual flag are unchanged
 
   Scenario Outline: Empty scope selects run the provider base once
@@ -45,12 +47,11 @@ Feature: CHK.017 universal selectable contract
     Then a single contract input error reports the closed both-set conflict type at the two scope locations
     And no client seam is invoked and no submitted value appears in the error
 
-  Scenario: A scope whose provider disagrees with the selected provider is rejected
+  Scenario: Global compliance whose provider disagrees with the selected provider is rejected
     Given the universal contract with provider "azure" and valid Azure fields
-    And service scope "aws/iam"
+    And compliance scope "mitre/aws"
     When the contract parses the form input
-    Then a contract input error reports the closed provider-scope mismatch type at the service location
-    And the same holds for a compliance scope whose provider disagrees
+    Then a contract input error reports the closed provider-scope mismatch type at the compliance location
     And no client seam is invoked and no submitted value appears in the error
 
   Scenario: Wrong-provider credential fields cannot satisfy the selected provider

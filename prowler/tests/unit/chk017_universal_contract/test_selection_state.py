@@ -101,7 +101,7 @@ def test_selection_reset_at_parse_start(
         {
             **provider_forms["aws"],
             "prowler_provider": ["aws"],
-            "prowler_service": ["aws/s3"],
+            "prowler_service_aws": ["aws/s3"],
         }
     )
     assert contract.safe_request_info(second)["filters"] == "service=aws/s3"
@@ -119,7 +119,7 @@ def test_failed_parse_never_exposes_prior_selection(
         {
             **provider_forms["aws"],
             "prowler_provider": ["aws"],
-            "prowler_service": ["aws/s3"],
+            "prowler_service_aws": ["aws/s3"],
         }
     )
     assert contract.safe_request_info(parsed)["filters"] == "service=aws/s3"
@@ -128,7 +128,7 @@ def test_failed_parse_never_exposes_prior_selection(
             {
                 **provider_forms["aws"],
                 "prowler_provider": ["aws"],
-                "prowler_service": ["scope-canary-bad"],
+                "prowler_service_aws": ["scope-canary-bad"],
             }
         )
     assert contract.safe_request_info(parsed)["filters"] == "unselected"
@@ -154,7 +154,7 @@ def test_provider_key_rejection_clears_selection_before_early_return(
         {
             **provider_forms["aws"],
             "prowler_provider": ["aws"],
-            "prowler_service": ["aws/s3"],
+            "prowler_service_aws": ["aws/s3"],
         }
     )
     assert contract.safe_request_info(parsed)["filters"] == "service=aws/s3"
@@ -187,7 +187,7 @@ def test_each_worker_thread_executes_its_own_selection(
 
     first = threading.Thread(
         target=_injection,
-        args=("aws", {"prowler_service": ["aws/s3"]}),
+        args=("aws", {"prowler_service_aws": ["aws/s3"]}),
         name="worker-aws-s3",
     )
     second = threading.Thread(
@@ -228,7 +228,7 @@ def test_failed_parse_in_one_thread_keeps_another_thread_run_intact(
             {
                 **forms,
                 "prowler_provider": ["aws"],
-                "prowler_service": ["aws/s3"],
+                "prowler_service_aws": ["aws/s3"],
             }
         )
         barrier.wait(timeout=5)
@@ -243,7 +243,7 @@ def test_failed_parse_in_one_thread_keeps_another_thread_run_intact(
                 {
                     **forms,
                     "prowler_provider": ["aws"],
-                    "prowler_service": ["scope-canary-bad"],
+                    "prowler_service_aws": ["scope-canary-bad"],
                 }
             )
         except ContractInputError:
