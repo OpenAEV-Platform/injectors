@@ -46,15 +46,11 @@ _PRE_EXISTING_31 = (
     "gcp/select-compliance",
 )
 _ALL_ROUTES = _PRE_EXISTING_31 + ("universal",)
-_LOCAL_SNAPSHOT = Path(
-    "/tmp/opencode/chk017-universal-pre-change-contracts.json"  # noqa: S108
-)
-_REPO_SNAPSHOT = (
+_SNAPSHOT = (
     Path(__file__).resolve().parent.parent.parent
     / "fixtures"
     / "chk017-universal-pre-change-contracts.json"
 )
-_SNAPSHOT = _LOCAL_SNAPSHOT if _LOCAL_SNAPSHOT.exists() else _REPO_SNAPSHOT
 
 
 def test_catalog_appends_universal_descriptor_last() -> None:

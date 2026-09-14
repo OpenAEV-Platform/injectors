@@ -92,16 +92,10 @@ _EXPECTED_CLASS = {
     "gcp/select-service": GcpSelectServiceContract,
     "gcp/select-compliance": GcpSelectComplianceContract,
 }
-_LOCAL_SNAPSHOT_PATH = Path(
-    "/tmp/opencode/chk017-pre-change-contracts.json"  # noqa: S108
-)
-_REPO_SNAPSHOT_PATH = (
+_SNAPSHOT_PATH = (
     Path(__file__).resolve().parent.parent.parent
     / "fixtures"
     / "chk017-pre-change-contracts.json"
-)
-_SNAPSHOT_PATH = (
-    _LOCAL_SNAPSHOT_PATH if _LOCAL_SNAPSHOT_PATH.exists() else _REPO_SNAPSHOT_PATH
 )
 _ROUTE_IDS = [route for route, _, _ in _SELECT_ROUTES]
 
