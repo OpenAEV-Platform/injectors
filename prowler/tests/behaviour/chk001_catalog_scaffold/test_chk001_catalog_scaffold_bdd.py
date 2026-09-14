@@ -110,6 +110,7 @@ def _then_base_contracts_are_registered(config: ConfigLoader, helper: Mock) -> N
         str(stable_contract_id("azure/select-compliance")),
         str(stable_contract_id("gcp/select-service")),
         str(stable_contract_id("gcp/select-compliance")),
+        str(stable_contract_id("universal")),
     ]
     callback = helper.listen.call_args.kwargs["message_callback"]
     assert callable(callback)
@@ -176,7 +177,7 @@ def test_foundation_configuration_excludes_future_provider_settings() -> None:
 def test_startup_registers_the_base_assessment_contracts(
     standard_injector_environment: None,
 ) -> None:
-    """Startup registers all 31 canonical executable contracts."""
+    """Startup registers all 32 canonical executable contracts."""
     _given_the_prowler_project()
     config, helper = _when_injector_starts()
     _then_base_contracts_are_registered(config, helper)

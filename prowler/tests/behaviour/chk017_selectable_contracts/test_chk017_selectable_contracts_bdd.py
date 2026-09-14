@@ -440,11 +440,11 @@ def test_choices_derived_from_selector_literals(
         contract.parse_input({**_FORMS[provider], key: [value]})
 
 
-def test_registry_admits_full_31_catalog_with_stable_identities() -> None:
-    """Assert 31 routes are executable in canonical order with stable IDs."""
+def test_registry_admits_full_32_catalog_with_stable_identities() -> None:
+    """Assert 32 routes are executable in canonical order with stable IDs."""
     serialized = DEFAULT_PROWLER_CONTRACTS.contracts()
     routes = tuple(r.route_name for r in ROUTE_CATALOG)
-    assert len(serialized) == 31
+    assert len(serialized) == 32
     assert routes == _PRE_EXISTING_25 + (
         "aws/select-service",
         "aws/select-compliance",
@@ -452,6 +452,7 @@ def test_registry_admits_full_31_catalog_with_stable_identities() -> None:
         "azure/select-compliance",
         "gcp/select-service",
         "gcp/select-compliance",
+        "universal",
     )
     assert [item["contract_id"] for item in serialized] == [
         str(stable_contract_id(route)) for route in routes
@@ -465,7 +466,7 @@ def test_registry_admits_full_31_catalog_with_stable_identities() -> None:
         assert contract.external_id == f"prowler:{route}"
         if route in _EXPECTED_CLASS:
             assert type(contract) is _EXPECTED_CLASS[route]
-    assert len(set(routes)) == 31
+    assert len(set(routes)) == 32
     service_literals = (
         set(get_args(AwsServiceSelector))
         | set(get_args(AzureServiceSelector))

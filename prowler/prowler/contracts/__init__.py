@@ -63,6 +63,7 @@ from .selectable import (
     GcpSelectComplianceContract,
     GcpSelectServiceContract,
 )
+from .universal import UniversalProwlerContract
 
 __all__ = [
     "BaseProwlerContract",
@@ -117,5 +118,6 @@ __all__ = [
     "RouteFamily",
     "RouteHandler",
     "RouteNotFoundError",
+    "UniversalProwlerContract",
     "stable_contract_id",
 ]

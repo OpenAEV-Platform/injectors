@@ -160,6 +160,7 @@ def test_registry_retains_cis_contracts_without_selector_fields() -> None:
         "azure/select-compliance",
         "gcp/select-service",
         "gcp/select-compliance",
+        "universal",
     )
 
     assert [item["contract_id"] for item in serialized] == [

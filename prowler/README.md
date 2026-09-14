@@ -35,12 +35,13 @@ the generic engine does not hardcode a Prowler binary location.
 python -m prowler
 ```
 
-The injector registers 31 concrete assessment routes in the validated
+The injector registers 32 concrete assessment routes in the validated
 registry: 4 base provider routes (CHK.007–CHK.010), 7 service routes
-(CHK.011–CHK.013), 14 compliance routes (CHK.014–CHK.016), and 6
+(CHK.011–CHK.013), 14 compliance routes (CHK.014–CHK.016), 6
 selectable routes (CHK.017): `aws/select-service`, `aws/select-compliance`,
 `azure/select-service`, `azure/select-compliance`, `gcp/select-service`,
-and `gcp/select-compliance`.
+and `gcp/select-compliance`, and 1 universal route (CHK.017):
+`universal`.
 
 Every registered contract preserves each mapped CHK.005 finding as deterministic
 JSON text. FAILED findings are additionally projected as OpenAEV vulnerability
@@ -218,6 +219,60 @@ reserved under both route grammars: service routes read as
 aws, azure, gcp, and kubernetes. A rename of either token would only be
 forced by a future Prowler service or compliance framework literally
 named `select-service` or `select-compliance`.
+
+## Universal selectable contract
+
+CHK.017 also adds the single `universal` route with the provider
+meta-token `all` and the family token `universal`; the 31 pre-existing
+routes are unchanged. Its form opens with one mandatory single-select
+provider control offering `aws`, `azure`, `gcp`, and `kubernetes`
+(default `aws`), followed by the union of all fifteen provider
+credential fields in the fixed provider order. Every credential field
+is visible only when `prowler_provider` equals its own provider, and
+the thirteen required fields are mandatory only under the same
+condition (the two optional AWS fields carry visibility conditions
+only). Two optional single-select scope controls close the form:
+`prowler_service` offers the seven service routes and
+`prowler_compliance` the fourteen compliance routes as canonical route
+values (`aws/s3`, `cis/kubernetes`, …) with human-readable labels.
+Kubernetes is offered here for the first time: its base fields and the
+`cis/kubernetes` and `iso27001/kubernetes` compliance scopes, but no
+service scope. The six selectable contracts keep their closed
+non-Kubernetes choice sets unchanged.
+
+Scope semantics are closed: both scope selects empty means the
+selected provider's base scan; exactly one set means exactly that
+service or compliance route; both set is rejected with `scope_conflict`
+at the two scope locations; a scope whose provider part disagrees with
+the selected provider is rejected with `scope_provider_mismatch` at
+that scope key — all before any client call. The three select keys and
+every field of the three non-selected providers are stripped
+unconditionally and never validated or reported, so a wrong-provider
+form fails exactly like the matching fixed provider contract. Select
+validation reuses the closed vocabulary: `select_missing`,
+`select_multiple`, and `select_unknown_value` at the select location,
+plus the two scope-specific types above; no error ever names a
+submitted value.
+
+The parsed provider and both scope selections are bound to the worker
+thread that parsed them: all three are reset at the start of every
+parse before any early return, and set only after full validation
+succeeds, so a failed parse never exposes a prior selection on a
+reused thread and another thread's state is untouched. `execute`
+requires the held provider and a matching provider model, runs one
+CHK.004 seam call (base, service, or compliance) with the parsed
+provider input and empty `check_filters`, and retains findings and
+preview rows for the held provider name only. `safe_request_info`
+reports `filters` as `base`, `service=<route>`, `compliance=<route>`,
+or `unselected`, plus `selected_provider` as the held provider name or
+`unselected`; traces report the parsed provider name, never the `all`
+meta-token, and never forward free-form error text.
+
+The route name `universal` is reserved: it is slash-free, so it can
+never be read as a `<provider>/<service-literal>` or
+`<framework>/<provider>` route, and it is not a closed provider
+literal, so it is not a base route. The `all` meta-token is not a
+provider literal and appears in no route name.
 
 ## Prowler 5.36 CLI compatibility
 

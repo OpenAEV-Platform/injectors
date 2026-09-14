@@ -122,6 +122,7 @@ def test_default_registration_identity_fields_and_outputs() -> None:
         str(stable_contract_id("azure/select-compliance")),
         str(stable_contract_id("gcp/select-service")),
         str(stable_contract_id("gcp/select-compliance")),
+        str(stable_contract_id("universal")),
     ]
     assert UUID(serialized[0]["contract_id"]) == expected_id
     assert expected_id.version == 5

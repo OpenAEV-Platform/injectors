@@ -62,9 +62,9 @@ Feature: CHK.017 selectable service and compliance contracts
     Then their choices equal the CHK.004 selector literal values in both directions
     And no kubernetes selectable route exists
 
-  Scenario: The registry admits the full 31-contract catalog with stable identities
+  Scenario: The registry admits the full 32-contract catalog with stable identities
     Given the default registry is serialized
-    Then 31 routes are executable in canonical order
+    Then 32 routes are executable in canonical order
     And each carries its stable UUID and external ID
     And the new route names cannot collide with existing or grammatically valid future routes
     And the twenty-five pre-existing serialized contracts are unchanged

@@ -46,4 +46,5 @@ ROUTE_CATALOG: tuple[RouteDescriptor, ...] = (
     RouteDescriptor("azure/select-compliance", "azure", "compliance"),
     RouteDescriptor("gcp/select-service", "gcp", "service"),
     RouteDescriptor("gcp/select-compliance", "gcp", "compliance"),
+    RouteDescriptor("universal", "all", "universal"),
 )

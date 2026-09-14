@@ -142,7 +142,7 @@ def test_compliance_selector_type_contains_exact_supported_values() -> None:
     )
 
 
-def test_registry_has_31_canonical_contracts_with_exact_provider_fields() -> None:
+def test_registry_has_32_canonical_contracts_with_exact_provider_fields() -> None:
     """The executable public surface is stable, ordered, and exact on fields."""
     serialized = DEFAULT_PROWLER_CONTRACTS.contracts()
     routes = (
@@ -166,6 +166,7 @@ def test_registry_has_31_canonical_contracts_with_exact_provider_fields() -> Non
         "azure/select-compliance",
         "gcp/select-service",
         "gcp/select-compliance",
+        "universal",
     )
 
     assert [item["contract_id"] for item in serialized] == [

@@ -93,7 +93,7 @@ def test_default_registration_identity_fields_and_outputs() -> None:
     serialized = DEFAULT_PROWLER_CONTRACTS.contracts()
     expected_id = stable_contract_id("gcp")
 
-    assert len(serialized) == 31
+    assert len(serialized) == 32
     assert [item["contract_id"] for item in serialized] == [
         str(stable_contract_id("aws")),
         str(stable_contract_id("azure")),
@@ -126,6 +126,7 @@ def test_default_registration_identity_fields_and_outputs() -> None:
         str(stable_contract_id("azure/select-compliance")),
         str(stable_contract_id("gcp/select-service")),
         str(stable_contract_id("gcp/select-compliance")),
+        str(stable_contract_id("universal")),
     ]
     assert UUID(serialized[2]["contract_id"]) == expected_id
     assert expected_id.version == 5

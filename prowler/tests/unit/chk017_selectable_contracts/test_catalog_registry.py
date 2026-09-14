@@ -52,8 +52,8 @@ _SNAPSHOT = Path("/tmp/opencode/chk017-pre-change-contracts.json")  # noqa: S108
 def test_catalog_appends_exactly_six_descriptors_in_order() -> None:
     """Assert the catalog appends exactly six descriptors in order."""
     routes = tuple(r.route_name for r in ROUTE_CATALOG)
-    assert routes == _PRE_EXISTING_25 + _NEW_6
-    added = ROUTE_CATALOG[25:]
+    assert routes == _PRE_EXISTING_25 + _NEW_6 + ("universal",)
+    added = ROUTE_CATALOG[25:31]
     assert [(d.route_name, d.provider, d.family) for d in added] == [
         ("aws/select-service", "aws", "service"),
         ("aws/select-compliance", "aws", "compliance"),
@@ -64,14 +64,15 @@ def test_catalog_appends_exactly_six_descriptors_in_order() -> None:
     ]
 
 
-def test_registry_serializes_31_unique_stable_contracts() -> None:
-    """Assert the registry serializes 31 unique stable contracts."""
+def test_registry_serializes_32_unique_stable_contracts() -> None:
+    """Assert the registry serializes 32 unique stable contracts."""
     serialized = DEFAULT_PROWLER_CONTRACTS.contracts()
-    assert len(serialized) == 31
+    assert len(serialized) == 32
     ids = [item["contract_id"] for item in serialized]
-    assert len(set(ids)) == 31
+    assert len(set(ids)) == 32
     assert ids == [
-        str(stable_contract_id(route)) for route in _PRE_EXISTING_25 + _NEW_6
+        str(stable_contract_id(route))
+        for route in _PRE_EXISTING_25 + _NEW_6 + ("universal",)
     ]
 
 
@@ -80,7 +81,7 @@ def test_external_ids_follow_route_grammar() -> None:
     for item in DEFAULT_PROWLER_CONTRACTS.contracts():
         route = next(
             r
-            for r in _PRE_EXISTING_25 + _NEW_6
+            for r in _PRE_EXISTING_25 + _NEW_6 + ("universal",)
             if str(stable_contract_id(r)) == item["contract_id"]
         )
         contract = DEFAULT_PROWLER_CONTRACTS.resolve(str(item["contract_id"]))
