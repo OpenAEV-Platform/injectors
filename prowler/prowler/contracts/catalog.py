@@ -40,4 +40,10 @@ ROUTE_CATALOG: tuple[RouteDescriptor, ...] = (
     RouteDescriptor("mitre/aws", "aws", "compliance"),
     RouteDescriptor("mitre/azure", "azure", "compliance"),
     RouteDescriptor("mitre/gcp", "gcp", "compliance"),
+    RouteDescriptor("aws/select-service", "aws", "service"),
+    RouteDescriptor("aws/select-compliance", "aws", "compliance"),
+    RouteDescriptor("azure/select-service", "azure", "service"),
+    RouteDescriptor("azure/select-compliance", "azure", "compliance"),
+    RouteDescriptor("gcp/select-service", "gcp", "service"),
+    RouteDescriptor("gcp/select-compliance", "gcp", "compliance"),
 )

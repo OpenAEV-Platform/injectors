@@ -133,13 +133,20 @@ def _contract(route: str) -> Any:
     return DEFAULT_PROWLER_CONTRACTS.resolve(str(stable_contract_id(route)))
 
 
-def test_final_registry_serializes_and_resolves_exactly_25_canonical_routes() -> None:
+def test_final_registry_serializes_and_resolves_exactly_31_canonical_routes() -> None:
     """Every canonical descriptor has one executable stable registry entry."""
-    expected_routes = tuple(item[0] for item in _FINAL_ROUTE_EXPECTATIONS)
+    expected_routes = tuple(item[0] for item in _FINAL_ROUTE_EXPECTATIONS) + (
+        "aws/select-service",
+        "aws/select-compliance",
+        "azure/select-service",
+        "azure/select-compliance",
+        "gcp/select-service",
+        "gcp/select-compliance",
+    )
     serialized = DEFAULT_PROWLER_CONTRACTS.contracts()
 
     assert tuple(route.route_name for route in ROUTE_CATALOG) == expected_routes
-    assert len(serialized) == 25
+    assert len(serialized) == 31
     assert tuple(item["contract_id"] for item in serialized) == tuple(
         str(stable_contract_id(route)) for route in expected_routes
     )

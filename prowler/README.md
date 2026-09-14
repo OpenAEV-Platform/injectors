@@ -35,9 +35,12 @@ the generic engine does not hardcode a Prowler binary location.
 python -m prowler
 ```
 
-The injector registers 25 concrete assessment routes in the validated
+The injector registers 31 concrete assessment routes in the validated
 registry: 4 base provider routes (CHK.007–CHK.010), 7 service routes
-(CHK.011–CHK.013), and 14 compliance routes (CHK.014–CHK.016).
+(CHK.011–CHK.013), 14 compliance routes (CHK.014–CHK.016), and 6
+selectable routes (CHK.017): `aws/select-service`, `aws/select-compliance`,
+`azure/select-service`, `azure/select-compliance`, `gcp/select-service`,
+and `gcp/select-compliance`.
 
 Every registered contract preserves each mapped CHK.005 finding as deterministic
 JSON text. FAILED findings are additionally projected as OpenAEV vulnerability
@@ -165,6 +168,56 @@ safe field/type structure and gives operators a fixed correction sentence withou
 echoing the rejected value. Empty OpenAEV controls for `aws_session_token` and
 `aws_endpoint_url` are treated as omitted only at the AWS contract boundary;
 direct provider-model validation remains strict.
+
+## Selectable service and compliance contracts
+
+CHK.017 adds the six selectable routes above on the unchanged CHK.004
+seam; the 25 pre-existing routes are unchanged. Each selectable contract
+adds exactly one mandatory single-select control after its provider
+fields. The service dropdown offers the closed literal set of its
+provider — AWS `iam`, `s3`, `ec2`; Azure `iam`, `storage`; GCP `iam`,
+`compute` — and the compliance dropdown offers the four non-Kubernetes
+Prowler frameworks suffixed with the provider name, for example
+`cis_3.0_aws`, `nis2_gcp`, and `mitre_attack_azure`. The first offered
+value is the default selection.
+
+Validation is closed-set and value-free. A missing, non-list, or empty
+select reports `select_missing`; more than one element reports
+`select_multiple`; an element that is not an exact offered value reports
+`select_unknown_value`. Rejections name only the field location and issue
+type, never a submitted value, and stop before any client call. The
+select key is stripped before the remaining form is validated against the
+same strict provider model as the fixed routes, and a `provider` key is
+still rejected first.
+
+The chosen value is bound to the worker thread that parsed it and
+cleared at the start of every parse, before any early return. The
+pinned pyoaev 2.260521.0 `ListenQueue._process_message` (pyoaev
+helpers) acks each RabbitMQ message on receipt and starts a fresh
+worker thread per message — `basic_qos(prefetch_count=1)` does not
+serialize because the ack precedes processing — so injections of the
+same contract process concurrently against the one shared registry
+instance per contract, and each injection's parse and execute provably
+run on its own worker thread; on a reused thread (direct or test use)
+the reset preserves the same safety. `safe_request_info` reports
+`service=<value>` or `compliance=<value>` while a selection is held
+and `service=unselected`/`compliance=unselected` otherwise.
+
+Execution performs one mapped CHK.004 seam call carrying the held value as
+the `service_selector` or `compliance_selector`, exactly like the fixed
+service and compliance contracts. Executing with a mismatched provider
+model or without a held selection raises before any call. Output
+projection, Rich execution traces, the credential-file lifecycle,
+artifact handling, and failure classification are inherited unchanged
+from CHK.004–CHK.016.
+
+The route meta-tokens `select-service` and `select-compliance` are
+reserved under both route grammars: service routes read as
+`<provider>/<service-literal>`, and compliance routes read as
+`<framework>/<provider>` with the provider drawn from the closed set
+aws, azure, gcp, and kubernetes. A rename of either token would only be
+forced by a future Prowler service or compliance framework literally
+named `select-service` or `select-compliance`.
 
 ## Prowler 5.36 CLI compatibility
 

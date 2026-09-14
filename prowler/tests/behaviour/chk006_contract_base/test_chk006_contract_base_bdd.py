@@ -337,11 +337,17 @@ EXPECTED_ROUTES = (
     ("mitre/aws", "aws", "compliance"),
     ("mitre/azure", "azure", "compliance"),
     ("mitre/gcp", "gcp", "compliance"),
+    ("aws/select-service", "aws", "service"),
+    ("aws/select-compliance", "aws", "compliance"),
+    ("azure/select-service", "azure", "service"),
+    ("azure/select-compliance", "azure", "compliance"),
+    ("gcp/select-service", "gcp", "service"),
+    ("gcp/select-compliance", "gcp", "compliance"),
 )
 
 
 def test_route_catalog_is_the_immutable_canonical_catalog() -> None:
-    """All 25 provider/family route descriptors stay fixed and ordered."""
+    """All 31 provider/family route descriptors stay fixed and ordered."""
     catalog = _subject().ROUTE_CATALOG
     assert type(catalog) is tuple
     assert (

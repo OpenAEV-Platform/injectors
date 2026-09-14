@@ -137,7 +137,7 @@ def test_compliance_selector_type_retains_exact_supported_cis_values() -> None:
 
 
 def test_registry_retains_cis_contracts_without_selector_fields() -> None:
-    """The executable public surface is stable, ordered, and not user-selectable."""
+    """The executable public surface is stable, ordered, and exact on fields."""
     serialized = DEFAULT_PROWLER_CONTRACTS.contracts()
     routes = (
         "aws",
@@ -154,6 +154,12 @@ def test_registry_retains_cis_contracts_without_selector_fields() -> None:
         *(item[0] for item in _ROUTES),
         *_CHK015_ROUTES,
         *_CHK016_ROUTES,
+        "aws/select-service",
+        "aws/select-compliance",
+        "azure/select-service",
+        "azure/select-compliance",
+        "gcp/select-service",
+        "gcp/select-compliance",
     )
 
     assert [item["contract_id"] for item in serialized] == [

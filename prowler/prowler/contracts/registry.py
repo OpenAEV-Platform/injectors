@@ -34,6 +34,17 @@ def stable_contract_id(route_name: str) -> UUID:
     return uuid5(PROWLER_CONTRACT_NAMESPACE, route_name)
 
 
+# Deferred: selectable derives its stable IDs from this module.
+from .selectable import (  # noqa: E402
+    AwsSelectComplianceContract,
+    AwsSelectServiceContract,
+    AzureSelectComplianceContract,
+    AzureSelectServiceContract,
+    GcpSelectComplianceContract,
+    GcpSelectServiceContract,
+)
+
+
 class ProwlerContracts:
     """Validate, instantiate, resolve, and serialize concrete route contracts."""
 
@@ -119,5 +130,11 @@ DEFAULT_PROWLER_CONTRACTS = ProwlerContracts(
         AwsMitreContract,
         AzureMitreContract,
         GcpMitreContract,
+        AwsSelectServiceContract,
+        AwsSelectComplianceContract,
+        AzureSelectServiceContract,
+        AzureSelectComplianceContract,
+        GcpSelectServiceContract,
+        GcpSelectComplianceContract,
     )
 )
