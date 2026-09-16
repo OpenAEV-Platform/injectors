@@ -5,11 +5,6 @@ from typing import ClassVar
 
 from prowler._core.prowler_client import AwsServiceSelector
 from prowler.models.configs.config_loader import ProwlerConfig
-from prowler.models.findings import (
-    OcsfDecodeError,
-    OcsfMappingError,
-    map_command_result_with_evidence,
-)
 from prowler.models.provider_inputs import AwsProviderInput, ProviderInput
 
 from .base import BaseProwlerContract, ContractExecutionOutcome, RouteFamily
@@ -56,26 +51,7 @@ class AwsServiceContract(AwsBaseContract):
             raise ValueError("unsupported AWS service selector")
         if not isinstance(provider, AwsProviderInput):
             raise ValueError("AWS service selector requires an AWS provider")
-        result = self._client_factory.run(
-            config,
-            provider,
-            check_filters=self.check_filters,
-            service_selector=self.service_selector,
-        )
-        if result.error is not None or result.return_code != 0:
-            return ContractExecutionOutcome(command_result=result, error=result.error)
-        try:
-            mapping = map_command_result_with_evidence(result)
-        except (OcsfDecodeError, OcsfMappingError) as error:
-            return ContractExecutionOutcome(command_result=result, error=error)
-        outcome = ContractExecutionOutcome(
-            command_result=result,
-            findings=mapping.findings,
-            raw_record_count=mapping.raw_record_count,
-            raw_output_bytes=mapping.raw_output_bytes,
-            raw_preview=mapping.raw_preview,
-        )
-        return replace(outcome, findings=self._provider_findings(outcome.findings))
+        return self._execute_service(config, provider, self.service_selector)
 
 
 class AwsIamContract(AwsServiceContract):

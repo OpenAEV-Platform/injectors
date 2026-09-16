@@ -11,7 +11,8 @@ from prowler._core.cli_engine.contracts import EnvironmentValue
 
 AwsServiceSelector = Literal["iam", "s3", "ec2"]
 AzureServiceSelector = Literal["iam", "storage"]
-ServiceSelector = AwsServiceSelector | AzureServiceSelector
+GcpServiceSelector = Literal["iam", "compute"]
+ServiceSelector = AwsServiceSelector | AzureServiceSelector | GcpServiceSelector
 
 
 class CliEnginePort(Protocol):

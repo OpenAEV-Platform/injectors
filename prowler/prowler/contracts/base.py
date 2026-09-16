@@ -218,6 +218,33 @@ class BaseProwlerContract(ABC):
             if finding.cloud_provider.casefold() == self.provider
         )
 
+    def _execute_service(
+        self,
+        config: ProwlerConfig,
+        provider: ProviderInput,
+        service_selector: ServiceSelector,
+    ) -> ContractExecutionOutcome:
+        """Run one validated service selector and retain its provider findings."""
+        result = self._client_factory.run(
+            config,
+            provider,
+            check_filters=self.check_filters,
+            service_selector=service_selector,
+        )
+        if result.error is not None or result.return_code != 0:
+            return ContractExecutionOutcome(command_result=result, error=result.error)
+        try:
+            mapping = map_command_result_with_evidence(result)
+        except (OcsfDecodeError, OcsfMappingError) as error:
+            return ContractExecutionOutcome(command_result=result, error=error)
+        return ContractExecutionOutcome(
+            command_result=result,
+            findings=self._provider_findings(mapping.findings),
+            raw_record_count=mapping.raw_record_count,
+            raw_output_bytes=mapping.raw_output_bytes,
+            raw_preview=mapping.raw_preview,
+        )
+
     @staticmethod
     def output_trace_config() -> dict[str, object]:
         """Return the common flattened-field trace contract."""
