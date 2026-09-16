@@ -21,7 +21,11 @@ from pyoaev.contracts.contract_config import (
 )
 
 from prowler._core.cli_engine import CommandResult
-from prowler._core.prowler_client import ProwlerClientFactory, ServiceSelector
+from prowler._core.prowler_client import (
+    ComplianceSelector,
+    ProwlerClientFactory,
+    ServiceSelector,
+)
 from prowler.models.configs.config_loader import ProwlerConfig
 from prowler.models.findings import (
     OcsfDecodeError,
@@ -66,6 +70,7 @@ class ClientFactoryPort(Protocol):
         *,
         check_filters: Sequence[str] = (),
         service_selector: ServiceSelector | None = None,
+        compliance_selector: ComplianceSelector | None = None,
     ) -> CommandResult:
         """Run one assessment and return the exact command result."""
 
@@ -230,6 +235,33 @@ class BaseProwlerContract(ABC):
             provider,
             check_filters=self.check_filters,
             service_selector=service_selector,
+        )
+        if result.error is not None or result.return_code != 0:
+            return ContractExecutionOutcome(command_result=result, error=result.error)
+        try:
+            mapping = map_command_result_with_evidence(result)
+        except (OcsfDecodeError, OcsfMappingError) as error:
+            return ContractExecutionOutcome(command_result=result, error=error)
+        return ContractExecutionOutcome(
+            command_result=result,
+            findings=self._provider_findings(mapping.findings),
+            raw_record_count=mapping.raw_record_count,
+            raw_output_bytes=mapping.raw_output_bytes,
+            raw_preview=mapping.raw_preview,
+        )
+
+    def _execute_compliance(
+        self,
+        config: ProwlerConfig,
+        provider: ProviderInput,
+        compliance_selector: ComplianceSelector,
+    ) -> ContractExecutionOutcome:
+        """Run one validated compliance selector and retain provider findings."""
+        result = self._client_factory.run(
+            config,
+            provider,
+            check_filters=self.check_filters,
+            compliance_selector=compliance_selector,
         )
         if result.error is not None or result.return_code != 0:
             return ContractExecutionOutcome(command_result=result, error=result.error)
