@@ -1,14 +1,13 @@
 """Base class for global config models."""
 
-from pydantic import Field
-from pyoaev.configuration import ConfigLoaderOAEV, Configuration, SettingsLoader
-
 from email_smtp.contracts.email_contracts import TYPE, EmailContracts
 from email_smtp.models.configs.email_configs import ConfigLoaderEmailSMTP
 from email_smtp.models.configs.injector_config_override import (
     ICON_FILEPATH,
     InjectorConfigOverride,
 )
+from pydantic import Field
+from pyoaev.configuration import ConfigLoaderOAEV, Configuration, SettingsLoader
 
 
 class ConfigLoader(SettingsLoader):

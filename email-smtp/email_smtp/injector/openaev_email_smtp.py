@@ -2,10 +2,6 @@ import json
 import time
 from typing import Dict, List, Tuple
 
-from injector_common.data_helpers import DataHelpers
-from pyoaev.helpers import OpenAEVInjectorHelper
-from pyoaev.signatures import SignatureManager
-
 from email_smtp.contracts import EmailContractId
 from email_smtp.models import ConfigLoader
 from email_smtp.models.exceptions import (
@@ -15,6 +11,10 @@ from email_smtp.models.exceptions import (
 )
 from email_smtp.services import EmailClient, EmailPayloadBuilder, ExecutionResult
 from email_smtp.services.signature_service import EmailSignatureService
+from pyoaev.helpers import OpenAEVInjectorHelper
+from pyoaev.signatures import SignatureManager
+
+from injector_common.data_helpers import DataHelpers
 
 LOG_PREFIX = "[EMAIL_SMTP_INJECTOR]"
 

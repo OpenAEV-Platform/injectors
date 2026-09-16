@@ -5,13 +5,13 @@ import os
 import sys
 from pathlib import Path
 
-from injector_common.dump_config import intercept_dump_argument
-from pydantic import ValidationError
-from pyoaev.helpers import OpenAEVConfigHelper, OpenAEVInjectorHelper
-
 from email_smtp.injector.openaev_email_smtp import EmailSMTPInjector
 from email_smtp.models import ConfigLoader
 from email_smtp.models.configs.injector_config_override import ICON_FILEPATH
+from pydantic import ValidationError
+from pyoaev.helpers import OpenAEVConfigHelper, OpenAEVInjectorHelper
+
+from injector_common.dump_config import intercept_dump_argument
 
 LOG_PREFIX = "[EMAIL_SMTP_MAIN]"
 

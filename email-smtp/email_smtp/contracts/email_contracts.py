@@ -1,6 +1,7 @@
 from enum import StrEnum
 from typing import List
 
+from email_smtp.contracts.craft_email import CraftEmail
 from pyoaev.contracts.contract_config import (
     Contract,
     ContractConfig,
@@ -9,8 +10,6 @@ from pyoaev.contracts.contract_config import (
     SupportedLanguage,
     prepare_contracts,
 )
-
-from email_smtp.contracts.craft_email import CraftEmail
 
 TYPE = "openaev_email_smtp"
 

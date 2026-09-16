@@ -2,10 +2,9 @@
 
 from unittest.mock import Mock, patch
 
-from pytest import fixture
-
 from email_smtp.injector.openaev_email_smtp import EmailSMTPInjector
 from email_smtp.services.signature_service import EmailSignatureService
+from pytest import fixture
 
 
 @fixture(autouse=True)

@@ -1,5 +1,4 @@
 import pytest
-
 from email_smtp.models.exceptions import CustomHeaderValidationError
 from email_smtp.services.utils import EmailPayloadBuilder
 

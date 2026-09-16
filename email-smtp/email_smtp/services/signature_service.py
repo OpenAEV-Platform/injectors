@@ -7,7 +7,6 @@ import logging
 from datetime import datetime, timezone
 from typing import Any
 
-from injector_common.targets import TargetMeta
 from ioc_finder import find_iocs
 from pyoaev.signatures import (
     ExtraSignatureData,
@@ -15,6 +14,8 @@ from pyoaev.signatures import (
 )
 from pyoaev.signatures.models import ExecutionDetails, ExecutionSignature
 from pyoaev.signatures.types import SignatureTypes
+
+from injector_common.targets import TargetMeta
 
 logger = logging.getLogger(__name__)
 

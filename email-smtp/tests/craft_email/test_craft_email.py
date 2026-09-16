@@ -1,8 +1,6 @@
 from unittest.mock import patch
 
 import pytest
-from pyoaev.signatures.types import SignatureTypes
-
 from email_smtp.contracts import EmailContractId
 from email_smtp.models.exceptions import (
     CustomHeaderValidationError,
@@ -10,6 +8,7 @@ from email_smtp.models.exceptions import (
     MissingRequiredFieldError,
 )
 from email_smtp.services.email_client import ExecutionResult
+from pyoaev.signatures.types import SignatureTypes
 
 CONTRACT_ID = EmailContractId.CRAFT_EMAIL
 

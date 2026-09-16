@@ -3,14 +3,14 @@
 import hashlib
 from unittest.mock import Mock
 
-from injector_common.targets import TargetMeta
+from email_smtp.services.signature_service import (
+    EmailSignatureService,
+)
 from pyoaev.signatures import ExtraSignatureData
 from pyoaev.signatures.models import ExecutionDetails, ExecutionSignature
 from pyoaev.signatures.types import SignatureTypes
 
-from email_smtp.services.signature_service import (
-    EmailSignatureService,
-)
+from injector_common.targets import TargetMeta
 
 
 class TestBuildExecutionDetails:
