@@ -21,7 +21,7 @@ from pyoaev.contracts.contract_config import (
 )
 
 from prowler._core.cli_engine import CommandResult
-from prowler._core.prowler_client import ProwlerClientFactory
+from prowler._core.prowler_client import AwsServiceSelector, ProwlerClientFactory
 from prowler.models.configs.config_loader import ProwlerConfig
 from prowler.models.findings import (
     OcsfDecodeError,
@@ -65,6 +65,7 @@ class ClientFactoryPort(Protocol):
         provider: ProviderInput,
         *,
         check_filters: Sequence[str] = (),
+        service_selector: AwsServiceSelector | None = None,
     ) -> CommandResult:
         """Run one assessment and return the exact command result."""
 

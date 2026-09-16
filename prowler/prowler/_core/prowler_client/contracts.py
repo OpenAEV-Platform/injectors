@@ -2,12 +2,14 @@
 
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Protocol
+from typing import Literal, Protocol
 
 from pydantic import SecretStr
 
 from prowler._core.cli_engine import CommandResult, ValidatedCommandRequest
 from prowler._core.cli_engine.contracts import EnvironmentValue
+
+AwsServiceSelector = Literal["iam", "s3", "ec2"]
 
 
 class CliEnginePort(Protocol):
