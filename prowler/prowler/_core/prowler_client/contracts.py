@@ -10,6 +10,8 @@ from prowler._core.cli_engine import CommandResult, ValidatedCommandRequest
 from prowler._core.cli_engine.contracts import EnvironmentValue
 
 AwsServiceSelector = Literal["iam", "s3", "ec2"]
+AzureServiceSelector = Literal["iam", "storage"]
+ServiceSelector = AwsServiceSelector | AzureServiceSelector
 
 
 class CliEnginePort(Protocol):
