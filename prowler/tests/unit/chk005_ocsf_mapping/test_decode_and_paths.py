@@ -59,6 +59,32 @@ def test_command_result_must_be_success() -> None:
     assert "sensitive" not in str(caught.value)
 
 
+@pytest.mark.parametrize("parsed", [None, {}, [], ()])
+def test_command_result_requires_the_captured_artifact_payload(parsed: object) -> None:
+    """Never reinterpret console diagnostics as artifact-backed OCSF output."""
+    result = CommandResult(
+        specification=ExecutionSpecification(
+            executable="prowler",
+            arguments=(),
+            environment=(),
+            working_directory=None,
+            input_bytes=b"",
+            output=object(),  # type: ignore[arg-type]
+            timeout_seconds=1,
+            maximum_accepted_output_bytes=1,
+        ),
+        return_code=0,
+        stdout=b'[{"console": "is not the artifact"}]',
+        parsed=parsed,
+    )
+
+    with pytest.raises(OcsfDecodeError) as caught:
+        map_command_result(result)
+
+    assert caught.value.code == "invalid_payload_type"
+    assert "console" not in str(caught.value)
+
+
 @pytest.mark.parametrize(
     ("compliance", "expected"),
     [

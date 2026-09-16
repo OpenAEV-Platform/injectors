@@ -21,6 +21,7 @@ from .output_workspace import (
     OUTPUT_ARTIFACT_BASENAME,
     OutputArtifactError,
     OutputWorkspaceCleanupError,
+    OutputWorkspacePreparationError,
 )
 from .provider_adapter import ProviderInvocationAdapter
 
@@ -112,7 +113,15 @@ class ProwlerClient:
                 raise ValueError("check filters must be nonblank strings")
 
             _safe_log(logging.INFO, "Preparing Prowler output workspace")
-            workspace = self._output_workspace_factory.create()
+            try:
+                workspace = self._output_workspace_factory.create()
+            except OutputWorkspacePreparationError:
+                _safe_log(
+                    logging.ERROR,
+                    "Prowler output workspace preparation failed",
+                    kind="preparation",
+                )
+                raise
             _safe_log(
                 logging.DEBUG,
                 "Prowler output workspace metadata",
@@ -174,6 +183,7 @@ class ProwlerClient:
                     maximum_bytes=DEFAULT_MAXIMUM_ARTIFACT_BYTES
                 )
             except OutputArtifactError as error:
+                error.command_result = result
                 _safe_log(
                     logging.ERROR,
                     "Prowler output artifact capture failed",
@@ -205,7 +215,10 @@ class ProwlerClient:
                     workspace.cleanup()
                 except BaseException:
                     cleanup_failures.append(
-                        ("output_workspace", OutputWorkspaceCleanupError())
+                        (
+                            "output_workspace",
+                            OutputWorkspaceCleanupError(command_result=result),
+                        )
                     )
                 else:
                     _safe_log(logging.INFO, "Prowler output workspace cleaned")
