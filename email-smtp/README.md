@@ -183,11 +183,3 @@ Set `INJECTOR_LOG_LEVEL=debug` to get more verbose logs. Common issues:
 - Connection errors or timeouts: confirm the SMTP hostname and port are reachable from where the injector runs.
 - Authentication errors: re-check the SMTP username / password and whether the server requires STARTTLS
   (`smtp_use_tls`).
-
-## Migration from Email
-
-This injector was renamed from `email` to `email-smtp`. Existing deployments must use the
-`openaev/injector-email-smtp` image and redeploy the injector. The OpenAEV slug and contract type are now
-`openaev_email_smtp`; the contract UUID remains unchanged. Rename `EMAIL_HASH_ALGORITHM` to
-`EMAIL_SMTP_HASH_ALGORITHM`, or `email.hash_algorithm` to `email_smtp.hash_algorithm` in YAML. Verify existing scenarios
-after redeployment because OpenAEV may register the renamed injector as a new integration.
