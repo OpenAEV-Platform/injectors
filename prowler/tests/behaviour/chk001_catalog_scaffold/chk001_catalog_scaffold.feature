@@ -9,7 +9,7 @@ Feature: Prowler catalog registration and project scaffold
   Scenario: Foundation configuration excludes future provider settings
     Given CHK.001 owns only the injector configuration foundation
     When the available configuration is inspected
-    Then only the standard OpenAEV and injector settings are present
+    Then only the standard OpenAEV and injector settings plus the Prowler runtime section are present
 
   Scenario: Foundation startup registers no assessment contracts
     Given assessment contracts are deferred to CHK.006
