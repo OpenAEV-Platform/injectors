@@ -57,7 +57,7 @@ __all__ = [
     "RouteFamily",
 ]
 
-RouteFamily = Literal["base", "service", "compliance"]
+RouteFamily = Literal["base", "service", "compliance", "universal"]
 
 
 class ClientFactoryPort(Protocol):
