@@ -246,7 +246,7 @@ workflows:
       - build_docker_images:
           matrix:
             parameters:
-              injector_name: [ "ai-redteam", "aws", "censys", "email-google-workspace", "http-query", "netexec", "nmap", "nuclei", "shodan", "slack", "stratus", "teams" ]
+              injector_name: [ "ai-redteam", "aws", "censys", "email-google-workspace", "email-smtp", "http-query", "netexec", "nmap", "nuclei", "shodan", "slack", "stratus", "teams" ]
           requires:
             - ensure_formatting
             - linter
@@ -257,7 +257,7 @@ workflows:
       - publish_images:
           matrix:
             parameters:
-              injector_name: [ "ai-redteam", "aws", "censys", "email-google-workspace", "http-query", "netexec", "nmap", "nuclei", "shodan", "slack", "stratus", "teams" ]
+              injector_name: [ "ai-redteam", "aws", "censys", "email-google-workspace", "email-smtp", "http-query", "netexec", "nmap", "nuclei", "shodan", "slack", "stratus", "teams" ]
           requires:
             - build_docker_images
           filters:

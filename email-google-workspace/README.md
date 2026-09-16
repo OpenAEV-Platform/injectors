@@ -39,7 +39,8 @@ contract is played, OpenAEV dispatches a job to the injector, which sends the em
 the result.
 
 This is the Google Workspace variant of the OpenAEV email injectors. To send through a raw SMTP server, use the
-Email (SMTP) injector; to send through Microsoft 365, use the Email (Microsoft 365) injector (Microsoft Graph API).
+Email (SMTP) injector in the `email-smtp` directory; to send through Microsoft 365, use the Email
+(Microsoft 365) injector (Microsoft Graph API).
 
 ## How it works
 
