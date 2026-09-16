@@ -10,6 +10,7 @@ import pytest
 from pydantic import BaseModel, ValidationError
 
 from prowler import __main__ as prowler_main
+from prowler.contracts import stable_contract_id
 from prowler.injector.openaev_prowler import ProwlerInjector
 from prowler.models.configs.config_loader import ConfigLoader
 
@@ -74,8 +75,10 @@ def _when_injector_starts() -> tuple[ConfigLoader, Mock]:
     return config, helper
 
 
-def _then_zero_contracts_are_registered(config: ConfigLoader, helper: Mock) -> None:
-    assert config.to_daemon_config().get("injector_contracts") == []
+def _then_aws_contract_is_registered(config: ConfigLoader, helper: Mock) -> None:
+    contracts = config.to_daemon_config().get("injector_contracts")
+    assert isinstance(contracts, list) and len(contracts) == 1
+    assert contracts[0]["contract_id"] == str(stable_contract_id("aws"))
     callback = helper.listen.call_args.kwargs["message_callback"]
     assert callable(callback)
 
@@ -138,13 +141,13 @@ def test_foundation_configuration_excludes_future_provider_settings() -> None:
     _then_only_standard_and_prowler_settings_are_available(settings)
 
 
-def test_foundation_startup_registers_no_assessment_contracts(
+def test_startup_registers_the_aws_assessment_contract(
     standard_injector_environment: None,
 ) -> None:
-    """The foundation starts its listener with an empty contract catalog."""
+    """CHK.007 starts its listener with the AWS base contract."""
     _given_the_prowler_project()
     config, helper = _when_injector_starts()
-    _then_zero_contracts_are_registered(config, helper)
+    _then_aws_contract_is_registered(config, helper)
 
 
 @pytest.mark.parametrize(

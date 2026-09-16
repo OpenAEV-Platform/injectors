@@ -398,7 +398,7 @@ def test_runtime_start_logs_one_fixed_listener_event() -> None:
     assert message == _LISTENER_START
     assert metadata["injector_id"] == "injector-test"
     assert metadata["injector_name"] == "Prowler"
-    assert metadata["registered_contract_count"] == 0
+    assert metadata["registered_contract_count"] == 1
     assert metadata["configured_executable_path"] == "/usr/local/bin/prowler"
     assert set(metadata) == {
         "injector_id",
@@ -1316,9 +1316,11 @@ def test_runtime_resolved_contract_uses_renderer_for_safe_error(
     assert "SECRET-MARKER" not in callback["execution_message"]
 
 
-def test_default_registry_and_daemon_config_remain_empty() -> None:
-    """CHK.006 defaults to no executable contract until CHK.007 registers one."""
+def test_default_registry_and_daemon_config_register_aws_only() -> None:
+    """CHK.007 makes AWS the sole default executable contract."""
     subject = _subject()
-    assert subject.DEFAULT_PROWLER_CONTRACTS.contracts() == []
+    contracts = subject.DEFAULT_PROWLER_CONTRACTS.contracts()
+    assert len(contracts) == 1
+    assert contracts[0]["contract_id"] == str(subject.stable_contract_id("aws"))
     daemon = _config().to_daemon_config()
-    assert daemon.get("injector_contracts") == []
+    assert daemon.get("injector_contracts") == contracts
