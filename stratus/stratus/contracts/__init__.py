@@ -32,6 +32,7 @@ from pyoaev.contracts.contract_config import (
     SupportedLanguage,
     prepare_contracts,
 )
+from pyoaev.credential.utils import build_single_referenced_credential_element
 from pyoaev.security_domain.types import SecurityDomains
 
 from stratus.contracts.platforms import (  # noqa: F401 (re-exported)
@@ -140,6 +141,9 @@ def _make_contract(
     elements: List[ContractElement] = [
         _credential_element(cred) for cred in platform.cred_fields
     ]
+    # Centralized credential-reference field: lets the OpenAEV inject form ask
+    # for a stored credential, filtered on the platform credential type.
+    elements.append(build_single_referenced_credential_element(platform.key))
     elements.extend(extra_fields)
     elements.append(_expectations_element())
 
