@@ -1,4 +1,4 @@
-"""Raw pytest executable contract for CHK.014."""
+"""Raw pytest executable contract for CHK.015."""
 
 from __future__ import annotations
 
@@ -32,19 +32,19 @@ from prowler.models.provider_inputs import AwsProviderInput
 from .conftest import RecordingLogger
 
 _ROUTES = (
+    ("nis2/aws", "aws", "nis2_aws"),
+    ("nis2/azure", "azure", "nis2_azure"),
+    ("nis2/gcp", "gcp", "nis2_gcp"),
+    ("iso27001/aws", "aws", "iso27001_2022_aws"),
+    ("iso27001/azure", "azure", "iso27001_2022_azure"),
+    ("iso27001/gcp", "gcp", "iso27001_2022_gcp"),
+    ("iso27001/kubernetes", "kubernetes", "iso27001_2022_kubernetes"),
+)
+_EXISTING_COMPLIANCE = (
     ("cis/aws", "aws", "cis_3.0_aws"),
     ("cis/azure", "azure", "cis_3.0_azure"),
     ("cis/gcp", "gcp", "cis_3.0_gcp"),
     ("cis/kubernetes", "kubernetes", "cis_1.12_kubernetes"),
-)
-_CHK015_ROUTES = (
-    "nis2/aws",
-    "nis2/azure",
-    "nis2/gcp",
-    "iso27001/aws",
-    "iso27001/azure",
-    "iso27001/gcp",
-    "iso27001/kubernetes",
 )
 _TEMP_PATHS = {
     "gcp": Path("/tmp/CANARY-GCP-CREDENTIAL.json"),  # noqa: S108
@@ -125,17 +125,19 @@ def test_route_selects_exact_typed_compliance_once(
     assert factory.calls[0][2:] == ((), None, compliance)
 
 
-def test_compliance_selector_type_retains_exact_supported_cis_values() -> None:
-    """The expanded internal typed seam retains all four exact CIS values."""
+def test_compliance_selector_type_contains_exact_supported_values() -> None:
+    """The internal typed seam admits the existing and seven new exact values."""
     import prowler._core.prowler_client as client_api
 
     selector_type = client_api.__dict__.get("ComplianceSelector")
 
     assert selector_type is not None
-    assert get_args(selector_type)[:4] == tuple(item[2] for item in _ROUTES)
+    assert get_args(selector_type) == tuple(
+        item[2] for item in (*_EXISTING_COMPLIANCE, *_ROUTES)
+    )
 
 
-def test_registry_retains_cis_contracts_without_selector_fields() -> None:
+def test_registry_has_22_canonical_contracts_without_selector_fields() -> None:
     """The executable public surface is stable, ordered, and not user-selectable."""
     serialized = DEFAULT_PROWLER_CONTRACTS.contracts()
     routes = (
@@ -150,16 +152,16 @@ def test_registry_retains_cis_contracts_without_selector_fields() -> None:
         "azure/storage",
         "gcp/iam",
         "gcp/compute",
+        *(item[0] for item in _EXISTING_COMPLIANCE),
         *(item[0] for item in _ROUTES),
-        *_CHK015_ROUTES,
     )
 
     assert [item["contract_id"] for item in serialized] == [
         str(stable_contract_id(route)) for route in routes
     ]
-    for item, (route, provider_name, _) in zip(serialized[11:15], _ROUTES, strict=True):
+    for item, (route, provider_name, _) in zip(serialized[15:], _ROUTES, strict=True):
         content = json.loads(item["contract_content"])
-        assert "cis" in content["label"]["en"].casefold()
+        assert route.split("/", maxsplit=1)[0] in content["label"]["en"].casefold()
         keys = tuple(field["key"] for field in content["fields"])
         assert keys
         assert all("compliance" not in key and "framework" not in key for key in keys)
@@ -175,39 +177,39 @@ def test_unsupported_contract_selector_is_rejected_pre_client(
     """Invalid internal route metadata cannot consume the CHK.004 seam."""
     import prowler.contracts as contract_api
 
-    cis_contract = contract_api.__dict__.get("CisComplianceContract")
-    assert cis_contract is not None
+    nis2_contract = contract_api.__dict__.get("Nis2ComplianceContract")
+    assert nis2_contract is not None
 
-    class InvalidCisContract(cis_contract):
-        contract_id = str(stable_contract_id("cis/aws"))
-        external_id = "prowler:cis/aws"
-        route_name = "cis/aws"
+    class InvalidNis2Contract(nis2_contract):
+        contract_id = str(stable_contract_id("nis2/aws"))
+        external_id = "prowler:nis2/aws"
+        route_name = "nis2/aws"
         provider = "aws"
         label = "Invalid"
-        compliance_selector = "cis_3.0_azure"
+        compliance_selector = "nis2_azure"
 
     factory = _ClientFactory(CommandResult(specification=_specification()))
-    contract = InvalidCisContract(factory)
+    contract = InvalidNis2Contract(factory)
 
-    with pytest.raises(ValueError, match="unsupported CIS compliance selection"):
+    with pytest.raises(ValueError, match="unsupported NIS2 compliance selection"):
         contract.execute(ProwlerConfig(), contract.parse_input(provider_forms["aws"]))
 
     assert factory.calls == []
 
 
 def test_mapping_preserves_model_duplicates_compliance_outputs_and_trace(
-    provider_forms: dict[str, dict[str, object]], cis_ocsf_record_factory: Any
+    provider_forms: dict[str, dict[str, object]], compliance_ocsf_record_factory: Any
 ) -> None:
     """Keep CHK.005 findings unchanged across all existing presentation channels."""
-    duplicate = cis_ocsf_record_factory(
-        "duplicate", compliance={"CIS-3.0": ["1.1", "1.1", "2.2"]}
+    duplicate = compliance_ocsf_record_factory(
+        "duplicate", compliance={"NIS2": ["21.1", "21.1", "21.2"]}
     )
     records = [
-        cis_ocsf_record_factory("first", status="PASS", compliance=["a", "b"]),
+        compliance_ocsf_record_factory("first", status="PASS", compliance=["a", "b"]),
         duplicate,
         duplicate.copy(),
-        cis_ocsf_record_factory("excluded", provider="azure"),
-        cis_ocsf_record_factory("last", status="PASS", compliance=["z"]),
+        compliance_ocsf_record_factory("excluded", provider="azure"),
+        compliance_ocsf_record_factory("last", status="PASS", compliance=["z"]),
     ]
     artifact = json.dumps(records).encode()
     factory = _ClientFactory(
@@ -218,7 +220,7 @@ def test_mapping_preserves_model_duplicates_compliance_outputs_and_trace(
             parsed=artifact,
         )
     )
-    contract = _contract("cis/aws")
+    contract = _contract("nis2/aws")
     contract._client_factory = factory
     provider = contract.parse_input(provider_forms["aws"])
 
@@ -237,8 +239,8 @@ def test_mapping_preserves_model_duplicates_compliance_outputs_and_trace(
     assert tuple(item.value for item in outcome.findings) == expected
     assert tuple(item.compliance_tags for item in outcome.findings) == (
         ("a", "b"),
-        ("CIS-3.0:1.1", "CIS-3.0:1.1", "CIS-3.0:2.2"),
-        ("CIS-3.0:1.1", "CIS-3.0:1.1", "CIS-3.0:2.2"),
+        ("NIS2:21.1", "NIS2:21.1", "NIS2:21.2"),
+        ("NIS2:21.1", "NIS2:21.1", "NIS2:21.2"),
         ("z",),
     )
     assert tuple(json.loads(item)["value"] for item in payload["findings"]) == expected
@@ -260,8 +262,9 @@ def test_mapping_preserves_model_duplicates_compliance_outputs_and_trace(
     assert trace.index("Prowler Findings") < raw_section_index
     assert outcome.raw_record_count == 5
     assert outcome.raw_output_bytes == len(artifact)
-    assert "cis/aws" in trace
-    assert "compliance=cis_3.0_aws" in trace
+    assert tuple(payload) == ("findings", "vulnerabilities")
+    assert "nis2/aws" in trace
+    assert "compliance=nis2_aws" in trace
 
 
 @dataclass
@@ -376,7 +379,7 @@ def test_runtime_one_call_exact_compliance_argv_lifecycle_and_canaries(
     provider_name: str,
     compliance: str,
     provider_forms: dict[str, dict[str, object]],
-    cis_ocsf_record_factory: Any,
+    compliance_ocsf_record_factory: Any,
 ) -> None:
     """Runtime uses one fake request and preserves provider resource handling."""
     from prowler.injector import ProwlerInjector
@@ -384,9 +387,11 @@ def test_runtime_one_call_exact_compliance_argv_lifecycle_and_canaries(
     callback_name = f"CALLBACK-CANARY-{provider_name}"
     finding_name = f"FINDING-CANARY-{provider_name}"
     records = [
-        cis_ocsf_record_factory(callback_name, provider=provider_name, status="PASS"),
-        cis_ocsf_record_factory(finding_name, provider=provider_name),
-        cis_ocsf_record_factory("excluded", provider="unsupported"),
+        compliance_ocsf_record_factory(
+            callback_name, provider=provider_name, status="PASS"
+        ),
+        compliance_ocsf_record_factory(finding_name, provider=provider_name),
+        compliance_ocsf_record_factory("excluded", provider="unsupported"),
     ]
     lifecycle: list[str] = []
     engine = _Engine(json.dumps(records).encode(), lifecycle)
@@ -706,7 +711,10 @@ def test_existing_check_and_service_argv_are_unchanged(
     assert "--compliance" not in second_engine.requests[0].arguments
 
 
-def test_cross_provider_compliance_rejected_before_adapter_or_engine() -> None:
+@pytest.mark.parametrize("compliance", ("nis2_azure", "iso27001_2022_kubernetes"))
+def test_cross_provider_compliance_rejected_before_adapter_or_engine(
+    compliance: str,
+) -> None:
     """Provider/selector pairs are validated before credentials or CLI use."""
     lifecycle: list[str] = []
     engine = _Engine(b"[]", lifecycle)
@@ -724,7 +732,7 @@ def test_cross_provider_compliance_rejected_before_adapter_or_engine() -> None:
         factory.run(
             ProwlerConfig(),
             provider,
-            compliance_selector=cast(Any, "cis_3.0_azure"),
+            compliance_selector=cast(Any, compliance),
         )
 
     assert leases.calls == []
