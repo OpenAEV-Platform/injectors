@@ -12,14 +12,16 @@ from prowler._core.cli_engine import (
     ValidatedCommandRequest,
 )
 from prowler.models.configs.config_loader import ProwlerConfig
-from prowler.models.provider_inputs import ProviderInput
+from prowler.models.provider_inputs import AwsProviderInput, ProviderInput
 
+from .contracts import AwsServiceSelector
 from .credentials import CredentialCleanupError
 from .output_workspace import (
     DEFAULT_MAXIMUM_ARTIFACT_BYTES,
     OUTPUT_ARTIFACT_BASENAME,
     OutputArtifactError,
     OutputWorkspaceCleanupError,
+    OutputWorkspacePreparationError,
 )
 from .ports import CliEnginePort, OutputWorkspaceFactoryPort
 from .provider_adapter import ProviderInvocationAdapter
@@ -92,7 +94,12 @@ class ProwlerClient:
         self._output_workspace_factory = output_workspace_factory
         self._consumption_lock = Lock()
 
-    def run(self, check_filters: Sequence[str] = ()) -> CommandResult:
+    def run(
+        self,
+        check_filters: Sequence[str] = (),
+        *,
+        service_selector: AwsServiceSelector | None = None,
+    ) -> CommandResult:
         """Run one assessment and capture its controlled OCSF artifact."""
         with self._consumption_lock:
             provider = self._provider
@@ -110,9 +117,23 @@ class ProwlerClient:
             filters = tuple(check_filters)
             if any(not isinstance(item, str) or not item.strip() for item in filters):
                 raise ValueError("check filters must be nonblank strings")
+            if service_selector not in (None, "iam", "s3", "ec2"):
+                raise ValueError("unsupported AWS service selector")
+            if service_selector is not None and not isinstance(
+                provider, AwsProviderInput
+            ):
+                raise ValueError("AWS service selector requires an AWS provider")
 
             _safe_log(logging.INFO, "Preparing Prowler output workspace")
-            workspace = self._output_workspace_factory.create()
+            try:
+                workspace = self._output_workspace_factory.create()
+            except OutputWorkspacePreparationError:
+                _safe_log(
+                    logging.ERROR,
+                    "Prowler output workspace preparation failed",
+                    kind="preparation",
+                )
+                raise
             _safe_log(
                 logging.DEBUG,
                 "Prowler output workspace metadata",
@@ -123,7 +144,14 @@ class ProwlerClient:
 
             invocation = self._provider_adapter.adapt(provider)
             filter_arguments = ("-c", *filters) if filters else ()
-            provider_and_selectors = (*invocation.arguments, *filter_arguments)
+            service_arguments = (
+                ("--services", service_selector) if service_selector is not None else ()
+            )
+            provider_and_selectors = (
+                *invocation.arguments,
+                *filter_arguments,
+                *service_arguments,
+            )
             narrowed = any(
                 argument in _NARROWING_OPTIONS for argument in provider_and_selectors
             )
@@ -174,6 +202,7 @@ class ProwlerClient:
                     maximum_bytes=DEFAULT_MAXIMUM_ARTIFACT_BYTES
                 )
             except OutputArtifactError as error:
+                error.command_result = result
                 _safe_log(
                     logging.ERROR,
                     "Prowler output artifact capture failed",
@@ -205,7 +234,10 @@ class ProwlerClient:
                     workspace.cleanup()
                 except BaseException:
                     cleanup_failures.append(
-                        ("output_workspace", OutputWorkspaceCleanupError())
+                        (
+                            "output_workspace",
+                            OutputWorkspaceCleanupError(command_result=result),
+                        )
                     )
                 else:
                     _safe_log(logging.INFO, "Prowler output workspace cleaned")
