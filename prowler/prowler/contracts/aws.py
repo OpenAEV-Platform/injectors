@@ -1,13 +1,13 @@
 """Executable complete-scope and service-specific AWS contracts."""
 
-from dataclasses import replace
-from typing import ClassVar
+from typing import ClassVar, get_args
 
 from prowler._core.prowler_client import AwsServiceSelector
 from prowler.models.configs.config_loader import ProwlerConfig
 from prowler.models.provider_inputs import AwsProviderInput, ProviderInput
 
 from .base import BaseProwlerContract, ContractExecutionOutcome, RouteFamily
+from .compliance import FixedServiceContract
 
 
 class AwsBaseContract(BaseProwlerContract):
@@ -25,33 +25,18 @@ class AwsBaseContract(BaseProwlerContract):
         self, config: ProwlerConfig, provider: ProviderInput
     ) -> ContractExecutionOutcome:
         """Map one complete-scope result, preserving ordered AWS findings only."""
-        outcome = super().execute(config, provider)
-        if outcome.error is not None or outcome.command_result.return_code != 0:
-            return outcome
-        return replace(outcome, findings=self._provider_findings(outcome.findings))
+        return self._execute_scoped(config, provider)
 
 
-class AwsServiceContract(AwsBaseContract):
+class AwsServiceContract(FixedServiceContract):
     """Execute one route-owned AWS service selector through the CHK.004 seam."""
 
-    family = "service"
+    provider = "aws"
     service_selector: ClassVar[AwsServiceSelector]
-
-    def safe_request_info(self, provider: ProviderInput | None) -> dict[str, object]:
-        """Identify the service through safe route metadata, never form input."""
-        info = super().safe_request_info(provider)
-        info["filters"] = f"service={self.service_selector}"
-        return info
-
-    def execute(
-        self, config: ProwlerConfig, provider: ProviderInput
-    ) -> ContractExecutionOutcome:
-        """Reject invalid route combinations before one service-specific client call."""
-        if self.service_selector not in ("iam", "s3", "ec2"):
-            raise ValueError("unsupported AWS service selector")
-        if not isinstance(provider, AwsProviderInput):
-            raise ValueError("AWS service selector requires an AWS provider")
-        return self._execute_service(config, provider, self.service_selector)
+    service_selectors = get_args(AwsServiceSelector)
+    provider_input_type = AwsProviderInput
+    provider_label = "AWS"
+    provider_article = "an"
 
 
 class AwsIamContract(AwsServiceContract):
