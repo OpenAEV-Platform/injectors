@@ -14,6 +14,7 @@ from .azure import (
     AzureStorageContract,
 )
 from .base import (
+    CREDENTIAL_REFERENCE_KEY,
     BaseProwlerContract,
     ContractExecutionOutcome,
     ContractInputError,

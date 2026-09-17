@@ -17,6 +17,7 @@ from prowler._core.cli_engine import (
     ValidatedCommandRequest,
 )
 from prowler._core.prowler_client import (
+    CREDENTIAL_REFERENCE_KEY,
     OUTPUT_ARTIFACT_FILENAME,
     ProwlerClientFactory,
 )

@@ -259,9 +259,11 @@ def _message(
 
 
 def _runtime(findings: tuple[OpenAevFinding, ...]) -> tuple[Any, Mock]:
-    from prowler._core.cli_engine import (CommandResult,
-                                          ExecutionSpecification,
-                                          OutputSpecification)
+    from prowler._core.cli_engine import (
+        CommandResult,
+        ExecutionSpecification,
+        OutputSpecification,
+    )
     from prowler.injector import ProwlerInjector
 
     subject = _subject()
