@@ -135,6 +135,7 @@ def test_default_registration_identity_fields_and_outputs() -> None:
         "aws_region",
         "aws_endpoint_url",
         "aws_session_token",
+        CREDENTIAL_REFERENCE_KEY,
     )
     assert tuple(output["field"] for output in content["outputs"]) == (
         "findings",

@@ -144,6 +144,7 @@ def test_registry_has_32_canonical_contracts_with_exact_provider_fields() -> Non
             "aws_region",
             "aws_endpoint_url",
             "aws_session_token",
+            CREDENTIAL_REFERENCE_KEY,
         )
         assert all(route in output["labels"] for output in content["outputs"])
 

@@ -134,6 +134,7 @@ def test_default_registration_identity_fields_and_outputs() -> None:
         "azure_client_secret",
         "azure_subscription_id",
         "azure_provider",
+        CREDENTIAL_REFERENCE_KEY,
     )
     assert tuple(output["field"] for output in content["outputs"]) == (
         "findings",

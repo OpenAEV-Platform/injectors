@@ -139,6 +139,7 @@ def test_registry_has_32_canonical_contracts_with_exact_provider_fields() -> Non
             "azure_client_secret",
             "azure_subscription_id",
             "azure_provider",
+            CREDENTIAL_REFERENCE_KEY,
         )
         assert all(route in output["labels"] for output in content["outputs"])
 

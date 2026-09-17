@@ -67,6 +67,7 @@ from .selectable import (
 from .universal import UniversalProwlerContract
 
 __all__ = [
+    "CREDENTIAL_REFERENCE_KEY",
     "BaseProwlerContract",
     "AwsBaseContract",
     "AwsEc2Contract",

@@ -135,6 +135,7 @@ def test_default_registration_identity_fields_and_outputs() -> None:
     assert tuple(field["key"] for field in content["fields"]) == (
         "kubernetes_kubeconfig",
         "kubernetes_context",
+        CREDENTIAL_REFERENCE_KEY,
     )
     assert tuple(output["field"] for output in content["outputs"]) == (
         "findings",
