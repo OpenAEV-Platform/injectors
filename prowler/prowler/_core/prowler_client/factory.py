@@ -8,7 +8,7 @@ from prowler.models.configs.config_loader import ProwlerConfig
 from prowler.models.provider_inputs import ProviderInput
 
 from .client import ProwlerClient
-from .contracts import ServiceSelector
+from .contracts import ComplianceSelector, ServiceSelector
 from .credentials import TemporaryCredentialLeaseFactory
 from .output_workspace import TemporaryOutputWorkspaceFactory
 from .ports import (
@@ -48,8 +48,11 @@ class ProwlerClientFactory:
         *,
         check_filters: Sequence[str] = (),
         service_selector: ServiceSelector | None = None,
+        compliance_selector: ComplianceSelector | None = None,
     ) -> CommandResult:
         """Create a client and synchronously run one assessment."""
         return self.create(config, provider).run(
-            check_filters, service_selector=service_selector
+            check_filters,
+            service_selector=service_selector,
+            compliance_selector=compliance_selector,
         )

@@ -11,6 +11,7 @@ from .aws import AwsBaseContract, AwsEc2Contract, AwsIamContract, AwsS3Contract
 from .azure import AzureBaseContract, AzureIamContract, AzureStorageContract
 from .base import BaseProwlerContract
 from .catalog import ROUTE_CATALOG
+from .cis import AwsCisContract, AzureCisContract, GcpCisContract, KubernetesCisContract
 from .gcp import GcpBaseContract, GcpComputeContract, GcpIamContract
 from .kubernetes import KubernetesBaseContract
 
@@ -94,5 +95,9 @@ DEFAULT_PROWLER_CONTRACTS = ProwlerContracts(
         AzureStorageContract,
         GcpIamContract,
         GcpComputeContract,
+        AwsCisContract,
+        AzureCisContract,
+        GcpCisContract,
+        KubernetesCisContract,
     )
 )
