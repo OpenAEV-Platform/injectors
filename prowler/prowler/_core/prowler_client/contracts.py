@@ -23,6 +23,9 @@ ComplianceSelector = Literal[
     "iso27001_2022_azure",
     "iso27001_2022_gcp",
     "iso27001_2022_kubernetes",
+    "mitre_attack_aws",
+    "mitre_attack_azure",
+    "mitre_attack_gcp",
 ]
 
 

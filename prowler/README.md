@@ -35,11 +35,11 @@ the generic engine does not hardcode a Prowler binary location.
 python -m prowler
 ```
 
-The injector still starts with zero assessment contracts. CHK.006 provides the
-shared executable boundary; CHK.007–CHK.016 will supply and register concrete
-contracts directly in the validated registry.
+The injector registers 25 concrete assessment routes in the validated
+registry: 4 base provider routes (CHK.007–CHK.010), 7 service routes
+(CHK.011–CHK.013), and 14 compliance routes (CHK.014–CHK.016).
 
-Every future contract preserves each mapped CHK.005 finding as deterministic
+Every registered contract preserves each mapped CHK.005 finding as deterministic
 JSON text. FAILED findings are additionally projected as OpenAEV vulnerability
 outputs. SUCCESS and IGNORED findings are not projected as vulnerabilities, and
 Prowler cloud resource identifiers are not claimed to be OpenAEV asset UUIDs.
@@ -133,8 +133,11 @@ output, exception text, and temporary paths remain excluded.
 ## Provider input boundary
 
 Provider selection, account or target values, and credentials are not injector
-startup configuration. Concrete contracts supply them per assessment and
-CHK.006 converts form data immediately into CHK.002's strict provider models.
+startup configuration. Concrete contracts supply them per assessment. The
+injector validates structure only: provider values must be nonblank, and an AWS
+account must contain exactly 12 ASCII digits. Prowler enforces region, project,
+and Kubernetes-context domain constraints at runtime. A runtime rejection is
+returned as a safe `ERROR` result without logging or echoing submitted values.
 
 ### Plaintext credential limitation
 
