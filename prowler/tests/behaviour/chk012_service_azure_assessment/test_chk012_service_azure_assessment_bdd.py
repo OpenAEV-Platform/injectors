@@ -1,4 +1,4 @@
-"""Raw pytest executable contract for CHK.011."""
+"""Raw pytest executable contract for CHK.012."""
 
 from __future__ import annotations
 
@@ -8,7 +8,6 @@ from pathlib import Path
 from typing import Any, cast
 
 import pytest
-from pydantic import SecretStr
 from pyoaev.configuration import ConfigLoaderOAEV
 
 from prowler._core.cli_engine import (
@@ -21,21 +20,17 @@ from prowler._core.prowler_client import (
     OUTPUT_ARTIFACT_FILENAME,
     ProwlerClientFactory,
 )
-from prowler.contracts import (
-    DEFAULT_PROWLER_CONTRACTS,
-    AwsServiceContract,
-    stable_contract_id,
-)
+from prowler.contracts import DEFAULT_PROWLER_CONTRACTS, stable_contract_id
 from prowler.models.configs.config_loader import (
     ConfigLoader,
     InjectorConfig,
     ProwlerConfig,
 )
-from prowler.models.provider_inputs import AzureProviderInput
+from prowler.models.provider_inputs import AwsProviderInput
 
 from .conftest import RecordingLogger
 
-_ROUTES = (("aws/iam", "iam"), ("aws/s3", "s3"), ("aws/ec2", "ec2"))
+_ROUTES = (("azure/iam", "iam"), ("azure/storage", "storage"))
 _ASSESSMENT_RECEIVED = "[PROWLER_INJECTOR] - Assessment received"
 _RECEPTION_ACKNOWLEDGED = "[PROWLER_INJECTOR] - Reception acknowledged"
 _CONTRACT_RESOLVED = "[PROWLER_INJECTOR] - Contract resolved"
@@ -46,10 +41,10 @@ _ASSESSMENT_FAILED = "[PROWLER_INJECTOR] - Assessment failed"
 _CALLBACK_COMPLETED = "[PROWLER_INJECTOR] - Assessment callback completed"
 
 
-def _specification() -> ExecutionSpecification:
+def _specification(arguments: tuple[str, ...] = ()) -> ExecutionSpecification:
     return ExecutionSpecification(
         executable="/fake/prowler",
-        arguments=(),
+        arguments=arguments,
         environment=(),
         working_directory=None,
         input_bytes=b"",
@@ -82,14 +77,14 @@ def _contract(route: str) -> Any:
 
 @pytest.mark.parametrize(("route", "service"), _ROUTES)
 def test_route_selects_exact_service_once(
-    route: str, service: str, aws_form: dict[str, object]
+    route: str, service: str, azure_form: dict[str, object]
 ) -> None:
     """A route-owned selector crosses the client seam once without check filters."""
     factory = _ClientFactory(CommandResult(specification=_specification()))
     contract = _contract(route)
     contract._client_factory = factory
 
-    contract.execute(ProwlerConfig(), contract.parse_input(aws_form))
+    contract.execute(ProwlerConfig(), contract.parse_input(azure_form))
 
     assert len(factory.calls) == 1
     assert factory.calls[0][2:] == ((), service)
@@ -103,57 +98,101 @@ def test_registry_has_exact_nine_canonical_contracts_without_selector_fields() -
         "azure",
         "gcp",
         "kubernetes",
+        "aws/iam",
+        "aws/s3",
+        "aws/ec2",
         *(item[0] for item in _ROUTES),
-        "azure/iam",
-        "azure/storage",
     )
 
     assert [item["contract_id"] for item in serialized] == [
         str(stable_contract_id(route)) for route in routes
     ]
-    for item, (route, service) in zip(serialized[4:7], _ROUTES, strict=True):
+    for item, (route, service) in zip(serialized[7:], _ROUTES, strict=True):
         content = json.loads(item["contract_content"])
-        assert service.upper() in content["label"]["en"]
+        assert service.casefold() in content["label"]["en"].casefold()
         assert tuple(field["key"] for field in content["fields"]) == (
-            "aws_access_key_id",
-            "aws_secret_access_key",
-            "aws_account_id",
-            "aws_region",
-            "aws_endpoint_url",
-            "aws_session_token",
+            "azure_tenant_id",
+            "azure_client_id",
+            "azure_client_secret",
+            "azure_subscription_id",
+            "azure_provider",
         )
         assert all(route in output["labels"] for output in content["outputs"])
 
 
 def test_unsupported_contract_selector_is_rejected_pre_client(
-    aws_form: dict[str, object],
+    azure_form: dict[str, object],
 ) -> None:
     """Invalid route metadata cannot consume the CHK.004 seam."""
+    import prowler.contracts as contract_api
 
-    class InvalidServiceContract(AwsServiceContract):
-        contract_id = str(stable_contract_id("aws/iam"))
-        external_id = "prowler:aws/iam"
-        route_name = "aws/iam"
+    service_contract = cast(Any, contract_api.__dict__["AzureServiceContract"])
+
+    class InvalidServiceContract(service_contract):
+        contract_id = str(stable_contract_id("azure/iam"))
+        external_id = "prowler:azure/iam"
+        route_name = "azure/iam"
         label = "Invalid"
-        service_selector = cast(Any, "lambda")
+        service_selector = "keyvault"
 
     factory = _ClientFactory(CommandResult(specification=_specification()))
     contract = InvalidServiceContract(factory)
 
-    with pytest.raises(ValueError, match="unsupported AWS service selector"):
-        contract.execute(ProwlerConfig(), contract.parse_input(aws_form))
+    with pytest.raises(ValueError, match="unsupported Azure service selector"):
+        contract.execute(ProwlerConfig(), contract.parse_input(azure_form))
 
     assert factory.calls == []
 
 
-def test_mapping_order_shared_outputs_and_safe_trace(
-    aws_form: dict[str, object], ocsf_record_factory: Any
+@pytest.mark.parametrize(
+    "field_name",
+    (
+        "azure_tenant_id",
+        "azure_client_id",
+        "azure_client_secret",
+        "azure_subscription_id",
+        "azure_provider",
+    ),
+)
+def test_blank_provider_field_is_rejected_pre_client(
+    azure_form: dict[str, object], field_name: str
 ) -> None:
-    """Keep ordered service-free output while identifying safe route context."""
+    """Service routes inherit structural nonblank validation before execution."""
+    factory = _ClientFactory(CommandResult(specification=_specification()))
+    contract = _contract("azure/iam")
+    contract._client_factory = factory
+
+    with pytest.raises(ValueError):
+        contract.parse_input({**azure_form, field_name: " \t"})
+
+    assert factory.calls == []
+
+
+def test_nonblank_provider_fields_receive_no_semantic_or_live_validation() -> None:
+    """Opaque nonblank identifiers parse locally without cloud access."""
+    contract = _contract("azure/storage")
+    provider = contract.parse_input(
+        {
+            "azure_tenant_id": "!",
+            "azure_client_id": "?",
+            "azure_client_secret": "#",
+            "azure_subscription_id": "$",
+            "azure_provider": "%",
+        }
+    )
+
+    assert provider.azure_tenant_id == "!"
+    assert provider.azure_subscription_id == "$"
+
+
+def test_mapping_order_shared_outputs_and_dynamic_trace(
+    azure_form: dict[str, object], azure_ocsf_record_factory: Any
+) -> None:
+    """Keep ordered CHK.005 output while tracing the same dynamic findings."""
     records = [
-        ocsf_record_factory("first", provider="AWS"),
-        ocsf_record_factory("excluded", provider="azure"),
-        ocsf_record_factory("second", status="PASS"),
+        azure_ocsf_record_factory("first", provider="Azure", status="PASS"),
+        azure_ocsf_record_factory("excluded", provider="aws", status="FAIL"),
+        azure_ocsf_record_factory("second", status="FAIL"),
     ]
     artifact = json.dumps(records).encode()
     factory = _ClientFactory(
@@ -164,9 +203,9 @@ def test_mapping_order_shared_outputs_and_safe_trace(
             parsed=artifact,
         )
     )
-    contract = _contract("aws/iam")
+    contract = _contract("azure/storage")
     contract._client_factory = factory
-    provider = contract.parse_input(aws_form)
+    provider = contract.parse_input(azure_form)
 
     outcome = contract.execute(ProwlerConfig(), provider)
     payload = contract.output_payload(outcome.findings)
@@ -180,24 +219,25 @@ def test_mapping_order_shared_outputs_and_safe_trace(
     )
 
     assert tuple(item.value for item in outcome.findings) == ("first", "second")
-    assert all("service" not in item.model_dump() for item in outcome.findings)
     assert tuple(json.loads(item)["value"] for item in payload["findings"]) == (
         "first",
         "second",
     )
-    assert "aws/iam" in trace
-    assert "service=iam" in trace
+    assert tuple(item["name"] for item in payload["vulnerabilities"]) == ("second",)
+    assert all(name in trace for name in ("first", "second"))
+    raw_section_index = trace.index("[PROWLER] Raw OCSF evidence (bounded preview)")
+    assert "excluded" not in trace[:raw_section_index]
+    assert trace.index("Prowler Findings") < raw_section_index
     assert outcome.raw_record_count == 3
     assert outcome.raw_output_bytes == len(artifact)
-    assert trace.index("Prowler Findings") < trace.index(
-        "[PROWLER] Raw OCSF evidence (bounded preview)"
+    assert "azure/storage" in trace
+    assert "service=storage" in trace
+    canaries = (
+        azure_form["azure_tenant_id"],
+        azure_form["azure_client_id"],
+        azure_form["azure_client_secret"],
     )
-    credential_canaries = (
-        aws_form["aws_access_key_id"],
-        aws_form["aws_secret_access_key"],
-        aws_form["aws_session_token"],
-    )
-    assert all(str(marker) not in trace for marker in credential_canaries)
+    assert all(str(marker) not in trace for marker in canaries)
 
 
 @dataclass
@@ -214,12 +254,12 @@ class _Engine:
         return CommandResult(
             specification=ExecutionSpecification(
                 executable=specification.executable,
-                arguments=(*specification.arguments, "ARGV-CANARY"),
+                arguments=(*specification.arguments, "PROCESS-ARGV-CANARY"),
                 environment=(
                     *specification.environment,
-                    ("ENV-NAME-CANARY", "ENV-VALUE-CANARY"),
+                    ("PROCESS-ENV-NAME-CANARY", "PROCESS-ENV-VALUE-CANARY"),
                 ),
-                working_directory="/tmp/TEMP-WORKDIR-CANARY",  # noqa: S108
+                working_directory="/tmp/PROCESS-WORKDIR-CANARY",  # noqa: S108
                 input_bytes=specification.input_bytes,
                 output=specification.output,
                 timeout_seconds=specification.timeout_seconds,
@@ -228,8 +268,8 @@ class _Engine:
                 ),
             ),
             return_code=0,
-            stdout=b"\x1b[31mCONSOLE-NON-JSON-CANARY\x1b[0m",
-            stderr=b"STDERR-CANARY",
+            stdout=b"\x1b[31mPROCESS-STDOUT-CANARY\x1b[0m",
+            stderr=b"PROCESS-STDERR-CANARY",
         )
 
 
@@ -250,7 +290,7 @@ class _NoLeaseFactory:
     def create(self, secret: Any, *, suffix: str) -> Any:
         del secret, suffix
         self.calls += 1
-        raise AssertionError("AWS must not create credential files")
+        raise AssertionError("Azure must not create credential files")
 
 
 class _InjectApi:
@@ -292,32 +332,41 @@ def _message(route: str, service: str, content: dict[str, object]) -> dict[str, 
 
 
 @pytest.mark.parametrize(("route", "service"), _ROUTES)
-def test_runtime_one_call_exact_service_argv_and_canaries(
+def test_runtime_one_call_exact_service_argv_outputs_and_canaries(
     route: str,
     service: str,
-    aws_form: dict[str, object],
-    ocsf_record_factory: Any,
+    azure_form: dict[str, object],
+    azure_ocsf_record_factory: Any,
 ) -> None:
-    """The full runtime uses one fake execution and emits exact non-shell argv."""
+    """The full runtime uses one fake execution and preserves safe dynamic output."""
     from prowler.injector import ProwlerInjector
 
-    finding_name = f"CALLBACK-FINDING-CANARY-{service}"
-    engine = _Engine(json.dumps([ocsf_record_factory(finding_name)]).encode())
+    callback_name = f"CALLBACK-CANARY-{service}"
+    finding_name = f"FINDING-CANARY-{service}"
+    records = [
+        azure_ocsf_record_factory(callback_name, status="PASS"),
+        azure_ocsf_record_factory(finding_name, status="FAIL"),
+        azure_ocsf_record_factory("excluded", provider="aws", status="FAIL"),
+    ]
+    engine = _Engine(json.dumps(records).encode())
     engine_factory = _EngineFactory(engine)
     leases = _NoLeaseFactory()
     contract = _contract(route)
     contract._client_factory = ProwlerClientFactory(engine_factory, leases)
     helper = _Helper()
     ProwlerInjector(_config(), helper).process_message(
-        _message(route, service, aws_form)
+        _message(route, service, azure_form)
     )
 
     assert engine_factory.calls == 1
     assert len(engine.requests) == 1
     assert tuple(engine.requests[0].arguments) == (
-        "aws",
-        "--region",
-        "eu-west-1",
+        "azure",
+        "--sp-env-auth",
+        "--subscription-id",
+        "SUBSCRIPTION-CANARY",
+        "--azure-region",
+        "PROVIDER-CANARY",
         "--services",
         service,
         "--output-directory",
@@ -332,14 +381,6 @@ def test_runtime_one_call_exact_service_argv_and_canaries(
         "-M",
         "json-ocsf",
     )
-    assert tuple(engine.requests[0].environment) == (
-        ("AWS_ACCESS_KEY_ID", SecretStr("CANARY-ACCESS-KEY")),
-        ("AWS_SECRET_ACCESS_KEY", SecretStr("CANARY-SECRET-KEY")),
-        ("AWS_SESSION_TOKEN", SecretStr("CANARY-SESSION-TOKEN")),
-        ("AWS_ENDPOINT_URL", "https://aws.internal.example:8443"),
-    )
-    assert str(aws_form["aws_endpoint_url"]) not in engine.requests[0].arguments
-    assert "AWS_ENDPOINT_URL" not in engine.requests[0].arguments
     assert "-c" not in engine.requests[0].arguments
     assert tuple(event[0] for event in helper.api.inject.events) == (
         "reception",
@@ -347,22 +388,37 @@ def test_runtime_one_call_exact_service_argv_and_canaries(
     )
     callback = helper.api.inject.events[1][2]
     assert callback["execution_status"] == "SUCCESS"
-    callback_sensitive_canaries = (
-        aws_form["aws_access_key_id"],
-        aws_form["aws_secret_access_key"],
-        aws_form["aws_session_token"],
-        aws_form["aws_endpoint_url"],
-        "ARGV-CANARY",
-        "ENV-NAME-CANARY",
-        "ENV-VALUE-CANARY",
-        "STDERR-CANARY",
-        "CONSOLE-NON-JSON-CANARY",
-        "/tmp/TEMP-WORKDIR-CANARY",  # noqa: S108 - deliberate leak canary
+    mapped_names = (callback_name, finding_name)
+    structured = json.loads(callback["execution_output_structured"])
+    assert tuple(json.loads(item)["value"] for item in structured["findings"]) == (
+        mapped_names
     )
-    serialized_callback = json.dumps(callback)
-    assert finding_name in serialized_callback
+    assert tuple(item["name"] for item in structured["vulnerabilities"]) == (
+        finding_name,
+    )
+    assert all(name in callback["execution_message"] for name in mapped_names)
+    raw_section_index = callback["execution_message"].index(
+        "[PROWLER] Raw OCSF evidence (bounded preview)"
+    )
+    assert "excluded" not in callback["execution_message"][:raw_section_index]
+    assert str(azure_form["azure_subscription_id"]) in callback["execution_message"]
+    assert str(azure_form["azure_provider"]) in callback["execution_message"]
+    callback_excluded_canaries = (
+        azure_form["azure_tenant_id"],
+        azure_form["azure_client_id"],
+        azure_form["azure_client_secret"],
+        "FORM-CANARY",
+        "PROCESS-ARGV-CANARY",
+        "PROCESS-ENV-NAME-CANARY",
+        "PROCESS-ENV-VALUE-CANARY",
+        "PROCESS-STDOUT-CANARY",
+        "PROCESS-STDERR-CANARY",
+        "/tmp/PROCESS-WORKDIR-CANARY",  # noqa: S108 - deliberate leak canary
+        "EXCEPTION-FIELD-CANARY",
+        "EXCEPTION-VALUE-CANARY",
+    )
     assert all(
-        str(marker) not in serialized_callback for marker in callback_sensitive_canaries
+        str(marker) not in json.dumps(callback) for marker in callback_excluded_canaries
     )
     assert leases.calls == 0
 
@@ -401,22 +457,20 @@ def test_runtime_one_call_exact_service_argv_and_canaries(
         assert event.metadata is not None
         assert event.metadata["contract_id"] == identifier
         assert event.metadata["route"] == route
-        assert event.metadata["provider"] == "aws"
+        assert event.metadata["provider"] == "azure"
     for event in logs[3:]:
         assert event.metadata is not None
-        assert event.metadata["aws_account_id"] == "123456789012"
-        assert event.metadata["aws_region"] == "eu-west-1"
-        assert event.metadata["aws_session_token_present"] is True
-        assert event.metadata["aws_endpoint_override_present"] is True
-        assert event.metadata["aws_endpoint_origin"] == (
-            "https://aws.internal.example:8443"
-        )
+        assert event.metadata["azure_tenant_id_present"] is True
+        assert event.metadata["azure_client_id_present"] is True
+        assert event.metadata["azure_client_secret_present"] is True
+        assert event.metadata["azure_subscription_id"] == "SUBSCRIPTION-CANARY"
+        assert event.metadata["azure_provider"] == "PROVIDER-CANARY"
     success_metadata = logs[5].metadata
     assert success_metadata is not None
     assert success_metadata["status"] == "SUCCESS"
-    assert success_metadata["finding_count"] == 1
+    assert success_metadata["finding_count"] == 2
     assert success_metadata["vulnerability_count"] == 1
-    assert success_metadata["raw_record_count"] == 1
+    assert success_metadata["raw_record_count"] == 3
     assert success_metadata["raw_output_bytes"] == len(engine.payload)
     callback_metadata = logs[6].metadata
     assert callback_metadata is not None
@@ -424,20 +478,12 @@ def test_runtime_one_call_exact_service_argv_and_canaries(
     assert callback_metadata["delivery_status"] == "SUCCESS"
     assert "status" not in callback_metadata
     assert "attempted_status" not in callback_metadata
-    log_canaries = (
-        aws_form["aws_access_key_id"],
-        aws_form["aws_secret_access_key"],
-        aws_form["aws_session_token"],
-        "ARGV-CANARY",
-        "ENV-NAME-CANARY",
-        "ENV-VALUE-CANARY",
-        "STDERR-CANARY",
-        "/tmp/TEMP-WORKDIR-CANARY",  # noqa: S108 - deliberate leak canary
+    log_excluded_canaries = (
+        *callback_excluded_canaries,
+        callback_name,
         finding_name,
-        "EXCEPTION-FIELD-CANARY",
-        "EXCEPTION-VALUE-CANARY",
     )
-    assert all(str(marker) not in repr(logs) for marker in log_canaries)
+    assert all(str(marker) not in repr(logs) for marker in log_excluded_canaries)
 
     invalid_helper = _Helper()
     ProwlerInjector(_config(), invalid_helper).process_message(
@@ -445,8 +491,8 @@ def test_runtime_one_call_exact_service_argv_and_canaries(
             route,
             service,
             {
-                **aws_form,
-                "aws_account_id": "INVALID-ACCOUNT-CANARY",
+                **azure_form,
+                "azure_subscription_id": " ",
                 "EXCEPTION-FIELD-CANARY": "EXCEPTION-VALUE-CANARY",
             },
         )
@@ -458,15 +504,9 @@ def test_runtime_one_call_exact_service_argv_and_canaries(
     )
     invalid_callback = invalid_helper.api.inject.events[1][2]
     assert invalid_callback["execution_status"] == "ERROR"
-    invalid_callback_canaries = (
-        *callback_sensitive_canaries,
-        "INVALID-ACCOUNT-CANARY",
-        "EXCEPTION-FIELD-CANARY",
-        "EXCEPTION-VALUE-CANARY",
-    )
     assert all(
         str(marker) not in json.dumps(invalid_callback)
-        for marker in invalid_callback_canaries
+        for marker in log_excluded_canaries
     )
     assert engine_factory.calls == 1
 
@@ -500,7 +540,7 @@ def test_runtime_one_call_exact_service_argv_and_canaries(
         assert event.metadata is not None
         assert event.metadata["contract_id"] == identifier
         assert event.metadata["route"] == route
-        assert event.metadata["provider"] == "aws"
+        assert event.metadata["provider"] == "azure"
     failure_metadata = invalid_logs[3].metadata
     assert failure_metadata is not None
     assert failure_metadata["status"] == "ERROR"
@@ -512,11 +552,11 @@ def test_runtime_one_call_exact_service_argv_and_canaries(
     )
     assert failure_metadata["issues"] == [
         {
-            "location": ["aws", "aws_account_id"],
-            "type": "string_pattern_mismatch",
+            "location": ["azure", "azure_subscription_id"],
+            "type": "value_error",
         },
         {
-            "location": ["aws", "unrecognized_field"],
+            "location": ["azure", "unrecognized_field"],
             "type": "extra_forbidden",
         },
     ]
@@ -528,41 +568,18 @@ def test_runtime_one_call_exact_service_argv_and_canaries(
     assert invalid_callback_metadata["delivery_status"] == "SUCCESS"
     assert "status" not in invalid_callback_metadata
     assert "attempted_status" not in invalid_callback_metadata
-    assert all(str(marker) not in repr(invalid_logs) for marker in log_canaries)
-    assert "INVALID-ACCOUNT-CANARY" not in repr(invalid_logs)
-
-
-def test_service_aws_endpoint_url_remains_optional(
-    aws_form: dict[str, object], ocsf_record_factory: Any
-) -> None:
-    """Omitting the optional endpoint leaves both environment and argv unchanged."""
-    engine = _Engine(json.dumps([ocsf_record_factory("iam")]).encode())
-    contract = _contract("aws/iam")
-    contract._client_factory = ProwlerClientFactory(
-        _EngineFactory(engine), _NoLeaseFactory()
-    )
-    form_without_endpoint = {
-        key: value for key, value in aws_form.items() if key != "aws_endpoint_url"
-    }
-
-    contract.execute(ProwlerConfig(), contract.parse_input(form_without_endpoint))
-
-    assert "AWS_ENDPOINT_URL" not in dict(engine.requests[0].environment)
-    assert "AWS_ENDPOINT_URL" not in engine.requests[0].arguments
-    service_index = engine.requests[0].arguments.index("--services")
-    assert tuple(engine.requests[0].arguments[service_index : service_index + 2]) == (
-        "--services",
-        "iam",
+    assert all(
+        str(marker) not in repr(invalid_logs) for marker in log_excluded_canaries
     )
 
 
 def test_existing_check_filter_argv_is_unchanged(
-    aws_form: dict[str, object], ocsf_record_factory: Any
+    azure_form: dict[str, object], azure_ocsf_record_factory: Any
 ) -> None:
     """The selector seam does not repurpose or remove CHK.004 check filtering."""
-    engine = _Engine(json.dumps([ocsf_record_factory("existing")]).encode())
+    engine = _Engine(json.dumps([azure_ocsf_record_factory("existing")]).encode())
     factory = ProwlerClientFactory(_EngineFactory(engine), _NoLeaseFactory())
-    provider = _contract("aws").parse_input(aws_form)
+    provider = _contract("azure").parse_input(azure_form)
 
     factory.run(
         ProwlerConfig(executable_path="/fake/prowler"),
@@ -578,20 +595,19 @@ def test_existing_check_filter_argv_is_unchanged(
     assert "--services" not in engine.requests[0].arguments
 
 
-def test_aws_service_selector_rejects_azure_before_engine() -> None:
+def test_azure_service_selector_rejects_aws_before_engine() -> None:
     """Provider/selector combinations are validated before any CLI call."""
     engine = _Engine(b"[]")
     factory = ProwlerClientFactory(_EngineFactory(engine), _NoLeaseFactory())
-    provider = AzureProviderInput(
-        provider="azure",
-        azure_client_id="client",
-        azure_client_secret="secret",
-        azure_tenant_id="tenant",
-        azure_subscription_id="subscription",
-        azure_provider="azure",
+    provider = AwsProviderInput(
+        provider="aws",
+        aws_access_key_id="access",
+        aws_secret_access_key="secret",
+        aws_account_id="123456789012",
+        aws_region="eu-west-1",
     )
 
-    with pytest.raises(ValueError, match="AWS service selector"):
-        factory.run(ProwlerConfig(), provider, service_selector="s3")
+    with pytest.raises(ValueError, match="Azure service selector"):
+        factory.run(ProwlerConfig(), provider, service_selector=cast(Any, "storage"))
 
     assert engine.requests == []

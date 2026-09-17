@@ -398,7 +398,7 @@ def test_runtime_start_logs_one_fixed_listener_event() -> None:
     assert message == _LISTENER_START
     assert metadata["injector_id"] == "injector-test"
     assert metadata["injector_name"] == "Prowler"
-    assert metadata["registered_contract_count"] == 7
+    assert metadata["registered_contract_count"] == 9
     assert metadata["configured_executable_path"] == "/usr/local/bin/prowler"
     assert set(metadata) == {
         "injector_id",
@@ -1317,7 +1317,7 @@ def test_runtime_resolved_contract_uses_renderer_for_safe_error(
 
 
 def test_default_registry_and_daemon_config_register_executable_routes() -> None:
-    """CHK.011 adds three AWS services after the four canonical base routes."""
+    """CHK.012 adds two Azure services after the CHK.011 executable routes."""
     subject = _subject()
     contracts = subject.DEFAULT_PROWLER_CONTRACTS.contracts()
     assert [item["contract_id"] for item in contracts] == [
@@ -1328,6 +1328,8 @@ def test_default_registry_and_daemon_config_register_executable_routes() -> None
         str(subject.stable_contract_id("aws/iam")),
         str(subject.stable_contract_id("aws/s3")),
         str(subject.stable_contract_id("aws/ec2")),
+        str(subject.stable_contract_id("azure/iam")),
+        str(subject.stable_contract_id("azure/storage")),
     ]
     daemon = _config().to_daemon_config()
     assert daemon.get("injector_contracts") == contracts
