@@ -1,5 +1,6 @@
-"""Reusable CHK.006 contract declarations; no contracts are registered here."""
+"""Prowler contract declarations and the executable default registry."""
 
+from .aws import AwsBaseContract
 from .base import (
     BaseProwlerContract,
     ContractExecutionOutcome,
@@ -19,6 +20,7 @@ from .registry import (
 
 __all__ = [
     "BaseProwlerContract",
+    "AwsBaseContract",
     "ContractDispatcher",
     "ContractExecutionOutcome",
     "ContractInputError",
