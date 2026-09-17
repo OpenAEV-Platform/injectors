@@ -9,9 +9,9 @@ from uuid import UUID
 
 import pytest
 from pyoaev.configuration import ConfigLoaderOAEV  # type: ignore[import-untyped]
-from pyoaev.contracts.contract_config import (
+from pyoaev.contracts.contract_config import (  # type: ignore[import-untyped]
     ContractOutputType,
-)  # type: ignore[import-untyped]
+)
 from pyoaev.utils import AppLogger  # type: ignore[import-untyped]
 
 from prowler._core.cli_engine import (
