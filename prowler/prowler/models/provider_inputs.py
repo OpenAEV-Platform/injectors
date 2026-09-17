@@ -38,10 +38,6 @@ class ImmutableProviderInput(BaseModel):
 class AwsProviderInput(ImmutableProviderInput):
     """AWS provider form input."""
 
-    model_config = ConfigDict(
-        extra="forbid", strict=True, hide_input_in_errors=True, frozen=True
-    )
-
     provider: Literal["aws"]
     aws_access_key_id: NonBlankStr
     aws_secret_access_key: NonBlankSecretStr
@@ -52,10 +48,6 @@ class AwsProviderInput(ImmutableProviderInput):
 
 class AzureProviderInput(ImmutableProviderInput):
     """Azure provider form input."""
-
-    model_config = ConfigDict(
-        extra="forbid", strict=True, hide_input_in_errors=True, frozen=True
-    )
 
     provider: Literal["azure"]
     azure_tenant_id: NonBlankStr
@@ -68,10 +60,6 @@ class AzureProviderInput(ImmutableProviderInput):
 class GcpProviderInput(ImmutableProviderInput):
     """GCP provider form input."""
 
-    model_config = ConfigDict(
-        extra="forbid", strict=True, hide_input_in_errors=True, frozen=True
-    )
-
     provider: Literal["gcp"]
     gcp_service_account_json: NonBlankSecretStr
     gcp_project_id: NonBlankStr
@@ -79,10 +67,6 @@ class GcpProviderInput(ImmutableProviderInput):
 
 class KubernetesProviderInput(ImmutableProviderInput):
     """Kubernetes provider form input."""
-
-    model_config = ConfigDict(
-        extra="forbid", strict=True, hide_input_in_errors=True, frozen=True
-    )
 
     provider: Literal["kubernetes"]
     kubernetes_kubeconfig: NonBlankSecretStr
