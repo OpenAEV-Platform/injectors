@@ -83,6 +83,13 @@ _COMPLIANCE_PROVIDER_TYPES: dict[ComplianceSelector, type[ImmutableProviderInput
     "cis_3.0_azure": AzureProviderInput,
     "cis_3.0_gcp": GcpProviderInput,
     "cis_1.12_kubernetes": KubernetesProviderInput,
+    "nis2_aws": AwsProviderInput,
+    "nis2_azure": AzureProviderInput,
+    "nis2_gcp": GcpProviderInput,
+    "iso27001_2022_aws": AwsProviderInput,
+    "iso27001_2022_azure": AzureProviderInput,
+    "iso27001_2022_gcp": GcpProviderInput,
+    "iso27001_2022_kubernetes": KubernetesProviderInput,
 }
 
 

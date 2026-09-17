@@ -93,7 +93,7 @@ def test_default_registration_identity_fields_and_outputs() -> None:
     serialized = DEFAULT_PROWLER_CONTRACTS.contracts()
     expected_id = stable_contract_id("kubernetes")
 
-    assert len(serialized) == 15
+    assert len(serialized) == 22
     assert [item["contract_id"] for item in serialized] == [
         str(stable_contract_id("aws")),
         str(stable_contract_id("azure")),
@@ -110,6 +110,13 @@ def test_default_registration_identity_fields_and_outputs() -> None:
         str(stable_contract_id("cis/azure")),
         str(stable_contract_id("cis/gcp")),
         str(stable_contract_id("cis/kubernetes")),
+        str(stable_contract_id("nis2/aws")),
+        str(stable_contract_id("nis2/azure")),
+        str(stable_contract_id("nis2/gcp")),
+        str(stable_contract_id("iso27001/aws")),
+        str(stable_contract_id("iso27001/azure")),
+        str(stable_contract_id("iso27001/gcp")),
+        str(stable_contract_id("iso27001/kubernetes")),
     ]
     assert UUID(serialized[3]["contract_id"]) == expected_id
     assert expected_id.version == 5
