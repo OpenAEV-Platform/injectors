@@ -11,26 +11,16 @@ import pytest
 from pydantic import SecretStr
 from pyoaev.configuration import ConfigLoaderOAEV
 
-from prowler._core.cli_engine import (
-    CommandResult,
-    ExecutionSpecification,
-    OutputSpecification,
-    ValidatedCommandRequest,
-)
-from prowler._core.prowler_client import (
-    OUTPUT_ARTIFACT_FILENAME,
-    ProwlerClientFactory,
-)
-from prowler.contracts import (
-    DEFAULT_PROWLER_CONTRACTS,
-    AwsServiceContract,
-    stable_contract_id,
-)
-from prowler.models.configs.config_loader import (
-    ConfigLoader,
-    InjectorConfig,
-    ProwlerConfig,
-)
+from prowler._core.cli_engine import (CommandResult, ExecutionSpecification,
+                                      OutputSpecification,
+                                      ValidatedCommandRequest)
+from prowler._core.prowler_client import (OUTPUT_ARTIFACT_FILENAME,
+                                          ProwlerClientFactory)
+from prowler.contracts import (CREDENTIAL_REFERENCE_KEY,
+                               DEFAULT_PROWLER_CONTRACTS, AwsServiceContract,
+                               stable_contract_id)
+from prowler.models.configs.config_loader import (ConfigLoader, InjectorConfig,
+                                                  ProwlerConfig)
 from prowler.models.provider_inputs import AzureProviderInput
 
 from .conftest import RecordingLogger
@@ -144,6 +134,7 @@ def test_registry_has_32_canonical_contracts_with_exact_provider_fields() -> Non
             "aws_region",
             "aws_endpoint_url",
             "aws_session_token",
+            CREDENTIAL_REFERENCE_KEY,
         )
         assert all(route in output["labels"] for output in content["outputs"])
 

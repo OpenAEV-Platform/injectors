@@ -12,21 +12,14 @@ import pytest
 from pydantic import SecretStr
 from pyoaev.configuration import ConfigLoaderOAEV
 
-from prowler._core.cli_engine import (
-    CommandResult,
-    ExecutionSpecification,
-    ValidatedCommandRequest,
-)
-from prowler._core.prowler_client import (
-    OUTPUT_ARTIFACT_FILENAME,
-    ProwlerClientFactory,
-)
-from prowler.contracts import DEFAULT_PROWLER_CONTRACTS, stable_contract_id
-from prowler.models.configs.config_loader import (
-    ConfigLoader,
-    InjectorConfig,
-    ProwlerConfig,
-)
+from prowler._core.cli_engine import (CommandResult, ExecutionSpecification,
+                                      ValidatedCommandRequest)
+from prowler._core.prowler_client import (OUTPUT_ARTIFACT_FILENAME,
+                                          ProwlerClientFactory)
+from prowler.contracts import (CREDENTIAL_REFERENCE_KEY,
+                               DEFAULT_PROWLER_CONTRACTS, stable_contract_id)
+from prowler.models.configs.config_loader import (ConfigLoader, InjectorConfig,
+                                                  ProwlerConfig)
 from prowler.models.findings import OpenAevFinding
 
 from .conftest import RecordingLogger
@@ -135,6 +128,7 @@ def test_default_registration_identity_fields_and_outputs() -> None:
     assert tuple(field["key"] for field in content["fields"]) == (
         "gcp_service_account_json",
         "gcp_project_id",
+        CREDENTIAL_REFERENCE_KEY,
     )
     assert tuple(output["field"] for output in content["outputs"]) == (
         "findings",
