@@ -15,6 +15,7 @@ from prowler.models.configs.config_loader import ProwlerConfig
 from prowler.models.provider_inputs import (
     AwsProviderInput,
     AzureProviderInput,
+    GcpProviderInput,
     ProviderInput,
 )
 
@@ -121,7 +122,14 @@ class ProwlerClient:
             filters = tuple(check_filters)
             if any(not isinstance(item, str) or not item.strip() for item in filters):
                 raise ValueError("check filters must be nonblank strings")
-            if service_selector not in (None, "iam", "s3", "ec2", "storage"):
+            if service_selector not in (
+                None,
+                "iam",
+                "s3",
+                "ec2",
+                "storage",
+                "compute",
+            ):
                 raise ValueError("unsupported service selector")
             if service_selector in ("s3", "ec2") and not isinstance(
                 provider, AwsProviderInput
@@ -131,11 +139,15 @@ class ProwlerClient:
                 provider, AzureProviderInput
             ):
                 raise ValueError("Azure service selector requires an Azure provider")
+            if service_selector == "compute" and not isinstance(
+                provider, GcpProviderInput
+            ):
+                raise ValueError("GCP service selector requires a GCP provider")
             if service_selector == "iam" and not isinstance(
-                provider, AwsProviderInput | AzureProviderInput
+                provider, AwsProviderInput | AzureProviderInput | GcpProviderInput
             ):
                 raise ValueError(
-                    "IAM service selector requires an AWS or Azure provider"
+                    "IAM service selector requires an AWS, Azure, or GCP provider"
                 )
 
             _safe_log(logging.INFO, "Preparing Prowler output workspace")

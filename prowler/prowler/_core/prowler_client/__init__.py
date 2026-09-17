@@ -7,7 +7,12 @@ from .client import (
     ProwlerClient,
     ProwlerClientConsumedError,
 )
-from .contracts import AwsServiceSelector, AzureServiceSelector, ServiceSelector
+from .contracts import (
+    AwsServiceSelector,
+    AzureServiceSelector,
+    GcpServiceSelector,
+    ServiceSelector,
+)
 from .credentials import (
     CredentialCleanupError,
     TemporaryCredentialLease,
@@ -40,6 +45,7 @@ __all__ = [
     "OutputWorkspacePreparationError",
     "AwsServiceSelector",
     "AzureServiceSelector",
+    "GcpServiceSelector",
     "ProwlerClient",
     "ProwlerClientConsumedError",
     "ProwlerClientFactory",
