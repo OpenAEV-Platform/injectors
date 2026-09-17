@@ -10,6 +10,8 @@ from pathlib import Path
 from threading import Lock
 from typing import Literal
 
+from ._private_directory import make_private_directory
+
 OUTPUT_ARTIFACT_BASENAME = "findings"
 OUTPUT_ARTIFACT_FILENAME = "findings.ocsf.json"
 DEFAULT_MAXIMUM_ARTIFACT_BYTES = 100 * 1024 * 1024
@@ -31,8 +33,11 @@ _ARTIFACT_MESSAGES: dict[OutputArtifactErrorKind, str] = {
 class OutputArtifactError(RuntimeError):
     """Report a closed artifact failure without filesystem details."""
 
-    def __init__(self, kind: OutputArtifactErrorKind) -> None:
+    def __init__(
+        self, kind: OutputArtifactErrorKind, *, command_result: object | None = None
+    ) -> None:
         self.kind = kind
+        self.command_result = command_result
         super().__init__(_ARTIFACT_MESSAGES[kind])
 
 
@@ -40,13 +45,15 @@ class OutputWorkspacePreparationError(RuntimeError):
     """Report output-workspace creation failure without filesystem details."""
 
     def __init__(self) -> None:
+        self.command_result: object | None = None
         super().__init__("temporary output workspace preparation failed")
 
 
 class OutputWorkspaceCleanupError(RuntimeError):
     """Report output-workspace cleanup failure without filesystem details."""
 
-    def __init__(self) -> None:
+    def __init__(self, *, command_result: object | None = None) -> None:
+        self.command_result = command_result
         super().__init__("temporary output workspace cleanup failed")
 
 
@@ -168,8 +175,7 @@ class TemporaryOutputWorkspaceFactory:
 
         directory = Path(temporary_directory.name)
         try:
-            if self.platform_name != "nt":
-                os.chmod(directory, 0o700)
+            make_private_directory(directory, platform_name=self.platform_name)
         except BaseException:
             try:
                 temporary_directory.cleanup()

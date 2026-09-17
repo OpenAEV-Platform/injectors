@@ -90,6 +90,9 @@ _COMPLIANCE_PROVIDER_TYPES: dict[ComplianceSelector, type[ImmutableProviderInput
     "iso27001_2022_azure": AzureProviderInput,
     "iso27001_2022_gcp": GcpProviderInput,
     "iso27001_2022_kubernetes": KubernetesProviderInput,
+    "mitre_attack_aws": AwsProviderInput,
+    "mitre_attack_azure": AzureProviderInput,
+    "mitre_attack_gcp": GcpProviderInput,
 }
 
 

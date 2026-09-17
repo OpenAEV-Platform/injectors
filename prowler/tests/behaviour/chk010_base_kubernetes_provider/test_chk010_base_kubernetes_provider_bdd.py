@@ -89,11 +89,11 @@ class _ClientFactory:
 
 
 def test_default_registration_identity_fields_and_outputs() -> None:
-    """The four base routes remain first in the CHK.014 executable surface."""
+    """The four base routes remain first in the final executable surface."""
     serialized = DEFAULT_PROWLER_CONTRACTS.contracts()
     expected_id = stable_contract_id("kubernetes")
 
-    assert len(serialized) == 22
+    assert len(serialized) == 25
     assert [item["contract_id"] for item in serialized] == [
         str(stable_contract_id("aws")),
         str(stable_contract_id("azure")),
@@ -117,6 +117,9 @@ def test_default_registration_identity_fields_and_outputs() -> None:
         str(stable_contract_id("iso27001/azure")),
         str(stable_contract_id("iso27001/gcp")),
         str(stable_contract_id("iso27001/kubernetes")),
+        str(stable_contract_id("mitre/aws")),
+        str(stable_contract_id("mitre/azure")),
+        str(stable_contract_id("mitre/gcp")),
     ]
     assert UUID(serialized[3]["contract_id"]) == expected_id
     assert expected_id.version == 5

@@ -1,17 +1,9 @@
 """Executable NIS2 and ISO 27001 compliance contracts."""
 
-from typing import ClassVar
-
 from prowler._core.prowler_client import ComplianceSelector
-from prowler.models.configs.config_loader import ProwlerConfig
-from prowler.models.provider_inputs import ProviderInput
 
-from .base import (
-    BaseProwlerContract,
-    ContractExecutionOutcome,
-    ProviderName,
-    RouteFamily,
-)
+from .base import ProviderName
+from .compliance import FixedComplianceContract
 
 _NIS2_BY_PROVIDER: dict[ProviderName, ComplianceSelector] = {
     "aws": "nis2_aws",
@@ -26,40 +18,14 @@ _ISO27001_BY_PROVIDER: dict[ProviderName, ComplianceSelector] = {
 }
 
 
-class _FrameworkComplianceContract(BaseProwlerContract):
-    """Share fixed framework routing across the CHK.015 contract families."""
-
-    family: ClassVar[RouteFamily] = "compliance"
-    compliance_selector: ClassVar[ComplianceSelector]
-    compliance_by_provider: ClassVar[dict[ProviderName, ComplianceSelector]]
-    framework_name: ClassVar[str]
-
-    def safe_request_info(self, provider: ProviderInput | None) -> dict[str, object]:
-        """Identify framework selection through safe route metadata only."""
-        info = super().safe_request_info(provider)
-        info["filters"] = f"compliance={self.compliance_selector}"
-        return info
-
-    def execute(
-        self, config: ProwlerConfig, provider: ProviderInput
-    ) -> ContractExecutionOutcome:
-        """Reject unsupported route metadata before one compliance client call."""
-        if (
-            self.compliance_by_provider.get(self.provider) != self.compliance_selector
-            or provider.provider != self.provider
-        ):
-            raise ValueError(f"unsupported {self.framework_name} compliance selection")
-        return self._execute_compliance(config, provider, self.compliance_selector)
-
-
-class Nis2ComplianceContract(_FrameworkComplianceContract):
+class Nis2ComplianceContract(FixedComplianceContract):
     """Execute one provider-owned NIS2 selector through the CHK.004 seam."""
 
     compliance_by_provider = _NIS2_BY_PROVIDER
     framework_name = "NIS2"
 
 
-class Iso27001ComplianceContract(_FrameworkComplianceContract):
+class Iso27001ComplianceContract(FixedComplianceContract):
     """Execute one provider-owned ISO 27001 selector through the CHK.004 seam."""
 
     compliance_by_provider = _ISO27001_BY_PROVIDER

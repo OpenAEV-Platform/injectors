@@ -1,4 +1,4 @@
-"""Raw pytest executable contract for CHK.015."""
+"""Raw pytest executable contract for CHK.016."""
 
 from __future__ import annotations
 
@@ -21,35 +21,58 @@ from prowler._core.prowler_client import (
     OUTPUT_ARTIFACT_FILENAME,
     ProwlerClientFactory,
 )
-from prowler.contracts import DEFAULT_PROWLER_CONTRACTS, stable_contract_id
+from prowler.contracts import (
+    DEFAULT_PROWLER_CONTRACTS,
+    ROUTE_CATALOG,
+    stable_contract_id,
+)
 from prowler.models.configs.config_loader import (
     ConfigLoader,
     InjectorConfig,
     ProwlerConfig,
 )
+from prowler.models.findings import OpenAevFinding
 from prowler.models.provider_inputs import AwsProviderInput
 
 from .conftest import RecordingLogger
 
-_ROUTES = (
-    ("nis2/aws", "aws", "nis2_aws"),
-    ("nis2/azure", "azure", "nis2_azure"),
-    ("nis2/gcp", "gcp", "nis2_gcp"),
-    ("iso27001/aws", "aws", "iso27001_2022_aws"),
-    ("iso27001/azure", "azure", "iso27001_2022_azure"),
-    ("iso27001/gcp", "gcp", "iso27001_2022_gcp"),
-    ("iso27001/kubernetes", "kubernetes", "iso27001_2022_kubernetes"),
-)
-_EXISTING_COMPLIANCE = (
-    ("cis/aws", "aws", "cis_3.0_aws"),
-    ("cis/azure", "azure", "cis_3.0_azure"),
-    ("cis/gcp", "gcp", "cis_3.0_gcp"),
-    ("cis/kubernetes", "kubernetes", "cis_1.12_kubernetes"),
-)
-_CHK016_COMPLIANCE = (
+_MITRE_ROUTES = (
     ("mitre/aws", "aws", "mitre_attack_aws"),
     ("mitre/azure", "azure", "mitre_attack_azure"),
     ("mitre/gcp", "gcp", "mitre_attack_gcp"),
+)
+_FINAL_ROUTE_EXPECTATIONS = (
+    ("aws", "aws", None, None),
+    ("azure", "azure", None, None),
+    ("gcp", "gcp", None, None),
+    ("kubernetes", "kubernetes", None, None),
+    ("aws/iam", "aws", "iam", None),
+    ("aws/s3", "aws", "s3", None),
+    ("aws/ec2", "aws", "ec2", None),
+    ("azure/iam", "azure", "iam", None),
+    ("azure/storage", "azure", "storage", None),
+    ("gcp/iam", "gcp", "iam", None),
+    ("gcp/compute", "gcp", "compute", None),
+    ("cis/aws", "aws", None, "cis_3.0_aws"),
+    ("cis/azure", "azure", None, "cis_3.0_azure"),
+    ("cis/gcp", "gcp", None, "cis_3.0_gcp"),
+    ("cis/kubernetes", "kubernetes", None, "cis_1.12_kubernetes"),
+    ("nis2/aws", "aws", None, "nis2_aws"),
+    ("nis2/azure", "azure", None, "nis2_azure"),
+    ("nis2/gcp", "gcp", None, "nis2_gcp"),
+    ("iso27001/aws", "aws", None, "iso27001_2022_aws"),
+    ("iso27001/azure", "azure", None, "iso27001_2022_azure"),
+    ("iso27001/gcp", "gcp", None, "iso27001_2022_gcp"),
+    (
+        "iso27001/kubernetes",
+        "kubernetes",
+        None,
+        "iso27001_2022_kubernetes",
+    ),
+    *((route, provider, None, selector) for route, provider, selector in _MITRE_ROUTES),
+)
+_COMPLIANCE_SELECTORS = tuple(
+    selector for _, _, _, selector in _FINAL_ROUTE_EXPECTATIONS if selector is not None
 )
 _TEMP_PATHS = {
     "gcp": Path("/tmp/CANARY-GCP-CREDENTIAL.json"),  # noqa: S108
@@ -110,14 +133,81 @@ def _contract(route: str) -> Any:
     return DEFAULT_PROWLER_CONTRACTS.resolve(str(stable_contract_id(route)))
 
 
-@pytest.mark.parametrize(("route", "provider_name", "compliance"), _ROUTES)
-def test_route_selects_exact_typed_compliance_once(
+def test_final_registry_serializes_and_resolves_exactly_25_canonical_routes() -> None:
+    """Every canonical descriptor has one executable stable registry entry."""
+    expected_routes = tuple(item[0] for item in _FINAL_ROUTE_EXPECTATIONS)
+    serialized = DEFAULT_PROWLER_CONTRACTS.contracts()
+
+    assert tuple(route.route_name for route in ROUTE_CATALOG) == expected_routes
+    assert len(serialized) == 25
+    assert tuple(item["contract_id"] for item in serialized) == tuple(
+        str(stable_contract_id(route)) for route in expected_routes
+    )
+    for route, provider_name, _, _ in _FINAL_ROUTE_EXPECTATIONS:
+        contract = _contract(route)
+        content = json.loads(
+            next(
+                item["contract_content"]
+                for item in serialized
+                if item["contract_id"] == contract.contract_id
+            )
+        )
+        assert contract.route_name == route
+        assert contract.provider == provider_name
+        assert contract.family == next(
+            descriptor.family
+            for descriptor in ROUTE_CATALOG
+            if descriptor.route_name == route
+        )
+        assert content["external_id"] == f"prowler:{route}"
+        assert content["contract_id"] == str(stable_contract_id(route))
+
+
+def test_mitre_serialization_has_provider_fields_shared_outputs_and_no_selector() -> (
+    None
+):
+    """MITRE routes expose no user-controlled selector or invented report output."""
+    serialized = {
+        item["contract_id"]: item for item in DEFAULT_PROWLER_CONTRACTS.contracts()
+    }
+
+    for route, provider_name, _ in _MITRE_ROUTES:
+        item = serialized[str(stable_contract_id(route))]
+        content = json.loads(item["contract_content"])
+        keys = tuple(field["key"] for field in content["fields"])
+        assert keys == tuple(
+            field.key for field in _contract(provider_name).build_provider_fields()
+        )
+        assert all(
+            token not in key
+            for key in keys
+            for token in ("compliance", "framework", "selector")
+        )
+        assert tuple(
+            (output["type"], output["field"]) for output in content["outputs"]
+        ) == (("text", "findings"), ("vulnerability", "vulnerabilities"))
+        assert all(route in output["labels"] for output in content["outputs"])
+        assert provider_name in content["label"]["en"].casefold()
+
+
+def test_compliance_selector_type_contains_exact_final_values() -> None:
+    """The internal seam admits only the 14 route-owned compliance values."""
+    import prowler._core.prowler_client as client_api
+
+    selector_type = client_api.__dict__.get("ComplianceSelector")
+
+    assert selector_type is not None
+    assert get_args(selector_type) == _COMPLIANCE_SELECTORS
+
+
+@pytest.mark.parametrize(("route", "provider_name", "compliance"), _MITRE_ROUTES)
+def test_mitre_route_selects_exact_typed_compliance_once(
     route: str,
     provider_name: str,
     compliance: str,
     provider_forms: dict[str, dict[str, object]],
 ) -> None:
-    """A route-owned selector crosses the client seam once without other selectors."""
+    """A fixed selector crosses the existing compliance seam exactly once."""
     factory = _ClientFactory(CommandResult(specification=_specification()))
     contract = _contract(route)
     contract._client_factory = factory
@@ -130,92 +220,52 @@ def test_route_selects_exact_typed_compliance_once(
     assert factory.calls[0][2:] == ((), None, compliance)
 
 
-def test_compliance_selector_type_contains_exact_supported_values() -> None:
-    """The internal typed seam admits the existing and seven new exact values."""
-    import prowler._core.prowler_client as client_api
-
-    selector_type = client_api.__dict__.get("ComplianceSelector")
-
-    assert selector_type is not None
-    assert get_args(selector_type) == tuple(
-        item[2] for item in (*_EXISTING_COMPLIANCE, *_ROUTES, *_CHK016_COMPLIANCE)
-    )
-
-
-def test_registry_has_25_canonical_contracts_without_selector_fields() -> None:
-    """The executable public surface is stable, ordered, and not user-selectable."""
-    serialized = DEFAULT_PROWLER_CONTRACTS.contracts()
-    routes = (
-        "aws",
-        "azure",
-        "gcp",
-        "kubernetes",
-        "aws/iam",
-        "aws/s3",
-        "aws/ec2",
-        "azure/iam",
-        "azure/storage",
-        "gcp/iam",
-        "gcp/compute",
-        *(item[0] for item in _EXISTING_COMPLIANCE),
-        *(item[0] for item in _ROUTES),
-        *(item[0] for item in _CHK016_COMPLIANCE),
-    )
-
-    assert [item["contract_id"] for item in serialized] == [
-        str(stable_contract_id(route)) for route in routes
-    ]
-    for item, (route, provider_name, _) in zip(serialized[15:22], _ROUTES, strict=True):
-        content = json.loads(item["contract_content"])
-        assert route.split("/", maxsplit=1)[0] in content["label"]["en"].casefold()
-        keys = tuple(field["key"] for field in content["fields"])
-        assert keys
-        assert all("compliance" not in key and "framework" not in key for key in keys)
-        assert all(route in output["labels"] for output in content["outputs"])
-        assert keys == tuple(
-            field.key for field in _contract(provider_name).build_provider_fields()
-        )
-
-
-def test_unsupported_contract_selector_is_rejected_pre_client(
+def test_unsupported_mitre_contract_metadata_is_rejected_pre_client(
     provider_forms: dict[str, dict[str, object]],
 ) -> None:
-    """Invalid internal route metadata cannot consume the CHK.004 seam."""
+    """A provider/selector mismatch cannot consume the CHK.004 seam."""
     import prowler.contracts as contract_api
 
-    nis2_contract = contract_api.__dict__.get("Nis2ComplianceContract")
-    assert nis2_contract is not None
+    mitre_contract = contract_api.__dict__.get("MitreComplianceContract")
+    assert mitre_contract is not None
 
-    class InvalidNis2Contract(nis2_contract):
-        contract_id = str(stable_contract_id("nis2/aws"))
-        external_id = "prowler:nis2/aws"
-        route_name = "nis2/aws"
+    class InvalidMitreContract(mitre_contract):
+        contract_id = str(stable_contract_id("mitre/aws"))
+        external_id = "prowler:mitre/aws"
+        route_name = "mitre/aws"
         provider = "aws"
         label = "Invalid"
-        compliance_selector = "nis2_azure"
+        compliance_selector = "mitre_attack_azure"
 
     factory = _ClientFactory(CommandResult(specification=_specification()))
-    contract = InvalidNis2Contract(factory)
+    contract = InvalidMitreContract(factory)
 
-    with pytest.raises(ValueError, match="unsupported NIS2 compliance selection"):
+    with pytest.raises(ValueError, match="unsupported MITRE compliance selection"):
         contract.execute(ProwlerConfig(), contract.parse_input(provider_forms["aws"]))
 
     assert factory.calls == []
 
 
-def test_mapping_preserves_model_duplicates_compliance_outputs_and_trace(
-    provider_forms: dict[str, dict[str, object]], compliance_ocsf_record_factory: Any
+def test_mapping_preserves_mitre_values_duplicates_outputs_and_dynamic_trace(
+    provider_forms: dict[str, dict[str, object]], mitre_ocsf_record_factory: Any
 ) -> None:
-    """Keep CHK.005 findings unchanged across all existing presentation channels."""
-    duplicate = compliance_ocsf_record_factory(
-        "duplicate", compliance={"NIS2": ["21.1", "21.1", "21.2"]}
+    """Existing CHK.005 findings alone feed all three presentation channels."""
+    duplicate = mitre_ocsf_record_factory(
+        "duplicate",
+        compliance=("MITRE ATT&CK", "T1078", "T1078", "CIS 1.1"),
     )
     records = [
-        compliance_ocsf_record_factory("first", status="PASS", compliance=["a", "b"]),
+        mitre_ocsf_record_factory(
+            "first",
+            status="PASS",
+            compliance=("MITRE ATT&CK", "T1190", "ISO27001 A.5.1"),
+        ),
         duplicate,
         duplicate.copy(),
-        compliance_ocsf_record_factory("excluded", provider="azure"),
-        compliance_ocsf_record_factory("last", status="PASS", compliance=["z"]),
+        mitre_ocsf_record_factory("excluded", provider="azure"),
+        mitre_ocsf_record_factory(
+            "last", status="PASS", compliance=("MITRE ATT&CK", "T1530")
+        ),
     ]
     artifact = json.dumps(records).encode()
     factory = _ClientFactory(
@@ -226,7 +276,7 @@ def test_mapping_preserves_model_duplicates_compliance_outputs_and_trace(
             parsed=artifact,
         )
     )
-    contract = _contract("nis2/aws")
+    contract = _contract("mitre/aws")
     contract._client_factory = factory
     provider = contract.parse_input(provider_forms["aws"])
 
@@ -241,15 +291,34 @@ def test_mapping_preserves_model_duplicates_compliance_outputs_and_trace(
         raw_preview=outcome.raw_preview,
     )
 
-    expected = ("first", "duplicate", "duplicate", "last")
-    assert tuple(item.value for item in outcome.findings) == expected
-    assert tuple(item.compliance_tags for item in outcome.findings) == (
-        ("a", "b"),
-        ("NIS2:21.1", "NIS2:21.1", "NIS2:21.2"),
-        ("NIS2:21.1", "NIS2:21.1", "NIS2:21.2"),
-        ("z",),
+    expected_names = ("first", "duplicate", "duplicate", "last")
+    expected_tags = (
+        ("MITRE ATT&CK", "T1190", "ISO27001 A.5.1"),
+        ("MITRE ATT&CK", "T1078", "T1078", "CIS 1.1"),
+        ("MITRE ATT&CK", "T1078", "T1078", "CIS 1.1"),
+        ("MITRE ATT&CK", "T1530"),
     )
-    assert tuple(json.loads(item)["value"] for item in payload["findings"]) == expected
+    assert tuple(OpenAevFinding.model_fields) == (
+        "type",
+        "value",
+        "expectation_result",
+        "severity",
+        "severity_weight",
+        "asset_reference",
+        "asset_name",
+        "cloud_provider",
+        "region",
+        "cloud_account",
+        "compliance_tags",
+        "remediation",
+        "remediation_url",
+        "description",
+    )
+    assert tuple(item.value for item in outcome.findings) == expected_names
+    assert tuple(item.compliance_tags for item in outcome.findings) == expected_tags
+    assert tuple(json.loads(item) for item in payload["findings"]) == tuple(
+        item.model_dump(mode="json") for item in outcome.findings
+    )
     assert tuple(item["name"] for item in payload["vulnerabilities"]) == (
         "duplicate",
         "duplicate",
@@ -261,16 +330,129 @@ def test_mapping_preserves_model_duplicates_compliance_outputs_and_trace(
         if any(name in line for name in ("first", "duplicate", "last"))
     )
     assert (
-        tuple(next(name for name in expected if name in line) for line in rendered_rows)
-        == expected
+        tuple(
+            next(name for name in expected_names if name in line)
+            for line in rendered_rows
+        )
+        == expected_names
     )
+    assert tuple(payload) == ("findings", "vulnerabilities")
     assert "excluded" not in trace[:raw_section_index]
     assert trace.index("Prowler Findings") < raw_section_index
     assert outcome.raw_record_count == 5
     assert outcome.raw_output_bytes == len(artifact)
-    assert tuple(payload) == ("findings", "vulnerabilities")
-    assert "nis2/aws" in trace
-    assert "compliance=nis2_aws" in trace
+    assert "mitre/aws" in trace
+    assert "compliance=mitre_attack_aws" in trace
+
+
+def test_mapping_emits_only_enabled_boolean_compliance_tags(
+    provider_forms: dict[str, dict[str, object]], mitre_ocsf_record_factory: Any
+) -> None:
+    """Boolean mapping values become tags only when explicitly enabled."""
+    record = mitre_ocsf_record_factory(
+        "boolean-mapping",
+        compliance={
+            "MITRE ATT&CK": True,
+            "CIS 1.1": True,
+            "ISO27001": False,
+        },
+    )
+    factory = _ClientFactory(
+        CommandResult(
+            specification=_specification(),
+            return_code=0,
+            stdout=b"console output is not OCSF JSON",
+            parsed=json.dumps([record]).encode(),
+        )
+    )
+    contract = _contract("mitre/aws")
+    contract._client_factory = factory
+
+    outcome = contract.execute(
+        ProwlerConfig(), contract.parse_input(provider_forms["aws"])
+    )
+
+    assert outcome.findings[0].compliance_tags == ("MITRE ATT&CK", "CIS 1.1")
+
+
+class _InjectApi:
+    def __init__(self) -> None:
+        self.events: list[tuple[str, str, dict[str, Any]]] = []
+
+    def execution_reception(self, *, inject_id: str, data: dict[str, Any]) -> None:
+        self.events.append(("reception", inject_id, data))
+
+    def execution_callback(self, *, inject_id: str, data: dict[str, Any]) -> None:
+        self.events.append(("callback", inject_id, data))
+
+
+class _Helper:
+    def __init__(self) -> None:
+        self.api = type("Api", (), {})()
+        self.api.inject = _InjectApi()
+        self.injector_logger = RecordingLogger()
+
+
+def _config() -> ConfigLoader:
+    return ConfigLoader.model_construct(
+        openaev=ConfigLoaderOAEV(
+            url="http://127.0.0.1:8080", token="runtime-placeholder"
+        ),
+        injector=InjectorConfig(id="injector-test"),
+        prowler=ProwlerConfig(executable_path="/fake/prowler"),
+    )
+
+
+def _message(
+    route: str, provider_name: str, content: dict[str, object]
+) -> dict[str, object]:
+    return {
+        "injection": {
+            "inject_id": f"INJECT-ID-CANARY-{provider_name}",
+            "injector_contract_id": str(stable_contract_id(route)),
+            "inject_content": content,
+        }
+    }
+
+
+@pytest.mark.parametrize(
+    ("route", "provider_name", "service", "compliance"),
+    _FINAL_ROUTE_EXPECTATIONS,
+)
+def test_final_25_contracts_resolve_and_dispatch_once_through_runtime(
+    route: str,
+    provider_name: str,
+    service: str | None,
+    compliance: str | None,
+    provider_forms: dict[str, dict[str, object]],
+) -> None:
+    """The final registry runtime-resolves every route to one expected client call."""
+    from prowler.injector import ProwlerInjector
+
+    factory = _ClientFactory(
+        CommandResult(
+            specification=_specification(),
+            return_code=0,
+            stdout=b"console output is not OCSF JSON",
+            parsed=b"[]",
+        )
+    )
+    contract = _contract(route)
+    contract._client_factory = factory
+    helper = _Helper()
+    message = {
+        "injection": {
+            "inject_id": f"inject-{route}",
+            "injector_contract_id": str(stable_contract_id(route)),
+            "inject_content": provider_forms[provider_name],
+        }
+    }
+
+    ProwlerInjector(_config(), helper).process_message(message)
+
+    assert len(factory.calls) == 1
+    assert factory.calls[0][2:] == ((), service, compliance)
+    assert helper.api.inject.events[1][2]["execution_status"] == "SUCCESS"
 
 
 @dataclass
@@ -339,65 +521,23 @@ class _CredentialLeaseFactory:
         return _CredentialLease(self.lifecycle, _TEMP_PATHS[provider_name])
 
 
-class _InjectApi:
-    def __init__(self) -> None:
-        self.events: list[tuple[str, str, dict[str, Any]]] = []
-
-    def execution_reception(self, *, inject_id: str, data: dict[str, Any]) -> None:
-        self.events.append(("reception", inject_id, data))
-
-    def execution_callback(self, *, inject_id: str, data: dict[str, Any]) -> None:
-        self.events.append(("callback", inject_id, data))
-
-
-class _Helper:
-    def __init__(self) -> None:
-        self.api = type("Api", (), {})()
-        self.api.inject = _InjectApi()
-        self.injector_logger = RecordingLogger()
-
-
-def _config() -> ConfigLoader:
-    return ConfigLoader.model_construct(
-        openaev=ConfigLoaderOAEV(
-            url="http://127.0.0.1:8080", token="runtime-placeholder"
-        ),
-        injector=InjectorConfig(id="injector-test"),
-        prowler=ProwlerConfig(executable_path="/fake/prowler"),
-    )
-
-
-def _message(
-    route: str, provider_name: str, content: dict[str, object]
-) -> dict[str, object]:
-    return {
-        "injection": {
-            "inject_id": f"INJECT-ID-CANARY-{provider_name}",
-            "injector_contract_id": str(stable_contract_id(route)),
-            "inject_content": content,
-        }
-    }
-
-
-@pytest.mark.parametrize(("route", "provider_name", "compliance"), _ROUTES)
-def test_runtime_one_call_exact_compliance_argv_lifecycle_and_canaries(
+@pytest.mark.parametrize(("route", "provider_name", "compliance"), _MITRE_ROUTES)
+def test_mitre_runtime_lifecycle_logs_and_canaries(
     route: str,
     provider_name: str,
     compliance: str,
     provider_forms: dict[str, dict[str, object]],
-    compliance_ocsf_record_factory: Any,
+    mitre_ocsf_record_factory: Any,
 ) -> None:
-    """Runtime uses one fake request and preserves provider resource handling."""
+    """MITRE runtime logs safe lifecycle metadata for every owned provider."""
     from prowler.injector import ProwlerInjector
 
     callback_name = f"CALLBACK-CANARY-{provider_name}"
     finding_name = f"FINDING-CANARY-{provider_name}"
     records = [
-        compliance_ocsf_record_factory(
-            callback_name, provider=provider_name, status="PASS"
-        ),
-        compliance_ocsf_record_factory(finding_name, provider=provider_name),
-        compliance_ocsf_record_factory("excluded", provider="unsupported"),
+        mitre_ocsf_record_factory(callback_name, provider=provider_name, status="PASS"),
+        mitre_ocsf_record_factory(finding_name, provider=provider_name),
+        mitre_ocsf_record_factory("excluded", provider="unsupported"),
     ]
     lifecycle: list[str] = []
     engine = _Engine(json.dumps(records).encode(), lifecycle)
@@ -421,9 +561,15 @@ def test_runtime_one_call_exact_compliance_argv_lifecycle_and_canaries(
     )
     assert "-c" not in arguments
     assert "--services" not in arguments
-    if provider_name in _TEMP_PATHS:
-        suffix = ".json" if provider_name == "gcp" else ".yaml"
-        assert lifecycle == [f"create:{suffix}", "engine", "cleanup"]
+    environment_keys = tuple(key for key, _ in engine.requests[0].environment)
+    expected_environment_keys = {
+        "aws": ("AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY", "AWS_SESSION_TOKEN"),
+        "azure": ("AZURE_TENANT_ID", "AZURE_CLIENT_ID", "AZURE_CLIENT_SECRET"),
+        "gcp": (),
+    }
+    assert environment_keys == expected_environment_keys[provider_name]
+    if provider_name == "gcp":
+        assert lifecycle == ["create:.json", "engine", "cleanup"]
         assert len(leases.calls) == 1
     else:
         assert lifecycle == ["engine"]
@@ -452,7 +598,6 @@ def test_runtime_one_call_exact_compliance_argv_lifecycle_and_canaries(
         "aws": ("123456789012", "eu-west-1"),
         "azure": ("subscription-123", "Microsoft.Compute"),
         "gcp": ("acme-prod",),
-        "kubernetes": ("acme-prod-cluster",),
     }
     assert all(
         marker in callback["execution_message"]
@@ -472,7 +617,6 @@ def test_runtime_one_call_exact_compliance_argv_lifecycle_and_canaries(
             "azure_client_secret",
         ),
         "gcp": ("gcp_service_account_json",),
-        "kubernetes": ("kubernetes_kubeconfig",),
     }
     callback_excluded_canaries = tuple(
         str(provider_forms[provider_name][field_name])
@@ -545,10 +689,6 @@ def test_runtime_one_call_exact_compliance_argv_lifecycle_and_canaries(
             "gcp_project_id": "acme-prod",
             "gcp_credentials_present": True,
         },
-        "kubernetes": {
-            "kubernetes_context": "acme-prod-cluster",
-            "kubernetes_credentials_present": True,
-        },
     }
     for event in logs[3:]:
         assert event.metadata is not None
@@ -580,7 +720,6 @@ def test_runtime_one_call_exact_compliance_argv_lifecycle_and_canaries(
         "aws": "aws_account_id",
         "azure": "azure_subscription_id",
         "gcp": "gcp_project_id",
-        "kubernetes": "kubernetes_context",
     }
     invalid_field = invalid_fields[provider_name]
     invalid_helper = _Helper()
@@ -609,11 +748,7 @@ def test_runtime_one_call_exact_compliance_argv_lifecycle_and_canaries(
     expected_lifecycle = (
         ["engine"]
         if provider_name not in _TEMP_PATHS
-        else [
-            "create:.json" if provider_name == "gcp" else "create:.yaml",
-            "engine",
-            "cleanup",
-        ]
+        else ["create:.json", "engine", "cleanup"]
     )
     assert lifecycle == expected_lifecycle
 
@@ -675,53 +810,8 @@ def test_runtime_one_call_exact_compliance_argv_lifecycle_and_canaries(
     assert all(marker not in repr(invalid_logs) for marker in log_excluded_canaries)
 
 
-def test_existing_check_and_service_argv_are_unchanged(
-    provider_forms: dict[str, dict[str, object]],
-) -> None:
-    """Compliance selection does not repurpose either existing selector channel."""
-    lifecycle: list[str] = []
-    engine = _Engine(b"[]", lifecycle)
-    factory = ProwlerClientFactory(
-        _EngineFactory(engine), _CredentialLeaseFactory(lifecycle)
-    )
-    provider = _contract("aws").parse_input(provider_forms["aws"])
-
-    factory.run(
-        ProwlerConfig(executable_path="/fake/prowler"),
-        provider,
-        check_filters=("check-one",),
-    )
-    check_index = engine.requests[0].arguments.index("-c")
-    assert tuple(engine.requests[0].arguments[check_index : check_index + 2]) == (
-        "-c",
-        "check-one",
-    )
-    assert "--services" not in engine.requests[0].arguments
-    assert "--compliance" not in engine.requests[0].arguments
-
-    second_engine = _Engine(b"[]", [])
-    second_factory = ProwlerClientFactory(
-        _EngineFactory(second_engine), _CredentialLeaseFactory([])
-    )
-    second_provider = _contract("aws").parse_input(provider_forms["aws"])
-    second_factory.run(
-        ProwlerConfig(executable_path="/fake/prowler"),
-        second_provider,
-        service_selector="iam",
-    )
-    service_index = second_engine.requests[0].arguments.index("--services")
-    assert tuple(
-        second_engine.requests[0].arguments[service_index : service_index + 2]
-    ) == ("--services", "iam")
-    assert "-c" not in second_engine.requests[0].arguments
-    assert "--compliance" not in second_engine.requests[0].arguments
-
-
-@pytest.mark.parametrize("compliance", ("nis2_azure", "iso27001_2022_kubernetes"))
-def test_cross_provider_compliance_rejected_before_adapter_or_engine(
-    compliance: str,
-) -> None:
-    """Provider/selector pairs are validated before credentials or CLI use."""
+def test_cross_provider_mitre_is_rejected_before_adapter_or_engine() -> None:
+    """A mismatched internal selector cannot consume credentials or runtime."""
     lifecycle: list[str] = []
     engine = _Engine(b"[]", lifecycle)
     leases = _CredentialLeaseFactory(lifecycle)
@@ -738,7 +828,7 @@ def test_cross_provider_compliance_rejected_before_adapter_or_engine(
         factory.run(
             ProwlerConfig(),
             provider,
-            compliance_selector=cast(Any, compliance),
+            compliance_selector=cast(Any, "mitre_attack_azure"),
         )
 
     assert leases.calls == []
