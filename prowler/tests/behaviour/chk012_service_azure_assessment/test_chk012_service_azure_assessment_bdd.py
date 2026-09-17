@@ -16,11 +16,12 @@ from prowler._core.cli_engine import (
     OutputSpecification,
     ValidatedCommandRequest,
 )
-from prowler._core.prowler_client import (
-    OUTPUT_ARTIFACT_FILENAME,
-    ProwlerClientFactory,
+from prowler._core.prowler_client import OUTPUT_ARTIFACT_FILENAME, ProwlerClientFactory
+from prowler.contracts import (
+    CREDENTIAL_REFERENCE_KEY,
+    DEFAULT_PROWLER_CONTRACTS,
+    stable_contract_id,
 )
-from prowler.contracts import DEFAULT_PROWLER_CONTRACTS, stable_contract_id
 from prowler.models.configs.config_loader import (
     ConfigLoader,
     InjectorConfig,
@@ -139,6 +140,7 @@ def test_registry_has_32_canonical_contracts_with_exact_provider_fields() -> Non
             "azure_client_secret",
             "azure_subscription_id",
             "azure_provider",
+            CREDENTIAL_REFERENCE_KEY,
         )
         assert all(route in output["labels"] for output in content["outputs"])
 

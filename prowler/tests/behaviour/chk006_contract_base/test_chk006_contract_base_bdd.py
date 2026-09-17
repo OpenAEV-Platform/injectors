@@ -11,8 +11,8 @@ from unittest.mock import Mock
 
 import pytest
 from pydantic import SecretStr, ValidationError
-from pyoaev.contracts.contract_config import (
-    ContractText,  # type: ignore[import-untyped]
+from pyoaev.contracts.contract_config import (  # type: ignore[import-untyped]
+    ContractText,
 )
 
 from prowler._core.cli_engine import (
@@ -21,6 +21,7 @@ from prowler._core.cli_engine import (
     OutputSpecification,
 )
 from prowler._core.prowler_client.provider_adapter import ProviderInvocationAdapter
+from prowler.contracts import CREDENTIAL_REFERENCE_KEY
 from prowler.models.configs.config_loader import ProwlerConfig
 from prowler.models.provider_inputs import (
     PROVIDER_INPUT_ADAPTER,
@@ -76,7 +77,7 @@ PROVIDER_CASES = {
     ),
 }
 
-AWS_FIELD_KEYS = (
+AWS_CREDENTIAL_TEXT_KEYS = (
     "aws_access_key_id",
     "aws_secret_access_key",
     "aws_account_id",
@@ -84,6 +85,7 @@ AWS_FIELD_KEYS = (
     "aws_endpoint_url",
     "aws_session_token",
 )
+AWS_FIELD_KEYS = (*AWS_CREDENTIAL_TEXT_KEYS, CREDENTIAL_REFERENCE_KEY)
 
 
 def _contract_class(provider: str, **overrides: Any) -> type[Any]:
@@ -139,7 +141,7 @@ def test_minimal_subclass_builds_provider_specific_openaev_contract() -> None:
     assert tuple(fields) == AWS_FIELD_KEYS
     assert "plaintext" in fields["aws_secret_access_key"].label.lower()
     assert "plaintext" in fields["aws_session_token"].label.lower()
-    assert all(field.defaultValue == "" for field in fields.values())
+    assert all(fields[key].defaultValue == "" for key in AWS_CREDENTIAL_TEXT_KEYS)
     assert type(fields["aws_endpoint_url"]) is ContractText
     assert fields["aws_endpoint_url"].label == "AWS endpoint URL (optional)"
     assert fields["aws_endpoint_url"].mandatory is False

@@ -35,8 +35,8 @@ def stable_contract_id(route_name: str) -> UUID:
 
 
 # Deferred: selectable and universal derive their stable IDs from this module.
-from .selectable import (  # noqa: E402
-    AwsSelectComplianceContract,
+from .selectable import AwsSelectComplianceContract  # noqa: E402
+from .selectable import (
     AwsSelectServiceContract,
     AzureSelectComplianceContract,
     AzureSelectServiceContract,

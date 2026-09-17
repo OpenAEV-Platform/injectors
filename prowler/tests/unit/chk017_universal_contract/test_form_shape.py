@@ -6,6 +6,7 @@ import json
 from typing import Any, cast
 
 from prowler.contracts import (
+    CREDENTIAL_REFERENCE_KEY,
     DEFAULT_PROWLER_CONTRACTS,
     UniversalProwlerContract,
     stable_contract_id,
@@ -76,11 +77,19 @@ def _serialized() -> dict[str, Any]:
 
 
 def _expected_credential_fields() -> list[tuple[str, str, str, str, bool]]:
-    """Derive the 15 credential fields from the four fixed provider contracts."""
+    """Derive the 15 credential fields from the four fixed provider contracts.
+
+    The fixed contracts also expose a credential reference, but its key is
+    pinned by pyoaev, so the universal form carries exactly one unconditioned
+    copy instead of one per provider. It is excluded here and asserted on its
+    own in ``test_single_unconditioned_credential_reference``.
+    """
     expected: list[tuple[str, str, str, str, bool]] = []
     for provider in PROVIDERS:
         fixed = DEFAULT_PROWLER_CONTRACTS.resolve(str(stable_contract_id(provider)))
         for element in fixed.build_provider_fields():
+            if element.key == CREDENTIAL_REFERENCE_KEY:
+                continue
             expected.append(
                 (provider, element.key, element.label, element.type, element.mandatory)
             )
@@ -101,25 +110,51 @@ def test_route_table_metadata() -> None:
     assert contract.check_filters == ()
 
 
-def test_serialized_form_has_20_fields_in_exact_order() -> None:
-    """Assert exactly the 20 fields of the contract, in that exact order."""
+def test_serialized_form_has_21_fields_in_exact_order() -> None:
+    """Assert exactly the 21 fields of the contract, in that exact order."""
     content = _serialized()
     fields = content["fields"]
     expected_credential = _expected_credential_fields()
-    assert len(fields) == 20
+    assert len(fields) == 21
     assert [f["key"] for f in fields] == [
         PROVIDER_KEY,
+        CREDENTIAL_REFERENCE_KEY,
         *(key for _provider, key, _label, _type, _mandatory in expected_credential),
         *SERVICE_KEYS.values(),
         COMPLIANCE_KEY,
     ]
-    assert [f["label"] for f in fields[1:16]] == [
+    assert [f["label"] for f in fields[2:17]] == [
         label for _provider, _key, label, _type, _mandatory in expected_credential
     ]
-    assert [f["type"] for f in fields[1:16]] == [
+    assert [f["type"] for f in fields[2:17]] == [
         field_type
         for _provider, _key, _label, field_type, _mandatory in expected_credential
     ]
+
+
+def test_single_unconditioned_credential_reference() -> None:
+    """Assert one always-visible credential reference with no provider filter."""
+    fields = _serialized()["fields"]
+    references = [f for f in fields if f["key"] == CREDENTIAL_REFERENCE_KEY]
+    assert len(references) == 1
+    reference = references[0]
+    assert fields.index(reference) == 1
+    assert reference["type"] == "credential-reference"
+    assert reference["mandatory"] is True
+    assert reference["multiple"] is False
+    # The operator selects the provider through PROVIDER_KEY, so the universal
+    # contract deliberately carries no CredentialType filter.
+    assert reference["credential_reference_type"] is None
+    assert reference["visibleConditionFields"] == []
+    assert reference["visibleConditionValues"] == []
+    assert reference["mandatoryConditionFields"] == []
+    assert reference["mandatoryConditionValues"] == []
+
+
+def test_form_field_keys_are_unique() -> None:
+    """Assert the pinned credential-reference key collides with nothing."""
+    keys = [f["key"] for f in _serialized()["fields"]]
+    assert len(keys) == len(set(keys))
 
 
 def test_provider_select_shape_and_conditions_empty() -> None:
@@ -141,7 +176,7 @@ def test_provider_select_shape_and_conditions_empty() -> None:
 
 def test_credential_fields_carry_exact_condition_attributes() -> None:
     """Assert visibility and conditional mandatory wiring per provider."""
-    fields = _serialized()["fields"][1:16]
+    fields = _serialized()["fields"][2:17]
     expected_credential = _expected_credential_fields()
     assert len(fields) == 15
     mandatory_count = 0
@@ -169,8 +204,8 @@ def test_credential_fields_carry_exact_condition_attributes() -> None:
 def test_scope_selects_are_conditioned_single_with_explicit_none_defaults() -> None:
     """Assert provider services and global compliance use an explicit none choice."""
     fields = _serialized()["fields"]
-    services = fields[16:19]
-    compliance = fields[19]
+    services = fields[17:20]
+    compliance = fields[20]
     assert [service["key"] for service in services] == list(SERVICE_KEYS.values())
     assert compliance["key"] == COMPLIANCE_KEY
     for select in (*services, compliance):

@@ -17,11 +17,9 @@ from prowler._core.cli_engine import (
     OutputSpecification,
     ValidatedCommandRequest,
 )
-from prowler._core.prowler_client import (
-    OUTPUT_ARTIFACT_FILENAME,
-    ProwlerClientFactory,
-)
+from prowler._core.prowler_client import OUTPUT_ARTIFACT_FILENAME, ProwlerClientFactory
 from prowler.contracts import (
+    CREDENTIAL_REFERENCE_KEY,
     DEFAULT_PROWLER_CONTRACTS,
     AwsServiceContract,
     stable_contract_id,
@@ -144,6 +142,7 @@ def test_registry_has_32_canonical_contracts_with_exact_provider_fields() -> Non
             "aws_region",
             "aws_endpoint_url",
             "aws_session_token",
+            CREDENTIAL_REFERENCE_KEY,
         )
         assert all(route in output["labels"] for output in content["outputs"])
 

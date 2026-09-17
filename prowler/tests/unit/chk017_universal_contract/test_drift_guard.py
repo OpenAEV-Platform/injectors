@@ -13,10 +13,7 @@ from prowler.contracts import (
     stable_contract_id,
 )
 from prowler.contracts.selectable import SERVICE_SELECT_VALUES
-from prowler.contracts.universal import (
-    COMPLIANCE_SCOPE_OPTIONS,
-    SERVICE_SCOPE_OPTIONS,
-)
+from prowler.contracts.universal import COMPLIANCE_SCOPE_OPTIONS, SERVICE_SCOPE_OPTIONS
 
 PROVIDER_LABELS = {"aws": "AWS", "azure": "Azure", "gcp": "GCP"}
 _KUBERNETES_LABELS = {

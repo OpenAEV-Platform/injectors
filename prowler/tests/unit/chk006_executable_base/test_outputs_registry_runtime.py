@@ -32,11 +32,7 @@ from prowler.models.configs.config_loader import (
     InjectorConfig,
     ProwlerConfig,
 )
-from prowler.models.findings import (
-    OcsfPreviewRecord,
-    OpenAevFinding,
-    map_ocsf_finding,
-)
+from prowler.models.findings import OcsfPreviewRecord, OpenAevFinding, map_ocsf_finding
 
 
 def _config() -> ConfigLoader:
