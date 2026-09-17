@@ -1,4 +1,4 @@
-"""Raw pytest executable contract for CHK.007."""
+"""Raw pytest executable contract for CHK.009."""
 
 from __future__ import annotations
 
@@ -43,9 +43,9 @@ _CALLBACK_COMPLETED = "[PROWLER_INJECTOR] - Assessment callback completed"
 
 def _contract() -> Any:
     try:
-        return DEFAULT_PROWLER_CONTRACTS.resolve(str(stable_contract_id("aws")))
+        return DEFAULT_PROWLER_CONTRACTS.resolve(str(stable_contract_id("gcp")))
     except LookupError:
-        pytest.fail("CHK.007 AWS base contract is not registered")
+        pytest.fail("CHK.009 GCP base contract is not registered")
 
 
 def _config() -> ConfigLoader:
@@ -58,11 +58,14 @@ def _config() -> ConfigLoader:
     )
 
 
-def _specification(arguments: tuple[str, ...] = ()) -> ExecutionSpecification:
+def _specification(
+    arguments: tuple[str, ...] = (),
+    environment: tuple[tuple[str, str], ...] = (),
+) -> ExecutionSpecification:
     return ExecutionSpecification(
         executable="/fake/prowler",
         arguments=arguments,
-        environment=(),
+        environment=environment,
         working_directory=None,
         input_bytes=b"",
         output=__import__(
@@ -86,26 +89,23 @@ class _ClientFactory:
 
 
 def test_default_registration_identity_fields_and_outputs() -> None:
-    """The canonical AWS base route remains first in the executable surface."""
+    """The default surface is exactly canonical AWS, Azure, then GCP routes."""
     serialized = DEFAULT_PROWLER_CONTRACTS.contracts()
-    expected_id = stable_contract_id("aws")
+    expected_id = stable_contract_id("gcp")
 
+    assert len(serialized) == 3
     assert [item["contract_id"] for item in serialized] == [
         str(stable_contract_id("aws")),
         str(stable_contract_id("azure")),
-        str(stable_contract_id("gcp")),
+        str(expected_id),
     ]
-    assert UUID(serialized[0]["contract_id"]) == expected_id
+    assert UUID(serialized[2]["contract_id"]) == expected_id
     assert expected_id.version == 5
-    content = json.loads(serialized[0]["contract_content"])
-    assert content["external_id"] == "prowler:aws"
+    content = json.loads(serialized[2]["contract_content"])
+    assert content["external_id"] == "prowler:gcp"
     assert tuple(field["key"] for field in content["fields"]) == (
-        "aws_access_key_id",
-        "aws_secret_access_key",
-        "aws_account_id",
-        "aws_region",
-        "aws_endpoint_url",
-        "aws_session_token",
+        "gcp_service_account_json",
+        "gcp_project_id",
     )
     assert tuple(output["field"] for output in content["outputs"]) == (
         "findings",
@@ -114,46 +114,31 @@ def test_default_registration_identity_fields_and_outputs() -> None:
 
 
 @pytest.mark.parametrize(
-    ("field_name", "invalid_value"),
+    "field_name",
     (
-        ("aws_access_key_id", " "),
-        ("aws_secret_access_key", ""),
-        ("aws_session_token", "\t"),
-        ("aws_account_id", "12345678901"),
-        ("aws_account_id", "12345678901x"),
-        ("aws_region", " "),
+        "gcp_service_account_json",
+        "gcp_project_id",
     ),
 )
-def test_invalid_input_is_rejected_before_dispatch(
-    aws_form: dict[str, object], field_name: str, invalid_value: str
+def test_structurally_blank_input_is_rejected_before_dispatch(
+    gcp_form: dict[str, object], field_name: str
 ) -> None:
-    """All credential and target validation remains local and pre-dispatch."""
+    """Inherited GCP validation remains structural, local, and pre-dispatch."""
     factory = _ClientFactory(CommandResult(specification=_specification()))
     contract = _contract()
     contract._client_factory = factory
-    raw = {**aws_form, field_name: invalid_value}
 
     with pytest.raises(ValueError):
-        contract.parse_input(raw)
+        contract.parse_input({**gcp_form, field_name: " \t"})
 
     assert factory.calls == []
 
 
-def test_aws_account_id_rejects_unicode_numerals(
-    aws_form: dict[str, object],
-) -> None:
-    """An AWS account ID must contain exactly 12 ASCII digits."""
-    contract = _contract()
-
-    with pytest.raises(ValueError):
-        contract.parse_input({**aws_form, "aws_account_id": "１２３４５６７８９０１２"})
-
-
 def test_valid_request_invokes_client_once_without_narrowing(
-    aws_form: dict[str, object], ocsf_record_factory: Any
+    gcp_form: dict[str, object], gcp_ocsf_record_factory: Any
 ) -> None:
-    """The concrete base route passes the complete AWS scope once."""
-    artifact = json.dumps([ocsf_record_factory("one")]).encode()
+    """The concrete base route passes the complete GCP scope once."""
+    artifact = json.dumps([gcp_ocsf_record_factory("one")]).encode()
     result = CommandResult(
         specification=_specification(),
         return_code=0,
@@ -164,7 +149,7 @@ def test_valid_request_invokes_client_once_without_narrowing(
     contract = _contract()
     contract._client_factory = factory
 
-    outcome = contract.execute(ProwlerConfig(), contract.parse_input(aws_form))
+    outcome = contract.execute(ProwlerConfig(), contract.parse_input(gcp_form))
 
     assert len(factory.calls) == 1
     assert factory.calls[0][2] == ()
@@ -177,9 +162,12 @@ def test_valid_request_invokes_client_once_without_narrowing(
 @dataclass
 class _Engine:
     payload: bytes
+    lifecycle: list[str]
     requests: list[ValidatedCommandRequest] = field(default_factory=list)
 
     def run(self, request: ValidatedCommandRequest) -> CommandResult:
+        assert self.lifecycle == ["create:.json"]
+        self.lifecycle.append("engine")
         self.requests.append(request)
         arguments = tuple(request.arguments)
         output_directory = Path(arguments[arguments.index("--output-directory") + 1])
@@ -202,36 +190,53 @@ class _EngineFactory:
 
 
 @dataclass
-class _NoCredentialLeaseFactory:
-    calls: int = 0
+class _CredentialLease:
+    path: Path
+    lifecycle: list[str]
 
-    def create(self, secret: Any, *, suffix: str) -> Any:
-        del secret, suffix
-        self.calls += 1
-        raise AssertionError("AWS must not create a temporary credential file")
+    def cleanup(self) -> None:
+        self.lifecycle.append("cleanup")
 
 
-def test_fake_engine_proves_exact_aws_subprocess_arguments(
-    aws_form: dict[str, object], ocsf_record_factory: Any
+@dataclass
+class _CredentialLeaseFactory:
+    lifecycle: list[str]
+    calls: list[tuple[SecretStr, str]] = field(default_factory=list)
+
+    def create(self, secret: SecretStr, *, suffix: str) -> _CredentialLease:
+        self.calls.append((secret, suffix))
+        self.lifecycle.append(f"create:{suffix}")
+        return _CredentialLease(
+            Path("/tmp/CANARY-GCP-CREDENTIAL.json"),  # noqa: S108 - leak canary
+            self.lifecycle,
+        )
+
+
+def test_fake_engine_proves_exact_gcp_subprocess_arguments(
+    gcp_form: dict[str, object], gcp_ocsf_record_factory: Any
 ) -> None:
     """The real client composition emits exact non-shell full-scope argv."""
-    engine = _Engine(json.dumps([ocsf_record_factory("argv")]).encode())
+    lifecycle: list[str] = []
+    engine = _Engine(json.dumps([gcp_ocsf_record_factory("argv")]).encode(), lifecycle)
     engine_factory = _EngineFactory(engine)
-    leases = _NoCredentialLeaseFactory()
+    leases = _CredentialLeaseFactory(lifecycle)
     contract = _contract()
     contract._client_factory = ProwlerClientFactory(engine_factory, leases)
 
     contract.execute(
-        ProwlerConfig(executable_path="/fake/prowler"), contract.parse_input(aws_form)
+        ProwlerConfig(executable_path="/fake/prowler"),
+        contract.parse_input(gcp_form),
     )
 
     assert engine_factory.calls == 1
     assert len(engine.requests) == 1
     request = engine.requests[0]
     assert tuple(request.arguments) == (
-        "aws",
-        "--region",
-        "eu-west-1",
+        "gcp",
+        "--credentials-file",
+        "/tmp/CANARY-GCP-CREDENTIAL.json",  # noqa: S108 - leak canary
+        "--project-id",
+        "PROJECT-ID-CANARY",
         "--severity",
         "critical",
         "high",
@@ -248,24 +253,26 @@ def test_fake_engine_proves_exact_aws_subprocess_arguments(
         "-M",
         "json-ocsf",
     )
-    assert tuple(request.environment) == (
-        ("AWS_ACCESS_KEY_ID", SecretStr("CANARY-ACCESS-KEY")),
-        ("AWS_SECRET_ACCESS_KEY", SecretStr("CANARY-SECRET-KEY")),
-        ("AWS_SESSION_TOKEN", SecretStr("CANARY-SESSION-TOKEN")),
-        ("AWS_ENDPOINT_URL", "https://aws.internal.example:8443"),
+    assert request.environment == ()
+    assert not {"-c", "--service", "--services", "--compliance"}.intersection(
+        request.arguments
     )
-    assert "-c" not in request.arguments
-    assert leases.calls == 0
+    assert len(leases.calls) == 1
+    assert leases.calls[0][0].get_secret_value() == (
+        '{"private_key":"SERVICE-ACCOUNT-JSON-CANARY",' '"form":"FORM-CANARY"}'
+    )
+    assert leases.calls[0][1] == ".json"
+    assert lifecycle == ["create:.json", "engine", "cleanup"]
 
 
-def test_mapping_filters_normalizes_and_preserves_all_fields_in_order(
-    aws_form: dict[str, object], ocsf_record_factory: Any
+def test_mapping_filters_normalizes_preserves_order_and_projects_outputs(
+    gcp_form: dict[str, object], gcp_ocsf_record_factory: Any
 ) -> None:
-    """CHK.005 mapping is retained while non-AWS findings are excluded."""
+    """CHK.005 mappings feed ordered GCP, Text, and FAILED output projections."""
     records = [
-        ocsf_record_factory("first", provider="AWS", status="PASS"),
-        ocsf_record_factory("excluded", provider="Azure", status="FAIL"),
-        ocsf_record_factory("second", provider="aws", status="MUTED"),
+        gcp_ocsf_record_factory("first", provider="GCP", status="PASS"),
+        gcp_ocsf_record_factory("excluded", provider="AWS", status="FAIL"),
+        gcp_ocsf_record_factory("second", provider="gcp", status="FAIL"),
     ]
     artifact = json.dumps(records).encode()
     factory = _ClientFactory(
@@ -279,16 +286,26 @@ def test_mapping_filters_normalizes_and_preserves_all_fields_in_order(
     contract = _contract()
     contract._client_factory = factory
 
-    first = contract.execute(ProwlerConfig(), contract.parse_input(aws_form)).findings
-    second = contract.execute(ProwlerConfig(), contract.parse_input(aws_form)).findings
+    findings = contract.execute(
+        ProwlerConfig(), contract.parse_input(gcp_form)
+    ).findings
+    payload = contract.output_payload(findings)
 
-    assert tuple(item.value for item in first) == ("first", "second")
-    assert tuple(item.cloud_provider for item in first) == ("aws", "aws")
-    assert tuple(item.expectation_result for item in first) == ("SUCCESS", "IGNORED")
-    assert first == second
-    assert all(
-        tuple(item.model_dump()) == tuple(OpenAevFinding.model_fields) for item in first
+    assert tuple(item.value for item in findings) == ("first", "second")
+    assert tuple(item.cloud_provider for item in findings) == ("gcp", "gcp")
+    assert tuple(item.expectation_result for item in findings) == (
+        "SUCCESS",
+        "FAILED",
     )
+    assert all(
+        tuple(item.model_dump()) == tuple(OpenAevFinding.model_fields)
+        for item in findings
+    )
+    assert tuple(json.loads(item)["value"] for item in payload["findings"]) == (
+        "first",
+        "second",
+    )
+    assert tuple(item["name"] for item in payload["vulnerabilities"]) == ("second",)
 
 
 class _InjectApi:
@@ -312,7 +329,7 @@ class _Helper:
 def _message(identifier: str, content: dict[str, object]) -> dict[str, object]:
     return {
         "injection": {
-            "inject_id": "inject-chk007",
+            "inject_id": "inject-chk009",
             "injector_contract_id": identifier,
             "inject_content": content,
         }
@@ -320,26 +337,48 @@ def _message(identifier: str, content: dict[str, object]) -> dict[str, object]:
 
 
 def test_runtime_success_and_safe_error_are_end_to_end(
-    aws_form: dict[str, object], ocsf_record_factory: Any
+    gcp_form: dict[str, object], gcp_ocsf_record_factory: Any
 ) -> None:
     """Real extraction, mapping, Rich output, and terminal callbacks are exercised."""
     from prowler.injector import ProwlerInjector
 
-    canaries = (
-        "CANARY-ACCESS-KEY",
-        "CANARY-SECRET-KEY",
-        "CANARY-SESSION-TOKEN",
-        "/tmp/credential-canary",  # noqa: S108 - deliberate leak canary
-        "STDERR-CANARY",
-        "CONSOLE-NON-JSON-CANARY",
+    service_account_json = (
+        '{"private_key":"SERVICE-ACCOUNT-JSON-CANARY",' '"form":"FORM-CANARY"}'
     )
-    artifact = json.dumps([ocsf_record_factory("runtime")]).encode()
+    sensitive_canaries = (
+        service_account_json,
+        "SERVICE-ACCOUNT-JSON-CANARY",
+        "FORM-CANARY",
+        "ARGV-CANARY",
+        "ENV-NAME-CANARY",
+        "ENV-VALUE-CANARY",
+        "STDOUT-CANARY",
+        "STDERR-CANARY",
+        "/tmp/TEMP-PATH-CANARY",  # noqa: S108 - deliberate leak canary
+        "EXCEPTION-FIELD-CANARY",
+        "EXCEPTION-VALUE-CANARY",
+    )
+    log_canaries = (
+        *sensitive_canaries,
+        "CALLBACK-CANARY",
+        "FINDING-CANARY",
+    )
+    records = [
+        gcp_ocsf_record_factory("CALLBACK-CANARY", status="PASS"),
+        gcp_ocsf_record_factory("FINDING-CANARY", status="FAIL"),
+        gcp_ocsf_record_factory("excluded", provider="aws", status="FAIL"),
+    ]
+    artifact = json.dumps(records).encode()
     result = CommandResult(
         specification=_specification(
-            ("/tmp/credential-canary",)  # noqa: S108 - deliberate leak canary
+            (
+                "ARGV-CANARY",
+                "/tmp/TEMP-PATH-CANARY",  # noqa: S108 - deliberate leak canary
+            ),
+            (("ENV-NAME-CANARY", "ENV-VALUE-CANARY"),),
         ),
         return_code=0,
-        stdout=b"\x1b[31mCONSOLE-NON-JSON-CANARY\x1b[0m",
+        stdout=b"\x1b[31mSTDOUT-CANARY\x1b[0m",
         stderr=b"STDERR-CANARY",
         parsed=artifact,
     )
@@ -348,25 +387,33 @@ def test_runtime_success_and_safe_error_are_end_to_end(
     contract._client_factory = factory
     helper = _Helper()
     injector = ProwlerInjector(_config(), helper, registry=DEFAULT_PROWLER_CONTRACTS)
-    identifier = str(stable_contract_id("aws"))
+    identifier = str(stable_contract_id("gcp"))
 
-    injector.process_message(_message(identifier, aws_form))
+    injector.process_message(_message(identifier, gcp_form))
 
     events = helper.api.inject.events
     assert tuple(event[0] for event in events) == ("reception", "callback")
     callback = events[1][2]
     assert callback["execution_status"] == "SUCCESS"
     structured = json.loads(callback["execution_output_structured"])
-    assert len(structured["findings"]) == 1
-    mapped = json.loads(structured["findings"][0])
-    assert mapped["value"] == "runtime"
-    assert "runtime" in callback["execution_message"]
-    assert callback["execution_message"].index("Prowler Findings") < callback[
-        "execution_message"
-    ].index("[PROWLER] Raw OCSF evidence (bounded preview)")
-    assert "Total raw records: 1" in callback["execution_message"]
+    mapped_names = tuple(json.loads(item)["value"] for item in structured["findings"])
+    assert mapped_names == ("CALLBACK-CANARY", "FINDING-CANARY")
+    assert tuple(item["name"] for item in structured["vulnerabilities"]) == (
+        "FINDING-CANARY",
+    )
+    assert all(name in callback["execution_message"] for name in mapped_names)
+    raw_section_index = callback["execution_message"].index(
+        "[PROWLER] Raw OCSF evidence (bounded preview)"
+    )
+    assert "excluded" not in callback["execution_message"][:raw_section_index]
+    assert callback["execution_message"].index("Prowler Findings") < raw_section_index
+    assert "Total raw records: 3" in callback["execution_message"]
     assert f"Artifact bytes: {len(artifact)}" in callback["execution_message"]
-    assert all(marker not in json.dumps(callback) for marker in canaries)
+    serialized_callback = json.dumps(callback)
+    assert (
+        tuple(marker for marker in sensitive_canaries if marker in serialized_callback)
+        == ()
+    )
     assert len(factory.calls) == 1
     logs = helper.injector_logger.events
     assert tuple((event.level, event.message) for event in logs) == (
@@ -389,7 +436,7 @@ def test_runtime_success_and_safe_error_are_end_to_end(
     ]
     assert all(event.metadata is not None for event in logs)
     assert all(
-        event.metadata["inject_id"] == "inject-chk007"
+        event.metadata["inject_id"] == "inject-chk009"
         for event in logs
         if event.metadata
     )
@@ -401,23 +448,18 @@ def test_runtime_success_and_safe_error_are_end_to_end(
     for event in logs[2:]:
         assert event.metadata is not None
         assert event.metadata["contract_id"] == identifier
-        assert event.metadata["route"] == "aws"
-        assert event.metadata["provider"] == "aws"
+        assert event.metadata["route"] == "gcp"
+        assert event.metadata["provider"] == "gcp"
     for event in logs[3:]:
         assert event.metadata is not None
-        assert event.metadata["aws_account_id"] == "123456789012"
-        assert event.metadata["aws_region"] == "eu-west-1"
-        assert event.metadata["aws_session_token_present"] is True
-        assert event.metadata["aws_endpoint_override_present"] is True
-        assert event.metadata["aws_endpoint_origin"] == (
-            "https://aws.internal.example:8443"
-        )
+        assert event.metadata["gcp_project_id"] == "PROJECT-ID-CANARY"
+        assert event.metadata["gcp_credentials_present"] is True
     success_metadata = logs[5].metadata
     assert success_metadata is not None
     assert success_metadata["status"] == "SUCCESS"
-    assert success_metadata["finding_count"] == 1
+    assert success_metadata["finding_count"] == 2
     assert success_metadata["vulnerability_count"] == 1
-    assert success_metadata["raw_record_count"] == 1
+    assert success_metadata["raw_record_count"] == 3
     assert success_metadata["raw_output_bytes"] == len(artifact)
     callback_metadata = logs[6].metadata
     assert callback_metadata is not None
@@ -425,19 +467,31 @@ def test_runtime_success_and_safe_error_are_end_to_end(
     assert callback_metadata["delivery_status"] == "SUCCESS"
     assert "status" not in callback_metadata
     assert "attempted_status" not in callback_metadata
-    serialized_logs = repr(logs)
-    assert all(marker not in serialized_logs for marker in canaries)
+    assert all(marker not in repr(logs) for marker in log_canaries)
 
     invalid_helper = _Helper()
     invalid_injector = ProwlerInjector(
         _config(), invalid_helper, registry=DEFAULT_PROWLER_CONTRACTS
     )
     invalid_injector.process_message(
-        _message(identifier, {**aws_form, "aws_account_id": "not-an-account"})
+        _message(
+            identifier,
+            {
+                **gcp_form,
+                "gcp_project_id": " ",
+                "EXCEPTION-FIELD-CANARY": "EXCEPTION-VALUE-CANARY",
+            },
+        )
     )
     invalid_callback = invalid_helper.api.inject.events[1][2]
     assert invalid_callback["execution_status"] == "ERROR"
-    assert all(marker not in json.dumps(invalid_callback) for marker in canaries)
+    serialized_invalid_callback = json.dumps(invalid_callback)
+    assert (
+        tuple(
+            marker for marker in log_canaries if marker in serialized_invalid_callback
+        )
+        == ()
+    )
     assert len(factory.calls) == 1
     invalid_logs = invalid_helper.injector_logger.events
     assert tuple((event.level, event.message) for event in invalid_logs) == (
@@ -456,7 +510,7 @@ def test_runtime_success_and_safe_error_are_end_to_end(
     ]
     assert all(event.metadata is not None for event in invalid_logs)
     assert all(
-        event.metadata["inject_id"] == "inject-chk007"
+        event.metadata["inject_id"] == "inject-chk009"
         for event in invalid_logs
         if event.metadata
     )
@@ -468,8 +522,8 @@ def test_runtime_success_and_safe_error_are_end_to_end(
     for event in invalid_logs[2:]:
         assert event.metadata is not None
         assert event.metadata["contract_id"] == identifier
-        assert event.metadata["route"] == "aws"
-        assert event.metadata["provider"] == "aws"
+        assert event.metadata["route"] == "gcp"
+        assert event.metadata["provider"] == "gcp"
     failure_metadata = invalid_logs[3].metadata
     assert failure_metadata is not None
     assert failure_metadata["status"] == "ERROR"
@@ -477,14 +531,16 @@ def test_runtime_success_and_safe_error_are_end_to_end(
     assert failure_metadata["failure_kind"] == "invalid_input"
     assert failure_metadata["failure_summary"] == "The assessment input was invalid."
     assert failure_metadata["operator_guidance"] == (
-        "AWS account ID must contain exactly 12 ASCII digits."
+        "Correct the listed assessment fields and retry."
     )
     assert failure_metadata["issues"] == [
+        {"location": ["gcp", "gcp_project_id"], "type": "value_error"},
         {
-            "location": ["aws", "aws_account_id"],
-            "type": "string_pattern_mismatch",
-        }
+            "location": ["gcp", "unrecognized_field"],
+            "type": "extra_forbidden",
+        },
     ]
+    assert failure_metadata["issues_truncated"] is True
     assert invalid_logs[3].exc_info is False
     invalid_callback_metadata = invalid_logs[4].metadata
     assert invalid_callback_metadata is not None
@@ -492,5 +548,4 @@ def test_runtime_success_and_safe_error_are_end_to_end(
     assert invalid_callback_metadata["delivery_status"] == "SUCCESS"
     assert "status" not in invalid_callback_metadata
     assert "attempted_status" not in invalid_callback_metadata
-    serialized_invalid_logs = repr(invalid_logs)
-    assert all(marker not in serialized_invalid_logs for marker in canaries)
+    assert all(marker not in repr(invalid_logs) for marker in log_canaries)
