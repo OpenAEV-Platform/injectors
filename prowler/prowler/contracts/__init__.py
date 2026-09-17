@@ -12,6 +12,7 @@ from .base import (
 )
 from .catalog import ROUTE_CATALOG, RouteDescriptor
 from .dispatcher import ContractDispatcher, RouteHandler, RouteNotFoundError
+from .gcp import GcpBaseContract
 from .registry import (
     DEFAULT_PROWLER_CONTRACTS,
     PROWLER_CONTRACT_NAMESPACE,
@@ -23,6 +24,7 @@ __all__ = [
     "BaseProwlerContract",
     "AwsBaseContract",
     "AzureBaseContract",
+    "GcpBaseContract",
     "ContractDispatcher",
     "ContractExecutionOutcome",
     "ContractInputError",
