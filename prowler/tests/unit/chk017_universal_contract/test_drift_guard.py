@@ -6,17 +6,11 @@ import json
 from typing import Any, get_args
 
 from prowler._core.prowler_client import ComplianceSelector
-from prowler.contracts import (
-    DEFAULT_PROWLER_CONTRACTS,
-    ROUTE_CATALOG,
-    UniversalProwlerContract,
-    stable_contract_id,
-)
+from prowler.contracts import (DEFAULT_PROWLER_CONTRACTS, ROUTE_CATALOG,
+                               UniversalProwlerContract, stable_contract_id)
 from prowler.contracts.selectable import SERVICE_SELECT_VALUES
-from prowler.contracts.universal import (
-    COMPLIANCE_SCOPE_OPTIONS,
-    SERVICE_SCOPE_OPTIONS,
-)
+from prowler.contracts.universal import (COMPLIANCE_SCOPE_OPTIONS,
+                                         SERVICE_SCOPE_OPTIONS)
 
 PROVIDER_LABELS = {"aws": "AWS", "azure": "Azure", "gcp": "GCP"}
 _KUBERNETES_LABELS = {
