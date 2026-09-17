@@ -11,30 +11,40 @@ from uuid import UUID
 
 from pydantic import ValidationError
 from pyoaev.contracts import ContractBuilder
-from pyoaev.contracts.contract_config import (Contract, ContractConfig,
-                                              ContractElement,
-                                              ContractOutputElement,
-                                              ContractOutputType,
-                                              SupportedLanguage)
+from pyoaev.contracts.contract_config import (
+    Contract,
+    ContractConfig,
+    ContractElement,
+    ContractOutputElement,
+    ContractOutputType,
+    SupportedLanguage,
+)
 
 from prowler._core.cli_engine import CommandResult
-from prowler._core.prowler_client import (ComplianceSelector,
-                                          ProwlerClientFactory,
-                                          ServiceSelector)
+from prowler._core.prowler_client import (
+    ComplianceSelector,
+    ProwlerClientFactory,
+    ServiceSelector,
+)
 from prowler.models.configs.config_loader import ProwlerConfig
-from prowler.models.findings import (OcsfDecodeError, OcsfMappingError,
-                                     OcsfPreviewRecord, OpenAevFinding,
-                                     map_command_result_with_evidence)
-from prowler.models.provider_inputs import (PROVIDER_INPUT_ADAPTER,
-                                            AwsProviderInput,
-                                            AzureProviderInput,
-                                            GcpProviderInput,
-                                            KubernetesProviderInput,
-                                            ProviderInput)
+from prowler.models.findings import (
+    OcsfDecodeError,
+    OcsfMappingError,
+    OcsfPreviewRecord,
+    OpenAevFinding,
+    map_command_result_with_evidence,
+)
+from prowler.models.provider_inputs import (
+    PROVIDER_INPUT_ADAPTER,
+    AwsProviderInput,
+    AzureProviderInput,
+    GcpProviderInput,
+    KubernetesProviderInput,
+    ProviderInput,
+)
 from prowler.services.output_trace import generate
 
-from .provider_fields import \
-    CREDENTIAL_REFERENCE_KEY as CREDENTIAL_REFERENCE_KEY
+from .provider_fields import CREDENTIAL_REFERENCE_KEY as CREDENTIAL_REFERENCE_KEY
 from .provider_fields import ProviderName as ProviderName
 from .provider_fields import build_provider_fields as _build_provider_fields
 

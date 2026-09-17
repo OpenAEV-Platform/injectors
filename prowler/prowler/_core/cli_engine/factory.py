@@ -2,12 +2,10 @@
 
 from dataclasses import dataclass
 
-from .adapters import (OutputParserAdapter, SubprocessExecutor,
-                       WhichBinaryResolver)
+from .adapters import OutputParserAdapter, SubprocessExecutor, WhichBinaryResolver
 from .engine import CliEngine
 from .policy import ExecutionPolicy
-from .ports import (BinaryResolverPort, ExecutorPort, OutputParserPort,
-                    PolicyPort)
+from .ports import BinaryResolverPort, ExecutorPort, OutputParserPort, PolicyPort
 
 
 @dataclass(frozen=True)

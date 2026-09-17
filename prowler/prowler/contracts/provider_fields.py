@@ -3,8 +3,11 @@
 from dataclasses import dataclass
 from typing import Literal
 
-from pyoaev.contracts.contract_config import (ContractElement, ContractText,
-                                              ContractTextArea)
+from pyoaev.contracts.contract_config import (
+    ContractElement,
+    ContractText,
+    ContractTextArea,
+)
 from pyoaev.credential.utils import build_single_referenced_credential_element
 
 ProviderName = Literal["aws", "azure", "gcp", "kubernetes", "all"]

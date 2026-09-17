@@ -3,15 +3,19 @@
 from __future__ import annotations
 
 import pytest
-from pyoaev.contracts.contract_config import (ContractFieldKey,
-                                              ContractFieldType,
-                                              ContractReferencedCredential)
+from pyoaev.contracts.contract_config import (
+    ContractFieldKey,
+    ContractFieldType,
+    ContractReferencedCredential,
+)
 from pyoaev.credential.types import CredentialType
 
-from prowler.contracts.provider_fields import (_PROVIDER_FIELDS,
-                                               CREDENTIAL_REFERENCE_KEY,
-                                               ProviderName,
-                                               build_provider_fields)
+from prowler.contracts.provider_fields import (
+    _PROVIDER_FIELDS,
+    CREDENTIAL_REFERENCE_KEY,
+    ProviderName,
+    build_provider_fields,
+)
 
 # The four providers that declare their own credential text fields. The "all"
 # meta-token is intentionally excluded: it has no entry in _PROVIDER_FIELDS.

@@ -10,10 +10,12 @@ import pytest
 from pydantic import SecretStr
 
 from prowler._core.cli_engine import CommandResult, ExecutionSpecification
-from prowler.models.provider_inputs import (AwsProviderInput,
-                                            AzureProviderInput,
-                                            GcpProviderInput,
-                                            KubernetesProviderInput)
+from prowler.models.provider_inputs import (
+    AwsProviderInput,
+    AzureProviderInput,
+    GcpProviderInput,
+    KubernetesProviderInput,
+)
 
 
 @dataclass

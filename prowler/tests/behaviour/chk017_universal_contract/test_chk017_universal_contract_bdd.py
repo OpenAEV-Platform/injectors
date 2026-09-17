@@ -9,12 +9,19 @@ from typing import Any
 
 import pytest
 
-from prowler._core.cli_engine import (CommandResult, ExecutionSpecification,
-                                      OutputSpecification)
-from prowler.contracts import (CREDENTIAL_REFERENCE_KEY,
-                               DEFAULT_PROWLER_CONTRACTS, ROUTE_CATALOG,
-                               ContractInputError, ContractInputIssue,
-                               stable_contract_id)
+from prowler._core.cli_engine import (
+    CommandResult,
+    ExecutionSpecification,
+    OutputSpecification,
+)
+from prowler.contracts import (
+    CREDENTIAL_REFERENCE_KEY,
+    DEFAULT_PROWLER_CONTRACTS,
+    ROUTE_CATALOG,
+    ContractInputError,
+    ContractInputIssue,
+    stable_contract_id,
+)
 from prowler.models.configs.config_loader import ProwlerConfig
 
 from .conftest import PROVIDER_FORMS
@@ -558,8 +565,10 @@ def _assert_pre_existing_31_unchanged(serialized: list[dict[str, Any]]) -> None:
 
 def test_scope_choices_derived_from_selector_literals() -> None:
     """Verify the drift guard in both directions against the catalog."""
-    from prowler.contracts.universal import (COMPLIANCE_SCOPE_OPTIONS,
-                                             SERVICE_SCOPE_OPTIONS)
+    from prowler.contracts.universal import (
+        COMPLIANCE_SCOPE_OPTIONS,
+        SERVICE_SCOPE_OPTIONS,
+    )
 
     service_routes = tuple(
         route.route_name

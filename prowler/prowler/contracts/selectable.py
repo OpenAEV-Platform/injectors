@@ -6,18 +6,28 @@ from typing import ClassVar, Mapping, cast, get_args
 from pyoaev.contracts.contract_config import ContractElement, ContractSelect
 from pyoaev.contracts.contract_utils import ContractCardinality
 
-from prowler._core.prowler_client import (AwsServiceSelector,
-                                          AzureServiceSelector,
-                                          ComplianceSelector,
-                                          GcpServiceSelector, ServiceSelector)
+from prowler._core.prowler_client import (
+    AwsServiceSelector,
+    AzureServiceSelector,
+    ComplianceSelector,
+    GcpServiceSelector,
+    ServiceSelector,
+)
 from prowler.models.configs.config_loader import ProwlerConfig
-from prowler.models.provider_inputs import (AwsProviderInput,
-                                            AzureProviderInput,
-                                            GcpProviderInput, ProviderInput)
+from prowler.models.provider_inputs import (
+    AwsProviderInput,
+    AzureProviderInput,
+    GcpProviderInput,
+    ProviderInput,
+)
 
-from .base import (BaseProwlerContract, ClientFactoryPort,
-                   ContractExecutionOutcome, ContractInputError,
-                   ContractInputIssue)
+from .base import (
+    BaseProwlerContract,
+    ClientFactoryPort,
+    ContractExecutionOutcome,
+    ContractInputError,
+    ContractInputIssue,
+)
 from .registry import stable_contract_id
 
 __all__ = [

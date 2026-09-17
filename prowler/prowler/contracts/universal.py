@@ -12,17 +12,24 @@ from pyoaev.credential.utils import build_single_referenced_credential_element
 from prowler._core.prowler_client import ComplianceSelector, ServiceSelector
 from prowler.models.configs.config_loader import ProwlerConfig
 from prowler.models.findings import OcsfPreviewRecord, OpenAevFinding
-from prowler.models.provider_inputs import (PROVIDER_INPUT_ADAPTER,
-                                            AwsProviderInput,
-                                            AzureProviderInput,
-                                            GcpProviderInput,
-                                            KubernetesProviderInput,
-                                            ProviderInput)
+from prowler.models.provider_inputs import (
+    PROVIDER_INPUT_ADAPTER,
+    AwsProviderInput,
+    AzureProviderInput,
+    GcpProviderInput,
+    KubernetesProviderInput,
+    ProviderInput,
+)
 from prowler.services.output_trace import generate
 
-from .base import (CREDENTIAL_REFERENCE_KEY, BaseProwlerContract,
-                   ClientFactoryPort, ContractExecutionOutcome,
-                   ContractInputError, ContractInputIssue)
+from .base import (
+    CREDENTIAL_REFERENCE_KEY,
+    BaseProwlerContract,
+    ClientFactoryPort,
+    ContractExecutionOutcome,
+    ContractInputError,
+    ContractInputIssue,
+)
 from .provider_fields import _PROVIDER_FIELDS, ProviderName
 from .provider_fields import build_provider_fields as _build_provider_fields
 from .registry import stable_contract_id

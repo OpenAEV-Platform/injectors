@@ -6,23 +6,35 @@ from dataclasses import replace
 from threading import Lock
 from time import monotonic
 
-from prowler._core.cli_engine import (CommandResult, OutputSpecification,
-                                      ValidatedCommandRequest)
+from prowler._core.cli_engine import (
+    CommandResult,
+    OutputSpecification,
+    ValidatedCommandRequest,
+)
 from prowler.models.configs.config_loader import ProwlerConfig
-from prowler.models.provider_inputs import (AwsProviderInput,
-                                            AzureProviderInput,
-                                            GcpProviderInput,
-                                            ImmutableProviderInput,
-                                            KubernetesProviderInput,
-                                            ProviderInput)
+from prowler.models.provider_inputs import (
+    AwsProviderInput,
+    AzureProviderInput,
+    GcpProviderInput,
+    ImmutableProviderInput,
+    KubernetesProviderInput,
+    ProviderInput,
+)
 
-from .contracts import (CliEnginePort, ComplianceSelector,
-                        OutputWorkspaceFactoryPort, ServiceSelector)
+from .contracts import (
+    CliEnginePort,
+    ComplianceSelector,
+    OutputWorkspaceFactoryPort,
+    ServiceSelector,
+)
 from .credentials import CredentialCleanupError
-from .output_workspace import (DEFAULT_MAXIMUM_ARTIFACT_BYTES,
-                               OUTPUT_ARTIFACT_BASENAME, OutputArtifactError,
-                               OutputWorkspaceCleanupError,
-                               OutputWorkspacePreparationError)
+from .output_workspace import (
+    DEFAULT_MAXIMUM_ARTIFACT_BYTES,
+    OUTPUT_ARTIFACT_BASENAME,
+    OutputArtifactError,
+    OutputWorkspaceCleanupError,
+    OutputWorkspacePreparationError,
+)
 from .provider_adapter import ProviderInvocationAdapter
 
 # A full multi-provider assessment may legitimately run for a substantial period.

@@ -14,15 +14,18 @@ from urllib.parse import urlsplit
 from pyoaev.helpers import OpenAEVInjectorHelper
 from pyoaev.utils import AppLogger
 
-from prowler._core.cli_engine import (CliEngineError, ExecutionError,
-                                      ParsingError)
-from prowler._core.prowler_client import (OutputArtifactError,
-                                          OutputWorkspaceCleanupError,
-                                          OutputWorkspacePreparationError)
+from prowler._core.cli_engine import CliEngineError, ExecutionError, ParsingError
+from prowler._core.prowler_client import (
+    OutputArtifactError,
+    OutputWorkspaceCleanupError,
+    OutputWorkspacePreparationError,
+)
 from prowler.contracts import DEFAULT_PROWLER_CONTRACTS, ProwlerContracts
-from prowler.contracts.base import (BaseProwlerContract,
-                                    ContractExecutionOutcome,
-                                    ContractInputError)
+from prowler.contracts.base import (
+    BaseProwlerContract,
+    ContractExecutionOutcome,
+    ContractInputError,
+)
 from prowler.models import ConfigLoader
 from prowler.models.findings import OcsfDecodeError, OcsfMappingError
 from prowler.models.provider_inputs import ProviderInput
@@ -1391,10 +1394,12 @@ class ProwlerInjector:
     @classmethod
     def _provider_metadata(cls, provider: ProviderInput) -> dict[str, object]:
         """Return approved provider facts without reading credential values."""
-        from prowler.models.provider_inputs import (AwsProviderInput,
-                                                    AzureProviderInput,
-                                                    GcpProviderInput,
-                                                    KubernetesProviderInput)
+        from prowler.models.provider_inputs import (
+            AwsProviderInput,
+            AzureProviderInput,
+            GcpProviderInput,
+            KubernetesProviderInput,
+        )
 
         if isinstance(provider, AwsProviderInput):
             account = cls._safe_attribute_text(provider, "aws_account_id")

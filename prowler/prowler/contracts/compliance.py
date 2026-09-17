@@ -6,8 +6,12 @@ from prowler._core.prowler_client import ComplianceSelector
 from prowler.models.configs.config_loader import ProwlerConfig
 from prowler.models.provider_inputs import ProviderInput
 
-from .base import (BaseProwlerContract, ContractExecutionOutcome, ProviderName,
-                   RouteFamily)
+from .base import (
+    BaseProwlerContract,
+    ContractExecutionOutcome,
+    ProviderName,
+    RouteFamily,
+)
 
 
 class FixedComplianceContract(BaseProwlerContract):

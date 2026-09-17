@@ -3,11 +3,13 @@
 from pydantic import SecretStr
 
 from prowler._core.cli_engine.contracts import EnvironmentValue
-from prowler.models.provider_inputs import (AwsProviderInput,
-                                            AzureProviderInput,
-                                            GcpProviderInput,
-                                            KubernetesProviderInput,
-                                            ProviderInput)
+from prowler.models.provider_inputs import (
+    AwsProviderInput,
+    AzureProviderInput,
+    GcpProviderInput,
+    KubernetesProviderInput,
+    ProviderInput,
+)
 
 from .contracts import CredentialLeaseFactoryPort, ProviderInvocation
 
