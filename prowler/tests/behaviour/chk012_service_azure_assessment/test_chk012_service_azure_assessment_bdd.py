@@ -10,15 +10,23 @@ from typing import Any, cast
 import pytest
 from pyoaev.configuration import ConfigLoaderOAEV
 
-from prowler._core.cli_engine import (CommandResult, ExecutionSpecification,
-                                      OutputSpecification,
-                                      ValidatedCommandRequest)
-from prowler._core.prowler_client import (OUTPUT_ARTIFACT_FILENAME,
-                                          ProwlerClientFactory)
-from prowler.contracts import (CREDENTIAL_REFERENCE_KEY,
-                               DEFAULT_PROWLER_CONTRACTS, stable_contract_id)
-from prowler.models.configs.config_loader import (ConfigLoader, InjectorConfig,
-                                                  ProwlerConfig)
+from prowler._core.cli_engine import (
+    CommandResult,
+    ExecutionSpecification,
+    OutputSpecification,
+    ValidatedCommandRequest,
+)
+from prowler._core.prowler_client import OUTPUT_ARTIFACT_FILENAME, ProwlerClientFactory
+from prowler.contracts import (
+    CREDENTIAL_REFERENCE_KEY,
+    DEFAULT_PROWLER_CONTRACTS,
+    stable_contract_id,
+)
+from prowler.models.configs.config_loader import (
+    ConfigLoader,
+    InjectorConfig,
+    ProwlerConfig,
+)
 from prowler.models.provider_inputs import AwsProviderInput
 
 from .conftest import RecordingLogger

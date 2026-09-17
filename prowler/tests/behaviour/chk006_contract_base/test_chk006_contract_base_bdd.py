@@ -11,20 +11,25 @@ from unittest.mock import Mock
 
 import pytest
 from pydantic import SecretStr, ValidationError
-from pyoaev.contracts.contract_config import \
-    ContractText  # type: ignore[import-untyped]
+from pyoaev.contracts.contract_config import (
+    ContractText,
+)  # type: ignore[import-untyped]
 
-from prowler._core.cli_engine import (CommandResult, ExecutionSpecification,
-                                      OutputSpecification)
-from prowler._core.prowler_client.provider_adapter import \
-    ProviderInvocationAdapter
+from prowler._core.cli_engine import (
+    CommandResult,
+    ExecutionSpecification,
+    OutputSpecification,
+)
+from prowler._core.prowler_client.provider_adapter import ProviderInvocationAdapter
 from prowler.contracts import CREDENTIAL_REFERENCE_KEY
 from prowler.models.configs.config_loader import ProwlerConfig
-from prowler.models.provider_inputs import (PROVIDER_INPUT_ADAPTER,
-                                            AwsProviderInput,
-                                            AzureProviderInput,
-                                            GcpProviderInput,
-                                            KubernetesProviderInput)
+from prowler.models.provider_inputs import (
+    PROVIDER_INPUT_ADAPTER,
+    AwsProviderInput,
+    AzureProviderInput,
+    GcpProviderInput,
+    KubernetesProviderInput,
+)
 
 
 def _subject() -> Any:

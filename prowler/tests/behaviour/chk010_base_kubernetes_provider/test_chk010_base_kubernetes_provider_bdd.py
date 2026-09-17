@@ -11,16 +11,23 @@ from uuid import UUID
 import pytest
 from pyoaev.configuration import ConfigLoaderOAEV
 
-from prowler._core.cli_engine import (CommandResult, ExecutionSpecification,
-                                      ValidatedCommandRequest)
-from prowler._core.prowler_client import (OUTPUT_ARTIFACT_FILENAME,
-                                          ProwlerClientFactory)
-from prowler._core.prowler_client.credentials import \
-    TemporaryCredentialLeaseFactory
-from prowler.contracts import (CREDENTIAL_REFERENCE_KEY,
-                               DEFAULT_PROWLER_CONTRACTS, stable_contract_id)
-from prowler.models.configs.config_loader import (ConfigLoader, InjectorConfig,
-                                                  ProwlerConfig)
+from prowler._core.cli_engine import (
+    CommandResult,
+    ExecutionSpecification,
+    ValidatedCommandRequest,
+)
+from prowler._core.prowler_client import OUTPUT_ARTIFACT_FILENAME, ProwlerClientFactory
+from prowler._core.prowler_client.credentials import TemporaryCredentialLeaseFactory
+from prowler.contracts import (
+    CREDENTIAL_REFERENCE_KEY,
+    DEFAULT_PROWLER_CONTRACTS,
+    stable_contract_id,
+)
+from prowler.models.configs.config_loader import (
+    ConfigLoader,
+    InjectorConfig,
+    ProwlerConfig,
+)
 from prowler.models.findings import OpenAevFinding
 
 from .conftest import RecordingLogger
