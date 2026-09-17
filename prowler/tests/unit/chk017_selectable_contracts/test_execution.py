@@ -10,16 +10,10 @@ from typing import Any
 import pytest
 from pydantic import SecretStr
 
-from prowler._core.cli_engine import (
-    CommandResult,
-    ExecutionSpecification,
-    OutputSpecification,
-)
-from prowler.contracts import (
-    DEFAULT_PROWLER_CONTRACTS,
-    BaseProwlerContract,
-    stable_contract_id,
-)
+from prowler._core.cli_engine import (CommandResult, ExecutionSpecification,
+                                      OutputSpecification)
+from prowler.contracts import (DEFAULT_PROWLER_CONTRACTS, BaseProwlerContract,
+                               stable_contract_id)
 from prowler.models.configs.config_loader import ProwlerConfig
 from prowler.models.provider_inputs import AzureProviderInput, GcpProviderInput
 

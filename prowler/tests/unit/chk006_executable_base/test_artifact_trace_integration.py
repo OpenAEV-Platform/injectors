@@ -8,11 +8,8 @@ from copy import deepcopy
 from dataclasses import dataclass
 from typing import Any
 
-from prowler._core.cli_engine import (
-    CommandResult,
-    ExecutionSpecification,
-    OutputSpecification,
-)
+from prowler._core.cli_engine import (CommandResult, ExecutionSpecification,
+                                      OutputSpecification)
 from prowler.contracts import BaseProwlerContract
 from prowler.models.configs.config_loader import ProwlerConfig
 

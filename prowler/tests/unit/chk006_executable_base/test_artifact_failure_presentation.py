@@ -7,30 +7,19 @@ from typing import Any, ClassVar, cast
 from unittest.mock import Mock
 
 import pytest
-from pyoaev.configuration import ConfigLoaderOAEV  # type: ignore[import-untyped]
+from pyoaev.configuration import \
+    ConfigLoaderOAEV  # type: ignore[import-untyped]
 
-from prowler._core.cli_engine import (
-    CommandResult,
-    ExecutionSpecification,
-    OutputSpecification,
-)
-from prowler._core.prowler_client import (
-    OutputArtifactError,
-    OutputWorkspaceCleanupError,
-    OutputWorkspacePreparationError,
-)
-from prowler.contracts import (
-    BaseProwlerContract,
-    ContractExecutionOutcome,
-    ProwlerContracts,
-    stable_contract_id,
-)
+from prowler._core.cli_engine import (CommandResult, ExecutionSpecification,
+                                      OutputSpecification)
+from prowler._core.prowler_client import (OutputArtifactError,
+                                          OutputWorkspaceCleanupError,
+                                          OutputWorkspacePreparationError)
+from prowler.contracts import (BaseProwlerContract, ContractExecutionOutcome,
+                               ProwlerContracts, stable_contract_id)
 from prowler.injector import ProwlerInjector
-from prowler.models.configs.config_loader import (
-    ConfigLoader,
-    InjectorConfig,
-    ProwlerConfig,
-)
+from prowler.models.configs.config_loader import (ConfigLoader, InjectorConfig,
+                                                  ProwlerConfig)
 
 _CONTRACT_ID = str(stable_contract_id("aws"))
 

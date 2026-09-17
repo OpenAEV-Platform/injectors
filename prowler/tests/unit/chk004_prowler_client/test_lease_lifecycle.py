@@ -11,16 +11,11 @@ import pytest
 from pydantic import SecretStr
 
 import prowler._core.prowler_client.client as client_module
-from prowler._core.cli_engine import (
-    CommandResult,
-    ExecutionSpecification,
-    OutputSpecification,
-)
-from prowler._core.prowler_client import (
-    CredentialCleanupError,
-    ProwlerClient,
-    TemporaryCredentialLeaseFactory,
-)
+from prowler._core.cli_engine import (CommandResult, ExecutionSpecification,
+                                      OutputSpecification)
+from prowler._core.prowler_client import (CredentialCleanupError,
+                                          ProwlerClient,
+                                          TemporaryCredentialLeaseFactory)
 from prowler.models.configs.config_loader import ProwlerConfig
 from prowler.models.provider_inputs import AwsProviderInput
 

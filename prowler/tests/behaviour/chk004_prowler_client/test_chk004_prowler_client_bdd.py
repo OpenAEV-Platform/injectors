@@ -10,11 +10,8 @@ from typing import Any
 import pytest
 from pydantic import SecretStr
 
-from prowler._core.cli_engine import (
-    CommandResult,
-    ExecutionSpecification,
-    OutputSpecification,
-)
+from prowler._core.cli_engine import (CommandResult, ExecutionSpecification,
+                                      OutputSpecification)
 from prowler.models.configs.config_loader import ProwlerConfig
 
 from .conftest import RecordingEngine, RecordingEngineFactory

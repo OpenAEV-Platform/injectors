@@ -8,31 +8,19 @@ from typing import Any, ClassVar, cast
 from unittest.mock import Mock
 
 import pytest
-from pyoaev.configuration import ConfigLoaderOAEV  # type: ignore[import-untyped]
+from pyoaev.configuration import \
+    ConfigLoaderOAEV  # type: ignore[import-untyped]
 
-from prowler._core.cli_engine import (
-    CliEngineError,
-    CommandResult,
-    ExecutionError,
-    ExecutionSpecification,
-    OutputSpecification,
-    ParsingError,
-    PolicyError,
-)
-from prowler.contracts import (
-    BaseProwlerContract,
-    ContractExecutionOutcome,
-    ContractInputError,
-    ContractInputIssue,
-    ProwlerContracts,
-    stable_contract_id,
-)
+from prowler._core.cli_engine import (CliEngineError, CommandResult,
+                                      ExecutionError, ExecutionSpecification,
+                                      OutputSpecification, ParsingError,
+                                      PolicyError)
+from prowler.contracts import (BaseProwlerContract, ContractExecutionOutcome,
+                               ContractInputError, ContractInputIssue,
+                               ProwlerContracts, stable_contract_id)
 from prowler.injector import ProwlerInjector
-from prowler.models.configs.config_loader import (
-    ConfigLoader,
-    InjectorConfig,
-    ProwlerConfig,
-)
+from prowler.models.configs.config_loader import (ConfigLoader, InjectorConfig,
+                                                  ProwlerConfig)
 from prowler.models.findings import OcsfMappingError, OpenAevFinding
 
 _LISTENER_START = "[PROWLER_INJECTOR] - Listener starting"

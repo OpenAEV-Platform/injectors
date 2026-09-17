@@ -9,30 +9,19 @@ from typing import Any, cast, get_args
 
 import pytest
 
-from prowler._core.cli_engine import (
-    CommandResult,
-    ExecutionSpecification,
-    OutputSpecification,
-)
-from prowler._core.prowler_client import (
-    AwsServiceSelector,
-    AzureServiceSelector,
-    ComplianceSelector,
-    GcpServiceSelector,
-)
-from prowler.contracts import (
-    DEFAULT_PROWLER_CONTRACTS,
-    ROUTE_CATALOG,
-    AwsSelectComplianceContract,
-    AwsSelectServiceContract,
-    AzureSelectComplianceContract,
-    AzureSelectServiceContract,
-    ContractInputError,
-    ContractInputIssue,
-    GcpSelectComplianceContract,
-    GcpSelectServiceContract,
-    stable_contract_id,
-)
+from prowler._core.cli_engine import (CommandResult, ExecutionSpecification,
+                                      OutputSpecification)
+from prowler._core.prowler_client import (AwsServiceSelector,
+                                          AzureServiceSelector,
+                                          ComplianceSelector,
+                                          GcpServiceSelector)
+from prowler.contracts import (DEFAULT_PROWLER_CONTRACTS, ROUTE_CATALOG,
+                               AwsSelectComplianceContract,
+                               AwsSelectServiceContract,
+                               AzureSelectComplianceContract,
+                               AzureSelectServiceContract, ContractInputError,
+                               ContractInputIssue, GcpSelectComplianceContract,
+                               GcpSelectServiceContract, stable_contract_id)
 from prowler.models.configs.config_loader import ProwlerConfig
 
 from .conftest import AWS_FORM, AZURE_FORM, GCP_FORM
@@ -429,10 +418,8 @@ def test_choices_derived_from_selector_literals(
     route: str, provider: str, _value: str
 ) -> None:
     """Assert choices and parse acceptance equal the selector literals."""
-    from prowler.contracts.selectable import (
-        COMPLIANCE_SELECT_CHOICES,
-        SERVICE_SELECT_CHOICES,
-    )
+    from prowler.contracts.selectable import (COMPLIANCE_SELECT_CHOICES,
+                                              SERVICE_SELECT_CHOICES)
 
     key = _SELECT_KEY[route]
     derived = list(_derived_values(route))

@@ -8,35 +8,21 @@ from unittest.mock import Mock, call
 from uuid import UUID
 
 import pytest
-from pyoaev.configuration import ConfigLoaderOAEV  # type: ignore[import-untyped]
-from pyoaev.contracts.contract_config import (  # type: ignore[import-untyped]
-    ContractOutputType,
-)
+from pyoaev.configuration import \
+    ConfigLoaderOAEV  # type: ignore[import-untyped]
+from pyoaev.contracts.contract_config import \
+    ContractOutputType  # type: ignore[import-untyped]
 from pyoaev.utils import AppLogger  # type: ignore[import-untyped]
 
-from prowler._core.cli_engine import (
-    CliEngineError,
-    ExecutionError,
-    ParsingError,
-    PolicyError,
-    ResolutionError,
-)
-from prowler.contracts import (
-    BaseProwlerContract,
-    ContractExecutionOutcome,
-    ContractInputError,
-    ContractInputIssue,
-)
-from prowler.models.configs.config_loader import (
-    ConfigLoader,
-    InjectorConfig,
-    ProwlerConfig,
-)
-from prowler.models.findings import (
-    OcsfPreviewRecord,
-    OpenAevFinding,
-    map_ocsf_finding,
-)
+from prowler._core.cli_engine import (CliEngineError, ExecutionError,
+                                      ParsingError, PolicyError,
+                                      ResolutionError)
+from prowler.contracts import (BaseProwlerContract, ContractExecutionOutcome,
+                               ContractInputError, ContractInputIssue)
+from prowler.models.configs.config_loader import (ConfigLoader, InjectorConfig,
+                                                  ProwlerConfig)
+from prowler.models.findings import (OcsfPreviewRecord, OpenAevFinding,
+                                     map_ocsf_finding)
 
 
 def _config() -> ConfigLoader:
@@ -259,11 +245,9 @@ def _message(
 
 
 def _runtime(findings: tuple[OpenAevFinding, ...]) -> tuple[Any, Mock]:
-    from prowler._core.cli_engine import (
-        CommandResult,
-        ExecutionSpecification,
-        OutputSpecification,
-    )
+    from prowler._core.cli_engine import (CommandResult,
+                                          ExecutionSpecification,
+                                          OutputSpecification)
     from prowler.injector import ProwlerInjector
 
     subject = _subject()

@@ -7,34 +7,23 @@ from typing import ClassVar, Mapping, Sequence, cast, get_args
 from pydantic import ValidationError
 from pyoaev.contracts.contract_config import ContractElement, ContractSelect
 from pyoaev.contracts.contract_utils import ContractCardinality
+from pyoaev.credential.utils import build_single_referenced_credential_element
 
-from prowler._core.prowler_client import (
-    ComplianceSelector,
-    ServiceSelector,
-)
+from prowler._core.prowler_client import ComplianceSelector, ServiceSelector
 from prowler.models.configs.config_loader import ProwlerConfig
 from prowler.models.findings import OcsfPreviewRecord, OpenAevFinding
-from prowler.models.provider_inputs import (
-    PROVIDER_INPUT_ADAPTER,
-    AwsProviderInput,
-    AzureProviderInput,
-    GcpProviderInput,
-    KubernetesProviderInput,
-    ProviderInput,
-)
+from prowler.models.provider_inputs import (PROVIDER_INPUT_ADAPTER,
+                                            AwsProviderInput,
+                                            AzureProviderInput,
+                                            GcpProviderInput,
+                                            KubernetesProviderInput,
+                                            ProviderInput)
 from prowler.services.output_trace import generate
 
-from .base import (
-    BaseProwlerContract,
-    ClientFactoryPort,
-    ContractExecutionOutcome,
-    ContractInputError,
-    ContractInputIssue,
-)
-from .provider_fields import (
-    _PROVIDER_FIELDS,
-    ProviderName,
-)
+from .base import (CREDENTIAL_REFERENCE_KEY, BaseProwlerContract,
+                   ClientFactoryPort, ContractExecutionOutcome,
+                   ContractInputError, ContractInputIssue)
+from .provider_fields import _PROVIDER_FIELDS, ProviderName
 from .provider_fields import build_provider_fields as _build_provider_fields
 from .registry import stable_contract_id
 from .selectable import SERVICE_SELECT_VALUES, STATIC_SELECT_LABELS
@@ -171,7 +160,15 @@ class UniversalProwlerContract(BaseProwlerContract):
         self._selection = threading.local()
 
     def build_provider_fields(self) -> list[ContractElement]:
-        """Declare the provider select, conditional credentials, and scope selects."""
+        """Declare the provider select, conditional credentials, and scope selects.
+
+        pyoaev pins one immutable key on every credential-reference element, so
+        the four provider field sets cannot each contribute one without
+        colliding. This form therefore exposes exactly one unconditioned
+        credential reference, built from the ``all`` meta-token so the platform
+        applies no provider-specific credential filter: the operator picks the
+        provider through ``prowler_provider`` instead.
+        """
         fields: list[ContractElement] = [
             ContractSelect(
                 key=PROVIDER_KEY,
@@ -184,10 +181,13 @@ class UniversalProwlerContract(BaseProwlerContract):
                 visibleConditionValues={},
                 mandatoryConditionFields=[],
                 mandatoryConditionValues={},
-            )
+            ),
+            build_single_referenced_credential_element(self.provider),
         ]
         for provider_name in _CREDENTIAL_FIELD_KEYS:
             for element in _build_provider_fields(provider_name):
+                if element.key == CREDENTIAL_REFERENCE_KEY:
+                    continue
                 element.visibleConditionFields = [PROVIDER_KEY]
                 element.visibleConditionValues = {PROVIDER_KEY: provider_name}
                 if element.mandatory:
@@ -278,7 +278,9 @@ class UniversalProwlerContract(BaseProwlerContract):
         candidate = {
             key: value
             for key, value in raw_input.items()
-            if key not in _SELECT_KEYS and key not in foreign_keys
+            if key not in _SELECT_KEYS
+            and key not in foreign_keys
+            and key != CREDENTIAL_REFERENCE_KEY
         }
         if selected_provider == "aws":
             for field in ("aws_session_token", "aws_endpoint_url"):

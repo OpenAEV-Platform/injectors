@@ -4,19 +4,15 @@ from __future__ import annotations
 
 from typing import get_args
 
-from prowler._core.prowler_client import (
-    AwsServiceSelector,
-    AzureServiceSelector,
-    ComplianceSelector,
-    GcpServiceSelector,
-)
+from prowler._core.prowler_client import (AwsServiceSelector,
+                                          AzureServiceSelector,
+                                          ComplianceSelector,
+                                          GcpServiceSelector)
 from prowler.contracts import DEFAULT_PROWLER_CONTRACTS, stable_contract_id
-from prowler.contracts.selectable import (
-    COMPLIANCE_SELECT_CHOICES,
-    COMPLIANCE_SELECT_VALUES,
-    SERVICE_SELECT_CHOICES,
-    SERVICE_SELECT_VALUES,
-)
+from prowler.contracts.selectable import (COMPLIANCE_SELECT_CHOICES,
+                                          COMPLIANCE_SELECT_VALUES,
+                                          SERVICE_SELECT_CHOICES,
+                                          SERVICE_SELECT_VALUES)
 
 _SERVICE_SELECTORS = {
     "aws": AwsServiceSelector,

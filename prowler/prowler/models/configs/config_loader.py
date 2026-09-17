@@ -4,12 +4,8 @@ from pathlib import Path
 from typing import Protocol
 
 from pydantic import BaseModel, Field, field_validator
-from pyoaev.configuration import (
-    ConfigLoaderCollector,
-    ConfigLoaderOAEV,
-    Configuration,
-    SettingsLoader,
-)
+from pyoaev.configuration import (ConfigLoaderCollector, ConfigLoaderOAEV,
+                                  Configuration, SettingsLoader)
 
 
 class InjectorConfig(ConfigLoaderCollector):

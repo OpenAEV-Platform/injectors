@@ -3,15 +3,8 @@
 from typing import Annotated, Any, Literal, NoReturn
 from urllib.parse import urlsplit
 
-from pydantic import (
-    BaseModel,
-    BeforeValidator,
-    ConfigDict,
-    Field,
-    SecretStr,
-    TypeAdapter,
-    field_validator,
-)
+from pydantic import (BaseModel, BeforeValidator, ConfigDict, Field, SecretStr,
+                      TypeAdapter, field_validator)
 
 
 def _reject_blank(value: object) -> object:

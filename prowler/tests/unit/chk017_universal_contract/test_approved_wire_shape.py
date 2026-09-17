@@ -6,13 +6,9 @@ from collections.abc import Mapping
 
 import pytest
 
-from prowler.contracts import (
-    DEFAULT_PROWLER_CONTRACTS,
-    BaseProwlerContract,
-    ContractInputError,
-    ContractInputIssue,
-    stable_contract_id,
-)
+from prowler.contracts import (DEFAULT_PROWLER_CONTRACTS, BaseProwlerContract,
+                               ContractInputError, ContractInputIssue,
+                               stable_contract_id)
 from prowler.models.provider_inputs import ProviderInput
 
 PROVIDER_KEY = "prowler_provider"

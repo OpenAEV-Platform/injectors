@@ -9,18 +9,12 @@ from typing import Any
 
 import pytest
 
-from prowler._core.cli_engine import (
-    CommandResult,
-    ExecutionSpecification,
-    OutputSpecification,
-)
-from prowler.contracts import (
-    DEFAULT_PROWLER_CONTRACTS,
-    ROUTE_CATALOG,
-    ContractInputError,
-    ContractInputIssue,
-    stable_contract_id,
-)
+from prowler._core.cli_engine import (CommandResult, ExecutionSpecification,
+                                      OutputSpecification)
+from prowler.contracts import (CREDENTIAL_REFERENCE_KEY,
+                               DEFAULT_PROWLER_CONTRACTS, ROUTE_CATALOG,
+                               ContractInputError, ContractInputIssue,
+                               stable_contract_id)
 from prowler.models.configs.config_loader import ProwlerConfig
 
 from .conftest import PROVIDER_FORMS
@@ -129,11 +123,18 @@ def _contract(route_name: str) -> Any:
 
 
 def _expected_credential_fields() -> list[tuple[str, str, bool]]:
-    """Derive the fifteen credential fields from the four fixed contracts."""
+    """Derive the fifteen credential fields from the four fixed contracts.
+
+    The credential reference is excluded: its key is pinned by pyoaev, so the
+    universal form carries exactly one unconditioned copy rather than one per
+    provider.
+    """
     expected: list[tuple[str, str, bool]] = []
     for provider in ("aws", "azure", "gcp", "kubernetes"):
         fixed = _contract(provider)
         for element in fixed.build_provider_fields():
+            if element.key == CREDENTIAL_REFERENCE_KEY:
+                continue
             expected.append((provider, element.key, element.mandatory))
     return expected
 
@@ -149,9 +150,10 @@ def test_form_conditions_every_credential_field_on_provider_select() -> None:
     content = json.loads(str(item["contract_content"]))
     fields = content["fields"]
     expected_credential = _expected_credential_fields()
-    assert len(fields) == 20
+    assert len(fields) == 21
     assert [f["key"] for f in fields] == [
         PROVIDER_KEY,
+        CREDENTIAL_REFERENCE_KEY,
         *(key for _provider, key, _mandatory in expected_credential),
         *SERVICE_KEYS.values(),
         COMPLIANCE_KEY,
@@ -169,9 +171,17 @@ def test_form_conditions_every_credential_field_on_provider_select() -> None:
     }
     assert provider_select["visibleConditionFields"] == []
     assert provider_select["mandatoryConditionFields"] == []
+    credential_reference = fields[1]
+    assert credential_reference["key"] == CREDENTIAL_REFERENCE_KEY
+    assert credential_reference["type"] == "credential-reference"
+    assert credential_reference["mandatory"] is True
+    assert credential_reference["multiple"] is False
+    # The provider is chosen through PROVIDER_KEY, so no CredentialType filter.
+    assert credential_reference["credential_reference_type"] is None
+    assert credential_reference["visibleConditionFields"] == []
     mandatory_count = 0
     for field_entry, (provider, _key, base_mandatory) in zip(
-        fields[1:16], expected_credential, strict=True
+        fields[2:17], expected_credential, strict=True
     ):
         assert field_entry["visibleConditionFields"] == [PROVIDER_KEY]
         assert field_entry["visibleConditionValues"] == {PROVIDER_KEY: provider}
@@ -184,7 +194,7 @@ def test_form_conditions_every_credential_field_on_provider_select() -> None:
             assert field_entry["mandatoryConditionFields"] == []
             assert field_entry["mandatoryConditionValues"] == {}
     assert mandatory_count == 13
-    for provider, select in zip(("aws", "azure", "gcp"), fields[16:19], strict=True):
+    for provider, select in zip(("aws", "azure", "gcp"), fields[17:20], strict=True):
         assert select["type"] == "select"
         assert select["mandatory"] is False
         assert select["cardinality"] == "1"
@@ -207,7 +217,7 @@ def test_form_conditions_every_credential_field_on_provider_select() -> None:
                 if route.startswith(f"{provider}/")
             ),
         }
-    compliance = fields[19]
+    compliance = fields[20]
     assert compliance["defaultValue"] == ["__none__"]
     assert compliance["visibleConditionFields"] == []
     assert len(compliance["choices"]) == 15
@@ -548,10 +558,8 @@ def _assert_pre_existing_31_unchanged(serialized: list[dict[str, Any]]) -> None:
 
 def test_scope_choices_derived_from_selector_literals() -> None:
     """Verify the drift guard in both directions against the catalog."""
-    from prowler.contracts.universal import (
-        COMPLIANCE_SCOPE_OPTIONS,
-        SERVICE_SCOPE_OPTIONS,
-    )
+    from prowler.contracts.universal import (COMPLIANCE_SCOPE_OPTIONS,
+                                             SERVICE_SCOPE_OPTIONS)
 
     service_routes = tuple(
         route.route_name

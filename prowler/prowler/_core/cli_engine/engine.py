@@ -2,13 +2,11 @@
 
 from dataclasses import replace
 
-from .contracts import (
-    CommandResult,
-    ExecutionSpecification,
-    ValidatedCommandRequest,
-)
+from .contracts import (CommandResult, ExecutionSpecification,
+                        ValidatedCommandRequest)
 from .errors import ExecutionError, ParsingError
-from .ports import BinaryResolverPort, ExecutorPort, OutputParserPort, PolicyPort
+from .ports import (BinaryResolverPort, ExecutorPort, OutputParserPort,
+                    PolicyPort)
 
 
 class CliEngine:

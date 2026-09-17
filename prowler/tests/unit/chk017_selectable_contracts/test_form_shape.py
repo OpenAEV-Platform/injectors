@@ -7,22 +7,17 @@ from typing import Any, get_args
 
 import pytest
 
-from prowler._core.prowler_client import (
-    AwsServiceSelector,
-    AzureServiceSelector,
-    ComplianceSelector,
-    GcpServiceSelector,
-)
-from prowler.contracts import (
-    DEFAULT_PROWLER_CONTRACTS,
-    AwsSelectComplianceContract,
-    AwsSelectServiceContract,
-    AzureSelectComplianceContract,
-    AzureSelectServiceContract,
-    GcpSelectComplianceContract,
-    GcpSelectServiceContract,
-    stable_contract_id,
-)
+from prowler._core.prowler_client import (AwsServiceSelector,
+                                          AzureServiceSelector,
+                                          ComplianceSelector,
+                                          GcpServiceSelector)
+from prowler.contracts import (DEFAULT_PROWLER_CONTRACTS,
+                               AwsSelectComplianceContract,
+                               AwsSelectServiceContract,
+                               AzureSelectComplianceContract,
+                               AzureSelectServiceContract,
+                               GcpSelectComplianceContract,
+                               GcpSelectServiceContract, stable_contract_id)
 
 _ROUTES: tuple[tuple[str, str, str, type[Any], str], ...] = (
     (

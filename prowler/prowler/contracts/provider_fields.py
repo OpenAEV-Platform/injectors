@@ -3,13 +3,15 @@
 from dataclasses import dataclass
 from typing import Literal
 
-from pyoaev.contracts.contract_config import (
-    ContractElement,
-    ContractText,
-    ContractTextArea,
-)
+from pyoaev.contracts.contract_config import (ContractElement, ContractText,
+                                              ContractTextArea)
+from pyoaev.credential.utils import build_single_referenced_credential_element
 
 ProviderName = Literal["aws", "azure", "gcp", "kubernetes", "all"]
+
+# pyoaev fixes this key on every ContractReferencedCredential element, so the
+# parse boundary can strip it by name without trusting the submitted form.
+CREDENTIAL_REFERENCE_KEY = "credential_reference"
 
 
 @dataclass(frozen=True, slots=True)
@@ -68,4 +70,5 @@ def build_provider_fields(provider: ProviderName) -> list[ContractElement]:
                 mandatory=specification.mandatory,
             )
         )
+    fields.append(build_single_referenced_credential_element(provider))
     return fields

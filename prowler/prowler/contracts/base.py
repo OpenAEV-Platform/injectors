@@ -11,43 +11,35 @@ from uuid import UUID
 
 from pydantic import ValidationError
 from pyoaev.contracts import ContractBuilder
-from pyoaev.contracts.contract_config import (
-    Contract,
-    ContractConfig,
-    ContractElement,
-    ContractOutputElement,
-    ContractOutputType,
-    SupportedLanguage,
-)
+from pyoaev.contracts.contract_config import (Contract, ContractConfig,
+                                              ContractElement,
+                                              ContractOutputElement,
+                                              ContractOutputType,
+                                              SupportedLanguage)
 
 from prowler._core.cli_engine import CommandResult
-from prowler._core.prowler_client import (
-    ComplianceSelector,
-    ProwlerClientFactory,
-    ServiceSelector,
-)
+from prowler._core.prowler_client import (ComplianceSelector,
+                                          ProwlerClientFactory,
+                                          ServiceSelector)
 from prowler.models.configs.config_loader import ProwlerConfig
-from prowler.models.findings import (
-    OcsfDecodeError,
-    OcsfMappingError,
-    OcsfPreviewRecord,
-    OpenAevFinding,
-    map_command_result_with_evidence,
-)
-from prowler.models.provider_inputs import (
-    PROVIDER_INPUT_ADAPTER,
-    AwsProviderInput,
-    AzureProviderInput,
-    GcpProviderInput,
-    KubernetesProviderInput,
-    ProviderInput,
-)
+from prowler.models.findings import (OcsfDecodeError, OcsfMappingError,
+                                     OcsfPreviewRecord, OpenAevFinding,
+                                     map_command_result_with_evidence)
+from prowler.models.provider_inputs import (PROVIDER_INPUT_ADAPTER,
+                                            AwsProviderInput,
+                                            AzureProviderInput,
+                                            GcpProviderInput,
+                                            KubernetesProviderInput,
+                                            ProviderInput)
 from prowler.services.output_trace import generate
 
+from .provider_fields import \
+    CREDENTIAL_REFERENCE_KEY as CREDENTIAL_REFERENCE_KEY
 from .provider_fields import ProviderName as ProviderName
 from .provider_fields import build_provider_fields as _build_provider_fields
 
 __all__ = [
+    "CREDENTIAL_REFERENCE_KEY",
     "BaseProwlerContract",
     "ClientFactoryPort",
     "ContractExecutionOutcome",
@@ -365,12 +357,21 @@ class BaseProwlerContract(ABC):
         }
 
     def parse_input(self, raw_input: Mapping[str, object]) -> ProviderInput:
-        """Convert ephemeral form values immediately into the strict CHK.002 model."""
+        """Convert ephemeral form values immediately into the strict CHK.002 model.
+
+        The credential reference is a platform-side selector rather than a
+        provider model field, so it is dropped before the ``extra="forbid"``
+        boundary instead of being rejected there as an unknown input.
+        """
         if "provider" in raw_input:
             raise ContractInputError.from_validation(
                 (ContractInputIssue(("provider",), "extra_forbidden"),)
             )
-        candidate = dict(raw_input)
+        candidate = {
+            key: value
+            for key, value in raw_input.items()
+            if key != CREDENTIAL_REFERENCE_KEY
+        }
         if self.provider == "aws":
             for field in ("aws_session_token", "aws_endpoint_url"):
                 value = candidate.get(field)

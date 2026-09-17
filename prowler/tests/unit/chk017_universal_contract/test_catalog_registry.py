@@ -5,12 +5,8 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from prowler.contracts import (
-    DEFAULT_PROWLER_CONTRACTS,
-    ROUTE_CATALOG,
-    UniversalProwlerContract,
-    stable_contract_id,
-)
+from prowler.contracts import (DEFAULT_PROWLER_CONTRACTS, ROUTE_CATALOG,
+                               UniversalProwlerContract, stable_contract_id)
 
 _PRE_EXISTING_31 = (
     "aws",

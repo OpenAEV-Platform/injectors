@@ -6,13 +6,9 @@ from typing import Any, Callable
 import pytest
 
 from prowler._core.cli_engine import CommandResult, ExecutionSpecification
-from prowler.models.findings import (
-    OcsfDecodeError,
-    OcsfMappingError,
-    decode_ocsf_output,
-    map_command_result,
-    map_ocsf_finding,
-)
+from prowler.models.findings import (OcsfDecodeError, OcsfMappingError,
+                                     decode_ocsf_output, map_command_result,
+                                     map_ocsf_finding)
 
 
 def test_empty_json_array_and_blank_json_lines_are_empty() -> None:
