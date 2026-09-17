@@ -16,10 +16,12 @@ from prowler.models.provider_inputs import (
     AwsProviderInput,
     AzureProviderInput,
     GcpProviderInput,
+    ImmutableProviderInput,
+    KubernetesProviderInput,
     ProviderInput,
 )
 
-from .contracts import ServiceSelector
+from .contracts import ComplianceSelector, ServiceSelector
 from .credentials import CredentialCleanupError
 from .output_workspace import (
     DEFAULT_MAXIMUM_ARTIFACT_BYTES,
@@ -76,6 +78,25 @@ def _safe_log(level: int, message: str, **metadata: object) -> None:
         return
 
 
+_COMPLIANCE_PROVIDER_TYPES: dict[ComplianceSelector, type[ImmutableProviderInput]] = {
+    "cis_3.0_aws": AwsProviderInput,
+    "cis_3.0_azure": AzureProviderInput,
+    "cis_3.0_gcp": GcpProviderInput,
+    "cis_1.12_kubernetes": KubernetesProviderInput,
+}
+
+
+def _validate_compliance_provider(
+    provider: ProviderInput, compliance_selector: ComplianceSelector
+) -> None:
+    """Reject unknown or cross-provider compliance selection before adaptation."""
+    provider_type = _COMPLIANCE_PROVIDER_TYPES.get(compliance_selector)
+    if provider_type is None:
+        raise ValueError("unsupported compliance selector")
+    if not isinstance(provider, provider_type):
+        raise ValueError("compliance selector requires its matching provider")
+
+
 class ProwlerClientConsumedError(RuntimeError):
     """Reject reuse of a client whose provider input was already consumed."""
 
@@ -104,6 +125,7 @@ class ProwlerClient:
         check_filters: Sequence[str] = (),
         *,
         service_selector: ServiceSelector | None = None,
+        compliance_selector: ComplianceSelector | None = None,
     ) -> CommandResult:
         """Run one assessment and capture its controlled OCSF artifact."""
         with self._consumption_lock:
@@ -149,6 +171,13 @@ class ProwlerClient:
                 raise ValueError(
                     "IAM service selector requires an AWS, Azure, or GCP provider"
                 )
+            if compliance_selector is not None:
+                _validate_compliance_provider(provider, compliance_selector)
+                if filters or service_selector is not None:
+                    raise ValueError(
+                        "compliance selector cannot be combined with check or "
+                        "service selectors"
+                    )
 
             _safe_log(logging.INFO, "Preparing Prowler output workspace")
             try:
@@ -173,10 +202,16 @@ class ProwlerClient:
             service_arguments = (
                 ("--services", service_selector) if service_selector is not None else ()
             )
+            compliance_arguments = (
+                ("--compliance", compliance_selector)
+                if compliance_selector is not None
+                else ()
+            )
             provider_and_selectors = (
                 *invocation.arguments,
                 *filter_arguments,
                 *service_arguments,
+                *compliance_arguments,
             )
             narrowed = any(
                 argument in _NARROWING_OPTIONS for argument in provider_and_selectors
