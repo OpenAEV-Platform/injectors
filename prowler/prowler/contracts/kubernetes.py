@@ -1,6 +1,5 @@
 """Executable CHK.010 complete-scope Kubernetes base contract."""
 
-from dataclasses import replace
 from typing import ClassVar
 
 from prowler.models.configs.config_loader import ProwlerConfig
@@ -24,7 +23,4 @@ class KubernetesBaseContract(BaseProwlerContract):
         self, config: ProwlerConfig, provider: ProviderInput
     ) -> ContractExecutionOutcome:
         """Map once, preserving ordered Kubernetes findings only."""
-        outcome = super().execute(config, provider)
-        if outcome.error is not None or outcome.command_result.return_code != 0:
-            return outcome
-        return replace(outcome, findings=self._provider_findings(outcome.findings))
+        return self._execute_scoped(config, provider)

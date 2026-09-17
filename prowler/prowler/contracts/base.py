@@ -5,8 +5,8 @@ from __future__ import annotations
 import json
 from abc import ABC, abstractmethod
 from collections.abc import Mapping, Sequence
-from dataclasses import dataclass
-from typing import Any, ClassVar, Literal, Protocol
+from dataclasses import dataclass, replace
+from typing import Any, ClassVar, Literal, Protocol, cast
 from uuid import UUID
 
 from pydantic import ValidationError
@@ -57,7 +57,7 @@ __all__ = [
     "RouteFamily",
 ]
 
-RouteFamily = Literal["base", "service", "compliance"]
+RouteFamily = Literal["base", "service", "compliance", "universal"]
 
 
 class ClientFactoryPort(Protocol):
@@ -223,6 +223,15 @@ class BaseProwlerContract(ABC):
             if finding.cloud_provider.casefold() == self.provider
         )
 
+    def _execute_scoped(
+        self, config: ProwlerConfig, provider: ProviderInput
+    ) -> ContractExecutionOutcome:
+        """Run the complete scope and retain only this contract's provider findings."""
+        outcome = BaseProwlerContract.execute(self, config, provider)
+        if outcome.error is not None or outcome.command_result.return_code != 0:
+            return outcome
+        return replace(outcome, findings=self._provider_findings(outcome.findings))
+
     def _execute_service(
         self,
         config: ProwlerConfig,
@@ -230,24 +239,8 @@ class BaseProwlerContract(ABC):
         service_selector: ServiceSelector,
     ) -> ContractExecutionOutcome:
         """Run one validated service selector and retain its provider findings."""
-        result = self._client_factory.run(
-            config,
-            provider,
-            check_filters=self.check_filters,
-            service_selector=service_selector,
-        )
-        if result.error is not None or result.return_code != 0:
-            return ContractExecutionOutcome(command_result=result, error=result.error)
-        try:
-            mapping = map_command_result_with_evidence(result)
-        except (OcsfDecodeError, OcsfMappingError) as error:
-            return ContractExecutionOutcome(command_result=result, error=error)
-        return ContractExecutionOutcome(
-            command_result=result,
-            findings=self._provider_findings(mapping.findings),
-            raw_record_count=mapping.raw_record_count,
-            raw_output_bytes=mapping.raw_output_bytes,
-            raw_preview=mapping.raw_preview,
+        return self._run(
+            config, provider, selector=service_selector, selector_kind="service"
         )
 
     def _execute_compliance(
@@ -257,12 +250,37 @@ class BaseProwlerContract(ABC):
         compliance_selector: ComplianceSelector,
     ) -> ContractExecutionOutcome:
         """Run one validated compliance selector and retain provider findings."""
-        result = self._client_factory.run(
-            config,
-            provider,
-            check_filters=self.check_filters,
-            compliance_selector=compliance_selector,
+        return self._run(
+            config, provider, selector=compliance_selector, selector_kind="compliance"
         )
+
+    def _run(
+        self,
+        config: ProwlerConfig,
+        provider: ProviderInput,
+        *,
+        selector: ServiceSelector | ComplianceSelector | None = None,
+        selector_kind: Literal["service", "compliance"] | None = None,
+    ) -> ContractExecutionOutcome:
+        """Run one selector shape and map successful output into an outcome."""
+        if selector_kind == "service":
+            result = self._client_factory.run(
+                config,
+                provider,
+                check_filters=self.check_filters,
+                service_selector=cast(ServiceSelector, selector),
+            )
+        elif selector_kind == "compliance":
+            result = self._client_factory.run(
+                config,
+                provider,
+                check_filters=self.check_filters,
+                compliance_selector=cast(ComplianceSelector, selector),
+            )
+        else:
+            result = self._client_factory.run(
+                config, provider, check_filters=self.check_filters
+            )
         if result.error is not None or result.return_code != 0:
             return ContractExecutionOutcome(command_result=result, error=result.error)
         try:
@@ -271,7 +289,11 @@ class BaseProwlerContract(ABC):
             return ContractExecutionOutcome(command_result=result, error=error)
         return ContractExecutionOutcome(
             command_result=result,
-            findings=self._provider_findings(mapping.findings),
+            findings=(
+                self._provider_findings(mapping.findings)
+                if selector_kind is not None
+                else mapping.findings
+            ),
             raw_record_count=mapping.raw_record_count,
             raw_output_bytes=mapping.raw_output_bytes,
             raw_preview=mapping.raw_preview,
@@ -395,19 +417,4 @@ class BaseProwlerContract(ABC):
         self, config: ProwlerConfig, provider: ProviderInput
     ) -> ContractExecutionOutcome:
         """Run once, preserve failures unchanged, and map successful raw output."""
-        result = self._client_factory.run(
-            config, provider, check_filters=self.check_filters
-        )
-        if result.error is not None or result.return_code != 0:
-            return ContractExecutionOutcome(command_result=result, error=result.error)
-        try:
-            mapping = map_command_result_with_evidence(result)
-        except (OcsfDecodeError, OcsfMappingError) as error:
-            return ContractExecutionOutcome(command_result=result, error=error)
-        return ContractExecutionOutcome(
-            command_result=result,
-            findings=mapping.findings,
-            raw_record_count=mapping.raw_record_count,
-            raw_output_bytes=mapping.raw_output_bytes,
-            raw_preview=mapping.raw_preview,
-        )
+        return self._run(config, provider)

@@ -1,21 +1,11 @@
 """Executable MITRE ATT&CK compliance contracts for cloud providers."""
 
-from prowler._core.prowler_client import ComplianceSelector
-
-from .base import ProviderName
 from .compliance import FixedComplianceContract
-
-_MITRE_BY_PROVIDER: dict[ProviderName, ComplianceSelector] = {
-    "aws": "mitre_attack_aws",
-    "azure": "mitre_attack_azure",
-    "gcp": "mitre_attack_gcp",
-}
 
 
 class MitreComplianceContract(FixedComplianceContract):
     """Execute one provider-owned MITRE selector through the CHK.004 seam."""
 
-    compliance_by_provider = _MITRE_BY_PROVIDER
     framework_name = "MITRE"
 
 
@@ -50,3 +40,9 @@ class GcpMitreContract(MitreComplianceContract):
     provider = "gcp"
     label = "Prowler GCP MITRE ATT&CK"
     compliance_selector = "mitre_attack_gcp"
+
+
+MitreComplianceContract.compliance_by_provider = {
+    contract.provider: contract.compliance_selector
+    for contract in (AwsMitreContract, AzureMitreContract, GcpMitreContract)
+}

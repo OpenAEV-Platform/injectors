@@ -1,0 +1,190 @@
+"""Focused unit contract for CHK.003 production adapters."""
+
+# ruff: noqa: D103
+
+import importlib
+import subprocess
+from typing import Any
+from unittest.mock import patch
+
+import pytest
+from pydantic import SecretStr
+
+
+def _api() -> Any:
+    try:
+        return importlib.import_module("prowler._core.cli_engine")
+    except ModuleNotFoundError:
+        pytest.fail("canonical prowler._core.cli_engine API is absent")
+
+
+def _spec(api: Any, **changes: Any) -> Any:
+    values = {
+        "executable": "tool",
+        "arguments": ("a;b",),
+        "environment": (("KEY", "value"),),
+        "working_directory": "/work",
+        "input_bytes": b"\x00\xff",
+        "output": api.OutputSpecification(parser="raw"),
+        "timeout_seconds": 2.5,
+        "maximum_accepted_output_bytes": 100,
+    }
+    values.update(changes)
+    return api.ExecutionSpecification(**values)
+
+
+def test_subprocess_executor_forces_shell_false_and_preserves_bytes() -> (
+    None
+):  # noqa: D103
+    api = _api()
+    specification = _spec(api)
+    completed = subprocess.CompletedProcess(
+        args=specification.argv, returncode=0, stdout=b"\xff", stderr=b"\x00"
+    )
+
+    with patch("subprocess.run", return_value=completed) as run:
+        outcome = api.SubprocessExecutor().execute(specification)
+
+    run.assert_called_once_with(
+        ("tool", "a;b"),
+        input=b"\x00\xff",
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        cwd="/work",
+        env={"KEY": "value"},
+        timeout=2.5,
+        shell=False,
+        check=False,
+    )
+    assert outcome == api.ProcessOutcome(0, b"\xff", b"\x00")
+
+
+def test_subprocess_executor_alone_unwraps_secret_into_fresh_exact_environment() -> (
+    None
+):
+    api = _api()
+    source_environment = (("LANG", "C"), ("TOKEN", SecretStr("exec-secret")))
+    specification = _spec(api, environment=source_environment)
+    completed = subprocess.CompletedProcess(
+        args=specification.argv, returncode=0, stdout=b"", stderr=b""
+    )
+
+    with patch("subprocess.run", return_value=completed) as run:
+        outcome = api.SubprocessExecutor().execute(specification)
+
+    passed_environment = run.call_args.kwargs["env"]
+    assert passed_environment == {"LANG": "C", "TOKEN": "exec-secret"}
+    assert passed_environment is not source_environment
+    assert dict(specification.environment)["TOKEN"].get_secret_value() == "exec-secret"
+    assert run.call_args.kwargs["shell"] is False
+    assert outcome == api.ProcessOutcome(0, b"", b"")
+
+
+def test_subprocess_start_error_does_not_expose_environment_values() -> None:
+    api = _api()
+    environment_value = "error-secret-value"
+    specification = _spec(
+        api,
+        environment=(
+            ("VISIBLE", environment_value),
+            ("TOKEN", SecretStr(environment_value)),
+        ),
+    )
+
+    with patch(
+        "subprocess.run", side_effect=OSError(f"failed near {environment_value}")
+    ):
+        error = api.SubprocessExecutor().execute(specification)
+
+    assert environment_value not in repr(error)
+    assert environment_value not in str(error)
+    assert environment_value not in (error.cause or "")
+
+
+def test_subprocess_start_and_timeout_errors_are_enveloped() -> None:  # noqa: D103
+    api = _api()
+    specification = _spec(api)
+    executor = api.SubprocessExecutor()
+    with patch("subprocess.run", side_effect=OSError("missing")):
+        started = executor.execute(specification)
+    with patch(
+        "subprocess.run",
+        side_effect=subprocess.TimeoutExpired(
+            specification.argv, 2.5, output=b"partial\xff", stderr=b"slow\x00"
+        ),
+    ):
+        timed_out = executor.execute(specification)
+
+    assert started.kind == "process_start_failed"
+    assert started.stdout == b"" and started.stderr == b""
+    assert timed_out.kind == "timeout"
+    assert (timed_out.stdout, timed_out.stderr) == (b"partial\xff", b"slow\x00")
+
+
+def test_binary_resolver_only_validates_exact_executable() -> None:  # noqa: D103
+    api = _api()
+    specification = _spec(
+        api, executable="scanner", environment=(("PATH", "/spec/bin"),)
+    )
+    resolver = api.WhichBinaryResolver()
+    with patch("shutil.which", return_value="/different/scanner") as which:
+        result = resolver.validate(specification)
+    assert result is None
+    which.assert_called_once_with("scanner", path="/spec/bin")
+    assert specification.executable == "scanner"
+
+
+@pytest.mark.parametrize("environment", [(), (("PATH", ""),)])
+def test_binary_resolver_rejects_relative_executable_without_usable_path(
+    environment: tuple[tuple[str, str], ...],
+) -> None:  # noqa: D103
+    api = _api()
+    specification = _spec(api, executable="scanner", environment=environment)
+
+    with patch("shutil.which", return_value="/parent/bin/scanner") as which:
+        result = api.WhichBinaryResolver().validate(specification)
+
+    assert isinstance(result, api.ResolutionError)
+    which.assert_not_called()
+
+
+def test_binary_resolver_validates_absolute_executable_without_path() -> (
+    None
+):  # noqa: D103
+    api = _api()
+    specification = _spec(api, executable="/opt/tools/scanner", environment=())
+
+    with patch("shutil.which", return_value="/opt/tools/scanner") as which:
+        result = api.WhichBinaryResolver().validate(specification)
+
+    assert result is None
+    which.assert_called_once_with("/opt/tools/scanner", path="")
+
+
+@pytest.mark.parametrize(
+    ("output", "specification", "expected"),
+    [
+        (b"\x00\xff", ("raw", None), b"\x00\xff"),
+        (b"hello\n", ("text", None), "hello\n"),
+        (b'{"ok": true}', ("json", None), {"ok": True}),
+        (b"a\nb\n", ("lines", None), ["a", "b"]),
+        (b"id=42", ("regex", r"id=(\d+)"), "42"),
+    ],
+)
+def test_output_parsers(  # noqa: D103
+    output: bytes, specification: tuple[str, str | None], expected: Any
+) -> None:
+    api = _api()
+    spec = _spec(api, output=api.OutputSpecification(*specification))
+    assert api.OutputParserAdapter().parse(spec, output) == expected
+
+
+def test_parser_failure_has_safe_context_without_claiming_process_evidence() -> (
+    None
+):  # noqa: D103
+    api = _api()
+    spec = _spec(api, output=api.OutputSpecification(parser="json"))
+    error = api.OutputParserAdapter().parse(spec, b"{bad")
+    assert isinstance(error, api.ParsingError)
+    assert error.stdout == b"" and error.stderr == b""
+    assert error.context

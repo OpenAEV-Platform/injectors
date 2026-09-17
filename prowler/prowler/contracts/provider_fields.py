@@ -9,7 +9,7 @@ from pyoaev.contracts.contract_config import (
     ContractTextArea,
 )
 
-ProviderName = Literal["aws", "azure", "gcp", "kubernetes"]
+ProviderName = Literal["aws", "azure", "gcp", "kubernetes", "all"]
 
 
 @dataclass(frozen=True, slots=True)

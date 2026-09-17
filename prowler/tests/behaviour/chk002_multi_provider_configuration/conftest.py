@@ -16,5 +16,5 @@ def standard_injector_environment(monkeypatch: pytest.MonkeyPatch) -> None:
 
 @pytest.fixture
 def clean_prowler_environment(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Ensure the default executable path is not overridden externally."""
+    """Ensure optional Prowler runtime settings are not overridden externally."""
     monkeypatch.delenv("PROWLER_EXECUTABLE_PATH", raising=False)

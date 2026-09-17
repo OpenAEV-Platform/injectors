@@ -1,34 +1,17 @@
 """Executable NIS2 and ISO 27001 compliance contracts."""
 
-from prowler._core.prowler_client import ComplianceSelector
-
-from .base import ProviderName
 from .compliance import FixedComplianceContract
-
-_NIS2_BY_PROVIDER: dict[ProviderName, ComplianceSelector] = {
-    "aws": "nis2_aws",
-    "azure": "nis2_azure",
-    "gcp": "nis2_gcp",
-}
-_ISO27001_BY_PROVIDER: dict[ProviderName, ComplianceSelector] = {
-    "aws": "iso27001_2022_aws",
-    "azure": "iso27001_2022_azure",
-    "gcp": "iso27001_2022_gcp",
-    "kubernetes": "iso27001_2022_kubernetes",
-}
 
 
 class Nis2ComplianceContract(FixedComplianceContract):
     """Execute one provider-owned NIS2 selector through the CHK.004 seam."""
 
-    compliance_by_provider = _NIS2_BY_PROVIDER
     framework_name = "NIS2"
 
 
 class Iso27001ComplianceContract(FixedComplianceContract):
     """Execute one provider-owned ISO 27001 selector through the CHK.004 seam."""
 
-    compliance_by_provider = _ISO27001_BY_PROVIDER
     framework_name = "ISO27001"
 
 
@@ -107,3 +90,18 @@ class KubernetesIso27001Contract(Iso27001ComplianceContract):
     provider = "kubernetes"
     label = "Prowler Kubernetes ISO27001"
     compliance_selector = "iso27001_2022_kubernetes"
+
+
+Nis2ComplianceContract.compliance_by_provider = {
+    contract.provider: contract.compliance_selector
+    for contract in (AwsNis2Contract, AzureNis2Contract, GcpNis2Contract)
+}
+Iso27001ComplianceContract.compliance_by_provider = {
+    contract.provider: contract.compliance_selector
+    for contract in (
+        AwsIso27001Contract,
+        AzureIso27001Contract,
+        GcpIso27001Contract,
+        KubernetesIso27001Contract,
+    )
+}
