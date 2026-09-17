@@ -5,9 +5,12 @@ from __future__ import annotations
 import json
 from typing import Any, cast
 
-from prowler.contracts import (CREDENTIAL_REFERENCE_KEY,
-                               DEFAULT_PROWLER_CONTRACTS,
-                               UniversalProwlerContract, stable_contract_id)
+from prowler.contracts import (
+    CREDENTIAL_REFERENCE_KEY,
+    DEFAULT_PROWLER_CONTRACTS,
+    UniversalProwlerContract,
+    stable_contract_id,
+)
 
 PROVIDER_KEY = "prowler_provider"
 SERVICE_KEYS = {
