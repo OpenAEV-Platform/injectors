@@ -1,6 +1,5 @@
 """Executable complete-scope and service-specific AWS contracts."""
 
-from collections.abc import Sequence
 from dataclasses import replace
 from typing import ClassVar
 
@@ -9,7 +8,6 @@ from prowler.models.configs.config_loader import ProwlerConfig
 from prowler.models.findings import (
     OcsfDecodeError,
     OcsfMappingError,
-    OpenAevFinding,
     map_command_result_with_evidence,
 )
 from prowler.models.provider_inputs import AwsProviderInput, ProviderInput
@@ -28,17 +26,6 @@ class AwsBaseContract(BaseProwlerContract):
     label = "Prowler AWS"
     check_filters = ()
 
-    @staticmethod
-    def _aws_findings(
-        findings: Sequence[OpenAevFinding],
-    ) -> tuple[OpenAevFinding, ...]:
-        """Retain ordered AWS findings with one canonical provider spelling."""
-        return tuple(
-            finding.model_copy(update={"cloud_provider": "aws"})
-            for finding in findings
-            if finding.cloud_provider.casefold() == "aws"
-        )
-
     def execute(
         self, config: ProwlerConfig, provider: ProviderInput
     ) -> ContractExecutionOutcome:
@@ -46,7 +33,7 @@ class AwsBaseContract(BaseProwlerContract):
         outcome = super().execute(config, provider)
         if outcome.error is not None or outcome.command_result.return_code != 0:
             return outcome
-        return replace(outcome, findings=self._aws_findings(outcome.findings))
+        return replace(outcome, findings=self._provider_findings(outcome.findings))
 
 
 class AwsServiceContract(AwsBaseContract):
@@ -88,7 +75,7 @@ class AwsServiceContract(AwsBaseContract):
             raw_output_bytes=mapping.raw_output_bytes,
             raw_preview=mapping.raw_preview,
         )
-        return replace(outcome, findings=self._aws_findings(outcome.findings))
+        return replace(outcome, findings=self._provider_findings(outcome.findings))
 
 
 class AwsIamContract(AwsServiceContract):

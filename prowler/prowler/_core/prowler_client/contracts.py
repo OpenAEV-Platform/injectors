@@ -8,6 +8,8 @@ from prowler._core.cli_engine.contracts import EnvironmentValue
 from .ports import CredentialLeasePort
 
 AwsServiceSelector = Literal["iam", "s3", "ec2"]
+AzureServiceSelector = Literal["iam", "storage"]
+ServiceSelector = AwsServiceSelector | AzureServiceSelector
 
 
 @dataclass(frozen=True)

@@ -7,7 +7,12 @@ from .aws import (
     AwsS3Contract,
     AwsServiceContract,
 )
-from .azure import AzureBaseContract
+from .azure import (
+    AzureBaseContract,
+    AzureIamContract,
+    AzureServiceContract,
+    AzureStorageContract,
+)
 from .base import (
     BaseProwlerContract,
     ContractExecutionOutcome,
@@ -35,6 +40,9 @@ __all__ = [
     "AwsS3Contract",
     "AwsServiceContract",
     "AzureBaseContract",
+    "AzureIamContract",
+    "AzureServiceContract",
+    "AzureStorageContract",
     "GcpBaseContract",
     "KubernetesBaseContract",
     "ContractDispatcher",
