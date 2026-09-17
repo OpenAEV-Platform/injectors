@@ -1,0 +1,122 @@
+"""Fixtures local to CHK.004 behaviour tests."""
+
+# ruff: noqa: D102, D103
+
+from dataclasses import dataclass, field
+from pathlib import Path
+from typing import Any
+
+import pytest
+from pydantic import SecretStr
+
+from prowler._core.cli_engine import CommandResult, ExecutionSpecification
+from prowler.models.provider_inputs import (
+    AwsProviderInput,
+    AzureProviderInput,
+    GcpProviderInput,
+    KubernetesProviderInput,
+)
+
+
+@dataclass
+class RecordingEngine:
+    """Record requests and inspect temporary files during synchronous runs."""
+
+    requests: list[Any] = field(default_factory=list)
+    result: Any = None
+    raised: BaseException | None = None
+    inspect_paths: tuple[Path, ...] = ()
+    observed_modes: list[int] = field(default_factory=list)
+    observed_directory_modes: list[int] = field(default_factory=list)
+    observed_contents: list[str] = field(default_factory=list)
+    artifact_bytes: bytes = b'{"raw":"artifact-ocsf"}\n'
+    console_stdout: bytes = b"\x1b[32mProwler completed\x1b[0m\n"
+    console_stderr: bytes = b""
+    write_artifact: bool = True
+    create_nested_output: bool = False
+    observed_output_directories: list[Path] = field(default_factory=list)
+
+    def run(self, request: Any) -> Any:
+        self.requests.append(request)
+        if "--output-directory" in request.arguments:
+            output_directory = Path(
+                request.arguments[request.arguments.index("--output-directory") + 1]
+            )
+            self.observed_output_directories.append(output_directory)
+            if self.create_nested_output:
+                nested = output_directory / "compliance" / "nested"
+                nested.mkdir(parents=True)
+                (nested / "summary.json").write_text("fixture", encoding="utf-8")
+            if self.write_artifact:
+                (output_directory / "findings.ocsf.json").write_bytes(
+                    self.artifact_bytes
+                )
+        paths = list(self.inspect_paths)
+        for flag in ("--credentials-file", "--kubeconfig-file"):
+            if flag in request.arguments:
+                paths.append(Path(request.arguments[request.arguments.index(flag) + 1]))
+        for path in paths:
+            self.observed_modes.append(path.stat().st_mode & 0o777)
+            self.observed_directory_modes.append(path.parent.stat().st_mode & 0o777)
+            self.observed_contents.append(path.read_text(encoding="utf-8"))
+        if self.raised is not None:
+            raise self.raised
+        if self.result is None:
+            specification = ExecutionSpecification.from_request(request)
+            self.result = CommandResult(
+                specification=specification,
+                stdout=self.console_stdout,
+                stderr=self.console_stderr,
+                return_code=0,
+                parsed=self.console_stdout,
+            )
+        return self.result
+
+
+@dataclass
+class RecordingEngineFactory:
+    """Return an injected recording engine."""
+
+    engine: RecordingEngine
+    create_calls: int = 0
+
+    def create(self) -> RecordingEngine:
+        self.create_calls += 1
+        return self.engine
+
+
+@pytest.fixture
+def recording_engine() -> RecordingEngine:
+    return RecordingEngine()
+
+
+@pytest.fixture
+def provider_inputs() -> dict[str, Any]:
+    return {
+        "AWS": AwsProviderInput(
+            provider="aws",
+            aws_access_key_id="AKIA_TEST",
+            aws_secret_access_key=SecretStr("aws-secret"),
+            aws_session_token=SecretStr("aws-session"),
+            aws_account_id="123456789012",
+            aws_region="eu-west-1",
+        ),
+        "Azure": AzureProviderInput(
+            provider="azure",
+            azure_tenant_id="tenant-id",
+            azure_client_id="client-id",
+            azure_client_secret=SecretStr("azure-secret"),
+            azure_subscription_id="subscription-id",
+            azure_provider="AzureUSGovernment",
+        ),
+        "GCP": GcpProviderInput(
+            provider="gcp",
+            gcp_service_account_json=SecretStr('{"private_key":"gcp-secret"}'),
+            gcp_project_id="project-id",
+        ),
+        "Kubernetes": KubernetesProviderInput(
+            provider="kubernetes",
+            kubernetes_kubeconfig=SecretStr("kube-secret"),
+            kubernetes_context="cluster-context",
+        ),
+    }
