@@ -8,13 +8,13 @@ from prowler.models.configs.config_loader import ProwlerConfig
 from prowler.models.provider_inputs import ProviderInput
 
 from .client import ProwlerClient
+from .credentials import TemporaryCredentialLeaseFactory
+from .output_workspace import TemporaryOutputWorkspaceFactory
 from .ports import (
     CliEngineFactoryPort,
     CredentialLeaseFactoryPort,
     OutputWorkspaceFactoryPort,
 )
-from .credentials import TemporaryCredentialLeaseFactory
-from .output_workspace import TemporaryOutputWorkspaceFactory
 from .provider_adapter import ProviderInvocationAdapter
 
 
