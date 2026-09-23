@@ -1,0 +1,64 @@
+[project]
+name = "openaev-prowler-injector"
+version = "0.1.0"
+description = "OpenAEV injector for Prowler cloud security assessments"
+readme = "README.md"
+authors = [{ name = "Filigran", email = "contact@filigran.io" }]
+license = "Apache-2.0"
+requires-python = ">=3.11,<4.0"
+dependencies = [
+    "pyoaev==2.3.5",
+    "pydantic>=2.11.3,<2.14.0",
+    "pydantic-settings>=2.11.0,<2.15.0",
+]
+
+[project.scripts]
+ProwlerInjector = "prowler.__main__:main"
+
+[project.optional-dependencies]
+dev = [
+    "black>=26.3.1,<26.4.0",
+    "build>=1.4.0,<1.5.0",
+    "isort>=8.0.1,<8.1.0",
+    "mypy~=1.18.2",
+    "pytest>=9.0.0,<9.1.0",
+    "ruff~=0.14.2",
+]
+
+[tool.poetry]
+packages = [{ include = "prowler" }]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.isort]
+profile = "black"
+src_paths = ["prowler"]
+
+[tool.ruff]
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "D", "B", "I", "S"]
+ignore = ["D104", "D203", "D211", "D213"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**/*.py" = ["S101", "S106"]
+
+[tool.mypy]
+strict = true
+plugins = ["pydantic.mypy"]
+
+[[tool.mypy.overrides]]
+module = ["prowler.__main__", "prowler.injector.*"]
+# pyoaev 2.3.5 does not publish a py.typed marker or external stubs.
+disable_error_code = ["import-untyped"]
+
+[[tool.mypy.overrides]]
+module = ["prowler.models.configs.config_loader"]
+# These two pyoaev base classes are consequently exposed to mypy as Any.
+disable_error_code = ["import-untyped", "misc"]
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
