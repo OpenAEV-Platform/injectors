@@ -10,6 +10,12 @@ from pyoaev.contracts.contract_config import (
     SupportedLanguage,
 )
 
+from shodan.contracts.finding_outputs import (
+    cve_output,
+    ipv4_output,
+    ports_scan_output,
+)
+
 if TYPE_CHECKING:
     from shodan.contracts.shodan_contracts import TargetSelectorField
 
@@ -149,7 +155,7 @@ class CustomQuery:
     def contract_with_specific_outputs(
         base_outputs: list[ContractOutputElement],
     ) -> list[ContractOutputElement]:
-        specific_outputs = []
+        specific_outputs = [ports_scan_output(), ipv4_output(), cve_output()]
         contract_outputs = (
             ContractBuilder()
             .add_outputs(base_outputs + specific_outputs)

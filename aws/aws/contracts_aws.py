@@ -222,7 +222,7 @@ class AWSContracts:
         )
 
         output_iam_privesc_paths = ContractOutputElement(
-            type=ContractOutputType.Text,
+            type=ContractOutputType.Vulnerability,
             field="privesc_paths",
             isMultiple=True,
             isFindingCompatible=True,
@@ -255,6 +255,27 @@ class AWSContracts:
             labels=["aws", "ec2", "security_group"],
         )
 
+        # Public IPv4 addresses parsed out of EC2 / VPC enumeration, exposed as
+        # finding-compatible IPv4 primitives so they can chain into follow-up
+        # network injects. Shared across the EC2 instance and VPC contracts.
+        output_public_ips = ContractOutputElement(
+            type=ContractOutputType.IPv4,
+            field="public_ips",
+            isMultiple=True,
+            isFindingCompatible=True,
+            labels=["aws", "ipv4", "public"],
+        )
+
+        # Open security-group ports parsed out of EC2 enumeration, exposed as
+        # finding-compatible Port primitives.
+        output_open_ports = ContractOutputElement(
+            type=ContractOutputType.Port,
+            field="open_ports",
+            isMultiple=True,
+            isFindingCompatible=True,
+            labels=["aws", "ec2", "port"],
+        )
+
         # Lambda Outputs
         output_lambda_functions = ContractOutputElement(
             type=ContractOutputType.Text,
@@ -273,18 +294,20 @@ class AWSContracts:
             labels=["aws", "rds", "database"],
         )
 
-        # Secrets Manager Outputs
+        # Secrets Manager Outputs -> Credentials (discovered credential-store
+        # entries; the enumeration surfaces the identifier, not the plaintext).
         output_secrets = ContractOutputElement(
-            type=ContractOutputType.Text,
+            type=ContractOutputType.Credentials,
             field="secrets",
             isMultiple=True,
             isFindingCompatible=True,
             labels=["aws", "secretsmanager", "secret"],
         )
 
-        # SSM Outputs
+        # SSM Outputs -> Credentials (SSM parameters frequently hold credential
+        # material; surfaced as credential-store references).
         output_ssm_parameters = ContractOutputElement(
-            type=ContractOutputType.Text,
+            type=ContractOutputType.Credentials,
             field="parameters",
             isMultiple=True,
             isFindingCompatible=True,
@@ -531,7 +554,12 @@ class AWSContracts:
             EC2_ENUM_INSTANCES_CONTRACT,
             "AWS - EC2 Enumerate Instances",
             "AWS - Énumération des instances EC2",
-            [output_ec2_instances, output_ec2_security_groups],
+            [
+                output_ec2_instances,
+                output_ec2_security_groups,
+                output_public_ips,
+                output_open_ports,
+            ],
             attack_patterns=["T1580"],
         )
 
@@ -539,7 +567,7 @@ class AWSContracts:
             EC2_ENUM_SECURITY_GROUPS_CONTRACT,
             "AWS - EC2 Enumerate Security Groups",
             "AWS - Énumération des groupes de sécurité EC2",
-            [output_ec2_security_groups],
+            [output_ec2_security_groups, output_open_ports],
             attack_patterns=["T1580"],
         )
 
@@ -607,7 +635,7 @@ class AWSContracts:
             VPC_ENUM_CONTRACT,
             "AWS - VPC Enumerate Networks",
             "AWS - Énumération des VPC",
-            [output_vpc_networks],
+            [output_vpc_networks, output_public_ips],
             attack_patterns=["T1580"],
         )
 
