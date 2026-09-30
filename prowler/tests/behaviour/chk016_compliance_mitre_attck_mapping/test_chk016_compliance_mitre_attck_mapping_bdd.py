@@ -17,10 +17,7 @@ from prowler._core.cli_engine import (
     OutputSpecification,
     ValidatedCommandRequest,
 )
-from prowler._core.prowler_client import (
-    OUTPUT_ARTIFACT_FILENAME,
-    ProwlerClientFactory,
-)
+from prowler._core.prowler_client import OUTPUT_ARTIFACT_FILENAME, ProwlerClientFactory
 from prowler.contracts import (
     DEFAULT_PROWLER_CONTRACTS,
     ROUTE_CATALOG,

@@ -4,11 +4,7 @@ from typing import Any
 
 import pytest
 
-from prowler.models.findings import (
-    OcsfMappingError,
-    OpenAevFinding,
-    map_ocsf_finding,
-)
+from prowler.models.findings import OcsfMappingError, OpenAevFinding, map_ocsf_finding
 
 _CANARY = "CANARY-SECRET-VALUE"
 
