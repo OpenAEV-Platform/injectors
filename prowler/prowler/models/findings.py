@@ -27,12 +27,9 @@ class OcsfDecodeError(ValueError):
 
 
 @dataclass(frozen=True)
-class OcsfMappingError(ValueError):
+class OcsfMappingError(OcsfDecodeError):
     """Safe structured failure while mapping one OCSF record."""
 
-    code: str
-    message: str
-    record_index: int | None = None
     source_path: str | None = None
 
     def __str__(self) -> str:
