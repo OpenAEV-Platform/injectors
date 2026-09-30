@@ -36,7 +36,7 @@ profile = "black"
 src_paths = ["prowler"]
 
 [tool.ruff]
-target-version = "py312"
+target-version = "py311"
 
 [tool.ruff.lint]
 select = ["E", "F", "W", "D", "B", "I", "S"]
