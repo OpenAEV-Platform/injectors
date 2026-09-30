@@ -31,13 +31,11 @@ class ProwlerConfig(BaseModel):
     @field_validator("executable_path", mode="before")
     @classmethod
     def validate_executable_path(cls, value: object) -> object:
-        """Reject blank, non-absolute, and nonexistent executable paths."""
+        """Reject blank and non-absolute executable paths."""
         if isinstance(value, str) and not value.strip():
             raise ValueError("executable path must not be blank")
         if isinstance(value, (str, Path)) and not Path(value).is_absolute():
             raise ValueError("executable path must be absolute")
-        if isinstance(value, (str, Path)) and not Path(value).exists():
-            raise ValueError("executable path must exist")
         return value
 
 
