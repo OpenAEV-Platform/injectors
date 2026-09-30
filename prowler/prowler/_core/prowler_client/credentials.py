@@ -9,6 +9,7 @@ from threading import Lock
 
 from pydantic import SecretStr
 
+
 class CredentialCleanupError(RuntimeError):
     """Report failed credential cleanup without exposing credential details."""
 
