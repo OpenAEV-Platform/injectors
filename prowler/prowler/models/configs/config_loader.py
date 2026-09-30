@@ -57,6 +57,7 @@ class ConfigLoader(SettingsLoader):
                 "injector_author": {"data": self.injector.author},
                 "injector_log_level": {"data": self.injector.log_level},
                 "injector_icon_filepath": {"data": self.injector.icon_filepath},
+                "prowler_executable_path": {"data": str(self.prowler.executable_path)},
             },
             config_base_model=self,
         )
