@@ -32,7 +32,6 @@ _SEVERITY_MAP = {
 
 _DECODE_MESSAGE = "unable to decode Prowler OCSF output"
 _MAPPING_MESSAGE = "unable to map Prowler OCSF record"
-_MAX_PREVIEW_VALUE_LENGTH = 512
 
 
 def _expectation_result(status: str, status_code: str) -> str:
@@ -200,7 +199,7 @@ def map_command_result_with_evidence(result: CommandResult) -> OcsfMappingResult
     for index, record in enumerate(records):
         findings.append(map_ocsf_finding(record, record_index=index))
         if index < 10:
-            previews.append(_preview_record(record))
+            previews.append(OcsfPreviewRecord.from_record(record))
     return OcsfMappingResult(
         findings=tuple(findings),
         raw_record_count=len(records),
@@ -209,51 +208,6 @@ def map_command_result_with_evidence(result: CommandResult) -> OcsfMappingResult
         ),
         raw_preview=tuple(previews),
     )
-
-
-def _preview_record(record: Mapping[str, Any]) -> OcsfPreviewRecord:
-    """Project only the approved OCSF paths from one already-mapped record."""
-    finding_value = record.get("finding_info", record.get("finding"))
-    finding = finding_value if isinstance(finding_value, Mapping) else {}
-    resources_value = record.get("resources")
-    resource_value = (
-        resources_value[0]
-        if isinstance(resources_value, Sequence)
-        and not isinstance(resources_value, (str, bytes))
-        and resources_value
-        else None
-    )
-    resource = resource_value if isinstance(resource_value, Mapping) else {}
-    cloud_value = record.get("cloud")
-    cloud = cloud_value if isinstance(cloud_value, Mapping) else {}
-    account_value = cloud.get("account")
-    account = account_value if isinstance(account_value, Mapping) else {}
-    unmapped_value = record.get("unmapped")
-    unmapped = unmapped_value if isinstance(unmapped_value, Mapping) else {}
-    return OcsfPreviewRecord(
-        finding_title=_optional_string(finding.get("title")),
-        finding_uid=_optional_string(finding.get("uid")),
-        status=_optional_string(record.get("status")),
-        status_code=_optional_string(record.get("status_code")),
-        severity=_optional_string(record.get("severity")),
-        resource_name=_optional_string(resource.get("name")),
-        resource_uid=_optional_string(resource.get("uid")),
-        cloud_provider=_optional_string(cloud.get("provider")),
-        cloud_region=_optional_string(cloud.get("region")),
-        cloud_account=_optional_string(account.get("uid")),
-        provider_uid=(
-            _optional_string(unmapped.get("provider_uid")) if not cloud else None
-        ),
-    )
-
-
-def _optional_string(value: object) -> str | None:
-    """Admit and bound only text at one statically selected preview path."""
-    if not isinstance(value, str):
-        return None
-    if len(value) <= _MAX_PREVIEW_VALUE_LENGTH:
-        return value
-    return f"{value[: _MAX_PREVIEW_VALUE_LENGTH - 3]}..."
 
 
 def _decode_json_lines(text: str) -> tuple[dict[str, Any], ...]:

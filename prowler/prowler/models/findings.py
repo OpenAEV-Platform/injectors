@@ -1,11 +1,15 @@
 """CHK.005 Prowler OCSF to OpenAEV finding boundary."""
 
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from typing import Any
 
 from pydantic import BaseModel, ConfigDict
 
 from prowler._core.cli_engine import CommandResult
+
+
+_MAX_PREVIEW_VALUE_LENGTH = 512
 
 
 @dataclass(frozen=True)
@@ -80,6 +84,51 @@ class OcsfPreviewRecord(BaseModel):
     cloud_region: str | None = None
     cloud_account: str | None = None
     provider_uid: str | None = None
+
+    @classmethod
+    def from_record(cls, record: Mapping[str, Any]) -> "OcsfPreviewRecord":
+        """Project only the approved OCSF paths from one mapped record."""
+        finding_value = record.get("finding_info", record.get("finding"))
+        finding = finding_value if isinstance(finding_value, Mapping) else {}
+        resources_value = record.get("resources")
+        resource_value = (
+            resources_value[0]
+            if isinstance(resources_value, Sequence)
+            and not isinstance(resources_value, (str, bytes))
+            and resources_value
+            else None
+        )
+        resource = resource_value if isinstance(resource_value, Mapping) else {}
+        cloud_value = record.get("cloud")
+        cloud = cloud_value if isinstance(cloud_value, Mapping) else {}
+        account_value = cloud.get("account")
+        account = account_value if isinstance(account_value, Mapping) else {}
+        unmapped_value = record.get("unmapped")
+        unmapped = unmapped_value if isinstance(unmapped_value, Mapping) else {}
+        return cls(
+            finding_title=_optional_string(finding.get("title")),
+            finding_uid=_optional_string(finding.get("uid")),
+            status=_optional_string(record.get("status")),
+            status_code=_optional_string(record.get("status_code")),
+            severity=_optional_string(record.get("severity")),
+            resource_name=_optional_string(resource.get("name")),
+            resource_uid=_optional_string(resource.get("uid")),
+            cloud_provider=_optional_string(cloud.get("provider")),
+            cloud_region=_optional_string(cloud.get("region")),
+            cloud_account=_optional_string(account.get("uid")),
+            provider_uid=(
+                _optional_string(unmapped.get("provider_uid")) if not cloud else None
+            ),
+        )
+
+
+def _optional_string(value: object) -> str | None:
+    """Admit and bound only text at one statically selected preview path."""
+    if not isinstance(value, str):
+        return None
+    if len(value) <= _MAX_PREVIEW_VALUE_LENGTH:
+        return value
+    return f"{value[: _MAX_PREVIEW_VALUE_LENGTH - 3]}..."
 
 
 @dataclass(frozen=True)
