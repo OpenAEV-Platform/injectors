@@ -154,7 +154,7 @@ class ProwlerClient:
             try:
                 result = self._engine.run(request)
             finally:
-                duration_ms = max(0, int((monotonic() - started) * 1000))
+                duration_ms = int((monotonic() - started) * 1000)
                 _safe_log(logging.INFO, "Prowler process completed")
                 _safe_log(
                     logging.DEBUG,
