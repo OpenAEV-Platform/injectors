@@ -2,7 +2,7 @@ openaev:
   url: 'ChangeMe'
   token: 'ChangeMe'
   # Optional for multi-tenancy (Enterprise Edition)
-  tenant_id: 'ChangeMe'
+  # tenant_id: 'ChangeMe'
 
 injector:
   id: 'ChangeMe'
