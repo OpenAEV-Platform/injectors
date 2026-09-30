@@ -166,18 +166,8 @@ class TemporaryOutputWorkspaceFactory:
             except BaseException:
                 raise OutputWorkspacePreparationError() from None
 
-        directory = Path(temporary_directory.name)
-        try:
-            if self.platform_name != "nt":
-                os.chmod(directory, 0o700)
-        except BaseException:
-            try:
-                temporary_directory.cleanup()
-            except BaseException:  # noqa: S110 - preserve the safe primary error
-                pass
-            raise OutputWorkspacePreparationError() from None
         return TemporaryOutputWorkspace(
-            directory=directory,
+            directory=Path(temporary_directory.name),
             backend=backend,
             _temporary_directory=temporary_directory,
         )
