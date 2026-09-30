@@ -140,6 +140,35 @@ class OcsfMappingResult:
     raw_output_bytes: int
     raw_preview: tuple[OcsfPreviewRecord, ...]
 
+    @classmethod
+    def from_command_result(cls, result: CommandResult) -> "OcsfMappingResult":
+        """Map one successful result and retain only bounded artifact evidence."""
+        if result.error is not None or result.return_code != 0:
+            raise OcsfMappingError(
+                "command_not_successful",
+                "Prowler command result is not successful",
+            )
+        payload = result.parsed
+        if not isinstance(payload, (bytes, str)):
+            raise OcsfDecodeError(
+                "invalid_payload_type", "unable to decode Prowler OCSF output"
+            )
+        records = decode_ocsf_output(payload)
+        findings: list[OpenAevFinding] = []
+        previews: list[OcsfPreviewRecord] = []
+        for index, record in enumerate(records):
+            findings.append(map_ocsf_finding(record, record_index=index))
+            if index < 10:
+                previews.append(OcsfPreviewRecord.from_record(record))
+        return cls(
+            findings=tuple(findings),
+            raw_record_count=len(records),
+            raw_output_bytes=(
+                len(payload) if isinstance(payload, bytes) else len(payload.encode("utf-8"))
+            ),
+            raw_preview=tuple(previews),
+        )
+
 
 def decode_ocsf_output(payload: bytes | str) -> tuple[dict[str, Any], ...]:
     """Lazily preserve the historic decoder export without an import cycle."""

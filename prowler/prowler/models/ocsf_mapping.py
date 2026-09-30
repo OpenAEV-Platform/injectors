@@ -2,7 +2,7 @@
 
 import json
 from collections.abc import Mapping, Sequence
-from typing import Any, Callable, cast
+from typing import Any
 
 from prowler._core.cli_engine import CommandResult
 from prowler.models.findings import (
@@ -173,41 +173,12 @@ def map_ocsf_finding(
 
 def map_command_result(result: CommandResult) -> tuple[OpenAevFinding, ...]:
     """Map one successful CHK.004 result without executing another command."""
-    return map_command_result_with_evidence(result).findings
+    return OcsfMappingResult.from_command_result(result).findings
 
 
 def map_command_result_with_evidence(result: CommandResult) -> OcsfMappingResult:
     """Map an artifact once and retain only counts and safe bounded previews."""
-    if result.error is not None or result.return_code != 0:
-        raise OcsfMappingError(
-            "command_not_successful",
-            "Prowler command result is not successful",
-        )
-    payload = result.parsed
-    if not isinstance(payload, (bytes, str)):
-        raise OcsfDecodeError("invalid_payload_type", _DECODE_MESSAGE)
-    # Resolve through the historic module path to preserve its patch seam.
-    from prowler.models import findings as findings_module
-
-    decode = cast(
-        Callable[[bytes | str], tuple[dict[str, Any], ...]],
-        findings_module.decode_ocsf_output,
-    )
-    records = decode(payload)
-    findings: list[OpenAevFinding] = []
-    previews: list[OcsfPreviewRecord] = []
-    for index, record in enumerate(records):
-        findings.append(map_ocsf_finding(record, record_index=index))
-        if index < 10:
-            previews.append(OcsfPreviewRecord.from_record(record))
-    return OcsfMappingResult(
-        findings=tuple(findings),
-        raw_record_count=len(records),
-        raw_output_bytes=(
-            len(payload) if isinstance(payload, bytes) else len(payload.encode("utf-8"))
-        ),
-        raw_preview=tuple(previews),
-    )
+    return OcsfMappingResult.from_command_result(result)
 
 
 def _decode_json_lines(text: str) -> tuple[dict[str, Any], ...]:
