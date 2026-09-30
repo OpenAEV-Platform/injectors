@@ -9,9 +9,6 @@ from threading import Lock
 
 from pydantic import SecretStr
 
-from ._private_directory import make_private_directory
-
-
 class CredentialCleanupError(RuntimeError):
     """Report failed credential cleanup without exposing credential details."""
 
@@ -67,7 +64,6 @@ class TemporaryCredentialLeaseFactory:
         path = directory / f"{secrets.token_hex(16)}{suffix}"
         lease = TemporaryCredentialLease(path=path, directory=directory)
         try:
-            make_private_directory(directory, platform_name=self.platform_name)
             flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL
             if self.platform_name == "nt":
                 descriptor = os.open(path, flags)
