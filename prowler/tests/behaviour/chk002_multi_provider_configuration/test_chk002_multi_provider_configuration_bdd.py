@@ -266,7 +266,7 @@ def test_absolute_prowler_executable_path_can_be_configured(
 
     config = ConfigLoader()
 
-    assert config.prowler.executable_path == configured_path
+    assert config.prowler.executable_path == Path(configured_path)
     assert configured_path in config.model_dump_json()
 
 
