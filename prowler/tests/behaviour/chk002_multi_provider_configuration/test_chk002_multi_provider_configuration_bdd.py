@@ -259,15 +259,17 @@ def test_recommended_prowler_executable_path_is_default(
 def test_absolute_prowler_executable_path_can_be_configured(
     standard_injector_environment: None,
     monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
 ) -> None:
     """Load a non-secret executable path from its environment setting."""
-    configured_path = "/opt/prowler/bin/prowler"
-    monkeypatch.setenv("PROWLER_EXECUTABLE_PATH", configured_path)
+    configured_path = tmp_path / "prowler"
+    configured_path.touch()
+    monkeypatch.setenv("PROWLER_EXECUTABLE_PATH", str(configured_path))
 
     config = ConfigLoader()
 
-    assert config.prowler.executable_path == Path(configured_path)
-    assert configured_path in config.model_dump_json()
+    assert config.prowler.executable_path == configured_path
+    assert str(configured_path) in config.model_dump_json()
 
 
 def test_absolute_prowler_executable_path_can_be_loaded_from_yaml(
@@ -276,7 +278,8 @@ def test_absolute_prowler_executable_path_can_be_loaded_from_yaml(
     tmp_path: Path,
 ) -> None:
     """Load the executable path from the Prowler YAML runtime section."""
-    configured_path = "/srv/prowler/bin/prowler"
+    configured_path = tmp_path / "prowler"
+    configured_path.touch()
     (tmp_path / "config.yml").write_text(
         f"prowler:\n  executable_path: '{configured_path}'\n",
         encoding="utf-8",
@@ -286,16 +289,18 @@ def test_absolute_prowler_executable_path_can_be_loaded_from_yaml(
 
     config = ConfigLoader()
 
-    assert config.prowler.executable_path == Path(configured_path)
+    assert config.prowler.executable_path == configured_path
 
 
-@pytest.mark.parametrize("executable_path", ["", "   ", "bin/prowler"])
+@pytest.mark.parametrize(
+    "executable_path", ["", "   ", "bin/prowler", "/nonexistent/prowler"]
+)
 def test_reject_invalid_prowler_executable_path(
     standard_injector_environment: None,
     monkeypatch: pytest.MonkeyPatch,
     executable_path: str,
 ) -> None:
-    """Reject blank and relative executable paths at startup."""
+    """Reject blank, relative, and nonexistent executable paths at startup."""
     monkeypatch.setenv("PROWLER_EXECUTABLE_PATH", executable_path)
 
     with pytest.raises(ValidationError):
