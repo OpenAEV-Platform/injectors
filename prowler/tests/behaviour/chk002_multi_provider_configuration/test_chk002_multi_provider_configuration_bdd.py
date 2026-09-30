@@ -292,6 +292,21 @@ def test_absolute_prowler_executable_path_can_be_loaded_from_yaml(
     assert config.prowler.executable_path == configured_path
 
 
+def test_daemon_config_exposes_configured_prowler_executable_path(
+    standard_injector_environment: None,
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    """Expose the configured Prowler executable path to the daemon."""
+    configured_path = tmp_path / "prowler"
+    configured_path.touch()
+    monkeypatch.setenv("PROWLER_EXECUTABLE_PATH", str(configured_path))
+
+    daemon_config = ConfigLoader().to_daemon_config()
+
+    assert daemon_config.get("prowler_executable_path") == str(configured_path)
+
+
 @pytest.mark.parametrize(
     "executable_path", ["", "   ", "bin/prowler", "/nonexistent/prowler"]
 )
