@@ -13,7 +13,6 @@ class RouteNotFoundError(LookupError):
 
     def __init__(self, route_name: str) -> None:
         """Identify only the rejected route name."""
-        self.route_name = route_name
         super().__init__(f"Unknown Prowler route: {route_name}")
 
 
