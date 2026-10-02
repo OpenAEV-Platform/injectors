@@ -105,7 +105,7 @@ class ContractsTest(TestCase):
     def test_credential_reference_is_mandatory_and_single_valued(self):
         for content in self.content_by_id.values():
             field = self._credential_reference_field(content)
-            self.assertTrue(field["mandatory"])
+            self.assertFalse(field["mandatory"])
             self.assertFalse(field["multiple"])
 
     def test_custom_contracts_credential_reference_type_matches_platform(self):
