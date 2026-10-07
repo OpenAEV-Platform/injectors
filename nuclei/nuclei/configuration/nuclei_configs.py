@@ -169,7 +169,29 @@ class ConfigLoaderNuclei(BaseSettings):
         ),
     )
 
-    @field_validator("exclude_type", "exclude_severity", mode="before")
+    template_url_allowed_domains: list[str] = Field(
+        default_factory=lambda: ["raw.githubusercontent.com"],
+        description=(
+            "Allowlist of domains a `template_url` inject field may be fetched "
+            "from (comma-separated). A template URL whose host is not in this "
+            "list is rejected before any download. The deployed Nuclei binary "
+            "does not load remote templates itself (no -tu/-rtd); the injector "
+            "downloads the template to a temporary local file and runs it with "
+            "-templates <path>. Not a Nuclei flag."
+        ),
+    )
+
+    template_url_max_bytes: PositiveInt = Field(
+        default=2_000_000,
+        description=(
+            "Maximum size in bytes of a template fetched via a `template_url` "
+            "inject field. A larger download is rejected. Not a Nuclei flag."
+        ),
+    )
+
+    @field_validator(
+        "exclude_type", "exclude_severity", "template_url_allowed_domains", mode="before"
+    )
     @classmethod
     def parser_csv_to_list(cls, value):
         if isinstance(value, str):

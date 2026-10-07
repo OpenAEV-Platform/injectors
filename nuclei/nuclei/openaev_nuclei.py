@@ -1,4 +1,5 @@
 import json
+import os
 import subprocess
 import threading
 import time
@@ -20,6 +21,7 @@ from nuclei.helpers.nuclei_command_builder import NucleiCommandBuilder
 from nuclei.helpers.nuclei_output_parser import NucleiOutputParser
 from nuclei.helpers.nuclei_process import NucleiProcess
 from nuclei.helpers.scan_coordination import TemplateAccessLock
+from nuclei.helpers.template_url import TemplateUrlError, materialize_template_url
 from nuclei.models.data import MessageData
 from nuclei.nuclei_contracts.external_contracts import ExternalContractsScheduler
 
@@ -40,6 +42,16 @@ SECURITY_PLATFORM_LOGO_PATH = "nuclei/img/nuclei.jpg"
 # Max characters of Nuclei's captured stderr kept in a log line, so a very
 # noisy scan cannot flood the injector logs.
 _STDERR_LOG_TAIL = 2000
+
+
+def _safe_remove(path: Optional[str]) -> None:
+    """Best-effort delete of a temporary template file; never raises."""
+    if not path:
+        return
+    try:
+        os.remove(path)
+    except OSError:
+        pass
 
 
 def _decode(raw: Optional[bytes]) -> str:
@@ -79,11 +91,42 @@ class OpenAEVNuclei:
         msg_data: MessageData,
     ) -> Dict:
         targets = msg_data.get_targets()
+
+        # template_url: the deployed Nuclei binary does not load remote templates
+        # itself (-tu / -remote-template-domain are rejected), so when an inject
+        # provides a template URL we download it to a temporary local file, run a
+        # validation pass on it, and feed it to Nuclei as a local -templates path.
+        # Lets an operator run a not-yet-merged template (e.g. one in review in a
+        # PR) with Nuclei's full matching logic. Cleaned up after the scan.
+        content = dict(msg_data.inject_content or {})
+        tmp_template_path: Optional[str] = None
+        template_url = content.get("template_url")
+        if template_url:
+            try:
+                tmp_template_path = materialize_template_url(
+                    template_url,
+                    self.config_loader.nuclei.template_url_allowed_domains,
+                    self.config_loader.nuclei.template_url_max_bytes,
+                )
+            except TemplateUrlError as exc:
+                raise RuntimeError(str(exc)) from exc
+            try:
+                NucleiProcess.nuclei_validate(tmp_template_path)
+            except subprocess.CalledProcessError as exc:
+                detail = _decode(exc.stderr) or _decode(exc.stdout) or "invalid template"
+                _safe_remove(tmp_template_path)
+                raise RuntimeError(
+                    f"template_url failed Nuclei validation: "
+                    f"{detail[-_STDERR_LOG_TAIL:]}"
+                ) from exc
+            # Hand the local file to the command builder as -templates <path>.
+            content["template_path"] = tmp_template_path
+
         # Nuclei Args Builder
         nuclei_builder = NucleiCommandBuilder(
             nuclei_configs=self.config_loader.nuclei,
             contract_id=msg_data.contract_id,
-            content=msg_data.inject_content,
+            content=content,
             targets=targets,
         )
         nuclei_args = nuclei_builder.build()
@@ -140,6 +183,7 @@ class OpenAEVNuclei:
                 f"{msg_data.inject_id} and was terminated. Nuclei stderr tail: "
                 f"{stderr_tail[-_STDERR_LOG_TAIL:] or '<none>'}"
             )
+            _safe_remove(tmp_template_path)
             raise RuntimeError(
                 f"Nuclei scan timed out after {scan_timeout} seconds and was "
                 "terminated before completion. Reduce the scan scope (tags / "
@@ -154,6 +198,7 @@ class OpenAEVNuclei:
                 f"{msg_data.inject_id}. Nuclei stderr tail: "
                 f"{stderr_tail[-_STDERR_LOG_TAIL:] or '<none>'}"
             )
+            _safe_remove(tmp_template_path)
             raise RuntimeError(
                 f"Nuclei exited with code {exc.returncode}: "
                 f"{stderr_tail[-_STDERR_LOG_TAIL:] or 'no stderr output'}"
@@ -170,9 +215,11 @@ class OpenAEVNuclei:
                 f"{stderr_tail[-_STDERR_LOG_TAIL:]}"
             )
 
-        return self.parser.parse(
+        parsed = self.parser.parse(
             result.stdout.decode("utf-8"), msg_data.target_results.ip_to_asset_id_map
         )
+        _safe_remove(tmp_template_path)
+        return parsed
 
     def _report_pre_execution_failure(
         self, data: Dict, start: float, err: Exception

@@ -18,6 +18,20 @@ class NucleiProcess:
         subprocess.run(["nuclei", "-version"], capture_output=True, check=True)
 
     @staticmethod
+    def nuclei_validate(template_path, timeout=60):
+        # Validate a template before running it. Used as a safety gate for
+        # templates fetched from a URL (not from the signed local store): a
+        # malformed or non-parseable template fails here with a non-zero exit
+        # instead of producing a confusing scan error. check=True raises
+        # CalledProcessError on failure so the caller can surface it.
+        subprocess.run(
+            ["nuclei", "-validate", "-disable-update-check", "-t", template_path],
+            capture_output=True,
+            check=True,
+            timeout=timeout,
+        )
+
+    @staticmethod
     def nuclei_execute(args, input_data, timeout=None):
         # timeout is a hard ceiling for the whole scan: when it fires,
         # subprocess.run kills the process and raises TimeoutExpired (carrying

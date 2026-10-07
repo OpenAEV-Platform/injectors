@@ -95,6 +95,8 @@ These tune how Nuclei runs. Most map to a Nuclei command-line flag (shown in the
 | Response size save             | `nuclei.response_size_save`             | `NUCLEI_RESPONSE_SIZE_SAVE`             | 1048576    | No        | Max response size to save, in bytes (`-response-size-save`).                                                   |
 | Exclude type                   | `nuclei.exclude_type`                   | `NUCLEI_EXCLUDE_TYPE`                   | headless   | No        | Protocol types to exclude: `dns`, `file`, `http`, `headless`, `tcp`, `workflow`, `ssl`, `websocket`, `whois`, `code`, `javascript` (`-exclude-type`). |
 | Exclude severity               | `nuclei.exclude_severity`               | `NUCLEI_EXCLUDE_SEVERITY`               | /          | No        | Severities to exclude: `info`, `low`, `medium`, `high`, `critical`, `unknown` (`-exclude-severity`).           |
+| Template URL allowed domains   | `nuclei.template_url_allowed_domains`   | `NUCLEI_TEMPLATE_URL_ALLOWED_DOMAINS`   | raw.githubusercontent.com | No | Comma-separated allowlist of domains a `template_url` inject field may be fetched from. A URL whose host is not listed is rejected before any download. Not a Nuclei flag. |
+| Template URL max bytes         | `nuclei.template_url_max_bytes`         | `NUCLEI_TEMPLATE_URL_MAX_BYTES`         | 2000000    | No        | Maximum size in bytes of a template fetched via a `template_url` inject field; a larger download is rejected. Not a Nuclei flag. |
 
 ## Deployment
 
@@ -181,9 +183,18 @@ The static contracts select Nuclei templates by tag:
 > path passed to Nuclei (not a special "all templates" keyword); scope the scan down with the manual template path
 > field below whenever possible.
 
-Every contract also exposes two optional free-text fields:
+Every contract also exposes three optional free-text fields:
 
-- `Manual template path (-t)` (`template`): run a specific template or template directory (`-templates <path>`).
+- `Manual template path (-t)` (`template`): run a specific template or template directory already present in the
+  injector's local template store (`-templates <path>`).
+- `Template URL (fetched to a local file)` (`template_url`): run a template that is **not** in the local store yet —
+  for example one still in review in a pull request, or kept in an internal repository. The injector downloads the
+  template from the URL to a temporary local file, validates it with `nuclei -validate`, runs it as a normal local
+  `-templates <path>`, and deletes the file afterwards. The deployed Nuclei binary does not fetch remote templates
+  itself (its `-tu` / `-remote-template-domain` flags are not used); the injector performs the fetch so the domain can
+  be restricted. The URL's host must be in `NUCLEI_TEMPLATE_URL_ALLOWED_DOMAINS` (default `raw.githubusercontent.com`)
+  and the download must stay under `NUCLEI_TEMPLATE_URL_MAX_BYTES` (default 2 MB). Combine it with the
+  `Nuclei - TEMPLATES Scan` contract to run only that template (other contracts also add their tag filter).
 - `Options` (`options`): extra raw Nuclei flags, appended to the command line.
 
 In addition to the static contracts, a background scheduler maintains one contract per CVE. On each tick (every
