@@ -2,7 +2,7 @@
 
 ## Repository Overview
 
-**Python monorepo** (~5,700 lines) with 4 injector modules: `nuclei/` (Nuclei scanner), `nmap/` (Nmap scanner), `http-query/` (HTTP testing), `aws/` (AWS/Pacu security), plus `injector_common/` (shared code for nmap/nuclei). Python 3.11-3.13, Docker, CircleCI, pyoaev client.
+**Python monorepo** (~5,700 lines) with 4 injector modules: `nuclei/` (Nuclei scanner), `nmap/` (Nmap scanner), `http-query/` (HTTP testing), `aws/` (AWS/Pacu security), plus `injector_common/` (shared code for nmap/nuclei). Python 3.14, Docker, CircleCI, pyoaev client.
 
 ## Critical Build & Test Commands
 
@@ -67,10 +67,6 @@ docker build --build-context injector_common=../injector_common -t openaev/injec
 # HTTP Query (standalone)
 cd http-query
 docker build -t openaev/injector-http-query:test .
-
-# AWS (uses Python 3.11-slim, not Alpine)
-cd aws
-docker build -t openaev/injector-aws:test .
 ```
 
 **Build Context Note:** The `--build-context injector_common=../injector_common` flag is required for nuclei and nmap. This is a Docker buildx feature that makes the shared code available during build.
@@ -81,7 +77,7 @@ docker build -t openaev/injector-aws:test .
 - `nuclei/nuclei/` - Source (helpers/, nuclei_contracts/), pyproject.toml
 - `nmap/src/` - Source (contracts/, helpers/)
 - `http-query/src/` - Source (contracts_http.py), requirements in src/
-- `aws/src/` - Source (contracts_aws.py, helpers/), Python 3.11-slim Docker
+- `aws/src/` - Source (contracts_aws.py, helpers/), Python 3.14-slim Docker
 - `injector_common/injector_common/` - Shared: targets.py, pagination.py, constants.py
 
 **Config/CI:**
@@ -95,9 +91,9 @@ docker build -t openaev/injector-aws:test .
 
 **Every PR/Commit runs:** ensure_formatting → linter → test-nuclei → test-nmap → test-http-query
 
-1. **ensure_formatting** - `isort --profile black --check .` and `black --check .` (Python 3.13)
+1. **ensure_formatting** - `isort --profile black --check .` and `black --check .` (Python 3.14)
 2. **linter** - `flake8 --ignore=E,W ~/repo` (alpine/flake8 image)
-3. **test-{injector}** - `pip install -r requirements.txt`, overwrite pyoaev from main/release branch, `python -m unittest` (Python 3.13)
+3. **test-{injector}** - `pip install -r requirements.txt`, overwrite pyoaev from main/release branch, `python -m unittest` (Python 3.14)
 
 **Build jobs** (main/release/tags only):
 - **build_rolling_1** - Builds all 4 injectors with `rolling` tag, runs on main
@@ -133,7 +129,7 @@ Docker builds use `--build-context injector_common=../injector_common` for nmap/
 
 ## Key Dependencies
 
-**All:** pyoaev==2.0.10 | **nuclei:** Nuclei 3.4.3, Python 3.13-alpine | **nmap:** nmap+jc, Python 3.13-alpine | **aws:** Pacu+AWS CLI, Python 3.11-slim | **http-query:** Python 3.13-alpine
+**All:** pyoaev==2.0.10 | **nuclei:** Nuclei 3.4.3, Python 3.14-alpine | **nmap:** nmap+jc, Python 3.14-alpine | **aws:** Pacu+AWS CLI, Python 3.14-slim | **http-query:** Python 3.14-alpine
 
 ## Pre-Commit Checklist
 
