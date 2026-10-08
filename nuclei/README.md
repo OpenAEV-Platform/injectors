@@ -183,7 +183,8 @@ The static contracts select Nuclei templates by tag:
 > path passed to Nuclei (not a special "all templates" keyword); scope the scan down with the manual template path
 > field below whenever possible.
 
-Every contract also exposes three optional free-text fields:
+Every static contract also exposes three optional free-text fields (the per-CVE
+contracts kept in sync with the catalog expose only `template` and `options`):
 
 - `Manual template path (-t)` (`template`): run a specific template or template directory already present in the
   injector's local template store (`-templates <path>`).
