@@ -1,7 +1,7 @@
 """Strict, secret-safe provider inputs for future OpenAEV form contracts."""
 
 from collections.abc import Mapping
-from typing import Annotated, Any, Literal, NoReturn
+from typing import Annotated, Any, Literal, NoReturn, Self
 from urllib.parse import urlsplit
 
 from pydantic import (
@@ -9,11 +9,12 @@ from pydantic import (
     BeforeValidator,
     ConfigDict,
     Field,
+    InstanceOf,
     SecretStr,
     TypeAdapter,
     field_validator,
 )
-from pyoaev.credential import CredentialAttachment
+from pyoaev.credential import CredentialAttachment, ResolvedSecret
 
 
 def _reject_blank(value: object) -> object:
@@ -205,21 +206,32 @@ class CredentialReferenceProviderInput(ImmutableProviderInput):
     """Provider input whose credential is resolved from an inject reference.
 
     It keeps only the non-credential fields of its legacy model: the credential
-    itself is resolved just in time from ``credential_attachment``. The
-    attachment is never serialized, and its authorisation code is kept out of
-    ``repr`` by pyoaev.
+    itself is resolved just in time from ``credential_attachment``, then held
+    in ``resolved_secret`` for the duration of the execution only. Neither is
+    ever serialized, and pyoaev keeps the authorisation code and the secret
+    values out of their ``repr``.
     """
 
     credential_attachment: Annotated[CredentialAttachment, Field(exclude=True)]
+    resolved_secret: Annotated[
+        InstanceOf[ResolvedSecret] | None, Field(exclude=True, repr=False)
+    ] = None
 
-    def _reference_log_metadata(self) -> dict[str, object]:
+    def with_resolved_secret(self, resolved_secret: ResolvedSecret) -> Self:
+        """Return a copy holding the secret resolved for this execution."""
+        return self.model_copy(update={"resolved_secret": resolved_secret})
+
+    def reference_log_metadata(self) -> dict[str, object]:
         """Return the log-safe facts about the credential reference."""
         from prowler.injector.failure_taxonomy import _safe_text
 
-        return {
+        metadata: dict[str, object] = {
             "credential_reference_present": True,
             "credential_reference": _safe_text(self.credential_attachment.reference),
         }
+        if self.resolved_secret is not None:
+            metadata["credential_secret_type"] = self.resolved_secret.secret_type.value
+        return metadata
 
 
 class AwsReferenceProviderInput(CredentialReferenceProviderInput):
@@ -241,7 +253,7 @@ class AwsReferenceProviderInput(CredentialReferenceProviderInput):
         metadata = _aws_scope_log_metadata(
             self.aws_account_id, self.aws_region, self.aws_endpoint_url
         )
-        metadata.update(self._reference_log_metadata())
+        metadata.update(self.reference_log_metadata())
         return metadata
 
 
@@ -256,7 +268,7 @@ class AzureReferenceProviderInput(CredentialReferenceProviderInput):
         """Return the log-safe metadata facts for this Azure input."""
         from prowler.injector.failure_taxonomy import _safe_text
 
-        metadata = self._reference_log_metadata()
+        metadata = self.reference_log_metadata()
         if isinstance(self.azure_subscription_id, str):
             metadata["azure_subscription_id"] = _safe_text(self.azure_subscription_id)
         if isinstance(self.azure_provider, str):
@@ -274,7 +286,7 @@ class GcpReferenceProviderInput(CredentialReferenceProviderInput):
         """Return the log-safe metadata facts for this GCP input."""
         from prowler.injector.failure_taxonomy import _safe_text
 
-        metadata = self._reference_log_metadata()
+        metadata = self.reference_log_metadata()
         if isinstance(self.gcp_project_id, str):
             metadata["gcp_project_id"] = _safe_text(self.gcp_project_id)
         return metadata
@@ -295,7 +307,7 @@ class KubernetesReferenceProviderInput(CredentialReferenceProviderInput):
         """Return the log-safe metadata facts for this Kubernetes input."""
         from prowler.injector.failure_taxonomy import _safe_text
 
-        metadata = self._reference_log_metadata()
+        metadata = self.reference_log_metadata()
         if isinstance(self.kubernetes_context, str):
             metadata["kubernetes_context"] = _safe_text(self.kubernetes_context)
         return metadata

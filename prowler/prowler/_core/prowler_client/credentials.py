@@ -3,11 +3,13 @@
 import os
 import secrets
 import tempfile
+from contextlib import ExitStack
 from dataclasses import dataclass, field
 from pathlib import Path
 from threading import Lock
 
 from pydantic import SecretStr
+from pyoaev.credential import MaterializedCredential, ResolvedSecret, materialize
 
 from ._private_directory import make_private_directory
 
@@ -49,6 +51,31 @@ class TemporaryCredentialLease:
             self._cleaned = True
 
 
+class MaterializedCredentialLease:
+    """Hold one pyoaev materialized credential until its cleanup.
+
+    ``materialize`` is a context manager; the lease enters it on creation and
+    leaves it on ``cleanup``, which removes its private directory and files.
+    """
+
+    def __init__(
+        self, resolved_secret: ResolvedSecret, *, temporary_root: Path | None = None
+    ) -> None:
+        self._exit_stack = ExitStack()
+        self._lock = Lock()
+        self.credential: MaterializedCredential = self._exit_stack.enter_context(
+            materialize(resolved_secret, temporary_root)
+        )
+
+    def cleanup(self) -> None:
+        """Idempotently remove the materialized credential files."""
+        with self._lock:
+            try:
+                self._exit_stack.close()
+            except BaseException:
+                raise CredentialCleanupError() from None
+
+
 @dataclass(frozen=True)
 class TemporaryCredentialLeaseFactory:
     """Create closed credential files in unique per-run temporary directories."""
@@ -82,3 +109,11 @@ class TemporaryCredentialLeaseFactory:
                 raise CredentialCleanupError() from None
             raise
         return lease
+
+    def materialize(
+        self, resolved_secret: ResolvedSecret
+    ) -> MaterializedCredentialLease:
+        """Materialize one resolved secret under the same temporary root."""
+        return MaterializedCredentialLease(
+            resolved_secret, temporary_root=self.temporary_root
+        )

@@ -8,7 +8,13 @@ from hashlib import sha256
 from time import monotonic
 from typing import Literal
 
-from pyoaev.credential import get_credential_attachment
+from pyoaev.credential import (
+    CredentialErrorCode,
+    CredentialResolutionError,
+    ensure_compatible,
+    get_credential_attachment,
+    parse_resolved_secret,
+)
 from pyoaev.helpers import OpenAEVInjectorHelper
 from pyoaev.utils import AppLogger
 
@@ -28,6 +34,7 @@ from prowler.injector.failure_taxonomy import (
     _CALLBACK_COMPLETED,
     _CALLBACK_FAILED,
     _CONTRACT_RESOLVED,
+    _CREDENTIAL_RESOLVED,
     _EXECUTION_STARTED,
     _INJECT_ID_PATTERN,
     _INVALID_INJECT_ID_DIGEST_LENGTH,
@@ -40,7 +47,11 @@ from prowler.injector.failure_taxonomy import (
 )
 from prowler.injector.lifecycle_metadata import LifecycleMetadataBuilder
 from prowler.models import ConfigLoader
-from prowler.models.provider_inputs import ProviderInput
+from prowler.models.provider_inputs import (
+    CredentialReferenceProviderInput,
+    KubernetesReferenceProviderInput,
+    ProviderInput,
+)
 
 
 class _Stage(Enum):
@@ -50,6 +61,7 @@ class _Stage(Enum):
     RECEPTION_ACKNOWLEDGED = "reception_acknowledged"
     CONTRACT_RESOLUTION = "contract_resolution"
     INPUT_VALIDATION = "input_validation"
+    CREDENTIAL_RESOLUTION = "credential_resolution"
     ASSESSMENT_EXECUTION = "assessment_execution"
     OUTPUT_PREPARATION = "output_preparation"
 
@@ -138,6 +150,7 @@ class ProwlerInjector:
         try:
             contract = self._resolve_contract(run, injection)
             provider = self._validate_input(run, data, injection, contract)
+            provider = self._resolve_credential(run, contract, provider)
             run.stage = _Stage.ASSESSMENT_EXECUTION
             self._log(
                 "info",
@@ -302,6 +315,51 @@ class ProwlerInjector:
             ),
         )
         return provider
+
+    def _resolve_credential(
+        self,
+        run: _MessageRun,
+        contract: BaseProwlerContract,
+        provider: ProviderInput,
+    ) -> ProviderInput:
+        """Resolve the referenced credential just in time for this execution.
+
+        Runs after the reception acknowledgment and before the callback, while
+        the inject authorisation code is valid. Legacy inputs are returned
+        unchanged and send no resolution request.
+        """
+        if not isinstance(provider, CredentialReferenceProviderInput):
+            return provider
+        run.stage = _Stage.CREDENTIAL_RESOLUTION
+        reference = provider.credential_attachment.reference
+        if isinstance(provider, KubernetesReferenceProviderInput):
+            # No credential type maps to Kubernetes: no secret can be used.
+            raise CredentialResolutionError(
+                CredentialErrorCode.CREDENTIAL_INCOMPATIBLE, reference
+            )
+        payload = self.helper.api.inject.resolve_attachment_secret(
+            run.inject_id,
+            reference,
+            provider.credential_attachment.authorisation_code,
+        )
+        resolved_secret = parse_resolved_secret(payload, reference=reference)
+        ensure_compatible(resolved_secret, provider.provider, reference=reference)
+        resolved = provider.with_resolved_secret(resolved_secret)
+        run.provider = resolved
+        self._log(
+            "debug",
+            _CREDENTIAL_RESOLVED,
+            self._guard(
+                lambda: self._context_metadata(
+                    run.started,
+                    run.safe_inject_id,
+                    stage=run.stage.value,
+                    contract=contract,
+                    provider=resolved,
+                )
+            ),
+        )
+        return resolved
 
     def _prepare_output(
         self,

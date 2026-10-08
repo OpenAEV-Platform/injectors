@@ -53,6 +53,7 @@ plugins = ["pydantic.mypy"]
 [[tool.mypy.overrides]]
 module = [
     "prowler.__main__",
+    "prowler._core.prowler_client.*",
     "prowler.contracts.*",
     "prowler.injector.*",
     "prowler.models.provider_inputs",

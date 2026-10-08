@@ -155,7 +155,8 @@ def test_reference_models_keep_every_non_credential_field(provider: str) -> None
     legacy_fields = set(LEGACY_MODELS[provider].model_fields)
     reference_fields = set(REFERENCE_MODELS[provider].model_fields)
     assert reference_fields == (legacy_fields - LEGACY_CREDENTIAL_KEYS[provider]) | {
-        "credential_attachment"
+        "credential_attachment",
+        "resolved_secret",
     }
     assert issubclass(REFERENCE_MODELS[provider], CredentialReferenceProviderInput)
 
@@ -415,6 +416,10 @@ def _process(attachments: object, content: dict[str, str]) -> Mock:
 
     _RecordingContract.attachments = []
     helper = Mock()
+    helper.api.inject.resolve_attachment_secret.return_value = {
+        "type": "AWS_ACCESS_KEY",
+        "value": {"aws_access_key_id": "id", "aws_secret_access_key": "secret"},
+    }
     injector = ProwlerInjector(
         Mock(), helper, registry=ProwlerContracts((_RecordingContract,))
     )

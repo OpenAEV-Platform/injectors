@@ -13,11 +13,12 @@ from prowler._core.cli_engine import (
 )
 from prowler.models.configs.config_loader import ProwlerConfig
 from prowler.models.provider_inputs import (
-    AwsProviderInput,
-    AzureProviderInput,
-    GcpProviderInput,
+    AWS_PROVIDER_INPUTS,
+    AZURE_PROVIDER_INPUTS,
+    GCP_PROVIDER_INPUTS,
+    KUBERNETES_PROVIDER_INPUTS,
+    CredentialReferenceProviderInput,
     ImmutableProviderInput,
-    KubernetesProviderInput,
     ProviderInput,
 )
 
@@ -78,21 +79,23 @@ def _safe_log(level: int, message: str, **metadata: object) -> None:
         return
 
 
-_COMPLIANCE_PROVIDER_TYPES: dict[ComplianceSelector, type[ImmutableProviderInput]] = {
-    "cis_3.0_aws": AwsProviderInput,
-    "cis_3.0_azure": AzureProviderInput,
-    "cis_3.0_gcp": GcpProviderInput,
-    "cis_1.12_kubernetes": KubernetesProviderInput,
-    "nis2_aws": AwsProviderInput,
-    "nis2_azure": AzureProviderInput,
-    "nis2_gcp": GcpProviderInput,
-    "iso27001_2022_aws": AwsProviderInput,
-    "iso27001_2022_azure": AzureProviderInput,
-    "iso27001_2022_gcp": GcpProviderInput,
-    "iso27001_2022_kubernetes": KubernetesProviderInput,
-    "mitre_attack_aws": AwsProviderInput,
-    "mitre_attack_azure": AzureProviderInput,
-    "mitre_attack_gcp": GcpProviderInput,
+_COMPLIANCE_PROVIDER_TYPES: dict[
+    ComplianceSelector, tuple[type[ImmutableProviderInput], ...]
+] = {
+    "cis_3.0_aws": AWS_PROVIDER_INPUTS,
+    "cis_3.0_azure": AZURE_PROVIDER_INPUTS,
+    "cis_3.0_gcp": GCP_PROVIDER_INPUTS,
+    "cis_1.12_kubernetes": KUBERNETES_PROVIDER_INPUTS,
+    "nis2_aws": AWS_PROVIDER_INPUTS,
+    "nis2_azure": AZURE_PROVIDER_INPUTS,
+    "nis2_gcp": GCP_PROVIDER_INPUTS,
+    "iso27001_2022_aws": AWS_PROVIDER_INPUTS,
+    "iso27001_2022_azure": AZURE_PROVIDER_INPUTS,
+    "iso27001_2022_gcp": GCP_PROVIDER_INPUTS,
+    "iso27001_2022_kubernetes": KUBERNETES_PROVIDER_INPUTS,
+    "mitre_attack_aws": AWS_PROVIDER_INPUTS,
+    "mitre_attack_azure": AZURE_PROVIDER_INPUTS,
+    "mitre_attack_gcp": GCP_PROVIDER_INPUTS,
 }
 
 
@@ -164,19 +167,20 @@ class ProwlerClient:
             ):
                 raise ValueError("unsupported service selector")
             if service_selector in ("s3", "ec2") and not isinstance(
-                provider, AwsProviderInput
+                provider, AWS_PROVIDER_INPUTS
             ):
                 raise ValueError("AWS service selector requires an AWS provider")
             if service_selector == "storage" and not isinstance(
-                provider, AzureProviderInput
+                provider, AZURE_PROVIDER_INPUTS
             ):
                 raise ValueError("Azure service selector requires an Azure provider")
             if service_selector == "compute" and not isinstance(
-                provider, GcpProviderInput
+                provider, GCP_PROVIDER_INPUTS
             ):
                 raise ValueError("GCP service selector requires a GCP provider")
             if service_selector == "iam" and not isinstance(
-                provider, AwsProviderInput | AzureProviderInput | GcpProviderInput
+                provider,
+                AWS_PROVIDER_INPUTS + AZURE_PROVIDER_INPUTS + GCP_PROVIDER_INPUTS,
             ):
                 raise ValueError(
                     "IAM service selector requires an AWS, Azure, or GCP provider"
@@ -208,6 +212,13 @@ class ProwlerClient:
             )
 
             invocation = self._provider_adapter.adapt(provider)
+            if isinstance(provider, CredentialReferenceProviderInput):
+                # Only the reference id and the secret type, never a value.
+                _safe_log(
+                    logging.DEBUG,
+                    "Prowler referenced credential metadata",
+                    **provider.reference_log_metadata(),
+                )
             filter_arguments = ("-c", *filters) if filters else ()
             service_arguments = (
                 ("--services", service_selector) if service_selector is not None else ()
