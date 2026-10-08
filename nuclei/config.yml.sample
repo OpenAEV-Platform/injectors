@@ -25,3 +25,5 @@ nuclei:
   response_size_save: 1048576  # in bytes
   exclude_type: "headless" # Available values: dns, file, http, headless, tcp, workflow, ssl, websocket, whois, code, javascript
 #  exclude_severity: "ChangeMe" # Available values: info, low, medium, high, critical, unknown
+  template_url_allowed_domains: "raw.githubusercontent.com" # allowlist of domains a `template_url` inject field may be fetched from (comma-separated)
+  template_url_max_bytes: 2000000 # maximum size in bytes of a template fetched via a `template_url` inject field
