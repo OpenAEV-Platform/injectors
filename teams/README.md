@@ -83,7 +83,7 @@ licensed work/school account - personal Microsoft accounts cannot post channel m
 - A Microsoft 365 tenant with Microsoft Teams, and a licensed work/school account to attribute the messages to.
 - A Microsoft Entra ID (Azure AD) app registration - see [Microsoft Entra ID setup](#microsoft-entra-id-setup).
 - Outbound HTTPS access from the injector to `login.microsoftonline.com` and `graph.microsoft.com`.
-- For a manual (non-Docker) deployment: Python >= 3.11 and [Poetry](https://python-poetry.org/) >= 2.1.
+- For a manual (non-Docker) deployment: Python >= 3.14 and [Poetry](https://python-poetry.org/) >= 2.1.
 
 ## Microsoft Entra ID setup
 

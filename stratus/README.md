@@ -56,7 +56,7 @@ then cleans up - so it needs outbound access to the target cloud provider's APIs
 - The Docker image must be built with `--build-context injector_common=../injector_common`, because the injector depends
   on the shared `injector_common` package located one level above this directory.
 - For a manual (non-Docker) deployment:
-  - Python >= 3.11 and [Poetry](https://python-poetry.org/) >= 2.1.
+  - Python >= 3.14 and [Poetry](https://python-poetry.org/) >= 2.1.
   - The `stratus` binary installed and on the `PATH` (see the
     [Stratus Red Team installation guide](https://stratus-red-team.cloud/getting-started/)).
 

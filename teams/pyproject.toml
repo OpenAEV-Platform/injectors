@@ -7,7 +7,7 @@ authors = [
     { name = "Filigran", email = "contact@filigran.io" },
 ]
 license = "Apache-2.0"
-requires-python = ">=3.11,<4.0"
+requires-python = ">=3.14,<4.0"
 dependencies = [
     "pyoaev (==3.261005.0); extra != 'dev'",
     "injector_common @ ../injector_common",

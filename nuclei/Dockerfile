@@ -1,4 +1,4 @@
-FROM python:3.13-alpine AS builder
+FROM python:3.14-alpine AS builder
 
 RUN apk update && apk upgrade && apk add git
 
@@ -18,7 +18,7 @@ ADD . ${installdir}
 WORKDIR ${installdir}
 RUN poetry install
 
-FROM python:3.13-alpine AS runner
+FROM python:3.14-alpine AS runner
 
 WORKDIR /opt/injector_common
 COPY --from=injector_common ./ ./
@@ -26,7 +26,7 @@ COPY --from=injector_common ./ ./
 ARG installdir=/opt/injector
 WORKDIR ${installdir}
 COPY --from=builder ${installdir} ${installdir}
-COPY --from=builder /usr/local/lib/python3.13/site-packages /usr/local/lib/python3.13/site-packages
+COPY --from=builder /usr/local/lib/python3.14/site-packages /usr/local/lib/python3.14/site-packages
 
 # Declare the build argument
 ARG PYOAEV_GIT_BRANCH_OVERRIDE
