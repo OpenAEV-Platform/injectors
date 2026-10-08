@@ -207,9 +207,9 @@ class FailureClassifier:
         """Normalize OCSF error codes through type-specific closed allowlists."""
         code = error.code
         allowed = (
-            _OCSF_DECODE_CODES
-            if isinstance(error, OcsfDecodeError)
-            else _OCSF_MAPPING_CODES
+            _OCSF_MAPPING_CODES
+            if isinstance(error, OcsfMappingError)
+            else _OCSF_DECODE_CODES
         )
         return code if code in allowed else _OCSF_CODE_SENTINEL
 
