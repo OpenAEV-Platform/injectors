@@ -9,7 +9,6 @@ from prowler.models.findings import (
     OcsfDecodeError,
     OcsfMappingError,
     OcsfMappingResult,
-    OcsfPreviewRecord,
     OpenAevFinding,
 )
 

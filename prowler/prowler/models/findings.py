@@ -8,7 +8,6 @@ from pydantic import BaseModel, ConfigDict
 
 from prowler._core.cli_engine import CommandResult
 
-
 _MAX_PREVIEW_VALUE_LENGTH = 512
 
 
@@ -164,7 +163,9 @@ class OcsfMappingResult:
             findings=tuple(findings),
             raw_record_count=len(records),
             raw_output_bytes=(
-                len(payload) if isinstance(payload, bytes) else len(payload.encode("utf-8"))
+                len(payload)
+                if isinstance(payload, bytes)
+                else len(payload.encode("utf-8"))
             ),
             raw_preview=tuple(previews),
         )
