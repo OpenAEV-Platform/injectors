@@ -4,6 +4,7 @@ from pathlib import Path
 from typing import Protocol
 
 from pydantic import SecretStr
+from pyoaev.credential import MaterializedCredential, ResolvedSecret
 
 from prowler._core.cli_engine import CommandResult, ValidatedCommandRequest
 
@@ -22,15 +23,27 @@ class CliEngineFactoryPort(Protocol):
         """Create one engine."""
 
 
-class CredentialLeasePort(Protocol):
-    """Own the lifecycle of one temporary credential resource."""
+class CredentialResourcePort(Protocol):
+    """Own the lifecycle of temporary credential resources."""
+
+    def cleanup(self) -> None:
+        """Idempotently remove the owned credential resources."""
+
+
+class CredentialLeasePort(CredentialResourcePort, Protocol):
+    """Own the lifecycle of one temporary credential file."""
 
     @property
     def path(self) -> Path:
         """Return the temporary credential path."""
 
-    def cleanup(self) -> None:
-        """Idempotently remove the owned credential resources."""
+
+class MaterializedCredentialLeasePort(CredentialResourcePort, Protocol):
+    """Own the environment and files materialized from a resolved secret."""
+
+    @property
+    def credential(self) -> MaterializedCredential:
+        """Return the materialized environment, files, and secret type."""
 
 
 class CredentialLeaseFactoryPort(Protocol):
@@ -38,6 +51,11 @@ class CredentialLeaseFactoryPort(Protocol):
 
     def create(self, content: SecretStr, *, suffix: str) -> CredentialLeasePort:
         """Return a newly materialized credential lease."""
+
+    def materialize(
+        self, resolved_secret: ResolvedSecret
+    ) -> MaterializedCredentialLeasePort:
+        """Return the materialized credential of one resolved secret."""
 
 
 class OutputWorkspacePort(Protocol):

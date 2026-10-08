@@ -5,7 +5,7 @@ from typing import Literal
 
 from prowler._core.cli_engine.contracts import EnvironmentValue
 
-from .ports import CredentialLeasePort
+from .ports import CredentialResourcePort
 
 AwsServiceSelector = Literal["iam", "s3", "ec2"]
 AzureServiceSelector = Literal["iam", "storage"]
@@ -35,4 +35,4 @@ class ProviderInvocation:
 
     arguments: tuple[str, ...]
     environment: tuple[tuple[str, EnvironmentValue], ...]
-    credential_leases: tuple[CredentialLeasePort, ...] = ()
+    credential_leases: tuple[CredentialResourcePort, ...] = ()
