@@ -15,6 +15,23 @@ import subprocess
 from dataclasses import dataclass, field
 from typing import Dict, List, Optional
 
+# Host variables through which the cloud SDKs and Terraform providers driven by
+# Stratus pick up credentials (or the project / subscription they apply to).
+HOST_CREDENTIAL_ENV_PREFIXES = (
+    "AWS_",
+    "AZURE_",
+    "ARM_",
+    "GOOGLE_",
+    "GCLOUD_",
+    "CLOUDSDK_",
+    "KUBECONFIG",
+)
+
+
+def _is_host_credential_variable(name: str) -> bool:
+    # Environment variable names are case-insensitive on Windows.
+    return name.upper().startswith(HOST_CREDENTIAL_ENV_PREFIXES)
+
 
 @dataclass
 class StratusResult:
@@ -51,10 +68,17 @@ class StratusExecutor:
         args: List[str],
         env: Optional[Dict[str, str]] = None,
         timeout: Optional[int] = None,
+        isolate_host_credentials: bool = False,
     ) -> subprocess.CompletedProcess:
         cmd = [self.binary, *args]
         self._log("info", f"Executing: {' '.join(cmd)}")
         run_env = os.environ.copy()
+        if isolate_host_credentials:
+            run_env = {
+                name: value
+                for name, value in run_env.items()
+                if not _is_host_credential_variable(name)
+            }
         if env:
             run_env.update({k: v for k, v in env.items() if v is not None})
         return subprocess.run(
@@ -71,18 +95,25 @@ class StratusExecutor:
         technique_id: str,
         env: Optional[Dict[str, str]] = None,
         cleanup: bool = True,
+        isolate_host_credentials: bool = False,
     ) -> StratusResult:
         """Warm up and detonate a technique, cleaning up infrastructure by default.
 
         ``--cleanup`` reverts the Terraform-provisioned prerequisites so a
         detonation never leaves live infrastructure behind.
+
+        ``isolate_host_credentials`` drops the host cloud credential variables
+        (see ``HOST_CREDENTIAL_ENV_PREFIXES``) before ``env`` is applied, so a
+        host credential can never be combined with the one supplied in ``env``.
         """
         args = ["detonate", technique_id]
         if cleanup:
             args.append("--cleanup")
 
         try:
-            result = self._run(args, env=env)
+            result = self._run(
+                args, env=env, isolate_host_credentials=isolate_host_credentials
+            )
         except subprocess.TimeoutExpired:
             return StratusResult(
                 success=False,

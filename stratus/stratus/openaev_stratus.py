@@ -5,11 +5,19 @@ import time
 from importlib.resources import files
 from typing import Dict, List, Optional, Tuple
 
+from pyoaev.credential import (
+    CredentialErrorCode,
+    CredentialResolutionError,
+    ResolvedSecret,
+    get_credential_attachment,
+    materialize,
+    resolve_inject_credential,
+)
 from pyoaev.helpers import OpenAEVConfigHelper, OpenAEVInjectorHelper
 
 from injector_common.data_helpers import DataHelpers
 from injector_common.dump_config import intercept_dump_argument
-from injector_common.stratus_executor import StratusExecutor
+from injector_common.stratus_executor import StratusExecutor, StratusResult
 from stratus.configuration.config_loader import ConfigLoader
 from stratus.contracts import (
     CONTRACT_REGISTRY,
@@ -19,6 +27,18 @@ from stratus.contracts import (
 )
 
 ICON_PATH = "img/icon-stratus.png"
+
+# Provider whose credential type a platform expects from a credential reference,
+# looked up in the pyoaev mapping shared with the contract field. Entra ID
+# declares no type on its contract but authenticates with an Azure credential;
+# Kubernetes needs a kubeconfig, which no referenced credential provides.
+CREDENTIAL_PROVIDER_BY_PLATFORM = {
+    "aws": "aws",
+    "eks": "eks",
+    "azure": "azure",
+    "entra-id": "azure",
+    "gcp": "gcp",
+}
 
 
 class OpenAEVStratus:
@@ -104,6 +124,62 @@ class OpenAEVStratus:
             raise
         return env, temp_files
 
+    def _resolve_credential(
+        self, inject_id: str, data: Dict, platform: PlatformSpec
+    ) -> Optional[ResolvedSecret]:
+        """Resolve the credential referenced by the job, if any.
+
+        Returns ``None`` when the job carries no credential reference: the
+        legacy credential fields of the inject are then used.
+        """
+        provider = CREDENTIAL_PROVIDER_BY_PLATFORM.get(platform.key)
+        if provider is None:
+            attachment = get_credential_attachment(data)
+            if attachment is None:
+                return None
+            # Fail before resolving: the secret is never fetched for nothing.
+            raise CredentialResolutionError(
+                CredentialErrorCode.CREDENTIAL_INCOMPATIBLE, attachment.reference
+            )
+        return resolve_inject_credential(self.helper.api, inject_id, data, provider)
+
+    @staticmethod
+    def _reference_fallback_env(
+        platform: PlatformSpec, content: Dict, credential: ResolvedSecret
+    ) -> Dict[str, str]:
+        """Non-secret values of the inject that the resolved credential omits."""
+        env: Dict[str, str] = {}
+        for cred in platform.cred_fields:
+            if cred.reference_attribute is None or getattr(
+                credential, cred.reference_attribute, None
+            ):
+                continue
+            raw = content.get(cred.key)
+            value = (raw.strip() if isinstance(raw, str) else raw) or cred.default
+            if value:
+                for env_var in cred.env_vars:
+                    env[env_var] = value
+        return env
+
+    def _detonate_with_credential(
+        self,
+        technique_id: str,
+        platform: PlatformSpec,
+        content: Dict,
+        credential: ResolvedSecret,
+    ) -> StratusResult:
+        # The legacy credential fields are not read at all, and the host
+        # credentials are not inherited: the resolved credential is the only
+        # one Stratus can use.
+        with materialize(credential) as materialized:
+            env = {
+                **self._reference_fallback_env(platform, content, credential),
+                **materialized.env,
+            }
+            return self.stratus.detonate(
+                technique_id, env=env, cleanup=True, isolate_host_credentials=True
+            )
+
     def process_message(self, data: Dict) -> None:
         start = time.time()
         inject_id = DataHelpers.get_inject_id(data)
@@ -119,8 +195,16 @@ class OpenAEVStratus:
             if not technique_id:
                 raise ValueError("No Stratus technique id provided")
 
-            env, temp_files = self._build_env(resolved.platform, content)
-            result = self.stratus.detonate(technique_id, env=env, cleanup=True)
+            # Resolved just in time, after the reception and before the callback,
+            # while the inject is in progress.
+            credential = self._resolve_credential(inject_id, data, resolved.platform)
+            if credential is None:
+                env, temp_files = self._build_env(resolved.platform, content)
+                result = self.stratus.detonate(technique_id, env=env, cleanup=True)
+            else:
+                result = self._detonate_with_credential(
+                    technique_id, resolved.platform, content, credential
+                )
 
             callback_data = {
                 "execution_message": result.message,
