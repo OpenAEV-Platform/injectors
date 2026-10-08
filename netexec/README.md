@@ -48,7 +48,7 @@ the RabbitMQ host/port advertised by the platform.
 - The Docker image must be built with `--build-context injector_common=../injector_common`, because the injector depends
   on the shared `injector_common` package located one level above this directory.
 - For a manual (non-Docker) deployment:
-  - Python >= 3.11 and [Poetry](https://python-poetry.org/) >= 2.1.
+  - Python >= 3.14 and [Poetry](https://python-poetry.org/) >= 2.1.
   - NetExec installed and reachable as `netexec` (see
     [the NetExec installation guide](https://www.netexec.wiki/getting-started/installation)).
 
