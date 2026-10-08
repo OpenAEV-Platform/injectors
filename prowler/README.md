@@ -58,15 +58,25 @@ Selectable routes let an operator choose one supported service or compliance sco
 
 Provider targets and credentials are supplied per assessment, not as injector startup configuration. GCP service-account JSON and Kubernetes kubeconfig are declared as plaintext form inputs at the OpenAEV contract boundary; they are not masked platform secret fields.
 
+AWS also accepts an optional `aws_endpoint_url` per-assessment provider input. When supplied, it must be an absolute HTTP or HTTPS URL with a host and no user information, query, fragment, or whitespace; it is passed to Prowler as `AWS_ENDPOINT_URL`.
+
 Each assessment returns every mapped finding as deterministic JSON text. Only findings whose expectation result is `FAILED` are projected as OpenAEV vulnerabilities; successful and ignored findings are not.
 
 The injector does not log or echo credential content, but the plaintext boundary exposure above remains by design.
 
 ## Operational safety
 
-GCP service-account JSON and Kubernetes kubeconfig credentials are written to temporary files while Prowler runs, and Prowler output goes to a temporary workspace directory. The injector cleans up its own temporary files and directories after normal completion or failure; it does not perform broad stale-file deletion.
+AWS and Azure credentials are passed to Prowler as environment values and are never written to files. GCP service-account JSON and Kubernetes kubeconfig credentials are written as plaintext to a randomly named temporary file that persists only for the Prowler command runtime and is deleted in `finally`, whether execution succeeds or fails. Prowler output goes to a separate temporary workspace directory. The injector cleans up its own temporary files and directories after normal completion or failure; it does not perform broad stale-file deletion.
 
-An abrupt crash, forced termination, host failure, or power loss can leave plaintext credential files and temporary assessment-output files in the operating system temporary location. Secure the temporary volume and apply an appropriate stale-file cleanup policy.
+On POSIX, credential files are owner-only (`0600`) inside owner-only (`0700`) directories. On Windows, the injector relies on the current user's temporary-directory ACL and does not claim owner-only permissions. Docker or Kubernetes pod ephemeral storage reduces exposure but does not eliminate it.
+
+An abrupt crash, forced termination, host failure, or power loss can leave plaintext credential files and temporary assessment-output files in the operating system temporary location. Secure and preferably encrypt the temporary volume and apply an appropriate stale-file cleanup policy. Python strings cannot be guaranteed to be zeroized, so credential values may remain in process memory until the injection completes.
+
+## Assessment output storage
+
+Each assessment writes Prowler's OCSF output to a unique, randomly named controlled directory. On Linux, memory-backed `/dev/shm` is preferred when it has room for the 100 MiB artifact limit plus a safety margin; otherwise the system temporary location is used. The artifact is read only at its exact path as a regular, non-symlink file.
+
+On native Windows, Python does not provide the POSIX `O_NOFOLLOW` guarantee. Regular-file and device/inode identity checks inside the controlled directory are a best-effort reparse-point defence; the injector does not claim atomic reparse-point exclusion. Secure the system temporary-directory ACL against untrusted writers.
 
 ## Troubleshooting
 
