@@ -1,3 +1,4 @@
+import base64
 import json
 import os
 import subprocess
@@ -5,11 +6,17 @@ import tempfile
 from unittest import TestCase
 from unittest.mock import MagicMock, patch
 
+from pyoaev.credential import CredentialErrorCode, CredentialResolutionError
+
 import stratus.openaev_stratus as mod
 from injector_common.stratus_executor import StratusExecutor, StratusResult
 from stratus.contracts import CONTRACT_REGISTRY, technique_contract_id
 from stratus.contracts.platforms import (
     AWS_CUSTOM_CONTRACT,
+    AZURE_CUSTOM_CONTRACT,
+    ENTRA_CUSTOM_CONTRACT,
+    K8S_CUSTOM_CONTRACT,
+    PLATFORMS,
     PLATFORMS_BY_KEY,
     CredField,
     PlatformSpec,
@@ -41,17 +48,61 @@ def make_injector():
     return injector
 
 
-def _data(content, contract_id):
-    return {
+def _data(content, contract_id, attachments=None):
+    data = {
         "injection": {
             "inject_id": "i1",
             "inject_injector_contract": {"injector_contract_id": contract_id},
             "inject_content": content,
         }
     }
+    if attachments is not None:
+        data["attachments"] = attachments
+    return data
 
 
 AWS_CREDS = {"aws_access_key_id": "AKIA", "aws_secret_access_key": "secret"}
+
+REFERENCE = "ref-1"
+AUTHORISATION_CODE = "code-1"
+ATTACHMENTS = {
+    "credential_references": [REFERENCE],
+    "authorisation_code": AUTHORISATION_CODE,
+}
+
+AWS_ACCESS_KEY_PAYLOAD = {
+    "type": "AWS_ACCESS_KEY",
+    "value": {
+        "aws_access_key_id": "AKIA-REF",
+        "aws_secret_access_key": "ref-aws-secret",
+        "aws_default_region": "us-west-2",
+    },
+}
+AZURE_SERVICE_PRINCIPAL_PAYLOAD = {
+    "type": "AZURE_SERVICE_PRINCIPAL",
+    "value": {
+        "azure_environment": "AzureCloud",
+        "azure_client_id": "ref-client",
+        "azure_client_secret": "ref-azure-secret",
+        "azure_tenant_id": "ref-tenant",
+    },
+}
+GCP_SERVICE_ACCOUNT_KEY = b'{"type": "service_account", "private_key": "ref-gcp-key"}'
+GCP_SERVICE_ACCOUNT_PAYLOAD = {
+    "type": "GCP_SERVICE_ACCOUNT",
+    "value": {
+        "gcp_scope": "googleapis.com",
+        "gcp_project_id": "ref-project",
+        "gcp_private_key_json": base64.b64encode(GCP_SERVICE_ACCOUNT_KEY).decode(),
+    },
+}
+SECRET_VALUES = (
+    "AKIA-REF",
+    "ref-aws-secret",
+    "ref-azure-secret",
+    "ref-gcp-key",
+    AUTHORISATION_CODE,
+)
 
 
 class ResolveContractTest(TestCase):
@@ -236,6 +287,289 @@ class ProcessMessageTest(TestCase):
         injector.helper.listen.assert_called_once()
 
 
+class ProcessMessageCredentialReferenceTest(TestCase):
+    def _injector(self, payload=None, resolution_error=None, detonate=None):
+        injector = make_injector()
+        resolve = injector.helper.api.inject.resolve_attachment_secret
+        resolve.return_value = payload
+        resolve.side_effect = resolution_error
+        if detonate is None:
+            injector.stratus.detonate.return_value = StratusResult(
+                success=True, technique_id="t", status="DETONATED", message="ok"
+            )
+        else:
+            injector.stratus.detonate.side_effect = detonate
+        return injector
+
+    def _callback(self, injector):
+        return injector.helper.api.inject.execution_callback.call_args.kwargs["data"]
+
+    def _detonate_env(self, injector):
+        return injector.stratus.detonate.call_args.kwargs["env"]
+
+    def _assert_no_secret_reported(self, injector):
+        for call in injector.helper.api.inject.execution_callback.call_args_list:
+            reported = json.dumps(call.kwargs["data"])
+            for secret in SECRET_VALUES:
+                self.assertNotIn(secret, reported)
+
+    def test_reference_is_resolved_with_the_job_authorisation(self):
+        injector = self._injector(AWS_ACCESS_KEY_PAYLOAD)
+        injector.process_message(_data({}, AWS_TECH_CONTRACT, ATTACHMENTS))
+        injector.helper.api.inject.resolve_attachment_secret.assert_called_once_with(
+            "i1", REFERENCE, AUTHORISATION_CODE
+        )
+        callback = self._callback(injector)
+        self.assertEqual(callback["execution_status"], "SUCCESS")
+        env = self._detonate_env(injector)
+        self.assertEqual(env["AWS_ACCESS_KEY_ID"], "AKIA-REF")
+        self.assertEqual(env["AWS_SECRET_ACCESS_KEY"], "ref-aws-secret")
+        self.assertEqual(env["AWS_REGION"], "us-west-2")
+        self._assert_no_secret_reported(injector)
+
+    def test_resolution_happens_after_reception_and_before_callback(self):
+        injector = self._injector(AWS_ACCESS_KEY_PAYLOAD)
+        injector.process_message(_data({}, AWS_TECH_CONTRACT, ATTACHMENTS))
+        calls = [name for name, _, _ in injector.helper.api.inject.mock_calls]
+        self.assertEqual(
+            calls,
+            ["execution_reception", "resolve_attachment_secret", "execution_callback"],
+        )
+
+    def test_reference_wins_over_filled_legacy_fields(self):
+        injector = self._injector(AWS_ACCESS_KEY_PAYLOAD)
+        content = dict(AWS_CREDS, aws_session_token="legacy-token")
+        injector.process_message(_data(content, AWS_TECH_CONTRACT, ATTACHMENTS))
+        self.assertEqual(self._callback(injector)["execution_status"], "SUCCESS")
+        env = self._detonate_env(injector)
+        self.assertEqual(env["AWS_ACCESS_KEY_ID"], "AKIA-REF")
+        self.assertEqual(env["AWS_SECRET_ACCESS_KEY"], "ref-aws-secret")
+        # No merge: a legacy value the credential does not carry is not used.
+        self.assertNotIn("AWS_SESSION_TOKEN", env)
+        self.assertNotIn("legacy-token", env.values())
+        self.assertNotIn("secret", env.values())
+
+    def test_reference_path_does_not_inherit_host_credentials(self):
+        injector = self._injector(AWS_ACCESS_KEY_PAYLOAD)
+        injector.process_message(_data({}, AWS_TECH_CONTRACT, ATTACHMENTS))
+        self.assertTrue(
+            injector.stratus.detonate.call_args.kwargs["isolate_host_credentials"]
+        )
+
+    def test_no_attachments_keeps_the_legacy_path(self):
+        for attachments in (
+            None,
+            {"credential_references": [], "authorisation_code": "x"},
+            {"credential_references": None},
+        ):
+            with self.subTest(attachments=attachments):
+                injector = self._injector()
+                data = _data(AWS_CREDS, AWS_TECH_CONTRACT)
+                data["attachments"] = attachments
+                injector.process_message(data)
+                resolve = injector.helper.api.inject.resolve_attachment_secret
+                resolve.assert_not_called()
+                self.assertEqual(
+                    self._callback(injector)["execution_status"], "SUCCESS"
+                )
+                env = self._detonate_env(injector)
+                self.assertEqual(env["AWS_ACCESS_KEY_ID"], "AKIA")
+                self.assertEqual(env["AWS_REGION"], "us-east-1")
+                self.assertNotIn(
+                    "isolate_host_credentials",
+                    injector.stratus.detonate.call_args.kwargs,
+                )
+
+    def test_platform_resolution_codes_reported_in_the_trace(self):
+        for code in (
+            CredentialErrorCode.CREDENTIAL_NOT_FOUND,
+            CredentialErrorCode.CREDENTIAL_INACTIVE,
+            CredentialErrorCode.CREDENTIAL_ACCESS_DENIED,
+        ):
+            with self.subTest(code=code):
+                error = CredentialResolutionError(code, reference=REFERENCE)
+                injector = self._injector(resolution_error=error)
+                injector.process_message(
+                    _data(AWS_CREDS, AWS_TECH_CONTRACT, ATTACHMENTS)
+                )
+                callback = self._callback(injector)
+                self.assertEqual(callback["execution_status"], "ERROR")
+                self.assertEqual(callback["execution_message"], str(error))
+                self.assertTrue(callback["execution_message"].startswith(code.value))
+                self.assertIn(error.message, callback["execution_message"])
+                # The legacy fields are not a fallback for a failed resolution.
+                injector.stratus.detonate.assert_not_called()
+                self._assert_no_secret_reported(injector)
+
+    def test_not_found_and_inactive_identify_the_reference(self):
+        for code in (
+            CredentialErrorCode.CREDENTIAL_NOT_FOUND,
+            CredentialErrorCode.CREDENTIAL_INACTIVE,
+        ):
+            with self.subTest(code=code):
+                error = CredentialResolutionError(code, reference=REFERENCE)
+                injector = self._injector(resolution_error=error)
+                injector.process_message(_data({}, AWS_TECH_CONTRACT, ATTACHMENTS))
+                self.assertIn(REFERENCE, self._callback(injector)["execution_message"])
+
+    def test_missing_authorisation_code_is_access_denied(self):
+        injector = self._injector(AWS_ACCESS_KEY_PAYLOAD)
+        attachments = {"credential_references": [REFERENCE]}
+        injector.process_message(_data(AWS_CREDS, AWS_TECH_CONTRACT, attachments))
+        callback = self._callback(injector)
+        self.assertEqual(callback["execution_status"], "ERROR")
+        self.assertTrue(
+            callback["execution_message"].startswith(
+                CredentialErrorCode.CREDENTIAL_ACCESS_DENIED.value
+            )
+        )
+        injector.helper.api.inject.resolve_attachment_secret.assert_not_called()
+        injector.stratus.detonate.assert_not_called()
+
+    def test_incompatible_credential_type_is_reported(self):
+        injector = self._injector(GCP_SERVICE_ACCOUNT_PAYLOAD)
+        injector.process_message(_data(AWS_CREDS, AWS_TECH_CONTRACT, ATTACHMENTS))
+        callback = self._callback(injector)
+        self.assertEqual(callback["execution_status"], "ERROR")
+        self.assertTrue(
+            callback["execution_message"].startswith(
+                CredentialErrorCode.CREDENTIAL_INCOMPATIBLE.value
+            )
+        )
+        self.assertIn(REFERENCE, callback["execution_message"])
+        injector.stratus.detonate.assert_not_called()
+        self._assert_no_secret_reported(injector)
+
+    def test_kubernetes_reference_is_incompatible_without_resolution(self):
+        injector = self._injector(AWS_ACCESS_KEY_PAYLOAD)
+        content = {"kubeconfig": "apiVersion: v1", "technique_id": "k8s.x"}
+        injector.process_message(_data(content, K8S_CUSTOM_CONTRACT, ATTACHMENTS))
+        callback = self._callback(injector)
+        self.assertEqual(callback["execution_status"], "ERROR")
+        self.assertTrue(
+            callback["execution_message"].startswith(
+                CredentialErrorCode.CREDENTIAL_INCOMPATIBLE.value
+            )
+        )
+        injector.helper.api.inject.resolve_attachment_secret.assert_not_called()
+        injector.stratus.detonate.assert_not_called()
+
+    def test_kubernetes_without_reference_keeps_the_legacy_path(self):
+        injector = self._injector()
+        content = {"kubeconfig": "apiVersion: v1", "technique_id": "k8s.x"}
+        injector.process_message(_data(content, K8S_CUSTOM_CONTRACT))
+        self.assertEqual(self._callback(injector)["execution_status"], "SUCCESS")
+        self.assertIn("KUBECONFIG", self._detonate_env(injector))
+
+    def test_entra_id_uses_an_azure_credential(self):
+        injector = self._injector(AZURE_SERVICE_PRINCIPAL_PAYLOAD)
+        content = {"technique_id": "entra-id.persistence.guest-user"}
+        injector.process_message(_data(content, ENTRA_CUSTOM_CONTRACT, ATTACHMENTS))
+        self.assertEqual(self._callback(injector)["execution_status"], "SUCCESS")
+        env = self._detonate_env(injector)
+        self.assertEqual(env["AZURE_CLIENT_ID"], "ref-client")
+        self.assertEqual(env["AZURE_TENANT_ID"], "ref-tenant")
+
+    def test_every_credential_platform_maps_to_a_provider(self):
+        self.assertEqual(
+            {p.key for p in PLATFORMS} - set(mod.CREDENTIAL_PROVIDER_BY_PLATFORM),
+            {"k8s"},
+        )
+
+    def test_resolved_region_wins_over_the_inject_region(self):
+        injector = self._injector(AWS_ACCESS_KEY_PAYLOAD)
+        content = {"aws_region": "eu-west-3"}
+        injector.process_message(_data(content, AWS_TECH_CONTRACT, ATTACHMENTS))
+        env = self._detonate_env(injector)
+        self.assertEqual(env["AWS_REGION"], "us-west-2")
+        self.assertEqual(env["AWS_DEFAULT_REGION"], "us-west-2")
+
+    def test_inject_region_used_when_the_credential_omits_it(self):
+        payload = {
+            "type": "AWS_ACCESS_KEY",
+            "value": {
+                "aws_access_key_id": "AKIA-REF",
+                "aws_secret_access_key": "ref-aws-secret",
+            },
+        }
+        for content, expected in (
+            ({"aws_region": " eu-west-3 "}, "eu-west-3"),
+            ({}, "us-east-1"),
+        ):
+            with self.subTest(content=content):
+                injector = self._injector(payload)
+                injector.process_message(_data(content, AWS_TECH_CONTRACT, ATTACHMENTS))
+                env = self._detonate_env(injector)
+                self.assertEqual(env["AWS_REGION"], expected)
+                self.assertEqual(env["AWS_DEFAULT_REGION"], expected)
+
+    def test_assume_role_region_is_not_overridden(self):
+        payload = {
+            "type": "AWS_ASSUME_ROLE",
+            "value": {
+                "aws_role_arn": "arn:aws:iam::123456789012:role/r",
+                "aws_source_identity_type": "INSTANCE_DEFAULT",
+                "aws_default_region": "us-west-2",
+            },
+        }
+        injector = self._injector(payload)
+        injector.process_message(
+            _data({"aws_region": "eu-west-3"}, AWS_TECH_CONTRACT, ATTACHMENTS)
+        )
+        env = self._detonate_env(injector)
+        # The region lives in the materialized profile: an AWS_REGION variable
+        # would take precedence over it.
+        self.assertNotIn("AWS_REGION", env)
+        self.assertEqual(env["AWS_PROFILE"], "srt-target")
+
+    def test_inject_subscription_used_when_the_credential_omits_it(self):
+        injector = self._injector(AZURE_SERVICE_PRINCIPAL_PAYLOAD)
+        content = {
+            "azure_subscription_id": "form-subscription",
+            "azure_client_secret": "legacy-secret",
+            "technique_id": "azure.x",
+        }
+        injector.process_message(_data(content, AZURE_CUSTOM_CONTRACT, ATTACHMENTS))
+        env = self._detonate_env(injector)
+        self.assertEqual(env["AZURE_SUBSCRIPTION_ID"], "form-subscription")
+        self.assertEqual(env["AZURE_CLIENT_SECRET"], "ref-azure-secret")
+
+    def test_resolved_project_wins_and_key_file_is_removed_after_success(self):
+        seen = {}
+
+        def _detonate(technique_id, env, **kwargs):
+            path = env["GOOGLE_APPLICATION_CREDENTIALS"]
+            with open(path, "rb") as handle:
+                seen["key"] = handle.read()
+            seen["path"] = path
+            return StratusResult(
+                success=True, technique_id=technique_id, status="DETONATED", message=""
+            )
+
+        injector = self._injector(GCP_SERVICE_ACCOUNT_PAYLOAD, detonate=_detonate)
+        content = {
+            "gcp_project_id": "form-project",
+            "gcp_service_account_key": '{"type": "legacy"}',
+        }
+        injector.process_message(_data(content, GCP_TECH_CONTRACT, ATTACHMENTS))
+        self.assertEqual(self._callback(injector)["execution_status"], "SUCCESS")
+        env = self._detonate_env(injector)
+        self.assertEqual(env["GOOGLE_PROJECT"], "ref-project")
+        self.assertEqual(seen["key"], GCP_SERVICE_ACCOUNT_KEY)
+        self.assertFalse(os.path.exists(seen["path"]))
+        self.assertFalse(os.path.exists(os.path.dirname(seen["path"])))
+
+    def test_key_file_is_removed_when_detonate_raises(self):
+        injector = self._injector(
+            GCP_SERVICE_ACCOUNT_PAYLOAD, detonate=RuntimeError("boom")
+        )
+        injector.process_message(_data({}, GCP_TECH_CONTRACT, ATTACHMENTS))
+        self.assertEqual(self._callback(injector)["execution_status"], "ERROR")
+        path = self._detonate_env(injector)["GOOGLE_APPLICATION_CREDENTIALS"]
+        self.assertFalse(os.path.exists(path))
+        self.assertFalse(os.path.exists(os.path.dirname(path)))
+
+
 class StratusExecutorTest(TestCase):
     @patch("injector_common.stratus_executor.subprocess.run")
     def test_detonate_success(self, run):
@@ -243,6 +577,40 @@ class StratusExecutorTest(TestCase):
         result = StratusExecutor().detonate("aws.foo", env={"A": "B"})
         self.assertTrue(result.success)
         self.assertEqual(result.outputs, {"technique": "aws.foo"})
+
+    @patch("injector_common.stratus_executor.subprocess.run")
+    def test_detonate_inherits_the_host_environment_by_default(self, run):
+        run.return_value = MagicMock(returncode=0, stdout="", stderr="")
+        with patch.dict(os.environ, {"AWS_PROFILE": "host"}):
+            StratusExecutor().detonate("aws.foo", env={"A": "B"})
+        run_env = run.call_args.kwargs["env"]
+        self.assertEqual(run_env["AWS_PROFILE"], "host")
+        self.assertEqual(run_env["A"], "B")
+
+    @patch("injector_common.stratus_executor.subprocess.run")
+    def test_detonate_can_isolate_host_credentials(self, run):
+        run.return_value = MagicMock(returncode=0, stdout="", stderr="")
+        host = {
+            "AWS_PROFILE": "host",
+            "AWS_ACCESS_KEY_ID": "host",
+            "AZURE_CLIENT_SECRET": "host",
+            "ARM_CLIENT_SECRET": "host",
+            "GOOGLE_APPLICATION_CREDENTIALS": "host",
+            "GCLOUD_PROJECT": "host",
+            "CLOUDSDK_CORE_PROJECT": "host",
+            "KUBECONFIG": "host",
+            "STRATUS_KEEP_ME": "kept",
+        }
+        with patch.dict(os.environ, host):
+            StratusExecutor().detonate(
+                "aws.foo",
+                env={"AWS_ACCESS_KEY_ID": "resolved"},
+                isolate_host_credentials=True,
+            )
+        run_env = run.call_args.kwargs["env"]
+        self.assertEqual(run_env["AWS_ACCESS_KEY_ID"], "resolved")
+        self.assertEqual(run_env["STRATUS_KEEP_ME"], "kept")
+        self.assertNotIn("host", run_env.values())
 
     @patch("injector_common.stratus_executor.subprocess.run")
     def test_detonate_appends_cleanup_flag(self, run):
