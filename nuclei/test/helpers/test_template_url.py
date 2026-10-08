@@ -1,4 +1,3 @@
-import io
 import os
 from unittest import mock
 
@@ -24,9 +23,7 @@ def test_rejects_non_http_scheme():
 
 def test_rejects_domain_not_in_allowlist():
     with pytest.raises(TemplateUrlError):
-        materialize_template_url(
-            "https://evil.example.com/t.yaml", ALLOWED, 1000
-        )
+        materialize_template_url("https://evil.example.com/t.yaml", ALLOWED, 1000)
 
 
 def test_rejects_oversize_download():

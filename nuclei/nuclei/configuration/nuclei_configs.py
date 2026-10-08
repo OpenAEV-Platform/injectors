@@ -190,7 +190,10 @@ class ConfigLoaderNuclei(BaseSettings):
     )
 
     @field_validator(
-        "exclude_type", "exclude_severity", "template_url_allowed_domains", mode="before"
+        "exclude_type",
+        "exclude_severity",
+        "template_url_allowed_domains",
+        mode="before",
     )
     @classmethod
     def parser_csv_to_list(cls, value):

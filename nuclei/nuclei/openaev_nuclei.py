@@ -5,6 +5,9 @@ import threading
 import time
 from typing import Dict, Optional
 
+from injector_common.dump_config import intercept_dump_argument
+from injector_common.targets import Targets
+from injector_common.traces import send_per_target_traces
 from pyoaev.helpers import OpenAEVConfigHelper, OpenAEVInjectorHelper
 from pyoaev.signatures import (
     ExtraSignatureData,
@@ -13,9 +16,6 @@ from pyoaev.signatures import (
 )
 from pyoaev.signatures.models import ExecutionDetails
 
-from injector_common.dump_config import intercept_dump_argument
-from injector_common.targets import Targets
-from injector_common.traces import send_per_target_traces
 from nuclei.configuration.config_loader import ConfigLoader
 from nuclei.helpers.nuclei_command_builder import NucleiCommandBuilder
 from nuclei.helpers.nuclei_output_parser import NucleiOutputParser
@@ -98,9 +98,11 @@ class OpenAEVNuclei:
         # validation pass on it, and feed it to Nuclei as a local -templates path.
         # Lets an operator run a not-yet-merged template (e.g. one in review in a
         # PR) with Nuclei's full matching logic. Cleaned up after the scan.
-        content = dict(msg_data.inject_content or {})
+        content = msg_data.inject_content
         tmp_template_path: Optional[str] = None
-        template_url = content.get("template_url")
+        template_url = (
+            content.get("template_url") if isinstance(content, dict) else None
+        )
         if template_url:
             try:
                 tmp_template_path = materialize_template_url(
@@ -113,14 +115,17 @@ class OpenAEVNuclei:
             try:
                 NucleiProcess.nuclei_validate(tmp_template_path)
             except subprocess.CalledProcessError as exc:
-                detail = _decode(exc.stderr) or _decode(exc.stdout) or "invalid template"
+                detail = (
+                    _decode(exc.stderr) or _decode(exc.stdout) or "invalid template"
+                )
                 _safe_remove(tmp_template_path)
                 raise RuntimeError(
                     f"template_url failed Nuclei validation: "
                     f"{detail[-_STDERR_LOG_TAIL:]}"
                 ) from exc
-            # Hand the local file to the command builder as -templates <path>.
-            content["template_path"] = tmp_template_path
+            # Hand the local file to the command builder as -templates <path>
+            # (copy so the original inject_content is left untouched).
+            content = {**content, "template_path": tmp_template_path}
 
         # Nuclei Args Builder
         nuclei_builder = NucleiCommandBuilder(
