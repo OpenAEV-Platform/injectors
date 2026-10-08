@@ -57,7 +57,7 @@ when Slack replies with `ok: true`, otherwise `ERROR` with the Slack error code.
 - A Slack workspace where you can create/install an app.
 - A Slack bot token (`xoxb-...`) with the `chat:write` scope - see [Slack app setup](#slack-app-setup).
 - Outbound HTTPS access from the injector to `slack.com`.
-- For a manual (non-Docker) deployment: Python >= 3.11 and [Poetry](https://python-poetry.org/) >= 2.1.
+- For a manual (non-Docker) deployment: Python >= 3.14 and [Poetry](https://python-poetry.org/) >= 2.1.
 
 ## Slack app setup
 

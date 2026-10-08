@@ -41,7 +41,7 @@ the RabbitMQ host/port advertised by the platform.
 
 - OpenAEV Platform >= 1.19.0, reachable from the injector (along with its RabbitMQ broker)
 - For a manual (non-Docker) deployment:
-  - Python >= 3.11 and [Poetry](https://python-poetry.org/) >= 2.1
+  - Python >= 3.14 and [Poetry](https://python-poetry.org/) >= 2.1
   - The `nmap` binary available on the `PATH` (the Docker image already bundles them)
 
 ## Configuration variables
