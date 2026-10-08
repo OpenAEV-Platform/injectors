@@ -580,6 +580,52 @@ class TestOpenAEVNuclei(unittest.TestCase):
             message_callback=injector.process_message
         )
 
+    @patch.object(module, "materialize_template_url")
+    @patch.object(module.Targets, "build_execution_message")
+    @patch.object(module, "NucleiCommandBuilder")
+    def test_nuclei_execution_with_template_url(
+        self,
+        m_builder,
+        m_build_execution_message,
+        m_materialize,
+        m_configloader,
+        m_confighelper,
+        m_helper,
+        m_nucleiprocess,
+        m_parser,
+        m_msgdata,
+        _,
+    ):
+        import os
+        import tempfile
+
+        m_helper.return_value.api = MagicMock()
+        m_helper.return_value.injector_logger = MagicMock()
+        injector = module.OpenAEVNuclei()
+
+        # a real temp file so the post-scan cleanup path actually removes it
+        fd, tmp = tempfile.mkstemp(suffix=".yaml")
+        os.close(fd)
+        m_materialize.return_value = tmp
+
+        message_data = MagicMock()
+        message_data.get_targets.return_value = ["1.1.1.1"]
+        message_data.target_results.ip_to_asset_id_map = {}
+        message_data.inject_content = {
+            "template_url": "https://raw.githubusercontent.com/o/r/b/t.yaml"
+        }
+        m_builder.return_value.build.return_value = ["nuclei", "-jsonl"]
+
+        injector.nuclei_execution(1, message_data)
+
+        # the fetched local file is validated and handed to the builder as the
+        # template path, then removed once the scan completes
+        m_materialize.assert_called_once()
+        m_nucleiprocess.nuclei_validate.assert_called_once_with(tmp)
+        _, kwargs = m_builder.call_args
+        self.assertEqual(kwargs["content"]["template_path"], tmp)
+        self.assertFalse(os.path.exists(tmp))
+
 
 if __name__ == "__main__":
     unittest.main()
