@@ -18,6 +18,7 @@ from pyoaev.contracts.contract_config import (
     ContractOutputType,
     SupportedLanguage,
 )
+from pyoaev.credential import CredentialAttachment
 
 from prowler._core.cli_engine import CommandResult
 from prowler._core.prowler_client import (
@@ -34,13 +35,13 @@ from prowler.models.findings import (
     map_command_result_with_evidence,
 )
 from prowler.models.provider_inputs import (
-    AwsProviderInput,
-    AzureProviderInput,
-    GcpProviderInput,
-    KubernetesProviderInput,
+    AWS_PROVIDER_INPUTS,
+    AZURE_PROVIDER_INPUTS,
+    GCP_PROVIDER_INPUTS,
+    KUBERNETES_PROVIDER_INPUTS,
     ProviderInput,
     ProviderInputError,
-    parse_provider_input,
+    validate_provider_input,
 )
 from prowler.services.output_trace import generate
 
@@ -332,16 +333,16 @@ class BaseProwlerContract(ABC):
             "route": self.route_name,
             "filters": ", ".join(self.check_filters) if self.check_filters else "all",
         }
-        if isinstance(provider, AwsProviderInput):
+        if isinstance(provider, AWS_PROVIDER_INPUTS):
             info.update(account=provider.aws_account_id, region=provider.aws_region)
-        elif isinstance(provider, AzureProviderInput):
+        elif isinstance(provider, AZURE_PROVIDER_INPUTS):
             info.update(
                 subscription=provider.azure_subscription_id,
                 requested_provider=provider.azure_provider,
             )
-        elif isinstance(provider, GcpProviderInput):
+        elif isinstance(provider, GCP_PROVIDER_INPUTS):
             info["project"] = provider.gcp_project_id
-        elif isinstance(provider, KubernetesProviderInput):
+        elif isinstance(provider, KUBERNETES_PROVIDER_INPUTS):
             info["context"] = provider.kubernetes_context
         return info
 
@@ -411,12 +412,21 @@ class BaseProwlerContract(ABC):
             "details": details,
         }
 
-    def parse_input(self, raw_input: Mapping[str, object]) -> ProviderInput:
+    def parse_input(
+        self,
+        raw_input: Mapping[str, object],
+        *,
+        credential_attachment: CredentialAttachment | None = None,
+    ) -> ProviderInput:
         """Convert ephemeral form values immediately into the strict CHK.002 model.
 
         The credential reference is a platform-side selector rather than a
         provider model field, so it is dropped before the ``extra="forbid"``
         boundary instead of being rejected there as an unknown input.
+
+        When the job carries a ``credential_attachment``, the reference variant
+        of the provider model is validated instead: the legacy credential
+        fields are ignored, even when filled.
         """
         if "provider" in raw_input:
             raise ContractInputError.from_validation(
@@ -434,7 +444,7 @@ class BaseProwlerContract(ABC):
                     candidate[field] = None
         candidate["provider"] = self.provider
         try:
-            return parse_provider_input(candidate)
+            return validate_provider_input(candidate, credential_attachment)
         except ProviderInputError as error:
             issues = tuple(
                 ContractInputIssue(issue.location, issue.error_type)
