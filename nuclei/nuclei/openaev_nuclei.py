@@ -5,9 +5,6 @@ import threading
 import time
 from typing import Dict, Optional
 
-from injector_common.dump_config import intercept_dump_argument
-from injector_common.targets import Targets
-from injector_common.traces import send_per_target_traces
 from pyoaev.helpers import OpenAEVConfigHelper, OpenAEVInjectorHelper
 from pyoaev.signatures import (
     ExtraSignatureData,
@@ -16,6 +13,9 @@ from pyoaev.signatures import (
 )
 from pyoaev.signatures.models import ExecutionDetails
 
+from injector_common.dump_config import intercept_dump_argument
+from injector_common.targets import Targets
+from injector_common.traces import send_per_target_traces
 from nuclei.configuration.config_loader import ConfigLoader
 from nuclei.helpers.nuclei_command_builder import NucleiCommandBuilder
 from nuclei.helpers.nuclei_output_parser import NucleiOutputParser
