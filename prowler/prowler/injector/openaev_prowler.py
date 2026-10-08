@@ -8,6 +8,7 @@ from hashlib import sha256
 from time import monotonic
 from typing import Literal
 
+from pyoaev.credential import get_credential_attachment
 from pyoaev.helpers import OpenAEVInjectorHelper
 from pyoaev.utils import AppLogger
 
@@ -136,7 +137,7 @@ class ProwlerInjector:
             return
         try:
             contract = self._resolve_contract(run, injection)
-            provider = self._validate_input(run, injection, contract)
+            provider = self._validate_input(run, data, injection, contract)
             run.stage = _Stage.ASSESSMENT_EXECUTION
             self._log(
                 "info",
@@ -269,15 +270,23 @@ class ProwlerInjector:
     def _validate_input(
         self,
         run: _MessageRun,
+        data: dict[str, object],
         injection: Mapping[str, object],
         contract: BaseProwlerContract,
     ) -> ProviderInput:
-        """Strictly parse the injection content into a provider input."""
+        """Strictly parse the injection content into a provider input.
+
+        The credential attachment of the job, when present, selects the
+        reference path of the contract input instead of its legacy fields.
+        """
         run.stage = _Stage.INPUT_VALIDATION
         content = injection.get("inject_content")
         if not isinstance(content, Mapping):
             raise ContractInputError(())
-        provider = contract.parse_input(content)
+        credential_attachment = get_credential_attachment(data)
+        provider = contract.parse_input(
+            content, credential_attachment=credential_attachment
+        )
         run.provider = provider
         self._log(
             "debug",

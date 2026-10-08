@@ -4,6 +4,7 @@ from typing import ClassVar, Mapping, cast, get_args
 
 from pyoaev.contracts.contract_config import ContractElement, ContractSelect
 from pyoaev.contracts.contract_utils import ContractCardinality
+from pyoaev.credential import CredentialAttachment
 
 from prowler._core.prowler_client import (
     AwsServiceSelector,
@@ -14,9 +15,9 @@ from prowler._core.prowler_client import (
 )
 from prowler.models.configs.config_loader import ProwlerConfig
 from prowler.models.provider_inputs import (
-    AwsProviderInput,
-    AzureProviderInput,
-    GcpProviderInput,
+    AWS_PROVIDER_INPUTS,
+    AZURE_PROVIDER_INPUTS,
+    GCP_PROVIDER_INPUTS,
     ProviderInput,
 )
 
@@ -134,7 +135,12 @@ class SelectableProwlerContract(SelectionScopedContract):
         )
         return fields
 
-    def parse_input(self, raw_input: Mapping[str, object]) -> ProviderInput:
+    def parse_input(
+        self,
+        raw_input: Mapping[str, object],
+        *,
+        credential_attachment: CredentialAttachment | None = None,
+    ) -> ProviderInput:
         """Validate the closed single select before the strict provider model."""
         # Clear this thread's selection before any rejection path can run,
         # so no early return can expose a selection from an earlier parse.
@@ -149,7 +155,9 @@ class SelectableProwlerContract(SelectionScopedContract):
         candidate = {
             key: value for key, value in raw_input.items() if key != self.select_key
         }
-        return super().parse_input(candidate)
+        return super().parse_input(
+            candidate, credential_attachment=credential_attachment
+        )
 
     def _held_selection(self) -> str | None:
         """Return the selection held by the current thread, if any."""
@@ -216,7 +224,7 @@ class AwsSelectServiceContract(SelectableServiceContract):
         self, config: ProwlerConfig, provider: ProviderInput
     ) -> ContractExecutionOutcome:
         """Run exactly the parsed AWS service selection once through the seam."""
-        if not isinstance(provider, AwsProviderInput):
+        if not isinstance(provider, AWS_PROVIDER_INPUTS):
             raise ValueError("AWS selectable service requires an AWS provider")
         return self._execute_service(
             config, provider, cast(ServiceSelector, self._require_selection())
@@ -238,7 +246,7 @@ class AwsSelectComplianceContract(SelectableComplianceContract):
         self, config: ProwlerConfig, provider: ProviderInput
     ) -> ContractExecutionOutcome:
         """Run exactly the parsed AWS framework selection once through the seam."""
-        if not isinstance(provider, AwsProviderInput):
+        if not isinstance(provider, AWS_PROVIDER_INPUTS):
             raise ValueError("AWS selectable compliance requires an AWS provider")
         return self._execute_compliance(
             config, provider, cast(ComplianceSelector, self._require_selection())
@@ -260,7 +268,7 @@ class AzureSelectServiceContract(SelectableServiceContract):
         self, config: ProwlerConfig, provider: ProviderInput
     ) -> ContractExecutionOutcome:
         """Run exactly the parsed Azure service selection once through the seam."""
-        if not isinstance(provider, AzureProviderInput):
+        if not isinstance(provider, AZURE_PROVIDER_INPUTS):
             raise ValueError("Azure selectable service requires an Azure provider")
         return self._execute_service(
             config, provider, cast(ServiceSelector, self._require_selection())
@@ -282,7 +290,7 @@ class AzureSelectComplianceContract(SelectableComplianceContract):
         self, config: ProwlerConfig, provider: ProviderInput
     ) -> ContractExecutionOutcome:
         """Run exactly the parsed Azure framework selection once through the seam."""
-        if not isinstance(provider, AzureProviderInput):
+        if not isinstance(provider, AZURE_PROVIDER_INPUTS):
             raise ValueError("Azure selectable compliance requires an Azure provider")
         return self._execute_compliance(
             config, provider, cast(ComplianceSelector, self._require_selection())
@@ -304,7 +312,7 @@ class GcpSelectServiceContract(SelectableServiceContract):
         self, config: ProwlerConfig, provider: ProviderInput
     ) -> ContractExecutionOutcome:
         """Run exactly the parsed GCP service selection once through the seam."""
-        if not isinstance(provider, GcpProviderInput):
+        if not isinstance(provider, GCP_PROVIDER_INPUTS):
             raise ValueError("GCP selectable service requires a GCP provider")
         return self._execute_service(
             config, provider, cast(ServiceSelector, self._require_selection())
@@ -326,7 +334,7 @@ class GcpSelectComplianceContract(SelectableComplianceContract):
         self, config: ProwlerConfig, provider: ProviderInput
     ) -> ContractExecutionOutcome:
         """Run exactly the parsed GCP framework selection once through the seam."""
-        if not isinstance(provider, GcpProviderInput):
+        if not isinstance(provider, GCP_PROVIDER_INPUTS):
             raise ValueError("GCP selectable compliance requires a GCP provider")
         return self._execute_compliance(
             config, provider, cast(ComplianceSelector, self._require_selection())

@@ -4,7 +4,7 @@ from typing import ClassVar, get_args
 
 from prowler._core.prowler_client import AwsServiceSelector
 from prowler.models.configs.config_loader import ProwlerConfig
-from prowler.models.provider_inputs import AwsProviderInput, ProviderInput
+from prowler.models.provider_inputs import AWS_PROVIDER_INPUTS, ProviderInput
 
 from .base import BaseProwlerContract, ContractExecutionOutcome, RouteFamily
 from .compliance import FixedServiceContract
@@ -34,7 +34,7 @@ class AwsServiceContract(FixedServiceContract):
     provider = "aws"
     service_selector: ClassVar[AwsServiceSelector]
     service_selectors = get_args(AwsServiceSelector)
-    provider_input_type = AwsProviderInput
+    provider_input_types = AWS_PROVIDER_INPUTS
     provider_label = "AWS"
     provider_article = "an"
 

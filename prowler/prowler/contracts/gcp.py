@@ -4,7 +4,7 @@ from typing import ClassVar, get_args
 
 from prowler._core.prowler_client import GcpServiceSelector
 from prowler.models.configs.config_loader import ProwlerConfig
-from prowler.models.provider_inputs import GcpProviderInput, ProviderInput
+from prowler.models.provider_inputs import GCP_PROVIDER_INPUTS, ProviderInput
 
 from .base import BaseProwlerContract, ContractExecutionOutcome, RouteFamily
 from .compliance import FixedServiceContract
@@ -34,7 +34,7 @@ class GcpServiceContract(FixedServiceContract):
     provider = "gcp"
     service_selector: ClassVar[GcpServiceSelector]
     service_selectors = get_args(GcpServiceSelector)
-    provider_input_type = GcpProviderInput
+    provider_input_types = GCP_PROVIDER_INPUTS
     provider_label = "GCP"
     provider_article = "a"
 

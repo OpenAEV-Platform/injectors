@@ -99,10 +99,10 @@ class _DiagnosticContract(BaseProwlerContract):
     parse_failure: ClassVar[Exception | None] = None
     render_failure: ClassVar[bool] = False
 
-    def parse_input(self, raw_input: Any) -> Any:
+    def parse_input(self, raw_input: Any, **kwargs: Any) -> Any:
         if self.parse_failure is not None:
             raise self.parse_failure
-        return super().parse_input(raw_input)
+        return super().parse_input(raw_input, **kwargs)
 
     def execute(self, config: Any, provider: Any) -> ContractExecutionOutcome:
         del config, provider

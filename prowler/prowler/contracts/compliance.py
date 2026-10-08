@@ -46,7 +46,7 @@ class FixedServiceContract(BaseProwlerContract):
     family: ClassVar[RouteFamily] = "service"
     service_selector: ClassVar[ServiceSelector]
     service_selectors: ClassVar[tuple[ServiceSelector, ...]]
-    provider_input_type: ClassVar[type[object]]
+    provider_input_types: ClassVar[tuple[type[object], ...]]
     provider_label: ClassVar[str]
     provider_article: ClassVar[str]
 
@@ -62,7 +62,7 @@ class FixedServiceContract(BaseProwlerContract):
         """Reject unsupported route metadata before one service client call."""
         if self.service_selector not in self.service_selectors:
             raise ValueError(f"unsupported {self.provider_label} service selector")
-        if not isinstance(provider, self.provider_input_type):
+        if not isinstance(provider, self.provider_input_types):
             raise ValueError(
                 f"{self.provider_label} service selector requires "
                 f"{self.provider_article} {self.provider_label} provider"

@@ -4,7 +4,7 @@ from typing import ClassVar, get_args
 
 from prowler._core.prowler_client import AzureServiceSelector
 from prowler.models.configs.config_loader import ProwlerConfig
-from prowler.models.provider_inputs import AzureProviderInput, ProviderInput
+from prowler.models.provider_inputs import AZURE_PROVIDER_INPUTS, ProviderInput
 
 from .base import BaseProwlerContract, ContractExecutionOutcome, RouteFamily
 from .compliance import FixedServiceContract
@@ -34,7 +34,7 @@ class AzureServiceContract(FixedServiceContract):
     provider = "azure"
     service_selector: ClassVar[AzureServiceSelector]
     service_selectors = get_args(AzureServiceSelector)
-    provider_input_type = AzureProviderInput
+    provider_input_types = AZURE_PROVIDER_INPUTS
     provider_label = "Azure"
     provider_article = "an"
 

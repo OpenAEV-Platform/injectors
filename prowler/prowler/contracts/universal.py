@@ -6,18 +6,19 @@ from typing import ClassVar, Mapping, Sequence, cast, get_args
 from pydantic import ValidationError
 from pyoaev.contracts.contract_config import ContractElement, ContractSelect
 from pyoaev.contracts.contract_utils import ContractCardinality
+from pyoaev.credential import CredentialAttachment
 from pyoaev.credential.utils import build_single_referenced_credential_element
 
 from prowler._core.prowler_client import ComplianceSelector, ServiceSelector
 from prowler.models.configs.config_loader import ProwlerConfig
 from prowler.models.findings import OcsfPreviewRecord, OpenAevFinding
 from prowler.models.provider_inputs import (
-    PROVIDER_INPUT_ADAPTER,
-    AwsProviderInput,
-    AzureProviderInput,
-    GcpProviderInput,
-    KubernetesProviderInput,
+    AWS_PROVIDER_INPUTS,
+    AZURE_PROVIDER_INPUTS,
+    GCP_PROVIDER_INPUTS,
+    KUBERNETES_PROVIDER_INPUTS,
     ProviderInput,
+    validate_provider_input,
 )
 from prowler.services.output_trace import generate
 
@@ -249,8 +250,18 @@ class UniversalProwlerContract(SelectionScopedContract):
             mandatoryConditionValues={},
         )
 
-    def parse_input(self, raw_input: Mapping[str, object]) -> ProviderInput:
-        """Validate the closed selects before the strict provider model."""
+    def parse_input(
+        self,
+        raw_input: Mapping[str, object],
+        *,
+        credential_attachment: CredentialAttachment | None = None,
+    ) -> ProviderInput:
+        """Validate the closed selects before the strict provider model.
+
+        With a ``credential_attachment``, only the selected provider's
+        reference model is validated: its legacy credential fields are
+        ignored, like every other provider's credential fields.
+        """
         # Clear this thread's selection before any rejection path can run,
         # so no early return can expose a selection from an earlier parse.
         self._clear_selection("provider", "service_route", "compliance_route")
@@ -270,7 +281,7 @@ class UniversalProwlerContract(SelectionScopedContract):
         )
         candidate = self._build_provider_candidate(raw_input, selected_provider)
         try:
-            parsed = PROVIDER_INPUT_ADAPTER.validate_python(candidate)
+            parsed = validate_provider_input(candidate, credential_attachment)
         except ValidationError as error:
             raise translate_validation_error(error) from None
         self._selection.provider = selected_provider
@@ -395,12 +406,12 @@ class UniversalProwlerContract(SelectionScopedContract):
     def _provider_model_matches(provider_name: str, provider: ProviderInput) -> bool:
         """Return True only when the model class matches the held provider name."""
         if provider_name == "aws":
-            return type(provider) is AwsProviderInput
+            return type(provider) in AWS_PROVIDER_INPUTS
         if provider_name == "azure":
-            return type(provider) is AzureProviderInput
+            return type(provider) in AZURE_PROVIDER_INPUTS
         if provider_name == "gcp":
-            return type(provider) is GcpProviderInput
-        return type(provider) is KubernetesProviderInput
+            return type(provider) in GCP_PROVIDER_INPUTS
+        return type(provider) in KUBERNETES_PROVIDER_INPUTS
 
     def _provider_findings(
         self, findings: Sequence[OpenAevFinding]

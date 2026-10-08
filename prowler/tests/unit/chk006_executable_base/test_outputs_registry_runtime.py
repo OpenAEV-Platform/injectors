@@ -203,11 +203,11 @@ class _RuntimeContract(BaseProwlerContract):
     render_failure: ClassVar[bool] = False
     use_base_renderer: ClassVar[bool] = False
 
-    def parse_input(self, raw_input: Any) -> Any:
+    def parse_input(self, raw_input: Any, **kwargs: Any) -> Any:
         self.events.append(f"parse:{tuple(raw_input)}")
         if self.parse_failure is not None:
             raise self.parse_failure
-        return super().parse_input(raw_input)
+        return super().parse_input(raw_input, **kwargs)
 
     def execute(self, config: Any, provider: Any) -> ContractExecutionOutcome:
         del config, provider
