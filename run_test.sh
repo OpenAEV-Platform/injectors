@@ -16,9 +16,6 @@ RELEASE_REF="${RELEASE_REF:-main}"
 BRANCH="${CIRCLE_BRANCH:-${GITHUB_REF_NAME:-$RELEASE_REF}}"
 REPO_ROOT="$(cd "$(dirname "$0")" && pwd)"
 
-# Determine pyoaev git branch
-PYOAEV_BRANCH="main"
-
 # Discover injectors with test directories
 discover_injectors() {
   find "$REPO_ROOT" -maxdepth 2 \( -name "test" -o -name "tests" \) -type d \
@@ -108,10 +105,7 @@ run_injector_tests() {
     install_args=$(get_install_args "$injector_dir")
     poetry install $install_args
 
-    echo "→ Installing pyoaev from branch $PYOAEV_BRANCH"
-    poetry run pip install --force-reinstall -q \
-      "git+https://github.com/OpenAEV-Platform/client-python.git@$PYOAEV_BRANCH"
-
+    echo "→ pup install coverage"
     poetry run pip install -q coverage
 
     local test_rc=0
@@ -130,10 +124,7 @@ run_injector_tests() {
 
     pip install -q -e .
 
-    echo "→ Installing pyoaev from branch $PYOAEV_BRANCH"
-    pip install --force-reinstall -q \
-      "git+https://github.com/OpenAEV-Platform/client-python.git@$PYOAEV_BRANCH"
-
+    echo "→ pip install coverage"
     pip install -q coverage
 
     local test_rc=0
