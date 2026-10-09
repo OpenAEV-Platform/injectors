@@ -444,7 +444,7 @@ def test_runtime_one_call_exact_compliance_argv_lifecycle_and_canaries(
     assert "excluded" not in callback["execution_message"][:raw_section_index]
     trace_identifiers = {
         "aws": ("123456789012", "eu-west-1"),
-        "azure": ("subscription-123", "Microsoft.Compute"),
+        "azure": ("subscription-123", "AzureCloud"),
         "gcp": ("acme-prod",),
         "kubernetes": ("acme-prod-cluster",),
     }
@@ -533,7 +533,7 @@ def test_runtime_one_call_exact_compliance_argv_lifecycle_and_canaries(
             "azure_client_id_present": True,
             "azure_client_secret_present": True,
             "azure_subscription_id": "subscription-123",
-            "azure_provider": "Microsoft.Compute",
+            "azure_provider": "AzureCloud",
         },
         "gcp": {
             "gcp_project_id": "acme-prod",
