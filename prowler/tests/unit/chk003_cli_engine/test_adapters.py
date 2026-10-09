@@ -113,6 +113,35 @@ def test_subprocess_start_error_does_not_expose_environment_values() -> None:
     assert environment_value not in (error.cause or "")
 
 
+@pytest.mark.parametrize(
+    "changes",
+    [
+        {"environment": (("AWS_ENDPOINT_URL", "https://example.com/\x00"),)},
+        {"arguments": ("-c", "pass", "nul\x00argument")},
+    ],
+)
+def test_subprocess_start_rejection_of_nul_bytes_is_enveloped(
+    changes: dict[str, Any],
+) -> None:
+    api = _api()
+    specification = _spec(
+        api,
+        **{
+            "executable": sys.executable,
+            "arguments": ("-c", "pass"),
+            "working_directory": None,
+            **changes,
+        },
+    )
+
+    error = api.SubprocessExecutor().execute(specification)
+
+    assert isinstance(error, api.ExecutionError)
+    assert error.kind == "process_start_failed"
+    assert error.cause == "ValueError"
+    assert "example.com" not in repr(error) and "nul" not in repr(error)
+
+
 _SLOW_CHILD = (
     "import sys, time; "
     "sys.stdout.buffer.write(b'partial' + bytes([255])); sys.stdout.flush(); "

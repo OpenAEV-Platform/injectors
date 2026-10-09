@@ -73,7 +73,9 @@ class SubprocessExecutor:
                 env=environment,
                 shell=False,
             )
-        except OSError as error:
+        except (OSError, ValueError) as error:
+            # ValueError covers arguments, environment or paths that the OS
+            # cannot accept, such as embedded NUL characters.
             return ExecutionError(
                 "process could not be started",
                 kind="process_start_failed",
