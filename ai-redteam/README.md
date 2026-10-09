@@ -126,12 +126,12 @@ docker compose up -d
 Create a `config.yml` from `config.yml.sample`, then install and run the injector:
 
 ```shell
-poetry install --extras prod
+poetry install
 poetry run python -m ai_redteam.openaev_ai_redteam
 ```
 
 > For local development against a checkout of [client-python](https://github.com/OpenAEV-Platform/client-python)
-> (cloned at `../../client-python`), use `poetry install --extras dev`. To enable the Garak and Promptfoo engines,
+> (cloned at `../../client-python`), use `poetry install --with dev,test`. To enable the Garak and Promptfoo engines,
 > also install `garak` (`pip install garak`) and `promptfoo` (`npm install -g promptfoo`).
 
 ## Usage
