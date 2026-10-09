@@ -107,9 +107,15 @@ class ProwlerClient:
         result: CommandResult | None = None
         primary_error: BaseException | None = None
         try:
+            if isinstance(check_filters, (str, bytes)):
+                raise ValueError("check filters must be a sequence of check names")
             filters = tuple(check_filters)
             if any(not isinstance(item, str) or not item.strip() for item in filters):
                 raise ValueError("check filters must be nonblank strings")
+            if any(item.startswith("-") or "\x00" in item for item in filters):
+                raise ValueError(
+                    "check filters must not be option-shaped or contain NUL"
+                )
 
             _safe_log(logging.INFO, "Preparing Prowler output workspace")
             workspace = self._output_workspace_factory.create()

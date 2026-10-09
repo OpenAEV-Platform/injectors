@@ -66,6 +66,16 @@ Feature: Synchronous Prowler CLI assessments
     When the client receives a blank check filter
     Then no Prowler command runs
 
+  Scenario Outline: Unsafe check filters are rejected before execution
+    When the client receives <filters> as check filters
+    Then no Prowler command runs
+
+    Examples:
+      | filters                                      |
+      | one plain string instead of a filter sequence |
+      | an option-shaped value such as --severity     |
+      | a value containing a NUL character            |
+
   Scenario: An unset AWS provider endpoint ignores the ambient parent endpoint
     Given AWS credentials without an optional session token
     And the parent process has an ambient AWS_ENDPOINT_URL

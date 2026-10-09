@@ -271,6 +271,28 @@ def test_blank_filters_are_rejected_without_execution(
     assert recording_engine.requests == []
 
 
+@pytest.mark.parametrize(
+    "filters",
+    [
+        "check-a",
+        ("check-a", "--severity", "low"),
+        ("-c",),
+        ("check\x00a",),
+    ],
+)
+def test_unsafe_filters_are_rejected_without_execution(
+    recording_engine: RecordingEngine,
+    provider_inputs: dict[str, Any],
+    filters: Any,
+) -> None:
+    client = _factory(recording_engine).create(_config(), provider_inputs["AWS"])
+
+    with pytest.raises(ValueError, match="check filters"):
+        client.run(filters)
+
+    assert recording_engine.requests == []
+
+
 def test_request_uses_exact_bounded_raw_execution_contract(
     recording_engine: RecordingEngine, provider_inputs: dict[str, Any]
 ) -> None:
