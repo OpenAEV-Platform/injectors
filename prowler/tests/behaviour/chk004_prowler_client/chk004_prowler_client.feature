@@ -154,3 +154,14 @@ Feature: Synchronous Prowler CLI assessments
   Scenario: Operators are told the residual plaintext-file risk
     When an operator reads the injector documentation
     Then contract-runtime persistence and crash residue are disclosed for containers, pods, POSIX, and Windows
+
+  Scenario Outline: Artifact and cleanup failures carry the completed command result
+    Given a Prowler run whose process completed
+    When <failure> after the process completed
+    Then the raised typed error carries that exact command result
+
+    Examples:
+      | failure                                |
+      | the controlled OCSF artifact is missing |
+      | output workspace cleanup fails         |
+

@@ -180,6 +180,7 @@ class ProwlerClient:
                     maximum_bytes=DEFAULT_MAXIMUM_ARTIFACT_BYTES
                 )
             except OutputArtifactError as error:
+                error.command_result = result
                 _safe_log(
                     logging.ERROR,
                     "Prowler output artifact capture failed",
@@ -211,7 +212,10 @@ class ProwlerClient:
                     workspace.cleanup()
                 except BaseException:
                     cleanup_failures.append(
-                        ("output_workspace", OutputWorkspaceCleanupError())
+                        (
+                            "output_workspace",
+                            OutputWorkspaceCleanupError(command_result=result),
+                        )
                     )
                 else:
                     _safe_log(logging.INFO, "Prowler output workspace cleaned")

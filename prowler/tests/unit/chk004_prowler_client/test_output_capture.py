@@ -190,6 +190,7 @@ def test_missing_success_artifact_raises_typed_error_and_cleans_workspace(
             ProwlerConfig(executable_path="/opt/prowler/bin/prowler"), _provider()
         )
     assert caught.value.kind == "missing"
+    assert caught.value.command_result is engine.result
     assert engine.requests is not None
     workspace_path = Path(
         engine.requests[0].arguments[
@@ -373,6 +374,7 @@ def test_cleanup_failure_after_success_surfaces_only_safe_cleanup_error(
 
     assert str(caught.value) == "temporary output workspace cleanup failed"
     assert "canary" not in repr(caught.value)
+    assert caught.value.command_result is engine.result
 
 
 @pytest.mark.parametrize("primary_kind", ["exception", "result"])
