@@ -5,12 +5,14 @@ RUN pip3 install --no-cache-dir poetry==2.3.2
 RUN apt-get update && apt-get upgrade -y && rm -rf /var/lib/apt/lists/*
 
 ARG installdir=/injector
+WORKDIR ${installdir}
 ADD . ${installdir}
 RUN cd ${installdir} && poetry build
 
 FROM python:3.13-slim AS runner
 
 ARG installdir=/injector
+WORKDIR ${installdir}
 
 # Declare the build argument
 ARG PYOAEV_GIT_BRANCH_OVERRIDE
@@ -22,7 +24,7 @@ RUN apt-get update && apt-get upgrade -y && rm -rf /var/lib/apt/lists/*
 RUN pip3 install --no-cache-dir -U pip certifi
 
 COPY --from=builder ${installdir} ${installdir}
-RUN cd ${installdir}/dist && pip3 install --no-cache-dir "$(ls *.whl)[prod]"
+RUN cd ${installdir}/dist && pip3 install --no-cache-dir "$(ls *.whl)"
 
 RUN if [ "${PYOAEV_GIT_BRANCH_OVERRIDE}" ] ; then \
         echo "Forcing specific version of client-python" && \

@@ -39,7 +39,7 @@ get_install_args() {
     args="$args --with test"
   # Check if dev optional-dependencies contain pytest
   elif sed -n '/\[project\.optional-dependencies\]/,/^\[/p' "$pyproject" 2>/dev/null | grep -q 'pytest'; then
-    args="$args --extras dev"
+    args="$args --with test,dev"
   # Check if poetry dev group contains pytest
   elif grep -q '\[tool\.poetry\.group\.dev' "$pyproject" 2>/dev/null; then
     if sed -n '/\[tool\.poetry\.group\.dev/,/^\[/p' "$pyproject" | grep -q 'pytest'; then
@@ -105,7 +105,7 @@ run_injector_tests() {
     install_args=$(get_install_args "$injector_dir")
     poetry install $install_args
 
-    echo "→ pup install coverage"
+    echo "→ pip install coverage"
     poetry run pip install -q coverage
 
     local test_rc=0
