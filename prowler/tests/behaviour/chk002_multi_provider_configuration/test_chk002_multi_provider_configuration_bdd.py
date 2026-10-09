@@ -266,6 +266,24 @@ def test_parse_provider_input_reports_only_value_free_issues(
     assert result.__context__ is None
 
 
+@pytest.mark.parametrize(
+    ("field", "value"),
+    [
+        ("aws_region", "eu-west-1\x00"),
+        ("aws_secret_access_key", "example-nul\x00secret"),
+        ("aws_endpoint_url", "https://aws.example.com/\x00"),
+    ],
+)
+def test_parse_provider_input_rejects_nul_characters(field: str, value: str) -> None:
+    """Reject NUL characters before they can reach a process environment."""
+    result = _when_parsed({**PROVIDER_PAYLOADS["aws"], field: value})
+
+    module = importlib.import_module("prowler.models.provider_inputs")
+    assert isinstance(result, module.ProviderInputError)
+    assert any(field in issue.location for issue in result.issues)
+    assert value not in str(result) and value not in repr(result.issues)
+
+
 @pytest.mark.parametrize("provider", sorted(PROVIDER_PAYLOADS))
 def test_parse_provider_input_accepts_valid_payload(provider: str) -> None:
     """Return the same strict provider model as the raw adapter."""

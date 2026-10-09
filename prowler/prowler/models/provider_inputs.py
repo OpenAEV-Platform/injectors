@@ -17,9 +17,11 @@ from pydantic import (
 
 
 def _reject_blank(value: object) -> object:
-    """Reject blank strings before they can enter a provider field."""
+    """Reject blank or NUL-bearing strings before they enter a provider field."""
     if isinstance(value, str) and not value.strip():
         raise ValueError("value must not be blank")
+    if isinstance(value, str) and "\x00" in value:
+        raise ValueError("value must not contain NUL characters")
     return value
 
 
@@ -62,6 +64,8 @@ class AwsProviderInput(ImmutableProviderInput):
             raise ValueError("AWS endpoint URL must not be blank")
         if any(character.isspace() for character in value):
             raise ValueError("AWS endpoint URL must not contain whitespace")
+        if "\x00" in value:
+            raise ValueError("AWS endpoint URL must not contain NUL characters")
         if "?" in value or "#" in value:
             raise ValueError("AWS endpoint URL must not include query or fragment")
         try:

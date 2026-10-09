@@ -70,6 +70,17 @@ Feature: Prowler multi-provider form input
     When the provider input is submitted
     Then the provider input is rejected without exposing the rejected credential
 
+  Scenario Outline: Reject NUL characters in provider input
+    Given an AWS form input whose <field> contains a NUL character
+    When the provider input is parsed at the provider boundary
+    Then the provider input is rejected at that field without echoing it
+
+    Examples:
+      | field                 |
+      | aws_region            |
+      | aws_secret_access_key |
+      | aws_endpoint_url      |
+
   Scenario Outline: Parse provider input without retaining submitted values
     Given a <rejected> provider form input carrying a credential
     When the provider input is parsed at the provider boundary
