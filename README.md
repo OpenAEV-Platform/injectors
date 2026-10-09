@@ -16,77 +16,43 @@ to work with all injectors at once, it is possible to install each injector with
 to each injector's individual README for instructions.
 
 In this repository, you need to have `python >= 3.11` and `poetry >= 2.1`. Install the development environment with:
-> [!IMPORTANT]
-> This repository uses "mutually exclusive extra markers" to manage the source of the pyoaev dependency. Make sure to
-> follow the steps to set up poetry correctly to handle this case:
-> https://python-poetry.org/docs/dependency-specification/#exclusive-extras
-
 ```shell
-poetry install --extras dev
+poetry install --with dev,test
 ```
 
 ### Creating a new injector
 
-#### Project setup
 Assuming a new injector by the name of `new_injector`, create a skeleton directory with:
 ```shell
 poetry new new_injector
 ```
 
-#### `pyoaev` dependency
-We wish to retain the possibility to develop simultaneously on `pyoaev` and injectors. We rely on PEP 508 environment
-markers to alternatively install a local path `pyoaev` dependency or a released version from PyPI; specifically the `extra`
-marker.
+### Add pyoaev as a requirement
 
-Navigate to the new directory and edit `pyproject.toml`.
+Inside the new directory `new_injector`, add `pyoaev` to the current requirements:
 ```shell
-vim new_injector/pyproject.toml
+poetry add pyoaev
 ```
-(or open the file in your favourite editor).
 
-Here's the expression for the pyoaev dependency, including the `extra` definition:
-```toml
-dependencies = [
-    "pyoaev (==<latest pyoaev release on PyPI>); extra != 'dev'",
-]
-[project.optional-dependencies]
-dev = [
-    "pyoaev @ ../../client-python",
-]
-[tool.poetry.dependencies]
-pyoaev = [
-    { markers = "extra != 'dev'", source = "PyPI" },
-    { markers = "extra == 'dev'", develop = true },
-]
+### Add injector\_common as a requirement
+
+`injector_common` is currently provided as part of this project and should be added as a local path requirement. This can be achieved by adding the following line to the dependencies included in the `pyproject.toml`:
+```
+injector_common = { path = "../injector_common", develop = true }
 ```
 
 ### Simultaneous development on pyoaev and an injector
-The injectors repository is set to assume that in the event of a simultaneous development work on both `pyoaev`
-and injectors, the `pyoaev` repository is cloned in a directory at the same level as the injectors root directory,
-and is named strictly `client-python`.
 
-Here's an example layout:
+Two options: local path requirement and install post-poetry.
+
+Regarding, the local path requirement, the approach is similar to `injector_common`. If both the `client-python` and the `injectors` git projects are in a same folder, the dependency for `pyoaev` can thus be the following:
 ```
-.
-├── client-python       <= mandatory dir name
-│   ├── docs
-│   ├── pyoaev
-│   ├── scripts
-│   └── test
-└── injectors          <= this repo root dir
-    ├── ai-redteam
-    ├── aws
-    ├── censys
-    ├── http-query
-    ├── injector_common
-    ├── netexec
-    ├── nmap
-    ├── nuclei
-    ├── shodan
-    ├── stratus
-    └── teams
+pyoaev = { path = "../../client-python", develop = true }
 ```
 
+Regarding the install post-poetry, after the `poetry install --with dev,test`, it is still possible to `pip install` a different version of pyoaev in your (virtual) environment, whether a local one or from github (e.g. to install the `head` of `main`).
+
+Note that for container-based development and testing, the `PYOAEV_GIT_BRANCH_OVERRIDE` build argument is available to override the `pyproject.toml`-pinned version with one from a git branch.
 
 ## Contributing
 

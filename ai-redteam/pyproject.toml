@@ -13,26 +13,25 @@ packages = [
 
 [tool.poetry.dependencies]
 python = "^3.11"
-requests = "^2.32.0"
+injector_common = { path = "../injector_common", develop = true }
 pyyaml = "^6.0.1"
+pyoaev = "3.261009.0"
+requests = "^2.32.0"
+pydantic = "^2.11.3"
 
-[[tool.poetry.dependencies.pyoaev]]
-markers = "extra == 'prod' and extra != 'dev'"
-version = "3.261009.0"
-source = "pypi"
+[tool.poetry.group.dev.dependencies]
+black = "^26.3.0"
+flake8 = "^7.3.0"
+isort = "^8.0.1"
+mypy = "^1.17.1"
+pip-audit = "^2.9.0"
+pre-commit = "^4.6.0"
+ruff = "^0.14.13"
 
-[[tool.poetry.dependencies.pyoaev]]
-markers = "extra == 'dev' and extra != 'prod'"
-path = "../../client-python"
-develop = true
-
-[tool.poetry.extras]
-prod = [
-    "pyoaev",
-]
-dev = [
-    "pyoaev",
-]
+[tool.poetry.group.test.dependencies]
+coverage = "^7.13.5"
+pytest = "^9.1.1"
+polyfactory = "^2.22.2"
 
 [tool.isort]
 profile = "black"
@@ -41,7 +40,7 @@ known_local_folder = [
 ]
 
 [tool.cmw]
-install-command = "poetry install --extras prod"
+install-command = "poetry install"
 config-dump-command = "poetry run python -m ai_redteam.openaev_ai_redteam --dump-config-schema"
 icon-path = "ai_redteam/img/icon-ai-redteam.png"
 
