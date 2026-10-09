@@ -71,7 +71,7 @@ jobs:
           working_directory: ~/openaev/<< parameters.injector_name >>
           command: |
             echo "Running tests for injector: << parameters.injector_name >>"
-            poetry install --extras dev
+            poetry install --with dev,test
             poetry run python -m unittest
   build_docker_images:
     working_directory: ~/openaev
