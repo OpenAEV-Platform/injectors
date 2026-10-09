@@ -45,7 +45,7 @@ class ProviderInvocationAdapter:
                 arguments=(
                     "azure",
                     "--sp-env-auth",
-                    "--subscription-id",
+                    "--subscription-ids",
                     provider.azure_subscription_id,
                     "--azure-region",
                     provider.azure_provider,
@@ -65,7 +65,7 @@ class ProviderInvocationAdapter:
                     "gcp",
                     "--credentials-file",
                     str(lease.path),
-                    "--project-id",
+                    "--project-ids",
                     provider.gcp_project_id,
                 ),
                 environment=(),

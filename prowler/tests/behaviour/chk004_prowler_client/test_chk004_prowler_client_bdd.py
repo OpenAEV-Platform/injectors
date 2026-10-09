@@ -135,7 +135,7 @@ def test_check_filters_are_separate_ordered_tokens(
             (
                 "azure",
                 "--sp-env-auth",
-                "--subscription-id",
+                "--subscription-ids",
                 "subscription-id",
                 "--azure-region",
                 "AzureUSGovernment",
@@ -148,7 +148,7 @@ def test_check_filters_are_separate_ordered_tokens(
                 "gcp",
                 "--credentials-file",
                 "<temporary>",
-                "--project-id",
+                "--project-ids",
                 "project-id",
             ),
             set(),
