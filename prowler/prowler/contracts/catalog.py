@@ -2,7 +2,7 @@
 
 from dataclasses import dataclass
 
-from .base import ProviderName, RouteFamily
+from .base import RouteFamily, RouteProviderName
 
 
 @dataclass(frozen=True)
@@ -10,7 +10,7 @@ class RouteDescriptor:
     """A route name and its provider/family metadata, never a platform UUID."""
 
     route_name: str
-    provider: ProviderName
+    provider: RouteProviderName
     family: RouteFamily
 
 
@@ -40,4 +40,11 @@ ROUTE_CATALOG: tuple[RouteDescriptor, ...] = (
     RouteDescriptor("mitre/aws", "aws", "compliance"),
     RouteDescriptor("mitre/azure", "azure", "compliance"),
     RouteDescriptor("mitre/gcp", "gcp", "compliance"),
+    RouteDescriptor("aws/select-service", "aws", "service"),
+    RouteDescriptor("aws/select-compliance", "aws", "compliance"),
+    RouteDescriptor("azure/select-service", "azure", "service"),
+    RouteDescriptor("azure/select-compliance", "azure", "compliance"),
+    RouteDescriptor("gcp/select-service", "gcp", "service"),
+    RouteDescriptor("gcp/select-compliance", "gcp", "compliance"),
+    RouteDescriptor("universal", "all", "universal"),
 )

@@ -1,22 +1,11 @@
 """Executable CIS compliance contracts for the four supported providers."""
 
-from prowler._core.prowler_client import ComplianceSelector
-
-from .base import ProviderName
 from .compliance import FixedComplianceContract
-
-_CIS_BY_PROVIDER: dict[ProviderName, ComplianceSelector] = {
-    "aws": "cis_3.0_aws",
-    "azure": "cis_3.0_azure",
-    "gcp": "cis_3.0_gcp",
-    "kubernetes": "cis_1.12_kubernetes",
-}
 
 
 class CisComplianceContract(FixedComplianceContract):
     """Execute one provider-owned CIS selector through the CHK.004 seam."""
 
-    compliance_by_provider = _CIS_BY_PROVIDER
     framework_name = "CIS"
 
 
@@ -62,3 +51,14 @@ class KubernetesCisContract(CisComplianceContract):
     provider = "kubernetes"
     label = "Prowler Kubernetes CIS"
     compliance_selector = "cis_1.12_kubernetes"
+
+
+CisComplianceContract.compliance_by_provider = {
+    contract.provider: contract.compliance_selector
+    for contract in (
+        AwsCisContract,
+        AzureCisContract,
+        GcpCisContract,
+        KubernetesCisContract,
+    )
+}

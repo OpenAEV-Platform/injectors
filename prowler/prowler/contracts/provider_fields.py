@@ -10,6 +10,9 @@ from pyoaev.contracts.contract_config import (
 )
 
 ProviderName = Literal["aws", "azure", "gcp", "kubernetes"]
+# Route identity also admits the universal route's "all" meta-provider,
+# which selects a credential provider at parse time and has no fields itself.
+RouteProviderName = Literal["aws", "azure", "gcp", "kubernetes", "all"]
 
 
 @dataclass(frozen=True, slots=True)
