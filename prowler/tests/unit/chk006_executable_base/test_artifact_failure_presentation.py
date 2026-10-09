@@ -195,9 +195,12 @@ def test_artifact_failures_have_distinct_safe_log_and_ui_diagnostics(
 
 
 class _CompletedProcessEngine:
-    """Report a completed Prowler process that wrote no OCSF artifact."""
+    """Report a completed Prowler process that left a nonregular OCSF artifact."""
 
     def run(self, request: Any) -> CommandResult:
+        arguments = list(request.arguments)
+        directory = Path(arguments[arguments.index("--output-directory") + 1])
+        (directory / "findings.ocsf.json").mkdir()
         return CommandResult(
             ExecutionSpecification.from_request(request),
             return_code=0,
@@ -227,7 +230,7 @@ class _RealClientContract(BaseProwlerContract):
 def test_real_client_artifact_failure_reports_process_evidence(
     tmp_path: Path,
 ) -> None:
-    """Classify a real client's missing artifact with the completed process evidence."""
+    """Classify a real client's artifact failure with the completed process evidence."""
     _RealClientContract.client_factory = ProwlerClientFactory(
         engine_factory=_CompletedProcessEngineFactory(),
         output_workspace_factory=TemporaryOutputWorkspaceFactory(
@@ -249,7 +252,7 @@ def test_real_client_artifact_failure_reports_process_evidence(
     trace = helper.api.inject.execution_callback.call_args.kwargs["data"][
         "execution_message"
     ]
-    assert metadata["failure_kind"] == "output_artifact_missing"
+    assert metadata["failure_kind"] == "output_artifact_nonregular"
     assert metadata["return_code"] == 0
     assert metadata["stdout_bytes"] == len(b"STDOUT-CONTENT-CANARY")
     assert metadata["stderr_bytes"] == len(b"STDERR-CONTENT-CANARY")
