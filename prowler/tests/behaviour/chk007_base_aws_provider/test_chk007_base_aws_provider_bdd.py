@@ -93,6 +93,7 @@ def test_default_registration_identity_fields_and_outputs() -> None:
     assert [item["contract_id"] for item in serialized] == [
         str(stable_contract_id("aws")),
         str(stable_contract_id("azure")),
+        str(stable_contract_id("gcp")),
     ]
     assert UUID(serialized[0]["contract_id"]) == expected_id
     assert expected_id.version == 5
