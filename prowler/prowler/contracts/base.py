@@ -9,7 +9,6 @@ from dataclasses import dataclass
 from typing import Any, ClassVar, Literal, Protocol
 from uuid import UUID
 
-from pydantic import ValidationError
 from pyoaev.contracts import ContractBuilder
 from pyoaev.contracts.contract_config import (
     Contract,
@@ -31,12 +30,13 @@ from prowler.models.findings import (
     map_command_result_with_evidence,
 )
 from prowler.models.provider_inputs import (
-    PROVIDER_INPUT_ADAPTER,
     AwsProviderInput,
     AzureProviderInput,
     GcpProviderInput,
     KubernetesProviderInput,
     ProviderInput,
+    ProviderInputError,
+    parse_provider_input,
 )
 from prowler.services.output_trace import generate
 
@@ -308,16 +308,11 @@ class BaseProwlerContract(ABC):
                     candidate[field] = None
         candidate["provider"] = self.provider
         try:
-            return PROVIDER_INPUT_ADAPTER.validate_python(candidate)
-        except ValidationError as error:
+            return parse_provider_input(candidate)
+        except ProviderInputError as error:
             issues = tuple(
-                ContractInputIssue(
-                    tuple(str(part) for part in item["loc"]),
-                    item["type"],
-                )
-                for item in error.errors(
-                    include_url=False, include_context=False, include_input=False
-                )
+                ContractInputIssue(issue.location, issue.error_type)
+                for issue in error.issues
             )
             raise ContractInputError.from_validation(issues) from None
 
