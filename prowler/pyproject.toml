@@ -62,7 +62,10 @@ module = ["prowler.__main__", "prowler.injector.*"]
 disable_error_code = ["import-untyped"]
 
 [[tool.mypy.overrides]]
-module = ["prowler.models.configs.config_loader"]
+module = [
+    "prowler.models.configs.config_loader",
+    "prowler.models.configs.injector_config_override",
+]
 # These two pyoaev base classes are consequently exposed to mypy as Any.
 disable_error_code = ["import-untyped", "misc"]
 
