@@ -392,7 +392,7 @@ def test_runtime_one_call_exact_service_argv_lease_outputs_and_canaries(
         "gcp",
         "--credentials-file",
         str(_CREDENTIAL_PATH),
-        "--project-id",
+        "--project-ids",
         "PROJECT-CANARY",
         "--services",
         service,
