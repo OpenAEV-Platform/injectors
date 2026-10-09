@@ -38,6 +38,16 @@ Feature: Safe local CLI engine orchestration
       | missing |
       | blank   |
 
+  Scenario Outline: Reject a provided blank PATH for an absolute executable
+    Given an absolute executable and a <path> PATH in the specification environment
+    When resolution runs
+    Then resolution fails before execution without searching for the executable
+
+    Examples:
+      | path       |
+      | empty      |
+      | whitespace |
+
   Scenario: Validate an absolute executable without PATH
     Given an absolute executable and no PATH in the specification environment
     When resolution validates that exact executable

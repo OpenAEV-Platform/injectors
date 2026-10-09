@@ -157,6 +157,28 @@ def test_relative_executable_requires_usable_specification_path(  # noqa: D103
     which.assert_not_called()
 
 
+@pytest.mark.parametrize("path", ["", " \t "])
+def test_absolute_executable_rejects_provided_blank_path(  # noqa: D103
+    recording_ports: RecordingPorts, path: str
+) -> None:
+    api = _api()
+    engine = api.CliEngine(
+        policy=recording_ports,
+        resolver=api.WhichBinaryResolver(),
+        executor=recording_ports,
+        parser=recording_ports,
+    )
+
+    with patch("shutil.which", return_value="/opt/tools/scanner") as which:
+        result = engine.run(
+            _request(api, executable="/opt/tools/scanner", environment={"PATH": path})
+        )
+
+    assert isinstance(result.error, api.ResolutionError)
+    assert recording_ports.events == ["policy"]
+    which.assert_not_called()
+
+
 def test_absolute_executable_does_not_require_path(  # noqa: D103
     recording_ports: RecordingPorts,
 ) -> None:
