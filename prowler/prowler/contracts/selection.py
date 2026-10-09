@@ -3,7 +3,7 @@
 import threading
 from collections.abc import Container, Mapping
 
-from pydantic import ValidationError
+from prowler.models.provider_inputs import ProviderInputError
 
 from .base import (
     BaseProwlerContract,
@@ -67,16 +67,10 @@ def selection_input_error(
     )
 
 
-def translate_validation_error(error: ValidationError) -> ContractInputError:
-    """Translate strict provider-model validation into contract input issues."""
+def translate_provider_input_error(error: ProviderInputError) -> ContractInputError:
+    """Translate value-free provider-model issues into contract input issues."""
     issues = tuple(
-        ContractInputIssue(
-            tuple(str(part) for part in item["loc"]),
-            item["type"],
-        )
-        for item in error.errors(
-            include_url=False, include_context=False, include_input=False
-        )
+        ContractInputIssue(issue.location, issue.error_type) for issue in error.issues
     )
     return ContractInputError.from_validation(issues)
 

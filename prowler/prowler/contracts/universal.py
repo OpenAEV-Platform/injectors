@@ -3,7 +3,6 @@
 from dataclasses import dataclass
 from typing import ClassVar, Mapping, Sequence, cast, get_args
 
-from pydantic import ValidationError
 from pyoaev.contracts.contract_config import ContractElement, ContractSelect
 from pyoaev.contracts.contract_utils import ContractCardinality
 
@@ -14,12 +13,13 @@ from prowler._core.prowler_client import (
 from prowler.models.configs.config_loader import ProwlerConfig
 from prowler.models.findings import OcsfPreviewRecord, OpenAevFinding
 from prowler.models.provider_inputs import (
-    PROVIDER_INPUT_ADAPTER,
     AwsProviderInput,
     AzureProviderInput,
     GcpProviderInput,
     KubernetesProviderInput,
     ProviderInput,
+    ProviderInputError,
+    parse_provider_input,
 )
 from prowler.services.output_trace import generate
 
@@ -40,7 +40,7 @@ from .selection import (
     parse_closed_select,
     parse_compliance_literal,
     selection_input_error,
-    translate_validation_error,
+    translate_provider_input_error,
 )
 
 __all__ = [
@@ -263,9 +263,9 @@ class UniversalProwlerContract(SelectionScopedContract):
         )
         candidate = self._build_provider_candidate(raw_input, selected_provider)
         try:
-            parsed = PROVIDER_INPUT_ADAPTER.validate_python(candidate)
-        except ValidationError as error:
-            raise translate_validation_error(error) from None
+            parsed = parse_provider_input(candidate)
+        except ProviderInputError as error:
+            raise translate_provider_input_error(error) from None
         self._selection.provider = selected_provider
         self._selection.service_route = service_route
         self._selection.compliance_route = compliance_route
