@@ -580,7 +580,7 @@ def test_service_selector_rejects_non_aws_before_engine() -> None:
         azure_client_secret="secret",
         azure_tenant_id="tenant",
         azure_subscription_id="subscription",
-        azure_provider="azure",
+        azure_provider="AzureCloud",
     )
 
     with pytest.raises(ValueError, match="AWS service selector"):
