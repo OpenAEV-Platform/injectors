@@ -454,7 +454,7 @@ class UniversalProwlerContract(SelectionScopedContract):
         return generate(
             route_name=self.route_name,
             provider_name=provider_name,
-            request_info=self.safe_request_info(provider),
+            request_info=self._trace_request_info(provider, is_error=is_error),
             findings=findings,
             raw_record_count=raw_record_count,
             raw_output_bytes=raw_output_bytes,

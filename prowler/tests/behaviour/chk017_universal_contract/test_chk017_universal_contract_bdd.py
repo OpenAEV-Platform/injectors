@@ -492,11 +492,12 @@ def test_failed_universal_run_preserves_error_unchanged() -> None:
     assert outcome.findings == ()
     assert outcome.findings == fixed_outcome.findings
     error_message = str(engine_error)
+    # The runtime renders failures with the parsed provider, as it does here.
     trace = universal.render_trace(
-        None, (), 0, is_error=True, error_message=error_message
+        parsed, (), 0, is_error=True, error_message=error_message
     )
     fixed_trace = fixed.render_trace(
-        None, (), 0, is_error=True, error_message=error_message
+        fixed_parsed, (), 0, is_error=True, error_message=error_message
     )
     # Parity with the fixed route: the closed error channel is forwarded, not blanked.
     assert error_message in trace
@@ -504,10 +505,12 @@ def test_failed_universal_run_preserves_error_unchanged() -> None:
     # The held provider is reported on the failure path, never the all meta-token.
     assert "provider: gcp" in trace
     assert "provider: gcp" in fixed_trace
-    # The held scope stays hidden on the failure path (closed markers only).
-    assert "filters: unselected" in trace
-    assert "selected_provider: unselected" in trace
-    assert "gcp/compute" not in trace
+    # The held selection is reported on the failure path as closed literals...
+    assert "selected_provider: gcp" in trace
+    assert "service=gcp/compute" in trace
+    # ...while submitted form values stay out of every failure trace.
+    assert "project-id" not in trace
+    assert "project-id" not in fixed_trace
 
 
 def test_registry_admits_full_32_catalog_with_stable_identities() -> None:

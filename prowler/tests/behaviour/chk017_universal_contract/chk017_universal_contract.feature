@@ -75,6 +75,7 @@ Feature: CHK.017 universal selectable contract
     When its parsed provider input is executed
     Then the outcome preserves the error and returns no findings
     And the failure classification, trace, and callback behave as on the fixed gcp service route
+    And the failure trace reports the selected provider and scope but no submitted form values
 
   Scenario: The registry admits the full 32-contract catalog with stable identities
     Given the universal contract registered with the existing thirty-one
