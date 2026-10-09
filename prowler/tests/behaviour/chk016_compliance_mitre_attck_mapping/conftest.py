@@ -74,7 +74,7 @@ def provider_forms() -> dict[str, dict[str, object]]:
             "azure_client_id": "CANARY-AZURE-CLIENT",
             "azure_client_secret": "CANARY-AZURE-SECRET",
             "azure_subscription_id": "subscription-123",
-            "azure_provider": "Microsoft.Compute",
+            "azure_provider": "AzureCloud",
         },
         "gcp": {
             "gcp_service_account_json": "CANARY-GCP-SERVICE-ACCOUNT",
