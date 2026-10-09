@@ -103,7 +103,7 @@ def test_selector_type_is_exactly_iam_or_compute() -> None:
     assert get_args(selector_type) == ("iam", "compute")
 
 
-def test_registry_has_exact_eleven_canonical_contracts_without_selector_fields() -> (
+def test_registry_has_exact_fifteen_canonical_contracts_without_selector_fields() -> (
     None
 ):
     """The public surface is ordered, stable, labelled, and not user-selectable."""
@@ -119,12 +119,16 @@ def test_registry_has_exact_eleven_canonical_contracts_without_selector_fields()
         "azure/iam",
         "azure/storage",
         *(item[0] for item in _ROUTES),
+        "cis/aws",
+        "cis/azure",
+        "cis/gcp",
+        "cis/kubernetes",
     )
 
     assert [item["contract_id"] for item in serialized] == [
         str(stable_contract_id(route)) for route in routes
     ]
-    for item, (route, service) in zip(serialized[9:], _ROUTES, strict=True):
+    for item, (route, service) in zip(serialized[9:11], _ROUTES, strict=True):
         content = json.loads(item["contract_content"])
         assert service.casefold() in content["label"]["en"].casefold()
         assert tuple(field["key"] for field in content["fields"]) == (

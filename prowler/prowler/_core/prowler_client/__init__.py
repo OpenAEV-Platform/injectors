@@ -10,6 +10,7 @@ from .client import (
 from .contracts import (
     AwsServiceSelector,
     AzureServiceSelector,
+    ComplianceSelector,
     GcpServiceSelector,
     ServiceSelector,
 )
@@ -43,6 +44,7 @@ __all__ = [
     "OutputArtifactError",
     "OutputWorkspaceCleanupError",
     "OutputWorkspacePreparationError",
+    "ComplianceSelector",
     "AwsServiceSelector",
     "AzureServiceSelector",
     "GcpServiceSelector",
