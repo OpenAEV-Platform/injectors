@@ -3,6 +3,8 @@
 # ruff: noqa: D103
 
 import importlib
+import sys
+import time
 from dataclasses import FrozenInstanceError
 from typing import Any
 from unittest.mock import patch
@@ -306,6 +308,39 @@ def test_post_capture_output_size_classification_is_honest(  # noqa: D103
     assert result.error.kind == "output_too_large_after_capture"
     assert result.stdout == payload and result.error.stdout == payload
     assert recording_ports.events == ["policy", "resolution", "execution"]
+
+
+_ENDLESS_OUTPUT = (
+    "import sys\n"
+    "while True:\n"
+    "    sys.stdout.buffer.write(b'o' * 4096); sys.stdout.flush()\n"
+    "    sys.stderr.buffer.write(b'e' * 4096); sys.stderr.flush()\n"
+)
+
+
+def test_output_beyond_accepted_size_stops_the_process_while_capturing() -> None:
+    api = _api()
+    specification = api.ExecutionSpecification.from_request(
+        _request(
+            api,
+            executable=sys.executable,
+            arguments=["-c", _ENDLESS_OUTPUT],
+            working_directory=None,
+            input_bytes=b"",
+            timeout_seconds=60.0,
+            maximum_accepted_output_bytes=10_000,
+        )
+    )
+
+    started = time.monotonic()
+    outcome = api.SubprocessExecutor().execute(specification)
+    elapsed = time.monotonic() - started
+
+    assert isinstance(outcome, api.ExecutionError)
+    assert outcome.kind == "output_too_large_after_capture"
+    assert len(outcome.stdout) + len(outcome.stderr) == 10_000
+    assert set(outcome.stdout) <= {ord("o")} and set(outcome.stderr) <= {ord("e")}
+    assert elapsed < 15
 
 
 @pytest.mark.parametrize(

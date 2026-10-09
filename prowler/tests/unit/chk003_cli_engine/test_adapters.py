@@ -4,6 +4,7 @@
 
 import importlib
 import subprocess
+import sys
 from typing import Any
 from unittest.mock import patch
 
@@ -33,30 +34,37 @@ def _spec(api: Any, **changes: Any) -> Any:
     return api.ExecutionSpecification(**values)
 
 
+_ECHO_CHILD = (
+    "import sys; "
+    "sys.stdout.buffer.write(sys.stdin.buffer.read() + sys.argv[1].encode()); "
+    "sys.stderr.buffer.write(bytes([0]))"
+)
+
+
 def test_subprocess_executor_forces_shell_false_and_preserves_bytes() -> (
     None
 ):  # noqa: D103
     api = _api()
-    specification = _spec(api)
-    completed = subprocess.CompletedProcess(
-        args=specification.argv, returncode=0, stdout=b"\xff", stderr=b"\x00"
+    specification = _spec(
+        api,
+        executable=sys.executable,
+        arguments=("-c", _ECHO_CHILD, "a;b"),
+        working_directory=None,
     )
 
-    with patch("subprocess.run", return_value=completed) as run:
+    with patch("subprocess.Popen", wraps=subprocess.Popen) as popen:
         outcome = api.SubprocessExecutor().execute(specification)
 
-    run.assert_called_once_with(
-        ("tool", "a;b"),
-        input=b"\x00\xff",
+    popen.assert_called_once_with(
+        (sys.executable, "-c", _ECHO_CHILD, "a;b"),
+        stdin=subprocess.PIPE,
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
-        cwd="/work",
+        cwd=None,
         env={"KEY": "value"},
-        timeout=2.5,
         shell=False,
-        check=False,
     )
-    assert outcome == api.ProcessOutcome(0, b"\xff", b"\x00")
+    assert outcome == api.ProcessOutcome(0, b"\x00\xffa;b", b"\x00")
 
 
 def test_subprocess_executor_alone_unwraps_secret_into_fresh_exact_environment() -> (
@@ -64,20 +72,24 @@ def test_subprocess_executor_alone_unwraps_secret_into_fresh_exact_environment()
 ):
     api = _api()
     source_environment = (("LANG", "C"), ("TOKEN", SecretStr("exec-secret")))
-    specification = _spec(api, environment=source_environment)
-    completed = subprocess.CompletedProcess(
-        args=specification.argv, returncode=0, stdout=b"", stderr=b""
+    specification = _spec(
+        api,
+        executable=sys.executable,
+        arguments=("-c", "import os, sys; sys.stdout.write(os.environ['TOKEN'])"),
+        environment=source_environment,
+        working_directory=None,
+        input_bytes=b"",
     )
 
-    with patch("subprocess.run", return_value=completed) as run:
+    with patch("subprocess.Popen", wraps=subprocess.Popen) as popen:
         outcome = api.SubprocessExecutor().execute(specification)
 
-    passed_environment = run.call_args.kwargs["env"]
+    passed_environment = popen.call_args.kwargs["env"]
     assert passed_environment == {"LANG": "C", "TOKEN": "exec-secret"}
     assert passed_environment is not source_environment
     assert dict(specification.environment)["TOKEN"].get_secret_value() == "exec-secret"
-    assert run.call_args.kwargs["shell"] is False
-    assert outcome == api.ProcessOutcome(0, b"", b"")
+    assert popen.call_args.kwargs["shell"] is False
+    assert outcome == api.ProcessOutcome(0, b"exec-secret", b"")
 
 
 def test_subprocess_start_error_does_not_expose_environment_values() -> None:
@@ -92,7 +104,7 @@ def test_subprocess_start_error_does_not_expose_environment_values() -> None:
     )
 
     with patch(
-        "subprocess.run", side_effect=OSError(f"failed near {environment_value}")
+        "subprocess.Popen", side_effect=OSError(f"failed near {environment_value}")
     ):
         error = api.SubprocessExecutor().execute(specification)
 
@@ -101,19 +113,29 @@ def test_subprocess_start_error_does_not_expose_environment_values() -> None:
     assert environment_value not in (error.cause or "")
 
 
+_SLOW_CHILD = (
+    "import sys, time; "
+    "sys.stdout.buffer.write(b'partial' + bytes([255])); sys.stdout.flush(); "
+    "sys.stderr.buffer.write(b'slow' + bytes([0])); sys.stderr.flush(); "
+    "time.sleep(30)"
+)
+
+
 def test_subprocess_start_and_timeout_errors_are_enveloped() -> None:  # noqa: D103
     api = _api()
-    specification = _spec(api)
     executor = api.SubprocessExecutor()
-    with patch("subprocess.run", side_effect=OSError("missing")):
-        started = executor.execute(specification)
-    with patch(
-        "subprocess.run",
-        side_effect=subprocess.TimeoutExpired(
-            specification.argv, 2.5, output=b"partial\xff", stderr=b"slow\x00"
-        ),
-    ):
-        timed_out = executor.execute(specification)
+    with patch("subprocess.Popen", side_effect=OSError("missing")):
+        started = executor.execute(_spec(api))
+    timed_out = executor.execute(
+        _spec(
+            api,
+            executable=sys.executable,
+            arguments=("-c", _SLOW_CHILD),
+            working_directory=None,
+            input_bytes=b"",
+            timeout_seconds=1.0,
+        )
+    )
 
     assert started.kind == "process_start_failed"
     assert started.stdout == b"" and started.stderr == b""

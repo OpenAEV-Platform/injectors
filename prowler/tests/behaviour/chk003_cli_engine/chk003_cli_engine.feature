@@ -113,6 +113,13 @@ Feature: Safe local CLI engine orchestration
     When the engine handles the process outcome
     Then it returns an output_too_large_after_capture execution error with exact bytes
 
+  Scenario: Stop a process whose output exceeds the accepted size while capturing
+    Given a process that keeps writing to stdout and stderr without ending
+    And an accepted output size far smaller than its output
+    When the subprocess executor runs it with a long timeout
+    Then the process is stopped long before the timeout
+    And an output_too_large_after_capture error keeps exactly the accepted bytes
+
   Scenario Outline: Apply the accepted output size to stdout and stderr combined
     Given captured stdout of <stdout> bytes and stderr of <stderr> bytes
     And an accepted output size of 4 bytes
