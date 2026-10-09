@@ -18,6 +18,8 @@ from prowler._core.prowler_client import (
     OutputArtifactError,
     OutputWorkspaceCleanupError,
     OutputWorkspacePreparationError,
+    ProwlerClientFactory,
+    TemporaryOutputWorkspaceFactory,
 )
 from prowler.contracts import (
     BaseProwlerContract,
@@ -190,3 +192,66 @@ def test_artifact_failures_have_distinct_safe_log_and_ui_diagnostics(
         "SECRET-CANARY",
     ):
         assert canary not in rendered
+
+
+class _CompletedProcessEngine:
+    """Report a completed Prowler process that wrote no OCSF artifact."""
+
+    def run(self, request: Any) -> CommandResult:
+        return CommandResult(
+            ExecutionSpecification.from_request(request),
+            return_code=0,
+            stdout=b"STDOUT-CONTENT-CANARY",
+            stderr=b"STDERR-CONTENT-CANARY",
+        )
+
+
+class _CompletedProcessEngineFactory:
+    def create(self) -> _CompletedProcessEngine:
+        return _CompletedProcessEngine()
+
+
+class _RealClientContract(BaseProwlerContract):
+    contract_id = _CONTRACT_ID
+    external_id = "prowler:aws"
+    route_name = "aws"
+    provider = "aws"
+    family = "base"
+    label = "Real client artifact failure test"
+    client_factory: ClassVar[ProwlerClientFactory]
+
+    def __init__(self) -> None:
+        super().__init__(self.client_factory)
+
+
+def test_real_client_artifact_failure_reports_process_evidence(
+    tmp_path: Path,
+) -> None:
+    """Classify a real client's missing artifact with the completed process evidence."""
+    _RealClientContract.client_factory = ProwlerClientFactory(
+        engine_factory=_CompletedProcessEngineFactory(),
+        output_workspace_factory=TemporaryOutputWorkspaceFactory(
+            platform_name="nt", temporary_root=tmp_path
+        ),
+    )
+    injector, helper = _runtime(OutputArtifactError("missing"))
+    injector = ProwlerInjector(
+        injector.config,
+        helper,
+        registry=ProwlerContracts((_RealClientContract,)),
+    )
+
+    injector.process_message(_message())
+
+    metadata = helper.injector_logger.local_logger.error.call_args.kwargs["extra"][
+        "attributes"
+    ]
+    trace = helper.api.inject.execution_callback.call_args.kwargs["data"][
+        "execution_message"
+    ]
+    assert metadata["failure_kind"] == "output_artifact_missing"
+    assert metadata["return_code"] == 0
+    assert metadata["stdout_bytes"] == len(b"STDOUT-CONTENT-CANARY")
+    assert metadata["stderr_bytes"] == len(b"STDERR-CONTENT-CANARY")
+    assert "Return code: 0" in trace
+    assert "STDOUT-CONTENT-CANARY" not in trace
