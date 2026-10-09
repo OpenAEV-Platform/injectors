@@ -58,6 +58,7 @@ _NARROWING_OPTIONS = frozenset(
         "--compliance",
     }
 )
+_EMPTY_OCSF_ARTIFACT = b"[]"
 _LOGGER = logging.getLogger(__name__)
 
 
@@ -180,6 +181,11 @@ class ProwlerClient:
                     maximum_bytes=DEFAULT_MAXIMUM_ARTIFACT_BYTES
                 )
             except OutputArtifactError as error:
+                if error.kind == "missing":
+                    # Prowler writes no OCSF artifact when a successful scan has
+                    # no findings: report that as an empty OCSF result.
+                    _safe_log(logging.INFO, "Prowler reported no findings")
+                    return replace(result, parsed=_EMPTY_OCSF_ARTIFACT)
                 error.command_result = result
                 _safe_log(
                     logging.ERROR,

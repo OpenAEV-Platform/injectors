@@ -172,10 +172,10 @@ def test_engine_failure_result_is_unchanged_and_ignores_partial_artifact(
     assert captured is original
 
 
-def test_missing_success_artifact_raises_typed_error_and_cleans_workspace(
+def test_missing_success_artifact_reports_empty_result_and_cleans_workspace(
     caplog: pytest.LogCaptureFixture, tmp_path: Path
 ) -> None:
-    caplog.set_level(logging.ERROR)
+    caplog.set_level(logging.INFO)
     engine = _Engine(_result())
 
     def no_artifact(request: Any) -> CommandResult:
@@ -185,12 +185,13 @@ def test_missing_success_artifact_raises_typed_error_and_cleans_workspace(
         return engine.result
 
     engine.run = no_artifact  # type: ignore[method-assign]
-    with pytest.raises(_api().OutputArtifactError) as caught:
-        _factory(engine, tmp_path).run(
-            ProwlerConfig(executable_path="/opt/prowler/bin/prowler"), _provider()
-        )
-    assert caught.value.kind == "missing"
-    assert caught.value.command_result is engine.result
+    result = _factory(engine, tmp_path).run(
+        ProwlerConfig(executable_path="/opt/prowler/bin/prowler"), _provider()
+    )
+
+    # Prowler writes no OCSF artifact when a successful scan has no findings.
+    assert result.parsed == b"[]"
+    assert result.return_code == 0 and result.error is None
     assert engine.requests is not None
     workspace_path = Path(
         engine.requests[0].arguments[
@@ -198,10 +199,34 @@ def test_missing_success_artifact_raises_typed_error_and_cleans_workspace(
         ]
     )
     assert not workspace_path.exists()
-    assert [record.getMessage() for record in caplog.records] == [
-        "Prowler output artifact capture failed"
+    assert "Prowler reported no findings" in [
+        record.getMessage() for record in caplog.records
     ]
-    assert caplog.records[0].levelno == logging.ERROR
+    assert all(record.levelno < logging.ERROR for record in caplog.records)
+
+
+def test_nonregular_success_artifact_raises_typed_error_with_command_result(
+    tmp_path: Path,
+) -> None:
+    engine = _Engine(_result())
+
+    def directory_artifact(request: Any) -> CommandResult:
+        if engine.requests is None:
+            engine.requests = []
+        engine.requests.append(request)
+        directory = Path(
+            request.arguments[request.arguments.index("--output-directory") + 1]
+        )
+        (directory / "findings.ocsf.json").mkdir()
+        return engine.result
+
+    engine.run = directory_artifact  # type: ignore[method-assign]
+    with pytest.raises(_api().OutputArtifactError) as caught:
+        _factory(engine, tmp_path).run(
+            ProwlerConfig(executable_path="/opt/prowler/bin/prowler"), _provider()
+        )
+    assert caught.value.kind == "nonregular"
+    assert caught.value.command_result is engine.result
 
 
 def test_request_has_small_console_limit_and_exact_ordered_output_controls(

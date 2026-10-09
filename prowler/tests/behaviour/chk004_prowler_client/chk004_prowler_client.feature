@@ -90,9 +90,14 @@ Feature: Synchronous Prowler CLI assessments
 
   Scenario: Successful execution requires one safe bounded artifact
     Given Prowler reports success
-    When the exact output artifact is missing, nonregular, a symlink, unreadable, or oversized
+    When the exact output artifact is nonregular, a symlink, unreadable, or oversized
     Then the client fails with a typed closed artifact error
     But an exact-limit regular artifact is accepted
+
+  Scenario: A successful run without an artifact reports no findings
+    Given Prowler reports success
+    When it wrote no OCSF artifact, as Prowler does when a scan yields no findings
+    Then the client returns the successful result with an empty OCSF artifact
 
   Scenario: Failed execution ignores partial output artifacts
     When Prowler returns code 3, another nonzero code, or an engine error
@@ -162,6 +167,6 @@ Feature: Synchronous Prowler CLI assessments
 
     Examples:
       | failure                                |
-      | the controlled OCSF artifact is missing |
+      | the controlled OCSF artifact is not a regular file |
       | output workspace cleanup fails         |
 
