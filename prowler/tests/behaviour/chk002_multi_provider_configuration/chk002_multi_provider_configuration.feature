@@ -70,6 +70,28 @@ Feature: Prowler multi-provider form input
     When the provider input is submitted
     Then the provider input is rejected without exposing the rejected credential
 
+  Scenario: Accept a kubeconfig with inline credentials only
+    Given a Kubernetes form input whose kubeconfig carries an inline token and CA data
+    When the provider input is parsed at the provider boundary
+    Then the provider input is accepted
+
+  Scenario Outline: Reject kubeconfig settings that can run commands or read host files
+    Given a Kubernetes form input whose kubeconfig contains <setting>
+    When the provider input is parsed at the provider boundary
+    Then the provider input is rejected at the kubeconfig without echoing it
+
+    Examples:
+      | setting                              |
+      | an exec credential plugin            |
+      | an auth-provider command             |
+      | a token file path                    |
+      | a client certificate file path       |
+      | a certificate authority file path    |
+      | an unknown top-level setting         |
+      | a YAML alias                         |
+      | a document that is not a mapping     |
+      | invalid YAML                         |
+
   Scenario Outline: Accept only Prowler-supported Azure cloud environments
     Given an Azure form input whose cloud environment is <environment>
     When the provider input is parsed at the provider boundary

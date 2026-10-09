@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from typing import Annotated, Any, Literal, NoReturn
 from urllib.parse import urlsplit
 
+import yaml
 from pydantic import (
     BaseModel,
     BeforeValidator,
@@ -29,6 +30,91 @@ NonBlankStr = Annotated[str, BeforeValidator(_reject_blank)]
 NonBlankSecretStr = Annotated[SecretStr, BeforeValidator(_reject_blank)]
 # The cloud environments accepted by Prowler's --azure-region option.
 AzureCloudEnvironment = Literal["AzureCloud", "AzureChinaCloud", "AzureUSGovernment"]
+
+
+# Kubeconfig settings allowed for injection-supplied credentials. Anything else,
+# including exec and auth-provider plugins and every file-path setting, could run
+# commands or read files on the injector host when Prowler loads the kubeconfig.
+_KUBECONFIG_TOP_LEVEL_KEYS = frozenset(
+    {
+        "apiVersion",
+        "kind",
+        "clusters",
+        "contexts",
+        "users",
+        "current-context",
+        "preferences",
+    }
+)
+_KUBECONFIG_ENTRY_KEYS = {
+    "clusters": (
+        "cluster",
+        frozenset(
+            {
+                "server",
+                "certificate-authority-data",
+                "insecure-skip-tls-verify",
+                "tls-server-name",
+            }
+        ),
+    ),
+    "contexts": ("context", frozenset({"cluster", "user", "namespace"})),
+    "users": (
+        "user",
+        frozenset({"token", "client-certificate-data", "client-key-data"}),
+    ),
+}
+_UNSAFE_KUBECONFIG = "kubeconfig contains unsupported settings"
+
+
+def _is_scalar_setting(key: str, value: object) -> bool:
+    if key == "insecure-skip-tls-verify":
+        return isinstance(value, bool)
+    return isinstance(value, str)
+
+
+def _check_kubeconfig_entries(
+    section: object, entry_key: str, allowed: frozenset[str]
+) -> None:
+    if section is None:
+        return
+    if not isinstance(section, list):
+        raise ValueError(_UNSAFE_KUBECONFIG)
+    for entry in section:
+        if not isinstance(entry, dict) or not set(entry) <= {"name", entry_key}:
+            raise ValueError(_UNSAFE_KUBECONFIG)
+        if not isinstance(entry.get("name", ""), str):
+            raise ValueError(_UNSAFE_KUBECONFIG)
+        settings = entry.get(entry_key, {})
+        if not isinstance(settings, dict) or not set(settings) <= allowed:
+            raise ValueError(_UNSAFE_KUBECONFIG)
+        if not all(_is_scalar_setting(key, value) for key, value in settings.items()):
+            raise ValueError(_UNSAFE_KUBECONFIG)
+
+
+def _reject_unsafe_kubeconfig(value: SecretStr) -> SecretStr:
+    """Accept only inline kubeconfig settings that cannot run commands or read files."""
+    text = value.get_secret_value()
+    try:
+        for event in yaml.parse(text, Loader=yaml.SafeLoader):
+            if isinstance(event, yaml.AliasEvent) or getattr(event, "anchor", None):
+                raise ValueError(_UNSAFE_KUBECONFIG)
+        document = yaml.safe_load(text)
+    except yaml.YAMLError:
+        raise ValueError("kubeconfig must be valid YAML") from None
+    if (
+        not isinstance(document, dict)
+        or not set(document) <= _KUBECONFIG_TOP_LEVEL_KEYS
+    ):
+        raise ValueError(_UNSAFE_KUBECONFIG)
+    for key in ("apiVersion", "kind", "current-context"):
+        if key in document and not isinstance(document[key], str):
+            raise ValueError(_UNSAFE_KUBECONFIG)
+    if not isinstance(document.get("preferences", {}), dict):
+        raise ValueError(_UNSAFE_KUBECONFIG)
+    for section, (entry_key, allowed) in _KUBECONFIG_ENTRY_KEYS.items():
+        _check_kubeconfig_entries(document.get(section), entry_key, allowed)
+    return value
 
 
 class ImmutableProviderInput(BaseModel):
@@ -113,6 +199,12 @@ class KubernetesProviderInput(ImmutableProviderInput):
     provider: Literal["kubernetes"]
     kubernetes_kubeconfig: NonBlankSecretStr
     kubernetes_context: NonBlankStr
+
+    @field_validator("kubernetes_kubeconfig", mode="after")
+    @classmethod
+    def validate_kubeconfig(cls, value: SecretStr) -> SecretStr:
+        """Reject kubeconfigs that could execute plugins or reach host files."""
+        return _reject_unsafe_kubeconfig(value)
 
 
 ProviderInput = Annotated[

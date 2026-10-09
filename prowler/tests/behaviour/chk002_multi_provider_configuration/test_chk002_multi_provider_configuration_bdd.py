@@ -266,6 +266,108 @@ def test_parse_provider_input_reports_only_value_free_issues(
     assert result.__context__ is None
 
 
+_KUBECONFIG_HEAD = (
+    "apiVersion: v1\n"
+    "kind: Config\n"
+    "clusters:\n"
+    "- name: c\n"
+    "  cluster:\n"
+    "    server: https://k8s.example:6443\n"
+)
+_KUBECONFIG_CONTEXT = (
+    "contexts:\n"
+    "- name: ctx\n"
+    "  context: {cluster: c, user: u, namespace: default}\n"
+    "current-context: ctx\n"
+)
+
+
+def _kubeconfig(user: str, *, cluster_extra: str = "", head: str = "") -> str:
+    return (
+        head
+        + _KUBECONFIG_HEAD
+        + cluster_extra
+        + _KUBECONFIG_CONTEXT
+        + "users:\n- name: u\n  user:\n"
+        + user
+    )
+
+
+def test_inline_credential_kubeconfig_is_accepted() -> None:
+    """Accept inline token, client key pair and CA data."""
+    kubeconfig = _kubeconfig(
+        "    token: inline-token\n"
+        "    client-certificate-data: Q0VSVA==\n"
+        "    client-key-data: S0VZ\n",
+        cluster_extra=(
+            "    certificate-authority-data: Q0E=\n"
+            "    tls-server-name: k8s.example\n"
+            "    insecure-skip-tls-verify: false\n"
+        ),
+    )
+
+    result = _when_parsed(
+        {**PROVIDER_PAYLOADS["kubernetes"], "kubernetes_kubeconfig": kubeconfig}
+    )
+
+    assert result.kubernetes_kubeconfig.get_secret_value() == kubeconfig
+
+
+_KUBECONFIG_CANARY = "/opt/KUBECONFIG-CANARY"
+
+
+@pytest.mark.parametrize(
+    "kubeconfig",
+    [
+        _kubeconfig(
+            "    exec:\n"
+            "      apiVersion: client.authentication.k8s.io/v1beta1\n"
+            f"      command: {_KUBECONFIG_CANARY}\n"
+        ),
+        _kubeconfig(
+            "    auth-provider:\n"
+            "      name: gcp\n"
+            f"      config: {{cmd-path: {_KUBECONFIG_CANARY}}}\n"
+        ),
+        _kubeconfig(f"    tokenFile: {_KUBECONFIG_CANARY}\n"),
+        _kubeconfig(f"    client-certificate: {_KUBECONFIG_CANARY}\n"),
+        _kubeconfig(
+            "    token: t\n",
+            cluster_extra=f"    certificate-authority: {_KUBECONFIG_CANARY}\n",
+        ),
+        _kubeconfig("    token: t\n", head=f"extensions: [{_KUBECONFIG_CANARY}]\n"),
+        _KUBECONFIG_HEAD.replace("- name: c", "- &a\n  name: c")
+        + f"users: [*a]\n# {_KUBECONFIG_CANARY}\n",
+        f"{_KUBECONFIG_CANARY}\n",
+        f"apiVersion: [{_KUBECONFIG_CANARY}\n",
+    ],
+    ids=[
+        "exec-plugin",
+        "auth-provider-command",
+        "token-file",
+        "client-certificate-file",
+        "certificate-authority-file",
+        "unknown-top-level",
+        "yaml-alias",
+        "not-a-mapping",
+        "invalid-yaml",
+    ],
+)
+def test_kubeconfig_settings_that_run_commands_or_read_files_are_rejected(
+    kubeconfig: str,
+) -> None:
+    """Reject kubeconfigs that could execute plugins or reach host files."""
+    result = _when_parsed(
+        {**PROVIDER_PAYLOADS["kubernetes"], "kubernetes_kubeconfig": kubeconfig}
+    )
+
+    module = importlib.import_module("prowler.models.provider_inputs")
+    assert isinstance(result, module.ProviderInputError)
+    assert any("kubernetes_kubeconfig" in issue.location for issue in result.issues)
+    assert _KUBECONFIG_CANARY not in str(result)
+    assert _KUBECONFIG_CANARY not in repr(result.issues)
+
+
 @pytest.mark.parametrize(
     ("environment", "accepted"),
     [
