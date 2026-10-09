@@ -11,7 +11,7 @@ from prowler._core.cli_engine import CommandResult
 _MAX_PREVIEW_VALUE_LENGTH = 512
 
 
-@dataclass(frozen=True)
+@dataclass(eq=False)
 class OcsfDecodeError(ValueError):
     """Safe structured failure while decoding raw OCSF output."""
 
@@ -29,7 +29,7 @@ class OcsfDecodeError(ValueError):
         return f"{self.code}: {self.message}{suffix}"
 
 
-@dataclass(frozen=True)
+@dataclass(eq=False)
 class OcsfMappingError(OcsfDecodeError):
     """Safe structured failure while mapping one OCSF record."""
 

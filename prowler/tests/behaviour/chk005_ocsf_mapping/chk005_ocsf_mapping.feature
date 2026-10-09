@@ -135,3 +135,9 @@ Feature: Map raw Prowler OCSF output to OpenAEV findings
     Given a nested OCSF finding violating a required or typed nested path
     When the finding is mapped
     Then the structured mapping error carries only code, record index, and source path
+
+  Scenario: Deliver structured OCSF errors across context manager boundaries
+    Given an OCSF finding with an unsupported compliance value
+    When the finding is mapped inside a context manager boundary
+    Then the caller receives the structured mapping error itself
+    And the error remains hashable like any other exception

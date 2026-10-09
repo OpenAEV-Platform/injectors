@@ -14,17 +14,8 @@ _CANARY = "CANARY-SECRET-VALUE"
 
 
 def _mapped(record: dict[str, Any], record_index: int = 0) -> OpenAevFinding:
-    """Map a record expected to succeed, surfacing absent behavior clearly.
-
-    The frozen OcsfMappingError dataclass cannot survive the contextlib
-    traceback reassignment in this host's pytest runner, so an escaped
-    structured error is converted into an explicit failure carrying its
-    rendered code, record index, and source path.
-    """
-    try:
-        return map_ocsf_finding(record, record_index=record_index)
-    except OcsfMappingError as error:
-        pytest.fail(f"dual-shape behavior absent: {error}")
+    """Map a record expected to succeed."""
+    return map_ocsf_finding(record, record_index=record_index)
 
 
 def _nested_record() -> dict[str, Any]:

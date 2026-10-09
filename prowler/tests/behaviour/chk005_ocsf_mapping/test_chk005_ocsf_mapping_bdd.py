@@ -1,5 +1,6 @@
 """Raw-pytest bindings for the CHK.005 feature."""
 
+import contextlib
 import json
 from dataclasses import FrozenInstanceError
 from typing import Any, Callable
@@ -261,3 +262,23 @@ def test_empty_resources_has_structured_mapping_error(
     assert caught.value.code == "missing_source_path"
     assert caught.value.source_path == "resources[0]"
     assert caught.value.record_index == 2
+
+
+def test_structured_mapping_error_survives_context_manager_boundaries(
+    copy_record: Callable[[], dict[str, Any]],
+) -> None:
+    """Deliver the structured error even when a context manager re-raises it."""
+
+    @contextlib.contextmanager
+    def boundary() -> Any:
+        yield
+
+    record = copy_record()
+    record["unmapped"]["compliance"] = {"CIS": ["1.1", 42]}
+
+    with pytest.raises(OcsfMappingError) as caught:
+        with boundary():
+            map_ocsf_finding(record)
+
+    assert caught.value.code == "invalid_source_value"
+    assert hash(caught.value) == hash(caught.value)
