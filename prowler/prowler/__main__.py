@@ -2,6 +2,7 @@
 
 import logging
 import sys
+from pathlib import Path
 
 from pydantic import ValidationError
 from pyoaev.helpers import OpenAEVConfigHelper, OpenAEVInjectorHelper
@@ -17,11 +18,15 @@ def main() -> None:
     logger = logging.getLogger(__name__)
     try:
         config = ConfigLoader()
+        # Load the injector icon for the helper
+        icon_bytes = (
+            Path(__file__).parents[1] / str(config.injector.icon_filepath)
+        ).read_bytes()
         helper = OpenAEVInjectorHelper(
             config=OpenAEVConfigHelper.from_configuration_object(
                 config.to_daemon_config()
             ),
-            icon=None,
+            icon=icon_bytes,
         )
         ProwlerInjector(config=config, helper=helper).start()
     except ValidationError:

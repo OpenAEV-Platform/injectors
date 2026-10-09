@@ -15,7 +15,7 @@ class InjectorConfigOverride(ConfigLoaderCollector):
         description="Name of the injector.",
     )
     icon_filepath: str | None = Field(
-        default=None,
+        default="prowler/img/icon-prowler.png",
         description="Path to the icon file",
     )
     author: str | None = Field(

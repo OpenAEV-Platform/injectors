@@ -146,6 +146,24 @@ def test_foundation_startup_registers_no_assessment_contracts(
     _then_zero_contracts_are_registered(config, helper)
 
 
+def test_startup_registers_the_injector_with_its_bundled_icon(
+    standard_injector_environment: None, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Registration uploads the bundled icon instead of an empty icon part."""
+    helper = Mock()
+    injector = Mock()
+    monkeypatch.setattr(prowler_main, "OpenAEVInjectorHelper", helper)
+    monkeypatch.setattr(prowler_main, "ProwlerInjector", injector)
+
+    prowler_main.main()
+
+    icon = helper.call_args.kwargs["icon"]
+    assert isinstance(icon, bytes)
+    assert icon.startswith(b"\x89PNG\r\n\x1a\n")
+    assert icon == (PROJECT_ROOT / "prowler" / "img" / "icon-prowler.png").read_bytes()
+    injector.return_value.start.assert_called_once_with()
+
+
 @pytest.mark.parametrize(
     ("failure_type", "expected_exit_status"),
     (("configuration error", 2), ("unexpected exception", 1)),

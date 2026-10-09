@@ -16,6 +16,11 @@ Feature: Prowler catalog registration and project scaffold
     When the Prowler injector starts
     Then it registers with an empty contract catalog
 
+  Scenario: Startup registers the injector with its bundled icon
+    Given the Prowler injector configuration
+    When the Prowler injector registers with OpenAEV at startup
+    Then the registration carries the bundled Prowler icon as PNG bytes
+
   Scenario Outline: Startup failures are logged without sensitive exception details
     Given startup fails with a <failure type> containing a sensitive canary
     When the Prowler injector handles the startup failure
