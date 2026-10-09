@@ -113,6 +113,18 @@ Feature: Safe local CLI engine orchestration
     When the engine handles the process outcome
     Then it returns an output_too_large_after_capture execution error with exact bytes
 
+  Scenario Outline: Apply the accepted output size to stdout and stderr combined
+    Given captured stdout of <stdout> bytes and stderr of <stderr> bytes
+    And an accepted output size of 4 bytes
+    When the engine handles the process outcome
+    Then the output is <outcome>
+
+    Examples:
+      | stdout | stderr | outcome  |
+      | 2      | 2      | accepted |
+      | 3      | 2      | rejected |
+      | 0      | 5      | rejected |
+
   Scenario: Preserve arbitrary bytes without decoding
     Given stdin, stdout, and stderr contain invalid UTF-8, NULs, and newlines
     When execution succeeds with the raw parser

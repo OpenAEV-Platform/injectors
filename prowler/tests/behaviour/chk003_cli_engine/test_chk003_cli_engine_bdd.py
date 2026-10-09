@@ -308,6 +308,27 @@ def test_post_capture_output_size_classification_is_honest(  # noqa: D103
     assert recording_ports.events == ["policy", "resolution", "execution"]
 
 
+@pytest.mark.parametrize(
+    ("stdout", "stderr", "rejected"),
+    [(b"xx", b"ee", False), (b"xxx", b"ee", True), (b"", b"eeeee", True)],
+)
+def test_output_size_limit_applies_to_combined_streams(  # noqa: D103
+    recording_ports: RecordingPorts, stdout: bytes, stderr: bytes, rejected: bool
+) -> None:
+    api = _api()
+    recording_ports.execution_result = api.ProcessOutcome(0, stdout, stderr)
+
+    result = _engine(api, recording_ports).run(
+        _request(api, maximum_accepted_output_bytes=4)
+    )
+
+    if rejected:
+        assert result.error.kind == "output_too_large_after_capture"
+        assert (result.stdout, result.stderr) == (stdout, stderr)
+    else:
+        assert result.error is None
+
+
 def test_arbitrary_bytes_remain_exact(
     recording_ports: RecordingPorts,
 ) -> None:  # noqa: D103

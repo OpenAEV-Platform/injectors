@@ -63,7 +63,7 @@ class CliEngine:
                 ),
             )
         if (
-            max(len(execution.stdout), len(execution.stderr))
+            len(execution.stdout) + len(execution.stderr)
             > specification.maximum_accepted_output_bytes
         ):
             return replace(
