@@ -25,7 +25,7 @@ PROVIDER_PAYLOADS: dict[str, dict[str, str]] = {
         "azure_client_id": "example-client",
         "azure_client_secret": "example-azure-secret",
         "azure_subscription_id": "example-subscription",
-        "azure_provider": "Microsoft.Compute",
+        "azure_provider": "AzureCloud",
     },
     "gcp": {
         "provider": "gcp",
@@ -264,6 +264,31 @@ def test_parse_provider_input_reports_only_value_free_issues(
     )
     assert result.__cause__ is None
     assert result.__context__ is None
+
+
+@pytest.mark.parametrize(
+    ("environment", "accepted"),
+    [
+        ("AzureCloud", True),
+        ("AzureChinaCloud", True),
+        ("AzureUSGovernment", True),
+        ("Microsoft.Compute", False),
+        ("azurecloud", False),
+    ],
+)
+def test_azure_cloud_environment_is_a_prowler_supported_value(
+    environment: str, accepted: bool
+) -> None:
+    """Accept only the cloud environments Prowler's --azure-region allows."""
+    result = _when_parsed({**PROVIDER_PAYLOADS["azure"], "azure_provider": environment})
+
+    module = importlib.import_module("prowler.models.provider_inputs")
+    if accepted:
+        assert result.azure_provider == environment
+    else:
+        assert isinstance(result, module.ProviderInputError)
+        assert any("azure_provider" in issue.location for issue in result.issues)
+        assert environment not in str(result)
 
 
 @pytest.mark.parametrize(

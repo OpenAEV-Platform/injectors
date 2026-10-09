@@ -27,6 +27,8 @@ def _reject_blank(value: object) -> object:
 
 NonBlankStr = Annotated[str, BeforeValidator(_reject_blank)]
 NonBlankSecretStr = Annotated[SecretStr, BeforeValidator(_reject_blank)]
+# The cloud environments accepted by Prowler's --azure-region option.
+AzureCloudEnvironment = Literal["AzureCloud", "AzureChinaCloud", "AzureUSGovernment"]
 
 
 class ImmutableProviderInput(BaseModel):
@@ -94,7 +96,7 @@ class AzureProviderInput(ImmutableProviderInput):
     azure_client_id: NonBlankStr
     azure_client_secret: NonBlankSecretStr
     azure_subscription_id: NonBlankStr
-    azure_provider: NonBlankStr
+    azure_provider: AzureCloudEnvironment
 
 
 class GcpProviderInput(ImmutableProviderInput):

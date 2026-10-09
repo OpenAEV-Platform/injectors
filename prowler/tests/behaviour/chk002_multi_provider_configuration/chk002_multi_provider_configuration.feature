@@ -70,6 +70,19 @@ Feature: Prowler multi-provider form input
     When the provider input is submitted
     Then the provider input is rejected without exposing the rejected credential
 
+  Scenario Outline: Accept only Prowler-supported Azure cloud environments
+    Given an Azure form input whose cloud environment is <environment>
+    When the provider input is parsed at the provider boundary
+    Then the provider input is <outcome>
+
+    Examples:
+      | environment       | outcome  |
+      | AzureCloud        | accepted |
+      | AzureChinaCloud   | accepted |
+      | AzureUSGovernment | accepted |
+      | Microsoft.Compute | rejected |
+      | azurecloud        | rejected |
+
   Scenario Outline: Reject NUL characters in provider input
     Given an AWS form input whose <field> contains a NUL character
     When the provider input is parsed at the provider boundary
