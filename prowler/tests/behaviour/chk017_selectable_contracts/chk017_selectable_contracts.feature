@@ -43,7 +43,7 @@ Feature: CHK.017 selectable service and compliance contracts
 
   Scenario: A missing select value is rejected before any client call
     Given any selectable contract
-    When form input omits the select key, supplies a non-list value, or an empty list
+    When form input omits the select key or supplies an empty string, an empty list, or null
     Then the parse fails with select_missing before any client call
     And no submitted value appears in the error
 
