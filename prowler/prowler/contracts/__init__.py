@@ -20,6 +20,7 @@ from .base import (
     ContractInputIssue,
     ProviderName,
     RouteFamily,
+    RouteProviderName,
 )
 from .catalog import ROUTE_CATALOG, RouteDescriptor
 from .cis import (
@@ -112,6 +113,7 @@ __all__ = [
     "DEFAULT_PROWLER_CONTRACTS",
     "PROWLER_CONTRACT_NAMESPACE",
     "ProviderName",
+    "RouteProviderName",
     "ProwlerContracts",
     "ROUTE_CATALOG",
     "RouteDescriptor",

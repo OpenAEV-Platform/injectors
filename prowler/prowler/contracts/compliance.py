@@ -33,7 +33,9 @@ class FixedComplianceContract(BaseProwlerContract):
     ) -> ContractExecutionOutcome:
         """Reject unsupported route metadata before one compliance client call."""
         if (
-            self.compliance_by_provider.get(self.provider) != self.compliance_selector
+            self.provider == "all"
+            or self.compliance_by_provider.get(self.provider)
+            != self.compliance_selector
             or provider.provider != self.provider
         ):
             raise ValueError(f"unsupported {self.framework_name} compliance selection")

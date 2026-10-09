@@ -2,7 +2,7 @@
 
 from dataclasses import dataclass
 
-from .base import ProviderName, RouteFamily
+from .base import RouteFamily, RouteProviderName
 
 
 @dataclass(frozen=True)
@@ -10,7 +10,7 @@ class RouteDescriptor:
     """A route name and its provider/family metadata, never a platform UUID."""
 
     route_name: str
-    provider: ProviderName
+    provider: RouteProviderName
     family: RouteFamily
 
 

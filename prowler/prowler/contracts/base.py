@@ -45,6 +45,7 @@ from prowler.models.provider_inputs import (
 from prowler.services.output_trace import generate
 
 from .provider_fields import ProviderName as ProviderName
+from .provider_fields import RouteProviderName as RouteProviderName
 from .provider_fields import build_provider_fields as _build_provider_fields
 
 __all__ = [
@@ -54,6 +55,7 @@ __all__ = [
     "ContractInputError",
     "ContractInputIssue",
     "ProviderName",
+    "RouteProviderName",
     "RouteFamily",
 ]
 
@@ -144,7 +146,7 @@ class BaseProwlerContract(ABC):
 
     contract_id: ClassVar[str]
     external_id: ClassVar[str]
-    provider: ClassVar[ProviderName]
+    provider: ClassVar[RouteProviderName]
     family: ClassVar[RouteFamily]
     label: ClassVar[str]
     check_filters: ClassVar[tuple[str, ...]] = ()
@@ -177,6 +179,8 @@ class BaseProwlerContract(ABC):
 
     def build_provider_fields(self) -> list[ContractElement]:
         """Declare exact provider model fields using current plaintext controls."""
+        if self.provider == "all":
+            raise TypeError("the universal route must declare its own provider fields")
         return _build_provider_fields(self.provider)
 
     def build_outputs(self) -> list[ContractOutputElement]:
