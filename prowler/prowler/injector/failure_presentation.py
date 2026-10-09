@@ -14,6 +14,7 @@ from prowler.injector.failure_taxonomy import (
 if TYPE_CHECKING:
     from prowler.injector.lifecycle_metadata import LifecycleMetadataBuilder
     from prowler.injector.openaev_prowler import ProwlerInjector
+    from prowler.models.provider_inputs import ProviderInput
 
 
 class FailurePresenter:
@@ -70,6 +71,7 @@ class FailurePresenter:
         failure: _FailurePresentation,
         *,
         inject_id: str,
+        provider: ProviderInput | None = None,
     ) -> str:
         """Render once, falling back to the same closed code and guidance."""
         safe_error = self._plain_safe_error(
@@ -79,7 +81,7 @@ class FailurePresenter:
             return safe_error
         try:
             return contract.render_trace(
-                None,
+                provider,
                 (),
                 duration,
                 is_error=True,

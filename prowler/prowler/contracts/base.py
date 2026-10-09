@@ -69,6 +69,12 @@ class ClientFactoryPort(Protocol):
         """Run one assessment and return the exact command result."""
 
 
+# Request-summary keys derived from submitted form values.
+_FORM_VALUE_REQUEST_KEYS = frozenset(
+    {"account", "region", "subscription", "requested_provider", "project", "context"}
+)
+
+
 @dataclass(frozen=True)
 class ContractInputIssue:
     """Value-free location and category for one rejected form input."""
@@ -241,6 +247,19 @@ class BaseProwlerContract(ABC):
             info["context"] = provider.kubernetes_context
         return info
 
+    def _trace_request_info(
+        self, provider: ProviderInput | None, *, is_error: bool
+    ) -> dict[str, object]:
+        """Return trace request context; error traces carry no form values."""
+        request_info = self.safe_request_info(provider)
+        if not is_error:
+            return request_info
+        return {
+            key: value
+            for key, value in request_info.items()
+            if key not in _FORM_VALUE_REQUEST_KEYS
+        }
+
     def render_trace(
         self,
         provider: ProviderInput | None,
@@ -257,7 +276,7 @@ class BaseProwlerContract(ABC):
         return generate(
             route_name=self.route_name,
             provider_name=self.provider,
-            request_info=self.safe_request_info(provider),
+            request_info=self._trace_request_info(provider, is_error=is_error),
             findings=findings,
             raw_record_count=raw_record_count,
             raw_output_bytes=raw_output_bytes,

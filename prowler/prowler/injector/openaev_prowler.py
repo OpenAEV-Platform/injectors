@@ -164,6 +164,7 @@ class ProwlerInjector:
                         duration,
                         failure,
                         inject_id=run.safe_inject_id,
+                        provider=provider,
                     ),
                     duration,
                 )
@@ -192,6 +193,7 @@ class ProwlerInjector:
                     duration,
                     failure,
                     inject_id=run.safe_inject_id,
+                    provider=run.provider,
                 ),
                 duration,
             )

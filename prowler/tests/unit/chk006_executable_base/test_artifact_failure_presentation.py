@@ -255,3 +255,5 @@ def test_real_client_artifact_failure_reports_process_evidence(
     assert metadata["stderr_bytes"] == len(b"STDERR-CONTENT-CANARY")
     assert "Return code: 0" in trace
     assert "STDOUT-CONTENT-CANARY" not in trace
+    assert "eu-west-1" not in trace  # error traces carry no form values
+    assert "SECRET-CANARY" not in trace
