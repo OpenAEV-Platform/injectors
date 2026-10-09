@@ -24,7 +24,7 @@ PROVIDER_FORMS: dict[str, dict[str, str]] = {
         "gcp_project_id": "project-id",
     },
     "kubernetes": {
-        "kubernetes_kubeconfig": "kubeconfig-canary",
+        "kubernetes_kubeconfig": "apiVersion: v1\nkind: Config\nusers:\n- name: u\n  user:\n    token: kubeconfig-canary\n",
         "kubernetes_context": "context-canary",
     },
 }
