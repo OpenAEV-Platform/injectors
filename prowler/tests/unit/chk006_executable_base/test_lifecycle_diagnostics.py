@@ -30,9 +30,9 @@ from prowler.contracts import (
 from prowler.injector import ProwlerInjector
 from prowler.models.configs.config_loader import (
     ConfigLoader,
-    InjectorConfig,
     ProwlerConfig,
 )
+from prowler.models.configs.injector_config_override import InjectorConfigOverride
 from prowler.models.findings import OcsfMappingError, OpenAevFinding
 
 _LISTENER_START = "[PROWLER_INJECTOR] - Listener starting"
@@ -154,7 +154,9 @@ def _config(executable: str = "/opt/prowler/bin/prowler") -> ConfigLoader:
             openaev=ConfigLoaderOAEV(
                 url="http://127.0.0.1:8080", token="runtime-test-token"
             ),
-            injector=InjectorConfig(id="prowler-injector", name="Prowler diagnostics"),
+            injector=InjectorConfigOverride(
+                id="prowler-injector", name="Prowler diagnostics"
+            ),
             prowler=ProwlerConfig(executable_path=Path(executable)),
         ),
     )

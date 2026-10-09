@@ -28,9 +28,9 @@ from prowler.contracts import (
 from prowler.injector import ProwlerInjector
 from prowler.models.configs.config_loader import (
     ConfigLoader,
-    InjectorConfig,
     ProwlerConfig,
 )
+from prowler.models.configs.injector_config_override import InjectorConfigOverride
 
 _CONTRACT_ID = str(stable_contract_id("aws"))
 
@@ -70,7 +70,7 @@ def _runtime(error: Exception) -> tuple[ProwlerInjector, Mock]:
             openaev=ConfigLoaderOAEV(
                 url="http://127.0.0.1:8080", token="runtime-test-token"
             ),
-            injector=InjectorConfig(id="prowler-injector"),
+            injector=InjectorConfigOverride(id="prowler-injector"),
             prowler=ProwlerConfig(executable_path=Path("/opt/prowler/bin/prowler")),
         ),
     )
