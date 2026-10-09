@@ -382,7 +382,9 @@ def test_credential_file_is_closed_before_engine_execution(
     _factory(recording_engine).run(_config(), provider_inputs["Kubernetes"])
 
     # Reading in RecordingEngine proves the writer released its handle before run().
-    assert recording_engine.observed_contents == ["kube-secret"]
+    assert recording_engine.observed_contents == [
+        "apiVersion: v1\nkind: Config\nusers:\n- name: u\n  user:\n    token: kube-secret\n"
+    ]
 
 
 def test_credential_lease_cleanup_is_idempotent(tmp_path: Path) -> None:

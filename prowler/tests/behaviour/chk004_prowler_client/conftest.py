@@ -116,7 +116,9 @@ def provider_inputs() -> dict[str, Any]:
         ),
         "Kubernetes": KubernetesProviderInput(
             provider="kubernetes",
-            kubernetes_kubeconfig=SecretStr("kube-secret"),
+            kubernetes_kubeconfig=SecretStr(
+                "apiVersion: v1\nkind: Config\nusers:\n- name: u\n  user:\n    token: kube-secret\n"
+            ),
             kubernetes_context="cluster-context",
         ),
     }
