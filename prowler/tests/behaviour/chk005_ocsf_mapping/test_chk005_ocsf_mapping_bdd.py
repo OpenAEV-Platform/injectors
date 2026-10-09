@@ -282,3 +282,19 @@ def test_structured_mapping_error_survives_context_manager_boundaries(
 
     assert caught.value.code == "invalid_source_value"
     assert hash(caught.value) == hash(caught.value)
+
+
+def test_compliance_error_paths_never_contain_decoded_keys(
+    copy_record: Callable[[], dict[str, Any]],
+) -> None:
+    """Locate invalid compliance values by position, never by artifact key."""
+    canary = "CANARY-COMPLIANCE-KEY"
+    record = copy_record()
+    record["unmapped"]["compliance"] = {"CIS": ["1.1"], canary: ["2.1", 42]}
+
+    with pytest.raises(OcsfMappingError) as caught:
+        map_ocsf_finding(record, record_index=0)
+
+    assert caught.value.source_path == "unmapped.compliance[1][1]"
+    rendered = (str(caught.value), repr(caught.value), caught.value.source_path)
+    assert all(canary not in text for text in rendered)

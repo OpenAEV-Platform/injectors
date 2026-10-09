@@ -119,7 +119,7 @@ def test_invalid_compliance_leaf_has_structured_error(
 
     assert caught.value.code == "invalid_source_value"
     assert caught.value.record_index == 3
-    assert caught.value.source_path == "unmapped.compliance.CIS[1]"
+    assert caught.value.source_path == "unmapped.compliance[0][1]"
 
 
 @pytest.mark.parametrize(

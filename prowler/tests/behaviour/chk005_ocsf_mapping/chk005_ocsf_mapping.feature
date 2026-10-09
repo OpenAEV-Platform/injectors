@@ -141,3 +141,10 @@ Feature: Map raw Prowler OCSF output to OpenAEV findings
     When the finding is mapped inside a context manager boundary
     Then the caller receives the structured mapping error itself
     And the error remains hashable like any other exception
+
+  Scenario: Keep compliance error paths free of decoded keys
+    Given an OCSF finding whose compliance mapping uses a secret-bearing key
+    And that key holds an unsupported compliance value
+    When the finding is mapped
+    Then the mapping error locates the value by position only
+    And the key appears in no rendered error or source path

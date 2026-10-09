@@ -353,7 +353,7 @@ def _flatten_compliance(
         return [value]
     if isinstance(value, Mapping):
         flattened = []
-        for key, nested in value.items():
+        for ordinal, (key, nested) in enumerate(value.items()):
             if nested is True:
                 flattened.append(str(key))
             elif nested is False or nested is None:
@@ -362,7 +362,7 @@ def _flatten_compliance(
                 flattened.extend(
                     f"{key}:{tag}"
                     for tag in _flatten_compliance(
-                        nested, f"{source_path}.{key}", record_index
+                        nested, f"{source_path}[{ordinal}]", record_index
                     )
                 )
         return flattened
