@@ -1,11 +1,9 @@
 """Executable CHK.010 complete-scope Kubernetes base contract."""
 
-from collections.abc import Sequence
 from dataclasses import replace
 from typing import ClassVar
 
 from prowler.models.configs.config_loader import ProwlerConfig
-from prowler.models.findings import OpenAevFinding
 from prowler.models.provider_inputs import ProviderInput
 
 from .base import BaseProwlerContract, ContractExecutionOutcome
@@ -21,17 +19,6 @@ class KubernetesBaseContract(BaseProwlerContract):
     family = "base"
     label = "Prowler Kubernetes"
     check_filters = ()
-
-    @staticmethod
-    def _provider_findings(
-        findings: Sequence[OpenAevFinding],
-    ) -> tuple[OpenAevFinding, ...]:
-        """Retain source order while normalizing matching provider labels."""
-        return tuple(
-            finding.model_copy(update={"cloud_provider": "kubernetes"})
-            for finding in findings
-            if finding.cloud_provider.casefold() == "kubernetes"
-        )
 
     def execute(
         self, config: ProwlerConfig, provider: ProviderInput

@@ -27,9 +27,4 @@ class GcpBaseContract(BaseProwlerContract):
         outcome = super().execute(config, provider)
         if outcome.error is not None or outcome.command_result.return_code != 0:
             return outcome
-        findings = tuple(
-            finding.model_copy(update={"cloud_provider": "gcp"})
-            for finding in outcome.findings
-            if finding.cloud_provider.casefold() == "gcp"
-        )
-        return replace(outcome, findings=findings)
+        return replace(outcome, findings=self._provider_findings(outcome.findings))
