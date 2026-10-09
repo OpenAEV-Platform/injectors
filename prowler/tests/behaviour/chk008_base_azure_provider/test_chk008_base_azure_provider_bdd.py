@@ -218,10 +218,10 @@ def test_fake_engine_proves_exact_azure_subprocess_arguments(
     assert tuple(request.arguments) == (
         "azure",
         "--sp-env-auth",
-        "--subscription-id",
+        "--subscription-ids",
         "subscription-123",
         "--azure-region",
-        "Microsoft.Compute",
+        "AzureCloud",
         "--severity",
         "critical",
         "high",
@@ -419,7 +419,7 @@ def test_runtime_success_and_safe_error_are_end_to_end(
         assert event.metadata["azure_client_id_present"] is True
         assert event.metadata["azure_client_secret_present"] is True
         assert event.metadata["azure_subscription_id"] == "subscription-123"
-        assert event.metadata["azure_provider"] == "Microsoft.Compute"
+        assert event.metadata["azure_provider"] == "AzureCloud"
     success_metadata = logs[5].metadata
     assert success_metadata is not None
     assert success_metadata["status"] == "SUCCESS"
