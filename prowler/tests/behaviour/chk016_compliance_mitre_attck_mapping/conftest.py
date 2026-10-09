@@ -81,7 +81,7 @@ def provider_forms() -> dict[str, dict[str, object]]:
             "gcp_project_id": "acme-prod",
         },
         "kubernetes": {
-            "kubernetes_kubeconfig": "CANARY-KUBECONFIG-CONTENT",
+            "kubernetes_kubeconfig": "apiVersion: v1\nkind: Config\nusers:\n- name: u\n  user:\n    token: CANARY-KUBECONFIG-CONTENT\n",
             "kubernetes_context": "acme-prod-cluster",
         },
     }
