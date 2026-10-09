@@ -261,6 +261,58 @@ _SUMMARY_BY_FAILURE_KIND = {
     "callback_failed": "The terminal OpenAEV callback could not be delivered.",
     "unexpected_failure": "The assessment failed at an unexpected internal boundary.",
 }
+# Fixed human-readable messages of the credential error taxonomy, split into
+# what happened (summary) and what to do (guidance). For the codes raised by
+# pyoaev, "<summary> <guidance>" is exactly the CredentialResolutionError
+# message. ``{reference}`` is the credential reference id, never a secret.
+_CREDENTIAL_FAILURE_KIND_BY_CODE = {
+    "CREDENTIAL_NOT_FOUND": "credential_not_found",
+    "CREDENTIAL_INACTIVE": "credential_inactive",
+    "CREDENTIAL_ACCESS_DENIED": "credential_access_denied",
+    "CREDENTIAL_INCOMPATIBLE": "credential_incompatible",
+    "CREDENTIAL_MISSING": "credential_missing",
+}
+_CREDENTIAL_CODE_BY_FAILURE_KIND = {
+    kind: code for code, kind in _CREDENTIAL_FAILURE_KIND_BY_CODE.items()
+}
+_CREDENTIAL_SUMMARY_BY_FAILURE_KIND = {
+    "credential_not_found": (
+        "The credential configured on this inject ({reference}) no longer exists "
+        "at the moment of execution."
+    ),
+    "credential_inactive": (
+        "The credential {reference} is inactive at the moment of execution."
+    ),
+    "credential_access_denied": (
+        "This execution is not entitled to use the credential configured on this "
+        "inject."
+    ),
+    "credential_incompatible": (
+        "The credential {reference} is not compatible with this inject."
+    ),
+    "credential_missing": (
+        "No credential is available for this inject: no credential is selected "
+        "and the credential fields are empty."
+    ),
+}
+_CREDENTIAL_GUIDANCE_BY_FAILURE_KIND = {
+    "credential_not_found": (
+        "Select an existing credential on the inject, then run it again."
+    ),
+    "credential_inactive": (
+        "Update or replace this credential, then run the inject again."
+    ),
+    "credential_access_denied": "Contact your Cloud platform administrator",
+    "credential_incompatible": (
+        "Select a credential of the type expected by the inject, then run it again."
+    ),
+    "credential_missing": "Select a credential on the inject, then run it again.",
+}
+_CREDENTIAL_INCOMPATIBLE_TYPED_GUIDANCE = (
+    "Select a credential of type {type} on the inject, then run it again."
+)
+_CREDENTIAL_REFERENCE_PATTERN = re.compile(r"[A-Za-z0-9._:-]{1,128}")
+_CREDENTIAL_REFERENCE_SENTINEL = "unknown reference"
 _ISSUE_FIELD_LABELS = {
     "provider": "Provider",
     "aws_access_key_id": "AWS access key ID",
@@ -425,6 +477,18 @@ class _InputValidationFailure(_FailurePresentation):
 
 
 @dataclass(frozen=True)
+class _CredentialFailure(_InputValidationFailure):
+    """Credential failure with its taxonomy code and reference id.
+
+    Issues are only carried when the failure is detected on the form input
+    (no credential available).
+    """
+
+    credential_error_code: str | None = None
+    credential_reference: str | None = None
+
+
+@dataclass(frozen=True)
 class _OcsfDecodeFailure(_FailurePresentation):
     """Raised OCSF failure with the safe decode and mapping evidence."""
 
@@ -585,6 +649,8 @@ def _terminal_callback(
 # (metadata key, display label) pairs shared by the failure metadata
 # projection and the plain safe-error rendering.
 _FAILURE_FIELDS: tuple[tuple[str, str], ...] = (
+    ("credential_error_code", "Credential error code"),
+    ("credential_reference", "Credential reference"),
     ("configured_executable_path", "Configured executable"),
     ("actual_executable_path", "Actual executable"),
     ("executable_is_absolute", "Executable absolute"),
