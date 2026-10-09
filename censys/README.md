@@ -120,7 +120,7 @@ poetry run python -m censys_injector.openaev_censys
 ```
 
 > For local development against a checkout of [client-python](https://github.com/OpenAEV-Platform/client-python)
-> (cloned next to this repository), use `poetry install --extras dev`.
+> (cloned next to this repository), use `poetry install --with dev,test`.
 
 ## Usage
 
