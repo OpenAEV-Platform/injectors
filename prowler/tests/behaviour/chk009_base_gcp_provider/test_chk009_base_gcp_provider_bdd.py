@@ -235,7 +235,7 @@ def test_fake_engine_proves_exact_gcp_subprocess_arguments(
         "gcp",
         "--credentials-file",
         "/tmp/CANARY-GCP-CREDENTIAL.json",  # noqa: S108 - leak canary
-        "--project-id",
+        "--project-ids",
         "PROJECT-ID-CANARY",
         "--severity",
         "critical",
