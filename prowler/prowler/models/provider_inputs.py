@@ -354,6 +354,21 @@ LEGACY_CREDENTIAL_KEYS: Mapping[str, frozenset[str]] = {
     )
 }
 
+# Required legacy credential fields of the providers whose credential can come
+# from a reference: when all of them are absent, no credential is available.
+REQUIRED_CLOUD_CREDENTIAL_KEYS: Mapping[str, frozenset[str]] = {
+    provider: frozenset(
+        key
+        for key in LEGACY_CREDENTIAL_KEYS[provider]
+        if legacy.model_fields[key].is_required()
+    )
+    for provider, legacy in (
+        ("aws", AwsProviderInput),
+        ("azure", AzureProviderInput),
+        ("gcp", GcpProviderInput),
+    )
+}
+
 
 def validate_provider_input(
     candidate: Mapping[str, object],
