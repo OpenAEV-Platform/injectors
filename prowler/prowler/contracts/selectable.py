@@ -145,11 +145,13 @@ class SelectableProwlerContract(SelectionScopedContract):
         )
         if element is None:
             raise RuntimeError("a required select must produce a value")
-        self._selection.selected = element
         candidate = {
             key: value for key, value in raw_input.items() if key != self.select_key
         }
-        return super().parse_input(candidate)
+        parsed = super().parse_input(candidate)
+        # Commit the selection only once the provider model has validated.
+        self._selection.selected = element
+        return parsed
 
     def _held_selection(self) -> str | None:
         """Return the selection held by the current thread, if any."""

@@ -107,6 +107,22 @@ def test_failed_parse_never_exposes_prior_selection(
     assert contract.safe_request_info(None)["filters"] == "service=unselected"
 
 
+def test_selection_is_committed_only_after_provider_validation(
+    provider_forms: dict[str, dict[str, str]],
+) -> None:
+    """Assert a provider-field rejection never leaves its submitted selection held."""
+    contract = _contract("aws/select-service")
+    first = contract.parse_input({**provider_forms["aws"], "prowler_service": ["s3"]})
+    without_region = {
+        key: value
+        for key, value in provider_forms["aws"].items()
+        if key != "aws_region"
+    }
+    with pytest.raises(ContractInputError):
+        contract.parse_input({**without_region, "prowler_service": ["ec2"]})
+    assert contract.safe_request_info(first)["filters"] == "service=unselected"
+
+
 def test_compliance_selection_state(
     provider_forms: dict[str, dict[str, str]],
 ) -> None:
