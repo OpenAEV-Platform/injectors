@@ -66,7 +66,7 @@ def azure_form() -> dict[str, object]:
         "azure_client_id": "CLIENT-ID-CANARY",
         "azure_client_secret": "CLIENT-SECRET-CANARY\nFORM-CANARY",
         "azure_subscription_id": "SUBSCRIPTION-CANARY",
-        "azure_provider": "PROVIDER-CANARY",
+        "azure_provider": "AzureChinaCloud",
     }
 
 

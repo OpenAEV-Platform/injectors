@@ -169,7 +169,7 @@ def test_blank_provider_field_is_rejected_pre_client(
 
 
 def test_nonblank_provider_fields_receive_no_semantic_or_live_validation() -> None:
-    """Opaque nonblank identifiers parse locally without cloud access."""
+    """Opaque nonblank identifiers parse locally; the cloud environment is a closed set."""
     contract = _contract("azure/storage")
     provider = contract.parse_input(
         {
@@ -177,7 +177,7 @@ def test_nonblank_provider_fields_receive_no_semantic_or_live_validation() -> No
             "azure_client_id": "?",
             "azure_client_secret": "#",
             "azure_subscription_id": "$",
-            "azure_provider": "%",
+            "azure_provider": "AzureCloud",
         }
     )
 
@@ -363,10 +363,10 @@ def test_runtime_one_call_exact_service_argv_outputs_and_canaries(
     assert tuple(engine.requests[0].arguments) == (
         "azure",
         "--sp-env-auth",
-        "--subscription-id",
+        "--subscription-ids",
         "SUBSCRIPTION-CANARY",
         "--azure-region",
-        "PROVIDER-CANARY",
+        "AzureChinaCloud",
         "--services",
         service,
         "--output-directory",
@@ -464,7 +464,7 @@ def test_runtime_one_call_exact_service_argv_outputs_and_canaries(
         assert event.metadata["azure_client_id_present"] is True
         assert event.metadata["azure_client_secret_present"] is True
         assert event.metadata["azure_subscription_id"] == "SUBSCRIPTION-CANARY"
-        assert event.metadata["azure_provider"] == "PROVIDER-CANARY"
+        assert event.metadata["azure_provider"] == "AzureChinaCloud"
     success_metadata = logs[5].metadata
     assert success_metadata is not None
     assert success_metadata["status"] == "SUCCESS"
