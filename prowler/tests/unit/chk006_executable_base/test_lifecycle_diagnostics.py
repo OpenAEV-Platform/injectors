@@ -980,7 +980,7 @@ def test_executable_diagnostic_extraction_failure_cannot_escape(
             "kubernetes",
             "kubernetes",
             {
-                "kubernetes_kubeconfig": "KUBECONFIG-CANARY",
+                "kubernetes_kubeconfig": "apiVersion: v1\nkind: Config\nusers:\n- name: u\n  user:\n    token: KUBECONFIG-CANARY\n",
                 "kubernetes_context": "context-safe",
             },
             {
