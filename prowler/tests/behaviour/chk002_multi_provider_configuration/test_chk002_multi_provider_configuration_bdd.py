@@ -73,6 +73,16 @@ def _when_submitted(payload: dict[str, str]) -> Any | ValidationError:
         return error
 
 
+def _when_parsed(payload: dict[str, object]) -> Any:
+    try:
+        module = importlib.import_module("prowler.models.provider_inputs")
+        return module.parse_provider_input(payload)
+    except AttributeError:
+        pytest.fail("value-free provider input parser is absent")
+    except ValueError as error:
+        return error
+
+
 def _ordinary_outputs(provider_input: Any) -> tuple[str, str, str]:
     json_dump = provider_input.model_dump(mode="json")
     return repr(provider_input), str(provider_input), json.dumps(json_dump)
@@ -199,6 +209,70 @@ def test_reject_cross_provider_field_without_leaking_it() -> None:
     assert isinstance(result, ValidationError)
     assert "azure_client_secret" in str(result)
     assert submitted_value not in str(result)
+
+
+REJECTED_PAYLOAD_CANARY = "example-rejected-canary-secret"
+
+
+@pytest.mark.parametrize(
+    ("rejected", "payload"),
+    [
+        (
+            "unknown provider",
+            {"provider": "oracle", "credential": REJECTED_PAYLOAD_CANARY},
+        ),
+        (
+            "cross-provider field",
+            {
+                **PROVIDER_PAYLOADS["aws"],
+                "azure_client_secret": REJECTED_PAYLOAD_CANARY,
+            },
+        ),
+        (
+            "credential-bearing endpoint",
+            {
+                **PROVIDER_PAYLOADS["aws"],
+                "aws_endpoint_url": f"https://user:{REJECTED_PAYLOAD_CANARY}@aws.example.com",
+            },
+        ),
+        (
+            "non-string credential",
+            {
+                **PROVIDER_PAYLOADS["gcp"],
+                "gcp_service_account_json": 4566,
+                "gcp_project_id": REJECTED_PAYLOAD_CANARY,
+            },
+        ),
+    ],
+)
+def test_parse_provider_input_reports_only_value_free_issues(
+    rejected: str, payload: dict[str, object]
+) -> None:
+    """Report structural issues while retaining no submitted value anywhere."""
+    result = _when_parsed(payload)
+
+    module = importlib.import_module("prowler.models.provider_inputs")
+    assert isinstance(result, module.ProviderInputError), rejected
+    assert result.issues
+    rendered = (str(result), repr(result), repr(result.issues), repr(result.args))
+    assert all(REJECTED_PAYLOAD_CANARY not in text for text in rendered)
+    assert all("4566" not in text for text in rendered)
+    assert all(
+        isinstance(issue.error_type, str)
+        and all(isinstance(part, str) for part in issue.location)
+        for issue in result.issues
+    )
+    assert result.__cause__ is None
+    assert result.__context__ is None
+
+
+@pytest.mark.parametrize("provider", sorted(PROVIDER_PAYLOADS))
+def test_parse_provider_input_accepts_valid_payload(provider: str) -> None:
+    """Return the same strict provider model as the raw adapter."""
+    result = _when_parsed(PROVIDER_PAYLOADS[provider])
+
+    assert result == _when_submitted(PROVIDER_PAYLOADS[provider])
+    assert result.provider == provider
 
 
 @pytest.mark.parametrize("provider", ["AWS", " aws "])

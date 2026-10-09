@@ -70,6 +70,19 @@ Feature: Prowler multi-provider form input
     When the provider input is submitted
     Then the provider input is rejected without exposing the rejected credential
 
+  Scenario Outline: Parse provider input without retaining submitted values
+    Given a <rejected> provider form input carrying a credential
+    When the provider input is parsed at the provider boundary
+    Then only value-free issue locations and categories are reported
+    And the rejection keeps no reference to the submitted payload
+
+    Examples:
+      | rejected                |
+      | unknown provider        |
+      | cross-provider field    |
+      | credential-bearing endpoint |
+      | non-string credential   |
+
   Scenario: Startup configuration remains provider-free
     Given the six standard injector startup settings
     When startup configuration is loaded

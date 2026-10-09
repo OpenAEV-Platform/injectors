@@ -1,5 +1,6 @@
 """Strict, secret-safe provider inputs for future OpenAEV form contracts."""
 
+from dataclasses import dataclass
 from typing import Annotated, Any, Literal, NoReturn
 from urllib.parse import urlsplit
 
@@ -10,6 +11,7 @@ from pydantic import (
     Field,
     SecretStr,
     TypeAdapter,
+    ValidationError,
     field_validator,
 )
 
@@ -116,3 +118,45 @@ PROVIDER_INPUT_ADAPTER: TypeAdapter[ProviderInput] = TypeAdapter(
     ProviderInput,
     config=ConfigDict(hide_input_in_errors=True),
 )
+
+
+@dataclass(frozen=True)
+class ProviderInputIssue:
+    """Value-free location and category of one rejected provider input."""
+
+    location: tuple[str, ...]
+    error_type: str
+
+
+class ProviderInputError(ValueError):
+    """Provider input rejection that never retains submitted values."""
+
+    def __init__(self, issues: tuple[ProviderInputIssue, ...]) -> None:
+        """Retain only the structural location and category of each issue."""
+        self.issues = issues
+        summary = ", ".join(
+            f"{'.'.join(issue.location)}:{issue.error_type}" for issue in issues
+        )
+        super().__init__(f"Invalid provider input ({summary})")
+
+
+def parse_provider_input(payload: object) -> ProviderInput:
+    """Validate one provider payload, raising only value-free issues.
+
+    Pydantic's structured errors keep rejected inputs even when they are hidden
+    from the rendered message, so they never leave this boundary. The error is
+    raised outside the handler so it does not chain the original exception.
+    """
+    try:
+        return PROVIDER_INPUT_ADAPTER.validate_python(payload)
+    except ValidationError as error:
+        issues = tuple(
+            ProviderInputIssue(
+                tuple(str(part) for part in item["loc"]),
+                item["type"],
+            )
+            for item in error.errors(
+                include_url=False, include_context=False, include_input=False
+            )
+        )
+    raise ProviderInputError(issues)
