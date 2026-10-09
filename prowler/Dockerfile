@@ -33,4 +33,16 @@ RUN if [[ ${PYOAEV_GIT_BRANCH_OVERRIDE} ]] ; then \
         pip install git+https://github.com/OpenAEV-Platform/client-python@${PYOAEV_GIT_BRANCH_OVERRIDE} ; \
     fi
 
+# Install Prowler, like the netexec injector installs its CLI, in its own
+# virtual environment: the Prowler wheel ships a top-level `prowler` package
+# (same import name as this injector) and pins pydantic==2.12.5, so it cannot
+# share the injector's environment. lz4 and zstd have no musl wheels.
+ARG PROWLER_VERSION=5.36.0
+RUN apk update && apk upgrade && apk add \
+    gcc \
+    musl-dev
+RUN python3 -m venv /opt/prowler \
+    && /opt/prowler/bin/python -m pip install --no-cache-dir "prowler==${PROWLER_VERSION}" \
+    && ln -s /opt/prowler/bin/prowler /usr/local/bin/prowler
+
 CMD ["python3", "-m", "prowler"]
