@@ -4,13 +4,11 @@ Run Prowler cloud-security assessments from OpenAEV and return the results to th
 
 ## Requirements
 
-- Python 3.11 or later
 - An OpenAEV instance and valid connection configuration
-- An installed Prowler executable, version 5.36.0, configured through `PROWLER_EXECUTABLE_PATH`
+- Prowler 5.36.0, reachable at `PROWLER_EXECUTABLE_PATH` (default `/usr/local/bin/prowler`)
+- Python 3.11 or later when running from source
 
-The injector emits Prowler 5.36.0 CLI arguments. It does not install or verify Prowler for you.
-
-This injector is a plain Python process. It ships no Docker or Compose deployment and no NetExec integration.
+The injector emits Prowler 5.36.0 CLI arguments. The Docker image bundles Prowler 5.36.0 in its own virtual environment, linked to `/usr/local/bin/prowler`: the Prowler package uses the same `prowler` import name as this injector and pins a different pydantic version, so the two cannot share an environment. When running from source, install Prowler the same way and point `PROWLER_EXECUTABLE_PATH` at its `prowler` executable.
 
 ## Configuration
 
@@ -27,6 +25,12 @@ Copy `config.yml.sample` to the ignored `config.yml`, or provide equivalent envi
 | `PROWLER_EXECUTABLE_PATH` | `prowler.executable_path` | `/usr/local/bin/prowler` | No | Nonblank absolute path to the Prowler executable |
 
 ## Run
+
+With Docker, using the `openaev/injector-prowler` image and the provided `docker-compose.yml`:
+
+```shell
+docker compose up -d
+```
 
 From an installed injector package:
 
