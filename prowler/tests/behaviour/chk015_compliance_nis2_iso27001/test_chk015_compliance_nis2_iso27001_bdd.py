@@ -24,9 +24,9 @@ from prowler._core.prowler_client import (
 from prowler.contracts import DEFAULT_PROWLER_CONTRACTS, stable_contract_id
 from prowler.models.configs.config_loader import (
     ConfigLoader,
-    InjectorConfig,
     ProwlerConfig,
 )
+from prowler.models.configs.injector_config_override import InjectorConfigOverride
 from prowler.models.provider_inputs import AwsProviderInput
 
 from .conftest import RecordingLogger
@@ -356,7 +356,7 @@ def _config() -> ConfigLoader:
         openaev=ConfigLoaderOAEV(
             url="http://127.0.0.1:8080", token="runtime-placeholder"
         ),
-        injector=InjectorConfig(id="injector-test"),
+        injector=InjectorConfigOverride(id="injector-test"),
         prowler=ProwlerConfig(executable_path="/fake/prowler"),
     )
 
