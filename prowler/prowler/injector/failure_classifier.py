@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Literal
 
+from pyoaev.credential import CredentialResolutionError, CredentialType
+
 from prowler._core.cli_engine import CliEngineError, ExecutionError, ParsingError
 from prowler._core.prowler_client import (
     OutputArtifactError,
@@ -16,6 +18,13 @@ from prowler.injector.failure_taxonomy import (
     _ALLOWED_ISSUE_LOCATIONS,
     _ALLOWED_ISSUE_TYPES,
     _ARTIFACT_FAILURE_KIND,
+    _CREDENTIAL_CODE_BY_FAILURE_KIND,
+    _CREDENTIAL_FAILURE_KIND_BY_CODE,
+    _CREDENTIAL_GUIDANCE_BY_FAILURE_KIND,
+    _CREDENTIAL_INCOMPATIBLE_TYPED_GUIDANCE,
+    _CREDENTIAL_REFERENCE_PATTERN,
+    _CREDENTIAL_REFERENCE_SENTINEL,
+    _CREDENTIAL_SUMMARY_BY_FAILURE_KIND,
     _GENERIC_INPUT_GUIDANCE,
     _GUIDANCE_BY_FAILURE_KIND,
     _ISSUE_FIELD_LABELS,
@@ -37,6 +46,7 @@ from prowler.injector.failure_taxonomy import (
     _SUMMARY_BY_FAILURE_KIND,
     _ArtifactFailure,
     _AssessmentFailure,
+    _CredentialFailure,
     _ExecutableEvidence,
     _FailurePresentation,
     _InputValidationFailure,
@@ -45,6 +55,7 @@ from prowler.injector.failure_taxonomy import (
     _UnexpectedFailure,
 )
 from prowler.models.findings import OcsfDecodeError, OcsfMappingError
+from prowler.models.provider_inputs import REQUIRED_CLOUD_CREDENTIAL_KEYS
 
 if TYPE_CHECKING:
     from prowler.injector.lifecycle_metadata import LifecycleMetadataBuilder
@@ -252,8 +263,18 @@ class FailureClassifier:
         configured_executable: object | None = None,
     ) -> _FailurePresentation:
         """Classify a raised failure without reading its text or representation."""
+        if isinstance(error, CredentialResolutionError):
+            return self._classify_credential_failure(stage, error)
         if stage == "input_validation" and isinstance(error, ContractInputError):
             issues, omitted, truncated = self._safe_input_issues(error)
+            if self._is_credential_missing(error):
+                return self._credential_failure(
+                    stage,
+                    "credential_missing",
+                    issues=tuple(issues),
+                    issues_omitted=omitted,
+                    issues_truncated=truncated,
+                )
             return _InputValidationFailure(
                 stage=stage,
                 failure_kind="invalid_input",
@@ -303,6 +324,84 @@ class FailureClassifier:
             failure_summary=_SUMMARY_BY_FAILURE_KIND["unexpected_failure"],
             operator_guidance=_GUIDANCE_BY_FAILURE_KIND["unexpected_failure"],
             evidence=executable,
+        )
+
+    def _classify_credential_failure(
+        self, stage: str, error: CredentialResolutionError
+    ) -> _FailurePresentation:
+        """Classify a credential error by its closed code, at any stage.
+
+        An unknown code is reported as an access denial, like pyoaev does, so
+        that nothing about the credential leaks.
+        """
+        code = getattr(error.code, "value", None)
+        failure_kind = _CREDENTIAL_FAILURE_KIND_BY_CODE.get(
+            code if isinstance(code, str) else "", "credential_access_denied"
+        )
+        return self._credential_failure(
+            stage,
+            failure_kind,
+            reference=error.reference,
+            expected_type=error.expected_type,
+        )
+
+    @staticmethod
+    def _credential_failure(
+        stage: str,
+        failure_kind: str,
+        *,
+        reference: object = None,
+        expected_type: object = None,
+        issues: tuple[dict[str, object], ...] | None = None,
+        issues_omitted: int = 0,
+        issues_truncated: bool = False,
+    ) -> _CredentialFailure:
+        """Render the fixed taxonomy messages with the reference id only."""
+        safe_reference = (
+            reference
+            if isinstance(reference, str)
+            and _CREDENTIAL_REFERENCE_PATTERN.fullmatch(reference)
+            else None
+        )
+        guidance = _CREDENTIAL_GUIDANCE_BY_FAILURE_KIND[failure_kind]
+        if failure_kind == "credential_incompatible" and isinstance(
+            expected_type, CredentialType
+        ):
+            guidance = _CREDENTIAL_INCOMPATIBLE_TYPED_GUIDANCE.format(
+                type=expected_type.value
+            )
+        return _CredentialFailure(
+            stage=stage,
+            failure_kind=failure_kind,
+            failure_summary=_CREDENTIAL_SUMMARY_BY_FAILURE_KIND[failure_kind].format(
+                reference=safe_reference or _CREDENTIAL_REFERENCE_SENTINEL
+            ),
+            operator_guidance=guidance,
+            issues=issues,
+            issues_omitted=issues_omitted,
+            issues_truncated=issues_truncated,
+            credential_error_code=_CREDENTIAL_CODE_BY_FAILURE_KIND[failure_kind],
+            credential_reference=safe_reference,
+        )
+
+    @staticmethod
+    def _is_credential_missing(error: ContractInputError) -> bool:
+        """Detect a form with no reference and every cloud credential absent.
+
+        A reference input has no legacy credential field, so these issues can
+        only come from the legacy path. Blank values are rejected as
+        ``value_error`` by the credential fields, and count as absent.
+        """
+        if not error.issues_are_trusted:
+            return False
+        absent = {
+            issue.location
+            for issue in error.issues
+            if issue.error_type in {"missing", "value_error"}
+        }
+        return any(
+            all((provider, key) in absent for key in keys)
+            for provider, keys in REQUIRED_CLOUD_CREDENTIAL_KEYS.items()
         )
 
     def _classify_artifact_failure(
