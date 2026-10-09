@@ -173,7 +173,7 @@ class _Engine:
         self.credential_paths.append(credential_path)
         assert (
             credential_path.read_text(encoding="utf-8")
-            == "KUBECONFIG-CANARY\nFORM-CANARY"
+            == "apiVersion: v1\nkind: Config\n# FORM-CANARY\nusers:\n- name: u\n  user:\n    token: KUBECONFIG-CANARY\n"
         )
         if self.outcome == "raise":
             raise RuntimeError("fake engine failure")

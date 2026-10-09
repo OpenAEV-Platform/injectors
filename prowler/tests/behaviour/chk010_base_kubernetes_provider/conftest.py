@@ -62,7 +62,7 @@ class RecordingLogger:
 def kubernetes_form() -> dict[str, object]:
     """Return structurally valid placeholder-only Kubernetes form input."""
     return {
-        "kubernetes_kubeconfig": "KUBECONFIG-CANARY\nFORM-CANARY",
+        "kubernetes_kubeconfig": "apiVersion: v1\nkind: Config\n# FORM-CANARY\nusers:\n- name: u\n  user:\n    token: KUBECONFIG-CANARY\n",
         "kubernetes_context": "CONTEXT-CANARY",
     }
 
