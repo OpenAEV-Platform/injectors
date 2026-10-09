@@ -413,8 +413,8 @@ Structured output (e.g. auto-created assets) uses Pydantic models from `models/o
 ```bash
 cd my_injector
 
-# Install all dependencies including dev extras
-poetry install -E dev
+# Install all dependencies including dev and test extras
+poetry install --with dev,test
 
 # Configure (environment variables preferred in Docker; config.yml for local dev)
 cp config.yml.sample config.yml

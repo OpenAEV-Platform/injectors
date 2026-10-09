@@ -2,9 +2,24 @@
 name="injector_common"
 version="1.0.0"
 requires-python = ">=3.11,<4.0"
-dependencies = [
-    "pyoaev (==3.261005.0); extra != 'dev'",
-]
+
+[tool.poetry.dependencies]
+python = "^3.11"
+pyoaev = "3.261009.0"
+
+[tool.poetry.group.dev.dependencies]
+black = "^26.3.0"
+flake8 = "^7.3.0"
+isort = "^8.0.1"
+mypy = "^1.17.1"
+pip-audit = "^2.9.0"
+pre-commit = "^4.6.0"
+ruff = "^0.14.13"
+
+[tool.poetry.group.test.dependencies]
+coverage = "^7.13.5"
+pytest = "^9.1.1"
+polyfactory = "^2.22.2"
 
 [build-system]
 requires = ["setuptools", "wheel"]
@@ -14,7 +29,6 @@ build-backend = "setuptools.build_meta"
 include-package-data = true
 
 [tool.setuptools.packages.find]
-
 
 [tool.isort]
 profile = "black"

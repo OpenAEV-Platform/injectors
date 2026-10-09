@@ -155,7 +155,7 @@ poetry run python -m email_m365_injector.openaev_email_m365
 ```
 
 > For local development against a checkout of [client-python](https://github.com/OpenAEV-Platform/client-python)
-> (cloned next to this repository), use `poetry install --extras dev`.
+> (cloned next to this repository), use `poetry install --with dev,test`.
 
 ## Usage
 
