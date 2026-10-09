@@ -1,0 +1,71 @@
+name: "Test Container Injectors"
+
+on:
+  push:
+    branches:
+      - main
+      - "release/**"
+    tags:
+      - "[0-9]+.[0-9]+.[0-9]*"
+  pull_request:
+
+concurrency:
+  group: container-tests-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  detect-test-files:
+    name: Detect test files
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.set-matrix.outputs.matrix }}
+      has_tests: ${{ steps.set-matrix.outputs.has_tests }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - id: set-matrix
+        name: Build test matrix
+        env:
+          GITHUB_REF_NAME: ${{ github.ref_name }}
+          RELEASE_REF: main
+        run: python .github/scripts/build_test_matrix.py
+
+  test:
+    name: "Test ${{ matrix.name }}"
+    needs: detect-test-files
+    if: needs.detect-test-files.outputs.has_tests == 'true'
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJson(needs.detect-test-files.outputs.matrix) }}
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: docker/setup-buildx-action@v4
+
+      - uses: docker/build-push-action@v4
+        with:
+          build-contexts: "injector_common=./injector_common"
+          context: ${{ matrix.injector }}/.
+          file: "${{ matrix.injector }}/Dockerfile"
+          tags: localpytest-${{ matrix.injector }}:latest
+          load: true
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          push: false
+
+      - uses: addnab/docker-run-action@v3
+        with:
+          image: localpytest-${{ matrix.injector }}:latest
+          run: |
+            python -m pip install poetry
+            python -m poetry install --only=dev,test
+            python -m coverage run -m pytest
