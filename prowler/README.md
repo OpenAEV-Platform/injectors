@@ -39,3 +39,10 @@ startup configuration. They will be supplied per OpenAEV form contract so that
 credential changes do not require redeploying the injector. CHK.002 provides
 only reusable, strict provider input models; it does not register forms, routes,
 or contracts.
+
+`aws_endpoint_url` is an optional per-assessment provider input for AWS, like
+its credentials. When supplied, it must be an absolute HTTP or HTTPS URL with a
+host and must not contain user information, a query, a fragment, or whitespace.
+Paths and valid ports are allowed, including endpoints on localhost, private
+networks, and container services. The accepted value remains an ordinary string,
+and validation does not check network reachability.
