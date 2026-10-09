@@ -47,6 +47,11 @@ class CredField:
     file_mode: Optional[int] = None
     # Default applied when the field is optional and left empty.
     default: Optional[str] = None
+    # Non-secret value (region, project, subscription) also carried by a
+    # resolved credential, as this attribute. With a credential reference the
+    # resolved value wins, and this field is only read when the credential
+    # omits it. Secret fields leave it unset: they are never read in that case.
+    reference_attribute: Optional[str] = None
 
 
 @dataclass(frozen=True)
@@ -80,6 +85,7 @@ _AWS_CRED_FIELDS = [
         mandatory=False,
         env_vars=("AWS_REGION", "AWS_DEFAULT_REGION"),
         default="us-east-1",
+        reference_attribute="aws_default_region",
     ),
 ]
 
@@ -91,6 +97,7 @@ _AZURE_CRED_FIELDS = [
         key="azure_subscription_id",
         label="Azure Subscription ID",
         env_vars=("AZURE_SUBSCRIPTION_ID",),
+        reference_attribute="azure_subscription_id",
     ),
     CredField(
         key="azure_client_id",
@@ -123,6 +130,7 @@ _ENTRA_CRED_FIELDS = [
         label="Azure Subscription ID (optional)",
         mandatory=False,
         env_vars=("AZURE_SUBSCRIPTION_ID",),
+        reference_attribute="azure_subscription_id",
     ),
 ]
 
@@ -131,6 +139,7 @@ _GCP_CRED_FIELDS = [
         key="gcp_project_id",
         label="GCP Project ID",
         env_vars=("GOOGLE_PROJECT", "CLOUDSDK_CORE_PROJECT"),
+        reference_attribute="gcp_project_id",
     ),
     CredField(
         key="gcp_service_account_key",
