@@ -9,7 +9,8 @@ from .ports import CredentialLeasePort
 
 AwsServiceSelector = Literal["iam", "s3", "ec2"]
 AzureServiceSelector = Literal["iam", "storage"]
-ServiceSelector = AwsServiceSelector | AzureServiceSelector
+GcpServiceSelector = Literal["iam", "compute"]
+ServiceSelector = AwsServiceSelector | AzureServiceSelector | GcpServiceSelector
 
 
 @dataclass(frozen=True)

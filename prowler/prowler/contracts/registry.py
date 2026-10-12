@@ -11,7 +11,7 @@ from .aws import AwsBaseContract, AwsEc2Contract, AwsIamContract, AwsS3Contract
 from .azure import AzureBaseContract, AzureIamContract, AzureStorageContract
 from .base import BaseProwlerContract
 from .catalog import ROUTE_CATALOG
-from .gcp import GcpBaseContract
+from .gcp import GcpBaseContract, GcpComputeContract, GcpIamContract
 from .kubernetes import KubernetesBaseContract
 
 # Committed project namespace: changing it would break stable platform identities.
@@ -92,5 +92,7 @@ DEFAULT_PROWLER_CONTRACTS = ProwlerContracts(
         AwsEc2Contract,
         AzureIamContract,
         AzureStorageContract,
+        GcpIamContract,
+        GcpComputeContract,
     )
 )
