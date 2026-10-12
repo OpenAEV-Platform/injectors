@@ -12,6 +12,7 @@ from .azure import AzureBaseContract
 from .base import BaseProwlerContract
 from .catalog import ROUTE_CATALOG
 from .gcp import GcpBaseContract
+from .kubernetes import KubernetesBaseContract
 
 # Committed project namespace: changing it would break stable platform identities.
 PROWLER_CONTRACT_NAMESPACE = UUID("ee49522d-80b9-5d71-b164-569ee61a75bd")
@@ -81,5 +82,5 @@ class ProwlerContracts:
 
 
 DEFAULT_PROWLER_CONTRACTS = ProwlerContracts(
-    (AwsBaseContract, AzureBaseContract, GcpBaseContract)
+    (AwsBaseContract, AzureBaseContract, GcpBaseContract, KubernetesBaseContract)
 )

@@ -89,15 +89,16 @@ class _ClientFactory:
 
 
 def test_default_registration_identity_fields_and_outputs() -> None:
-    """The default surface is exactly canonical AWS, Azure, then GCP routes."""
+    """GCP remains third as the canonical registry grows through Kubernetes."""
     serialized = DEFAULT_PROWLER_CONTRACTS.contracts()
     expected_id = stable_contract_id("gcp")
 
-    assert len(serialized) == 3
+    assert len(serialized) == 4
     assert [item["contract_id"] for item in serialized] == [
         str(stable_contract_id("aws")),
         str(stable_contract_id("azure")),
         str(expected_id),
+        str(stable_contract_id("kubernetes")),
     ]
     assert UUID(serialized[2]["contract_id"]) == expected_id
     assert expected_id.version == 5
