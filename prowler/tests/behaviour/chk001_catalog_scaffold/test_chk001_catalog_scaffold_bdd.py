@@ -90,6 +90,10 @@ def _then_base_contracts_are_registered(config: ConfigLoader, helper: Mock) -> N
         str(stable_contract_id("azure/storage")),
         str(stable_contract_id("gcp/iam")),
         str(stable_contract_id("gcp/compute")),
+        str(stable_contract_id("cis/aws")),
+        str(stable_contract_id("cis/azure")),
+        str(stable_contract_id("cis/gcp")),
+        str(stable_contract_id("cis/kubernetes")),
     ]
     callback = helper.listen.call_args.kwargs["message_callback"]
     assert callable(callback)

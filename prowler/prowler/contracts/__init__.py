@@ -22,6 +22,13 @@ from .base import (
     RouteFamily,
 )
 from .catalog import ROUTE_CATALOG, RouteDescriptor
+from .cis import (
+    AwsCisContract,
+    AzureCisContract,
+    CisComplianceContract,
+    GcpCisContract,
+    KubernetesCisContract,
+)
 from .dispatcher import ContractDispatcher, RouteHandler, RouteNotFoundError
 from .gcp import GcpBaseContract, GcpComputeContract, GcpIamContract, GcpServiceContract
 from .kubernetes import KubernetesBaseContract
@@ -43,11 +50,16 @@ __all__ = [
     "AzureIamContract",
     "AzureServiceContract",
     "AzureStorageContract",
+    "AwsCisContract",
+    "AzureCisContract",
+    "CisComplianceContract",
     "GcpBaseContract",
     "GcpComputeContract",
     "GcpIamContract",
     "GcpServiceContract",
+    "GcpCisContract",
     "KubernetesBaseContract",
+    "KubernetesCisContract",
     "ContractDispatcher",
     "ContractExecutionOutcome",
     "ContractInputError",

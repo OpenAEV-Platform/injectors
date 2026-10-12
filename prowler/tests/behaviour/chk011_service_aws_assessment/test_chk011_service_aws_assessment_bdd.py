@@ -95,7 +95,7 @@ def test_route_selects_exact_service_once(
     assert factory.calls[0][2:] == ((), service)
 
 
-def test_registry_has_exact_eleven_canonical_contracts_without_selector_fields() -> (
+def test_registry_has_exact_fifteen_canonical_contracts_without_selector_fields() -> (
     None
 ):
     """The public surface is ordered, stable, labelled, and not user-selectable."""
@@ -110,6 +110,10 @@ def test_registry_has_exact_eleven_canonical_contracts_without_selector_fields()
         "azure/storage",
         "gcp/iam",
         "gcp/compute",
+        "cis/aws",
+        "cis/azure",
+        "cis/gcp",
+        "cis/kubernetes",
     )
 
     assert [item["contract_id"] for item in serialized] == [
