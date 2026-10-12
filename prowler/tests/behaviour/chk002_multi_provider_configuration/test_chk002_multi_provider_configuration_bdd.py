@@ -1,0 +1,683 @@
+"""Behaviour tests for CHK.002 provider form input models."""
+
+import importlib
+import json
+from pathlib import Path
+from typing import Any
+
+import pytest
+from pydantic import HttpUrl, SecretStr, TypeAdapter, ValidationError
+
+from prowler.models.configs.config_loader import ConfigLoader, ProwlerConfig
+
+PROVIDER_PAYLOADS: dict[str, dict[str, str]] = {
+    "aws": {
+        "provider": "aws",
+        "aws_access_key_id": "EXAMPLEACCESSKEY",
+        "aws_secret_access_key": "example-aws-secret",
+        "aws_session_token": "example-aws-session-token",
+        "aws_account_id": "123456789012",
+        "aws_region": "eu-west-1",
+    },
+    "azure": {
+        "provider": "azure",
+        "azure_tenant_id": "example-tenant",
+        "azure_client_id": "example-client",
+        "azure_client_secret": "example-azure-secret",
+        "azure_subscription_id": "example-subscription",
+        "azure_provider": "AzureCloud",
+    },
+    "gcp": {
+        "provider": "gcp",
+        "gcp_service_account_json": (
+            '{"type":"service_account","private_key":"example-gcp-secret"}'
+        ),
+        "gcp_project_id": "example-project",
+    },
+    "kubernetes": {
+        "provider": "kubernetes",
+        "kubernetes_kubeconfig": (
+            "apiVersion: v1\nusers: []\n# example-kubernetes-secret"
+        ),
+        "kubernetes_context": "example-context",
+    },
+}
+
+SECRET_FIELDS = {
+    "aws": ("aws_secret_access_key", "aws_session_token"),
+    "azure": ("azure_client_secret",),
+    "gcp": ("gcp_service_account_json",),
+    "kubernetes": ("kubernetes_kubeconfig",),
+}
+
+ORDINARY_FIELDS = {
+    "aws": "aws_region",
+    "azure": "azure_tenant_id",
+    "gcp": "gcp_project_id",
+    "kubernetes": "kubernetes_context",
+}
+
+
+def _provider_input_adapter() -> TypeAdapter[Any]:
+    try:
+        module = importlib.import_module("prowler.models.provider_inputs")
+    except ModuleNotFoundError:
+        pytest.fail("reusable provider input models are absent")
+    return module.PROVIDER_INPUT_ADAPTER  # type: ignore[no-any-return]
+
+
+def _when_submitted(payload: dict[str, str]) -> Any | ValidationError:
+    try:
+        return _provider_input_adapter().validate_python(payload)
+    except ValidationError as error:
+        return error
+
+
+def _when_parsed(payload: dict[str, object]) -> Any:
+    try:
+        module = importlib.import_module("prowler.models.provider_inputs")
+        return module.parse_provider_input(payload)
+    except AttributeError:
+        pytest.fail("value-free provider input parser is absent")
+    except ValueError as error:
+        return error
+
+
+def _ordinary_outputs(provider_input: Any) -> tuple[str, str, str]:
+    json_dump = provider_input.model_dump(mode="json")
+    return repr(provider_input), str(provider_input), json.dumps(json_dump)
+
+
+@pytest.mark.parametrize("provider", ["aws", "azure", "gcp", "kubernetes"])
+def test_select_exactly_one_supported_provider(provider: str) -> None:
+    """Accept each supported discriminator as exactly one provider model."""
+    result = _when_submitted(PROVIDER_PAYLOADS[provider])
+
+    assert not isinstance(result, ValidationError)
+    assert result.provider == provider
+    assert type(result).__name__.lower().startswith(provider)
+
+
+@pytest.mark.parametrize("provider", ["aws", "azure", "gcp", "kubernetes"])
+def test_protect_credentials_from_ordinary_output(provider: str) -> None:
+    """Redact provider credentials from repr, str, and JSON-mode dumps."""
+    payload = PROVIDER_PAYLOADS[provider]
+    result = _when_submitted(payload)
+
+    assert not isinstance(result, ValidationError)
+    outputs = _ordinary_outputs(result)
+    for field in SECRET_FIELDS[provider]:
+        assert all(payload[field] not in output for output in outputs)
+    assert all("**********" in output for output in outputs)
+
+
+@pytest.mark.parametrize("provider", ["aws", "azure", "gcp", "kubernetes"])
+def test_reject_mutation_of_provider_fields_without_leaking_secrets(
+    provider: str,
+) -> None:
+    """Reject raw assignment before attempted credentials can enter an error."""
+    payload = PROVIDER_PAYLOADS[provider]
+    result = _when_submitted(payload)
+
+    assert not isinstance(result, ValidationError)
+    for field in (ORDINARY_FIELDS[provider], *SECRET_FIELDS[provider]):
+        replacement_value = f"replacement-{provider}-secret"
+        original_value = getattr(result, field)
+        with pytest.raises(
+            TypeError, match="^Provider inputs are immutable$"
+        ) as raised:
+            setattr(result, field, replacement_value)
+        assert replacement_value not in str(raised.value)
+        assert replacement_value not in repr(raised.value)
+        assert all(
+            payload[secret] not in str(raised.value)
+            for secret in SECRET_FIELDS[provider]
+        )
+        assert all(
+            payload[secret] not in repr(raised.value)
+            for secret in SECRET_FIELDS[provider]
+        )
+        assert raised.value.__cause__ is None
+        assert raised.value.__context__ is None
+        assert getattr(result, field) == original_value
+
+
+@pytest.mark.parametrize("provider", ["aws", "azure", "gcp", "kubernetes"])
+def test_deep_copy_preserves_secret_values_and_redaction(provider: str) -> None:
+    """Deep-copy provider input without losing or exposing protected values."""
+    payload = PROVIDER_PAYLOADS[provider]
+    result = _when_submitted(payload)
+
+    assert not isinstance(result, ValidationError)
+    snapshot = result.model_copy(deep=True)
+    assert snapshot is not result
+    for field in SECRET_FIELDS[provider]:
+        source_secret = getattr(result, field)
+        copied_secret = getattr(snapshot, field)
+        assert isinstance(source_secret, SecretStr)
+        assert isinstance(copied_secret, SecretStr)
+        assert copied_secret is not source_secret
+        assert copied_secret.get_secret_value() == payload[field]
+        assert payload[field] not in repr(snapshot)
+        assert payload[field] not in str(snapshot)
+        assert payload[field] not in json.dumps(snapshot.model_dump(mode="json"))
+        for provider_input in (result, snapshot):
+            attempted_value = f"deep-copy-replacement-{field}"
+            with pytest.raises(
+                TypeError, match="^Provider inputs are immutable$"
+            ) as raised:
+                setattr(provider_input, field, attempted_value)
+            assert attempted_value not in str(raised.value)
+            assert attempted_value not in repr(raised.value)
+            assert getattr(provider_input, field).get_secret_value() == payload[field]
+
+
+def test_protect_optional_aws_session_token() -> None:
+    """Accept and redact the optional nonblank AWS session token."""
+    submitted_value = "example-aws-session-token"
+    result = _when_submitted(
+        {**PROVIDER_PAYLOADS["aws"], "aws_session_token": submitted_value}
+    )
+
+    assert not isinstance(result, ValidationError)
+    assert all(submitted_value not in output for output in _ordinary_outputs(result))
+
+
+def test_reject_missing_provider_selection() -> None:
+    """Reject form input without its provider discriminator."""
+    result = _when_submitted({})
+
+    assert isinstance(result, ValidationError)
+
+
+def test_reject_unknown_provider_without_leaking_input() -> None:
+    """Reject an unknown discriminator without echoing submitted values."""
+    submitted_value = "example-unknown-secret"
+    result = _when_submitted({"provider": "oracle", "credential": submitted_value})
+
+    assert isinstance(result, ValidationError)
+    assert submitted_value not in str(result)
+
+
+def test_reject_cross_provider_field_without_leaking_it() -> None:
+    """Forbid extra cross-provider fields without echoing their values."""
+    submitted_value = "example-cross-provider-secret"
+    payload = {**PROVIDER_PAYLOADS["aws"], "azure_client_secret": submitted_value}
+
+    result = _when_submitted(payload)
+
+    assert isinstance(result, ValidationError)
+    assert "azure_client_secret" in str(result)
+    assert submitted_value not in str(result)
+
+
+REJECTED_PAYLOAD_CANARY = "example-rejected-canary-secret"
+
+
+@pytest.mark.parametrize(
+    ("rejected", "payload"),
+    [
+        (
+            "unknown provider",
+            {"provider": "oracle", "credential": REJECTED_PAYLOAD_CANARY},
+        ),
+        (
+            "cross-provider field",
+            {
+                **PROVIDER_PAYLOADS["aws"],
+                "azure_client_secret": REJECTED_PAYLOAD_CANARY,
+            },
+        ),
+        (
+            "credential-bearing endpoint",
+            {
+                **PROVIDER_PAYLOADS["aws"],
+                "aws_endpoint_url": f"https://user:{REJECTED_PAYLOAD_CANARY}@aws.example.com",
+            },
+        ),
+        (
+            "non-string credential",
+            {
+                **PROVIDER_PAYLOADS["gcp"],
+                "gcp_service_account_json": 4566,
+                "gcp_project_id": REJECTED_PAYLOAD_CANARY,
+            },
+        ),
+    ],
+)
+def test_parse_provider_input_reports_only_value_free_issues(
+    rejected: str, payload: dict[str, object]
+) -> None:
+    """Report structural issues while retaining no submitted value anywhere."""
+    result = _when_parsed(payload)
+
+    module = importlib.import_module("prowler.models.provider_inputs")
+    assert isinstance(result, module.ProviderInputError), rejected
+    assert result.issues
+    rendered = (str(result), repr(result), repr(result.issues), repr(result.args))
+    assert all(REJECTED_PAYLOAD_CANARY not in text for text in rendered)
+    assert all("4566" not in text for text in rendered)
+    assert all(
+        isinstance(issue.error_type, str)
+        and all(isinstance(part, str) for part in issue.location)
+        for issue in result.issues
+    )
+    assert result.__cause__ is None
+    assert result.__context__ is None
+
+
+_KUBECONFIG_HEAD = (
+    "apiVersion: v1\n"
+    "kind: Config\n"
+    "clusters:\n"
+    "- name: c\n"
+    "  cluster:\n"
+    "    server: https://k8s.example:6443\n"
+)
+_KUBECONFIG_CONTEXT = (
+    "contexts:\n"
+    "- name: ctx\n"
+    "  context: {cluster: c, user: u, namespace: default}\n"
+    "current-context: ctx\n"
+)
+
+
+def _kubeconfig(user: str, *, cluster_extra: str = "", head: str = "") -> str:
+    return (
+        head
+        + _KUBECONFIG_HEAD
+        + cluster_extra
+        + _KUBECONFIG_CONTEXT
+        + "users:\n- name: u\n  user:\n"
+        + user
+    )
+
+
+def test_inline_credential_kubeconfig_is_accepted() -> None:
+    """Accept inline token, client key pair and CA data."""
+    kubeconfig = _kubeconfig(
+        "    token: inline-token\n"
+        "    client-certificate-data: Q0VSVA==\n"
+        "    client-key-data: S0VZ\n",
+        cluster_extra=(
+            "    certificate-authority-data: Q0E=\n"
+            "    tls-server-name: k8s.example\n"
+            "    insecure-skip-tls-verify: false\n"
+        ),
+    )
+
+    result = _when_parsed(
+        {**PROVIDER_PAYLOADS["kubernetes"], "kubernetes_kubeconfig": kubeconfig}
+    )
+
+    assert result.kubernetes_kubeconfig.get_secret_value() == kubeconfig
+
+
+_KUBECONFIG_CANARY = "/opt/KUBECONFIG-CANARY"
+
+
+@pytest.mark.parametrize(
+    "kubeconfig",
+    [
+        _kubeconfig(
+            "    exec:\n"
+            "      apiVersion: client.authentication.k8s.io/v1beta1\n"
+            f"      command: {_KUBECONFIG_CANARY}\n"
+        ),
+        _kubeconfig(
+            "    auth-provider:\n"
+            "      name: gcp\n"
+            f"      config: {{cmd-path: {_KUBECONFIG_CANARY}}}\n"
+        ),
+        _kubeconfig(f"    tokenFile: {_KUBECONFIG_CANARY}\n"),
+        _kubeconfig(f"    client-certificate: {_KUBECONFIG_CANARY}\n"),
+        _kubeconfig(
+            "    token: t\n",
+            cluster_extra=f"    certificate-authority: {_KUBECONFIG_CANARY}\n",
+        ),
+        _kubeconfig("    token: t\n", head=f"extensions: [{_KUBECONFIG_CANARY}]\n"),
+        _KUBECONFIG_HEAD.replace("- name: c", "- &a\n  name: c")
+        + f"users: [*a]\n# {_KUBECONFIG_CANARY}\n",
+        f"{_KUBECONFIG_CANARY}\n",
+        f"apiVersion: [{_KUBECONFIG_CANARY}\n",
+    ],
+    ids=[
+        "exec-plugin",
+        "auth-provider-command",
+        "token-file",
+        "client-certificate-file",
+        "certificate-authority-file",
+        "unknown-top-level",
+        "yaml-alias",
+        "not-a-mapping",
+        "invalid-yaml",
+    ],
+)
+def test_kubeconfig_settings_that_run_commands_or_read_files_are_rejected(
+    kubeconfig: str,
+) -> None:
+    """Reject kubeconfigs that could execute plugins or reach host files."""
+    result = _when_parsed(
+        {**PROVIDER_PAYLOADS["kubernetes"], "kubernetes_kubeconfig": kubeconfig}
+    )
+
+    module = importlib.import_module("prowler.models.provider_inputs")
+    assert isinstance(result, module.ProviderInputError)
+    assert any("kubernetes_kubeconfig" in issue.location for issue in result.issues)
+    assert _KUBECONFIG_CANARY not in str(result)
+    assert _KUBECONFIG_CANARY not in repr(result.issues)
+
+
+@pytest.mark.parametrize(
+    ("environment", "accepted"),
+    [
+        ("AzureCloud", True),
+        ("AzureChinaCloud", True),
+        ("AzureUSGovernment", True),
+        ("Microsoft.Compute", False),
+        ("azurecloud", False),
+    ],
+)
+def test_azure_cloud_environment_is_a_prowler_supported_value(
+    environment: str, accepted: bool
+) -> None:
+    """Accept only the cloud environments Prowler's --azure-region allows."""
+    result = _when_parsed({**PROVIDER_PAYLOADS["azure"], "azure_provider": environment})
+
+    module = importlib.import_module("prowler.models.provider_inputs")
+    if accepted:
+        assert result.azure_provider == environment
+    else:
+        assert isinstance(result, module.ProviderInputError)
+        assert any("azure_provider" in issue.location for issue in result.issues)
+        assert environment not in str(result)
+
+
+@pytest.mark.parametrize(
+    ("field", "value"),
+    [
+        ("aws_region", "eu-west-1\x00"),
+        ("aws_secret_access_key", "example-nul\x00secret"),
+        ("aws_endpoint_url", "https://aws.example.com/\x00"),
+    ],
+)
+def test_parse_provider_input_rejects_nul_characters(field: str, value: str) -> None:
+    """Reject NUL characters before they can reach a process environment."""
+    result = _when_parsed({**PROVIDER_PAYLOADS["aws"], field: value})
+
+    module = importlib.import_module("prowler.models.provider_inputs")
+    assert isinstance(result, module.ProviderInputError)
+    assert any(field in issue.location for issue in result.issues)
+    assert value not in str(result) and value not in repr(result.issues)
+
+
+@pytest.mark.parametrize("provider", sorted(PROVIDER_PAYLOADS))
+def test_parse_provider_input_accepts_valid_payload(provider: str) -> None:
+    """Return the same strict provider model as the raw adapter."""
+    result = _when_parsed(PROVIDER_PAYLOADS[provider])
+
+    assert result == _when_submitted(PROVIDER_PAYLOADS[provider])
+    assert result.provider == provider
+
+
+@pytest.mark.parametrize("provider", ["AWS", " aws "])
+def test_provider_discriminator_is_strict(provider: str) -> None:
+    """Reject discriminator values whose case or whitespace is altered."""
+    payload = {**PROVIDER_PAYLOADS["aws"], "provider": provider}
+
+    result = _when_submitted(payload)
+
+    assert isinstance(result, ValidationError)
+
+
+@pytest.mark.parametrize(
+    ("provider", "field"),
+    [
+        ("aws", "aws_secret_access_key"),
+        ("azure", "azure_client_secret"),
+        ("gcp", "gcp_service_account_json"),
+        ("kubernetes", "kubernetes_kubeconfig"),
+    ],
+)
+def test_reject_blank_required_values_without_leaking_them(
+    provider: str,
+    field: str,
+) -> None:
+    """Reject blank required values without including input in errors."""
+    payload = {**PROVIDER_PAYLOADS[provider], field: " \t "}
+
+    result = _when_submitted(payload)
+
+    assert isinstance(result, ValidationError)
+    assert field in str(result)
+    assert "input_value" not in str(result)
+
+
+def test_startup_configuration_remains_provider_free(
+    standard_injector_environment: None,
+) -> None:
+    """Keep provider form input outside the six-setting startup boundary."""
+    config = ConfigLoader()
+
+    assert set(type(config).model_fields) == {"openaev", "injector", "prowler"}
+    assert not hasattr(config, "provider")
+    assert not hasattr(config, "provider_config")
+    assert not hasattr(config, "selected_provider_config")
+
+
+def test_recommended_prowler_executable_path_is_default(
+    standard_injector_environment: None,
+    clean_prowler_environment: None,
+) -> None:
+    """Use the production Prowler executable location by default."""
+    config = ConfigLoader()
+
+    assert config.prowler.executable_path == Path("/usr/local/bin/prowler")
+
+
+def test_absolute_prowler_executable_path_can_be_configured(
+    standard_injector_environment: None,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Load a non-secret executable path from its environment setting."""
+    configured_path = "/opt/prowler/bin/prowler"
+    monkeypatch.setenv("PROWLER_EXECUTABLE_PATH", configured_path)
+
+    config = ConfigLoader()
+
+    assert config.prowler.executable_path == Path(configured_path)
+    assert configured_path in config.model_dump_json()
+
+
+def test_absolute_prowler_executable_path_can_be_loaded_from_yaml(
+    standard_injector_environment: None,
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    """Load the executable path from the Prowler YAML runtime section."""
+    configured_path = "/srv/prowler/bin/prowler"
+    (tmp_path / "config.yml").write_text(
+        f"prowler:\n  executable_path: '{configured_path}'\n",
+        encoding="utf-8",
+    )
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setitem(ConfigLoader.model_config, "yaml_file", None)
+
+    config = ConfigLoader()
+
+    assert config.prowler.executable_path == Path(configured_path)
+
+
+def test_daemon_config_exposes_configured_prowler_executable_path(
+    standard_injector_environment: None,
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    """Expose the configured Prowler executable path to the daemon."""
+    configured_path = tmp_path / "prowler"
+    configured_path.touch()
+    monkeypatch.setenv("PROWLER_EXECUTABLE_PATH", str(configured_path))
+
+    daemon_config = ConfigLoader().to_daemon_config()
+
+    assert daemon_config.get("prowler_executable_path") == str(configured_path)
+
+
+@pytest.mark.parametrize("executable_path", ["", "   ", "bin/prowler"])
+def test_reject_invalid_prowler_executable_path(
+    standard_injector_environment: None,
+    monkeypatch: pytest.MonkeyPatch,
+    executable_path: str,
+) -> None:
+    """Reject blank and relative executable paths at startup."""
+    monkeypatch.setenv("PROWLER_EXECUTABLE_PATH", executable_path)
+
+    with pytest.raises(ValidationError):
+        ConfigLoader()
+
+
+def test_aws_endpoint_url_defaults_to_none() -> None:
+    """Use the AWS SDK service endpoint when an assessment supplies no override."""
+    result = _when_submitted(PROVIDER_PAYLOADS["aws"])
+
+    assert not isinstance(result, ValidationError)
+    assert result.aws_endpoint_url is None
+
+
+@pytest.mark.parametrize(
+    "configured_url",
+    [
+        "https://s3.us-east-1.amazonaws.com",
+        "http://localhost:4566",
+        "http://localstack:4566",
+        "http://10.0.0.25:4566",
+        "https://aws.example.com:1/service/path",
+        "https://aws.example.com:65535/service/path",
+    ],
+)
+def test_trusted_aws_endpoint_url_can_be_supplied_per_assessment(
+    configured_url: str,
+) -> None:
+    """Accept assessment-trusted HTTP endpoints without contacting their hosts."""
+    result = _when_submitted(
+        {**PROVIDER_PAYLOADS["aws"], "aws_endpoint_url": configured_url}
+    )
+
+    assert not isinstance(result, ValidationError)
+    assert result.aws_endpoint_url == configured_url
+    assert type(result.aws_endpoint_url) is str
+
+
+def test_aws_endpoint_url_is_not_loaded_from_startup_environment(
+    standard_injector_environment: None,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Keep the per-assessment endpoint outside environment startup settings."""
+    monkeypatch.setenv("PROWLER_AWS_ENDPOINT_URL", "http://localhost:4566")
+
+    config = ConfigLoader()
+
+    assert "aws_endpoint_url" not in ProwlerConfig.model_fields
+    assert not hasattr(config.prowler, "aws_endpoint_url")
+
+
+def test_aws_endpoint_url_is_not_loaded_from_startup_yaml(
+    standard_injector_environment: None,
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    """Keep the per-assessment endpoint outside YAML startup settings."""
+    (tmp_path / "config.yml").write_text(
+        "prowler:\n  aws_endpoint_url: 'http://localhost:4566'\n",
+        encoding="utf-8",
+    )
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setitem(ConfigLoader.model_config, "yaml_file", None)
+
+    config = ConfigLoader()
+
+    assert "aws_endpoint_url" not in ProwlerConfig.model_fields
+    assert not hasattr(config.prowler, "aws_endpoint_url")
+
+
+@pytest.mark.parametrize(
+    "configured_url",
+    [
+        b"https://aws.example.com/unchecked",
+        HttpUrl("https://aws.example.com/service"),
+        4566,
+    ],
+)
+def test_reject_non_string_aws_endpoint_url(configured_url: object) -> None:
+    """Reject endpoint values that could bypass checks through later coercion."""
+    payload: dict[str, object] = {
+        **PROVIDER_PAYLOADS["aws"],
+        "aws_endpoint_url": configured_url,
+    }
+
+    with pytest.raises(ValidationError):
+        _provider_input_adapter().validate_python(payload)
+
+
+@pytest.mark.parametrize(
+    "configured_url",
+    [
+        "",
+        "   ",
+        "/relative",
+        "//localhost:4566",
+        "https:///missing-host",
+        "ftp://localhost:4566",
+        "https://user:password@aws.example.com",
+        "https://aws.example.com?region=local",
+        "https://aws.example.com#credentials",
+        "https://aws.example.com /service",
+        "https://aws.example.com:\t4566",
+        "https://aws.example.com:",
+        "https://aws.example.com:abc",
+        "https://aws.example.com:0",
+        "https://aws.example.com:65536",
+    ],
+)
+def test_reject_invalid_trusted_aws_endpoint_url(
+    configured_url: str,
+) -> None:
+    """Reject endpoint overrides that cross the provider-input boundary."""
+    payload = {**PROVIDER_PAYLOADS["aws"], "aws_endpoint_url": configured_url}
+
+    with pytest.raises(ValidationError):
+        _provider_input_adapter().validate_python(payload)
+
+
+def test_aws_endpoint_url_samples_and_documentation_are_consistent() -> None:
+    """Document the endpoint as provider input, never as a startup setting."""
+    project_root = Path(__file__).parents[3]
+
+    assert "PROWLER_AWS_ENDPOINT_URL" not in (project_root / ".env.sample").read_text(
+        encoding="utf-8"
+    )
+    assert "aws_endpoint_url" not in (project_root / "config.yml.sample").read_text(
+        encoding="utf-8"
+    )
+    readme = (project_root / "README.md").read_text(encoding="utf-8")
+    assert "`PROWLER_AWS_ENDPOINT_URL`" not in readme
+    assert "`prowler.aws_endpoint_url`" not in readme
+    assert "`aws_endpoint_url`" in readme
+    assert "per-assessment provider input" in readme
+
+
+def test_runtime_path_samples_and_documentation_are_consistent() -> None:
+    """Expose the same recommended runtime path in all operator guidance."""
+    project_root = Path(__file__).parents[3]
+    expected_path = "/usr/local/bin/prowler"
+
+    assert f"PROWLER_EXECUTABLE_PATH={expected_path}" in (
+        project_root / ".env.sample"
+    ).read_text(encoding="utf-8")
+    assert f"executable_path: '{expected_path}'" in (
+        project_root / "config.yml.sample"
+    ).read_text(encoding="utf-8")
+    readme = (project_root / "README.md").read_text(encoding="utf-8")
+    assert "`PROWLER_EXECUTABLE_PATH`" in readme
+    assert "`prowler.executable_path`" in readme
+    assert f"`{expected_path}`" in readme

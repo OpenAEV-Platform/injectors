@@ -21,6 +21,7 @@ STANDARD_ENV_SETTINGS = {
     "INJECTOR_ID",
     "INJECTOR_NAME",
     "INJECTOR_LOG_LEVEL",
+    "PROWLER_EXECUTABLE_PATH",
 }
 VALIDATION_CANARY = "PYDANTIC_VALIDATION_CANARY"
 UNEXPECTED_CANARY = "UNEXPECTED_EXCEPTION_CANARY"
@@ -61,7 +62,7 @@ def _when_sample_environment_is_loaded(project_root: Path) -> set[str]:
     }
 
 
-def _then_only_standard_settings_are_available(settings: set[str]) -> None:
+def _then_only_standard_and_prowler_settings_are_available(settings: set[str]) -> None:
     assert settings == STANDARD_ENV_SETTINGS
 
 
@@ -134,7 +135,7 @@ def test_foundation_configuration_excludes_future_provider_settings() -> None:
     """The foundation exposes only standard injector settings."""
     project_root = _given_the_prowler_project()
     settings = _when_sample_environment_is_loaded(project_root)
-    _then_only_standard_settings_are_available(settings)
+    _then_only_standard_and_prowler_settings_are_available(settings)
 
 
 def test_foundation_startup_registers_no_assessment_contracts(

@@ -8,3 +8,7 @@ injector:
   id: 'ChangeMe'
   name: 'Prowler'
   log_level: 'error'
+
+prowler:
+  # Must be a nonblank absolute path. Existence is checked only before execution.
+  executable_path: '/usr/local/bin/prowler'
