@@ -117,6 +117,32 @@ def _reject_unsafe_kubeconfig(value: SecretStr) -> SecretStr:
     return value
 
 
+_AWS_ACCOUNT_ID_PATTERN = r"^[0-9]{12}$"
+AwsAccountId = Annotated[
+    str, BeforeValidator(_reject_blank), Field(pattern=_AWS_ACCOUNT_ID_PATTERN)
+]
+
+
+def _aws_endpoint_origin(value: str) -> str | None:
+    """Reduce a validated AWS endpoint override to scheme and authority."""
+    from prowler.injector.failure_taxonomy import _safe_text
+
+    try:
+        endpoint = urlsplit(value)
+        host = endpoint.hostname
+        if endpoint.scheme.lower() not in {"http", "https"} or host is None:
+            return None
+        normalized_host = host.lower()
+        if ":" in normalized_host:
+            normalized_host = f"[{normalized_host}]"
+        authority = normalized_host
+        if endpoint.port is not None:
+            authority = f"{authority}:{endpoint.port}"
+        return _safe_text(f"{endpoint.scheme.lower()}://{authority}")
+    except Exception:
+        return None
+
+
 class ImmutableProviderInput(BaseModel):
     """Provider boundary that rejects assignment without retaining its value."""
 
@@ -135,7 +161,7 @@ class AwsProviderInput(ImmutableProviderInput):
     provider: Literal["aws"]
     aws_access_key_id: NonBlankStr
     aws_secret_access_key: NonBlankSecretStr
-    aws_account_id: NonBlankStr
+    aws_account_id: AwsAccountId
     aws_region: NonBlankStr
     aws_session_token: NonBlankSecretStr | None = None
     aws_endpoint_url: str | None = None
@@ -173,6 +199,26 @@ class AwsProviderInput(ImmutableProviderInput):
             raise ValueError("AWS endpoint URL port must be between 1 and 65535")
         return value
 
+    def safe_log_metadata(self) -> dict[str, object]:
+        """Return the log-safe metadata facts for this AWS input."""
+        from prowler.injector.failure_taxonomy import _safe_text
+
+        metadata: dict[str, object] = {}
+        if isinstance(self.aws_account_id, str):
+            metadata["aws_account_id"] = _safe_text(self.aws_account_id)
+        if isinstance(self.aws_region, str):
+            metadata["aws_region"] = _safe_text(self.aws_region)
+        metadata["aws_session_token_present"] = self.aws_session_token is not None
+        if self.aws_endpoint_url is None:
+            metadata["aws_endpoint_override_present"] = False
+            return metadata
+        endpoint = _safe_text(self.aws_endpoint_url)
+        metadata["aws_endpoint_override_present"] = True
+        origin = _aws_endpoint_origin(endpoint)
+        if origin is not None:
+            metadata["aws_endpoint_origin"] = origin
+        return metadata
+
 
 class AzureProviderInput(ImmutableProviderInput):
     """Azure provider form input."""
@@ -184,6 +230,21 @@ class AzureProviderInput(ImmutableProviderInput):
     azure_subscription_id: NonBlankStr
     azure_provider: AzureCloudEnvironment
 
+    def safe_log_metadata(self) -> dict[str, object]:
+        """Return the log-safe metadata facts for this Azure input."""
+        from prowler.injector.failure_taxonomy import _safe_text
+
+        metadata: dict[str, object] = {
+            "azure_tenant_id_present": True,
+            "azure_client_id_present": True,
+            "azure_client_secret_present": True,
+        }
+        if isinstance(self.azure_subscription_id, str):
+            metadata["azure_subscription_id"] = _safe_text(self.azure_subscription_id)
+        if isinstance(self.azure_provider, str):
+            metadata["azure_provider"] = _safe_text(self.azure_provider)
+        return metadata
+
 
 class GcpProviderInput(ImmutableProviderInput):
     """GCP provider form input."""
@@ -191,6 +252,15 @@ class GcpProviderInput(ImmutableProviderInput):
     provider: Literal["gcp"]
     gcp_service_account_json: NonBlankSecretStr
     gcp_project_id: NonBlankStr
+
+    def safe_log_metadata(self) -> dict[str, object]:
+        """Return the log-safe metadata facts for this GCP input."""
+        from prowler.injector.failure_taxonomy import _safe_text
+
+        metadata: dict[str, object] = {"gcp_credentials_present": True}
+        if isinstance(self.gcp_project_id, str):
+            metadata["gcp_project_id"] = _safe_text(self.gcp_project_id)
+        return metadata
 
 
 class KubernetesProviderInput(ImmutableProviderInput):
@@ -206,10 +276,20 @@ class KubernetesProviderInput(ImmutableProviderInput):
         """Reject kubeconfigs that could execute plugins or reach host files."""
         return _reject_unsafe_kubeconfig(value)
 
+    def safe_log_metadata(self) -> dict[str, object]:
+        """Return the log-safe metadata facts for this Kubernetes input."""
+        from prowler.injector.failure_taxonomy import _safe_text
 
+        metadata: dict[str, object] = {"kubernetes_credentials_present": True}
+        if isinstance(self.kubernetes_context, str):
+            metadata["kubernetes_context"] = _safe_text(self.kubernetes_context)
+        return metadata
+
+
+_PROVIDER_DISCRIMINATOR = "provider"
 ProviderInput = Annotated[
     AwsProviderInput | AzureProviderInput | GcpProviderInput | KubernetesProviderInput,
-    Field(discriminator="provider"),
+    Field(discriminator=_PROVIDER_DISCRIMINATOR),
 ]
 
 PROVIDER_INPUT_ADAPTER: TypeAdapter[ProviderInput] = TypeAdapter(

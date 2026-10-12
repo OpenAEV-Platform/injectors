@@ -8,9 +8,10 @@ license = "Apache-2.0"
 requires-python = ">=3.11,<4.0"
 dependencies = [
     "pyoaev (==3.261009.0); extra != 'dev'",
-    "pydantic>=2.11.3,<2.14.0",
-    "pydantic-settings>=2.11.0,<2.15.0",
+    "pydantic>=2.13.3,<2.14.0",
+    "pydantic-settings>=2.14.0,<2.15.0",
     "PyYAML>=6.0.2,<7.0.0",
+    "rich==14.2.0",
 ]
 
 [project.scripts]
@@ -59,7 +60,7 @@ strict = true
 plugins = ["pydantic.mypy"]
 
 [[tool.mypy.overrides]]
-module = ["prowler.__main__", "prowler.injector.*"]
+module = ["prowler.__main__", "prowler.contracts.*", "prowler.injector.*"]
 # pyoaev does not publish a py.typed marker or external stubs.
 disable_error_code = ["import-untyped"]
 
