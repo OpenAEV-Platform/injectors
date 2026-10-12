@@ -7,7 +7,7 @@ from uuid import UUID, uuid5
 
 from pyoaev.contracts.contract_config import prepare_contracts
 
-from .aws import AwsBaseContract
+from .aws import AwsBaseContract, AwsEc2Contract, AwsIamContract, AwsS3Contract
 from .azure import AzureBaseContract
 from .base import BaseProwlerContract
 from .catalog import ROUTE_CATALOG
@@ -82,5 +82,13 @@ class ProwlerContracts:
 
 
 DEFAULT_PROWLER_CONTRACTS = ProwlerContracts(
-    (AwsBaseContract, AzureBaseContract, GcpBaseContract, KubernetesBaseContract)
+    (
+        AwsBaseContract,
+        AzureBaseContract,
+        GcpBaseContract,
+        KubernetesBaseContract,
+        AwsIamContract,
+        AwsS3Contract,
+        AwsEc2Contract,
+    )
 )

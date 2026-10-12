@@ -1,6 +1,12 @@
 """Prowler contract declarations and the executable default registry."""
 
-from .aws import AwsBaseContract
+from .aws import (
+    AwsBaseContract,
+    AwsEc2Contract,
+    AwsIamContract,
+    AwsS3Contract,
+    AwsServiceContract,
+)
 from .azure import AzureBaseContract
 from .base import (
     BaseProwlerContract,
@@ -24,6 +30,10 @@ from .registry import (
 __all__ = [
     "BaseProwlerContract",
     "AwsBaseContract",
+    "AwsEc2Contract",
+    "AwsIamContract",
+    "AwsS3Contract",
+    "AwsServiceContract",
     "AzureBaseContract",
     "GcpBaseContract",
     "KubernetesBaseContract",
