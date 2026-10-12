@@ -50,8 +50,10 @@ jobs:
           fetch-depth: 0
 
       - uses: docker/setup-buildx-action@v4
+        if: ${{ hashFiles(format('{0}/Dockerfile', matrix.injector)) != '' }}
 
       - uses: docker/build-push-action@v4
+        if: ${{ hashFiles(format('{0}/Dockerfile', matrix.injector)) != '' }}
         with:
           build-contexts: "injector_common=./injector_common"
           context: ${{ matrix.injector }}/.
@@ -63,11 +65,12 @@ jobs:
           push: false
 
       - uses: addnab/docker-run-action@v3
+        if: ${{ hashFiles(format('{0}/Dockerfile', matrix.injector)) != '' }}
         with:
           image: localpytest-${{ matrix.injector }}:latest
-          options: -v ${{ github.workspace }}/${{ matrix.injector }}:/tmp/test-${{ matrix.injector }}
+          options: -v ${{ github.workspace }}:/tmp/github_workspace/
           run: |
-            cd /tmp/test-${{ matrix.injector }}
+            cd /tmp/github_workspace/${{ matrix.injector }}
             echo "> install and configure poetry"
             python -m pip install poetry
             python -m poetry config installer.re-resolve false
