@@ -1,13 +1,13 @@
 """Executable complete-scope and service-specific GCP contracts."""
 
-from dataclasses import replace
-from typing import ClassVar
+from typing import ClassVar, get_args
 
 from prowler._core.prowler_client import GcpServiceSelector
 from prowler.models.configs.config_loader import ProwlerConfig
 from prowler.models.provider_inputs import GcpProviderInput, ProviderInput
 
 from .base import BaseProwlerContract, ContractExecutionOutcome, RouteFamily
+from .compliance import FixedServiceContract
 
 
 class GcpBaseContract(BaseProwlerContract):
@@ -25,33 +25,18 @@ class GcpBaseContract(BaseProwlerContract):
         self, config: ProwlerConfig, provider: ProviderInput
     ) -> ContractExecutionOutcome:
         """Map one complete-scope result, preserving ordered GCP findings only."""
-        outcome = super().execute(config, provider)
-        if outcome.error is not None or outcome.command_result.return_code != 0:
-            return outcome
-        return replace(outcome, findings=self._provider_findings(outcome.findings))
+        return self._execute_scoped(config, provider)
 
 
-class GcpServiceContract(GcpBaseContract):
+class GcpServiceContract(FixedServiceContract):
     """Execute one route-owned GCP service selector through the CHK.004 seam."""
 
-    family = "service"
+    provider = "gcp"
     service_selector: ClassVar[GcpServiceSelector]
-
-    def safe_request_info(self, provider: ProviderInput | None) -> dict[str, object]:
-        """Identify the service through safe route metadata, never form input."""
-        info = super().safe_request_info(provider)
-        info["filters"] = f"service={self.service_selector}"
-        return info
-
-    def execute(
-        self, config: ProwlerConfig, provider: ProviderInput
-    ) -> ContractExecutionOutcome:
-        """Reject invalid route combinations before one service-specific client call."""
-        if self.service_selector not in ("iam", "compute"):
-            raise ValueError("unsupported GCP service selector")
-        if not isinstance(provider, GcpProviderInput):
-            raise ValueError("GCP service selector requires a GCP provider")
-        return self._execute_service(config, provider, self.service_selector)
+    service_selectors = get_args(GcpServiceSelector)
+    provider_input_type = GcpProviderInput
+    provider_label = "GCP"
+    provider_article = "a"
 
 
 class GcpIamContract(GcpServiceContract):

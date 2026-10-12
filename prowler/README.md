@@ -1,247 +1,89 @@
 # OpenAEV Prowler Injector
 
-The Prowler injector foundation registers Prowler with OpenAEV. CHK.006 adds
-reusable contract declarations, output projection, a validated concrete-contract
-registry, runtime dispatch, and the canonical route catalog. It does not register
-the future concrete assessment contracts.
+Run Prowler cloud-security assessments from OpenAEV and return the results to the platform.
+
+## Requirements
+
+- An OpenAEV instance and valid connection configuration
+- Prowler 5.36.0, reachable at `PROWLER_EXECUTABLE_PATH` (default `/usr/local/bin/prowler`)
+- Python 3.11 or later when running from source
+
+The injector emits Prowler 5.36.0 CLI arguments. The Docker image bundles Prowler 5.36.0 in its own virtual environment, linked to `/usr/local/bin/prowler`: the Prowler package uses the same `prowler` import name as this injector and pins a different pydantic version, so the two cannot share an environment. When running from source, install Prowler the same way and point `PROWLER_EXECUTABLE_PATH` at its `prowler` executable.
 
 ## Configuration
+
+Copy `config.yml.sample` to the ignored `config.yml`, or provide equivalent environment variables. Do not commit real tokens.
 
 | Environment variable | Configuration key | Default | Mandatory | Purpose |
 |---|---|---|---|---|
 | `OPENAEV_URL` | `openaev.url` | / | Yes | OpenAEV server URL |
 | `OPENAEV_TOKEN` | `openaev.token` | / | Yes | OpenAEV API token |
 | `OPENAEV_TENANT_ID` | `openaev.tenant_id` | / | No | Optional tenant identifier |
-| `INJECTOR_ID` | `injector.id` | / | Yes | Unique injector identifier |
+| `INJECTOR_ID` | `injector.id` | / | Yes | Injector identifier |
 | `INJECTOR_NAME` | `injector.name` | `Prowler` | No | Injector display name |
 | `INJECTOR_LOG_LEVEL` | `injector.log_level` | `error` | No | Runtime log level |
-| `PROWLER_EXECUTABLE_PATH` | `prowler.executable_path` | `/usr/local/bin/prowler` | No | Absolute path to the Prowler executable |
-
-Copy `config.yml.sample` to the ignored `config.yml` for local use, or supply
-the equivalent environment variables. Never commit real tokens.
-
-`prowler.executable_path` must be nonblank and absolute. Startup does not
-require the file to exist; executable resolution happens immediately before a
-future assessment execution.
-
-CHK.003 accepts this configured absolute path at its validated command-request
-boundary and preserves it in the immutable execution specification. The later
-Prowler adapter must pass `str(config.prowler.executable_path)` into that request;
-the generic engine does not hardcode a Prowler binary location.
+| `PROWLER_EXECUTABLE_PATH` | `prowler.executable_path` | `/usr/local/bin/prowler` | No | Nonblank absolute path to the Prowler executable |
 
 ## Run
+
+With Docker, using the `openaev/injector-prowler` image and the provided `docker-compose.yml`:
+
+```shell
+docker compose up -d
+```
+
+From an installed injector package:
 
 ```shell
 python -m prowler
 ```
 
-The injector registers 25 concrete assessment routes in the validated
-registry: 4 base provider routes (CHK.007–CHK.010), 7 service routes
-(CHK.011–CHK.013), and 14 compliance routes (CHK.014–CHK.016).
+The installed command is also available when the package has been installed with its script entry point:
 
-Every registered contract preserves each mapped CHK.005 finding as deterministic
-JSON text. FAILED findings are additionally projected as OpenAEV vulnerability
-outputs. SUCCESS and IGNORED findings are not projected as vulnerabilities, and
-Prowler cloud resource identifiers are not claimed to be OpenAEV asset UUIDs.
+```shell
+ProwlerInjector
+```
 
-### Rich execution traces
+## Contracts and routes
 
-Execution messages are deterministic Rich reports captured without terminal
-colour at a fixed width. The base contract supplies bounded default columns for
-CHK.005's flattened `OpenAevFinding` fields; a concrete contract can override
-`output_trace_config()` to select route-specific columns, including nested,
-numeric-index, wildcard, and fallback display paths. Missing and empty results
-remain valid display states, while row and cell limits prevent oversized
-callbacks.
+The injector registers 32 assessment routes:
 
-On success, the mapped findings section remains first. A separate ruled
-`[PROWLER] Raw OCSF evidence (bounded preview)` section follows it with the
-artifact byte count, total decoded record count, no more than ten compact rows,
-and an explicit omitted-record count. Those rows are projected only from finding
-title/UID, status/code, severity, first-resource name/UID, cloud
-provider/region/account, or the legacy provider UID. Descriptions, remediation,
-resource data, arbitrary `unmapped` content, credentials, and console output do
-not enter the preview. Empty artifacts report zero counts and remain successful.
+- **4 base provider routes:** `aws`, `azure`, `gcp`, and `kubernetes`
+- **7 service routes:** AWS `iam`, `s3`, and `ec2`; Azure `iam` and `storage`; GCP `iam` and `compute`
+- **14 compliance routes:** CIS, NIS2, ISO 27001, and MITRE ATT&CK where supported by the provider
+- **6 selectable routes:** `aws/select-service`, `aws/select-compliance`, `azure/select-service`, `azure/select-compliance`, `gcp/select-service`, and `gcp/select-compliance`
+- **1 universal route:** `universal`
 
-The trace is presentation only. It is separate from registered contract outputs
-and does not alter `execution_output_structured`. The renderer receives an
-explicit allowlist built from the parsed provider model (route, filters, and
-non-secret account, subscription, project, context, region, or requested-provider
-context). It never receives the raw form payload, credential fields, command
-environment or arguments, temporary credential paths, or raw stderr. Runtime
-errors use one closed failure classification with a fixed `failure_summary` that
-says what happened and why, plus separate fixed `operator_guidance` that says what
-to do next. ERROR metadata and the OpenAEV trace share the same code, reason,
-action, sanitized inject correlation, canonical contract/route/provider identity,
-and applicable typed evidence. The trace never receives parsed provider input, so
-account, subscription, project, and Kubernetes context do not appear in an error
-unless the contract already rendered them from its existing safe request summary.
-Structured output is serialized and measured as UTF-8 before success rendering.
-The callback accepts at most 32 MiB of encoded `execution_output_structured`; an
-oversized projection closes as `structured_output_too_large` with actual and
-accepted byte counts and no partial findings. Projection/JSON failures close as
-`structured_output_failed`, while Rich failures remain `rendering_failed`. Each
-path uses one callback attempt and no second render attempt.
+Base routes run the selected provider assessment. Service and compliance routes run their fixed scope.
 
-The runtime emits fixed `[PROWLER_INJECTOR]` lifecycle diagnostics through the
-injector logger. Startup INFO identifies the configured injector, registered
-contract count, executable path, and whether that path is absolute, exists, is a
-regular file, and is executable. Assessment events distinguish received,
-reception acknowledged, contract resolved, input validated, execution starting,
-terminal completion/failure, and callback completion/failure. Every usable-inject
-event carries a log-safe inject ID (`[A-Za-z0-9._:-]`, at most 128 characters).
-Malformed or oversized IDs use a bounded deterministic `invalid:<sha256-prefix>`
-correlation, so events remain distinguishable without logging the raw ID. Events
-also carry a controlled stage and bounded monotonic `elapsed_ms`; the logger
-supplies wall-clock timestamps. Once resolution succeeds,
-the canonical contract ID, route, and provider accompany every later event.
-Malformed envelopes receive a closed reason code without payload data.
+Selectable routes let an operator choose one supported service or compliance scope for AWS, Azure, or GCP. The universal route lets an operator select AWS, Azure, GCP, or Kubernetes, then optionally select one matching service or compliance scope. Without an optional scope, it runs the selected provider's base assessment.
 
-Successful and callback diagnostics also include approved provider facts: AWS
-account, region, normalized endpoint origin (`scheme://host[:port]`), and
-session-token/endpoint-override presence;
-Azure subscription and provider with credential-presence booleans; GCP project
-with a credential-presence boolean; or Kubernetes context with a
-credential-presence boolean. AWS access keys, Azure tenant/client ID values, and
-all credential material remain excluded.
+## Inputs and outputs
 
-Known failures add only evidence derived from the typed command specification,
-engine error, or result: configured/actual executable paths and stat checks;
-allowlisted process-start cause classes; configured timeout or output limit;
-parser name; return code; and captured stdout/stderr byte counts. OCSF decode and
-mapping failures are reported as `parsing_failed` with an allowlisted code, bounded
-record index, and closed source-path evidence. Input rejection
-uses only bounded field locations and issue types. The operational executable path
-is intentionally visible, but raw form values, credentials, arguments,
-environment values, stdin, stdout/stderr contents, exception text or traceback,
-callback payloads, finding content, GCP JSON, kubeconfig, and temporary credential
-paths are never logged or added to error traces. ERROR logging keeps
-`exc_info=False`. Metadata construction and log emission are both best-effort, so
-they cannot gate assessment delivery. Callback events distinguish
-`assessment_status` from `delivery_status`; a failed reception stops before any
-terminal callback is attempted.
-Correlated secondary cleanup is not performed inside callback handling and
-remains future work.
+Provider targets and credentials are supplied per assessment, not as injector startup configuration. GCP service-account JSON and Kubernetes kubeconfig are declared as plaintext form inputs at the OpenAEV contract boundary; they are not masked platform secret fields.
 
-Artifact lifecycle failures are also closed and actionable. Missing, nonregular,
-unreadable, and oversized artifacts, plus output-workspace preparation and cleanup
-failures, each have a distinct failure code, fixed summary, and fixed action in
-both ERROR metadata and the OpenAEV trace. When the process already returned, its
-return code and stdout/stderr byte counts are retained as typed evidence; raw
-output, exception text, and temporary paths remain excluded.
+AWS also accepts an optional `aws_endpoint_url` per-assessment provider input. When supplied, it must be an absolute HTTP or HTTPS URL with a host and no user information, query, fragment, or whitespace; it is passed to Prowler as `AWS_ENDPOINT_URL`.
 
-## Provider input boundary
+Each assessment returns every mapped finding as deterministic JSON text. Only findings whose expectation result is `FAILED` are projected as OpenAEV vulnerabilities; successful and ignored findings are not.
 
-Provider selection, account or target values, and credentials are not injector
-startup configuration. Concrete contracts supply them per assessment. The
-injector validates structure only: provider values must be nonblank, and an AWS
-account must contain exactly 12 ASCII digits. Prowler enforces region, project,
-and Kubernetes-context domain constraints at runtime. A runtime rejection is
-returned as a safe `ERROR` result without logging or echoing submitted values.
+The injector does not log or echo credential content, but the plaintext boundary exposure above remains by design.
 
-### Plaintext credential limitation
+## Operational safety
 
-At the current pyoaev/OpenAEV contract boundary, Prowler credential fields use
-ordinary `ContractText` or `ContractTextArea` controls. They are **plaintext
-inputs**; this implementation does not claim masking or secret-field protection.
-Credential fields have no defaults, are never intentionally logged or echoed,
-and are converted immediately to `SecretStr`-backed provider models after form
-submission. This limits handling inside the injector but does not remove the
-plaintext platform-boundary exposure. Value-free validation diagnostics may name
-the rejected credential field and error type, but never its submitted value.
+AWS and Azure credentials are passed to Prowler as environment values and are never written to files. GCP service-account JSON and Kubernetes kubeconfig credentials are written as plaintext to a randomly named temporary file that persists only for the Prowler command runtime and is deleted in `finally`, whether execution succeeds or fails. Prowler output goes to a separate temporary workspace directory. The injector cleans up its own temporary files and directories after normal completion or failure; it does not perform broad stale-file deletion.
 
-A future iteration will migrate these fields to credential references. CHK.006
-does not extend pyoaev or the platform with a new secret-field mechanism.
+On POSIX, credential files are owner-only (`0600`) inside owner-only (`0700`) directories. On Windows, the injector relies on the current user's temporary-directory ACL and does not claim owner-only permissions. Docker or Kubernetes pod ephemeral storage reduces exposure but does not eliminate it.
 
-`aws_endpoint_url` is an optional per-assessment provider input for AWS, like
-its credentials. When supplied, it must be an absolute HTTP or HTTPS URL with a
-host and must not contain user information, a query, a fragment, or whitespace.
-Paths and valid ports are allowed, including endpoints on localhost, private
-networks, and container services. The accepted value remains an ordinary string,
-and validation does not check network reachability.
-
-AWS account IDs contain exactly 12 ASCII digits. Contract validation reports the
-safe field/type structure and gives operators a fixed correction sentence without
-echoing the rejected value. Empty OpenAEV controls for `aws_session_token` and
-`aws_endpoint_url` are treated as omitted only at the AWS contract boundary;
-direct provider-model validation remains strict.
-
-## Prowler 5.36 CLI compatibility
-
-CHK.004 targets the installed `prowler` distribution version 5.36.0. Its
-Kubernetes parser registers `--context` for selecting a kubeconfig context;
-`--kube-context` is not registered. The adapter therefore emits
-`--kubeconfig-file <temporary path> --context <name>`. This installed parser
-evidence supersedes the stale proof-of-concept/contract spelling.
-
-## Contract credential-file lifecycle
-
-AWS and Azure credentials remain `SecretStr` environment values and are not
-written to files. Prowler 5.36 requires filesystem paths for GCP service-account
-JSON and Kubernetes kubeconfig input. Immediately before launching Prowler, one
-contract execution therefore writes that plaintext credential to a randomly
-named file inside a unique OS temporary directory. The file is closed before
-the subprocess starts so native Windows can reopen it. It persists for the
-Prowler command runtime and is deleted in `finally`, followed by its private
-directory, whether execution returns or raises. The immutable command
-specification and result may retain the now-stale temporary path, but never the
-file content.
-
-On POSIX, the directory is mode `0700` and the file is mode `0600`. Native
-Windows relies on the current user's temp-directory ACL. Python `chmod` cannot
-guarantee POSIX-equivalent ACL semantics on Windows, so this injector does not
-claim that Windows permissions are owner-only. Docker and Kubernetes pod
-ephemeral storage can reduce exposure, but does not eliminate it.
-
-An abrupt interpreter crash, forced kill, host failure, or power loss can occur
-before `finally` and leave plaintext residue in the OS temp location. Operators
-must secure and preferably encrypt the temp volume and clean stale files under
-their own retention policy. The injector deliberately performs no broad stale
-cleanup that could delete unrelated files.
-
-Each created client is one-shot and releases its copied provider input on the
-first terminal run path. Python immutable strings and copies cannot be
-guaranteed to be zeroized; the upstream OpenAEV injection payload may retain
-credential values until `process_message` returns.
+An abrupt crash, forced termination, host failure, or power loss can leave plaintext credential files and temporary assessment-output files in the operating system temporary location. Secure and preferably encrypt the temporary volume and apply an appropriate stale-file cleanup policy. Python strings cannot be guaranteed to be zeroized, so credential values may remain in process memory until the injection completes.
 
 ## Assessment output storage
 
-CHK.004 does not parse Prowler's console stream as OCSF. Each assessment owns a
-unique controlled temporary output directory and tells Prowler to write the
-single expected artifact as `findings.ocsf.json` (`--output-filename findings`
-with `-M json-ocsf`). Console stdout and stderr remain bounded diagnostics; the
-artifact is opened only at its exact path as a regular, non-symlink file and is
-read incrementally to its separate 100 MiB limit. CHK.004 debug metadata reports
-only the artifact byte size. The downstream mapper requires that captured
-artifact as bytes or text, decodes it, maps every decoded record, retains only the
-mapped findings and ten field-allowlisted preview rows, and then releases the full
-decoded records. The byte count comes from the captured artifact and the record
-count from the decoded collection; this is not a streaming or one-pass JSON
-implementation. Console stdout remains separate and is never parsed as OCSF.
+Each assessment writes Prowler's OCSF output to a unique, randomly named controlled directory. On Linux, memory-backed `/dev/shm` is preferred when it has room for the 100 MiB artifact limit plus a safety margin; otherwise the system temporary location is used. The artifact is read only at its exact path as a regular, non-symlink file.
 
-On Linux/POSIX, a writable directory at `/dev/shm` is preferred and labelled
-`memory_tmpfs`, keeping normal output in memory-backed temporary storage. It is
-selected only when a safe free-capacity probe reports at least the 100 MiB
-artifact limit plus a 16 MiB safety margin for Prowler's additional temporary or
-nested output. If `/dev/shm` is absent, unsuitable, undersized, cannot be probed,
-or fails workspace creation, the injector makes one attempt in the portable
-system temporary location labelled `filesystem_temp`, which may be disk-backed.
-Windows always uses that system-temp fallback and relies on its native
-temporary-directory ACL rather than making a POSIX permission claim. Owned
-output directories use mode `0700` on POSIX.
+On native Windows, Python does not provide the POSIX `O_NOFOLLOW` guarantee. Regular-file and device/inode identity checks inside the controlled directory are a best-effort reparse-point defence; the injector does not claim atomic reparse-point exclusion. Secure the system temporary-directory ACL against untrusted writers.
 
-On native Windows, Python does not expose the POSIX `O_NOFOLLOW` guarantee used
-to reject symlink substitution at open time. Regular-file checks before and
-after open, plus device/inode identity checks, are therefore a best-effort
-reparse-point defence inside the randomly named controlled directory. This
-fallback does not claim atomic reparse-point exclusion on native Windows;
-operators must secure the system temporary-directory ACL against untrusted
-writers.
+## Troubleshooting
 
-The complete owned output tree, including any nested compliance output, is
-recursively removed on every normal success or failure path. Cleanup is
-idempotent and never scans or deletes sibling temporary paths. An abrupt crash,
-forced kill, host failure, or power loss can still bypass controlled cleanup and
-leave output residue. Operators must protect both `/dev/shm` and the portable
-disk fallback according to the sensitivity of assessment findings and apply
-their own stale-file policy after abnormal termination.
+- Confirm `PROWLER_EXECUTABLE_PATH` is a nonblank absolute path to the intended Prowler executable.
+- Check OpenAEV URL, token, tenant configuration where applicable, and injector identity settings.
+- For authentication or permission failures, verify the per-assessment provider credentials and their permitted scope.

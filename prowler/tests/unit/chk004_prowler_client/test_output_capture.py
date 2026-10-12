@@ -398,6 +398,7 @@ def test_cleanup_failure_after_success_surfaces_only_safe_cleanup_error(
         )
 
     assert str(caught.value) == "temporary output workspace cleanup failed"
+    assert caught.value.command_result is engine.result
     assert "canary" not in repr(caught.value)
     assert caught.value.command_result is engine.result
 

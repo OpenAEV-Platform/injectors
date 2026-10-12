@@ -20,6 +20,7 @@ from .base import (
     ContractInputIssue,
     ProviderName,
     RouteFamily,
+    RouteProviderName,
 )
 from .catalog import ROUTE_CATALOG, RouteDescriptor
 from .cis import (
@@ -55,6 +56,15 @@ from .registry import (
     ProwlerContracts,
     stable_contract_id,
 )
+from .selectable import (
+    AwsSelectComplianceContract,
+    AwsSelectServiceContract,
+    AzureSelectComplianceContract,
+    AzureSelectServiceContract,
+    GcpSelectComplianceContract,
+    GcpSelectServiceContract,
+)
+from .universal import UniversalProwlerContract
 
 __all__ = [
     "BaseProwlerContract",
@@ -90,6 +100,12 @@ __all__ = [
     "KubernetesIso27001Contract",
     "Nis2ComplianceContract",
     "MitreComplianceContract",
+    "AwsSelectServiceContract",
+    "AwsSelectComplianceContract",
+    "AzureSelectServiceContract",
+    "AzureSelectComplianceContract",
+    "GcpSelectServiceContract",
+    "GcpSelectComplianceContract",
     "ContractDispatcher",
     "ContractExecutionOutcome",
     "ContractInputError",
@@ -97,11 +113,13 @@ __all__ = [
     "DEFAULT_PROWLER_CONTRACTS",
     "PROWLER_CONTRACT_NAMESPACE",
     "ProviderName",
+    "RouteProviderName",
     "ProwlerContracts",
     "ROUTE_CATALOG",
     "RouteDescriptor",
     "RouteFamily",
     "RouteHandler",
     "RouteNotFoundError",
+    "UniversalProwlerContract",
     "stable_contract_id",
 ]
