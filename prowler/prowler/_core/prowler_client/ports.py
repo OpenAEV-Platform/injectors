@@ -1,0 +1,65 @@
+"""Internal dependency ports for synchronous Prowler invocation."""
+
+from pathlib import Path
+from typing import Protocol
+
+from pydantic import SecretStr
+
+from prowler._core.cli_engine import CommandResult, ValidatedCommandRequest
+
+
+class CliEnginePort(Protocol):
+    """Execute one validated command request."""
+
+    def run(self, request: ValidatedCommandRequest) -> CommandResult:
+        """Run the command synchronously."""
+
+
+class CliEngineFactoryPort(Protocol):
+    """Create CLI engines without executing them."""
+
+    def create(self) -> CliEnginePort:
+        """Create one engine."""
+
+
+class CredentialLeasePort(Protocol):
+    """Own the lifecycle of one temporary credential resource."""
+
+    @property
+    def path(self) -> Path:
+        """Return the temporary credential path."""
+
+    def cleanup(self) -> None:
+        """Idempotently remove the owned credential resources."""
+
+
+class CredentialLeaseFactoryPort(Protocol):
+    """Materialize one secret as a cross-platform temporary lease."""
+
+    def create(self, content: SecretStr, *, suffix: str) -> CredentialLeasePort:
+        """Return a newly materialized credential lease."""
+
+
+class OutputWorkspacePort(Protocol):
+    """Own one controlled Prowler output directory and artifact."""
+
+    @property
+    def directory(self) -> Path:
+        """Return the workspace directory supplied to Prowler."""
+
+    @property
+    def backend(self) -> str:
+        """Return the closed storage-backend label."""
+
+    def read_artifact(self, *, maximum_bytes: int) -> bytes:
+        """Securely read the exact bounded output artifact."""
+
+    def cleanup(self) -> None:
+        """Idempotently remove the recursively owned workspace."""
+
+
+class OutputWorkspaceFactoryPort(Protocol):
+    """Create controlled Prowler output workspaces without executing Prowler."""
+
+    def create(self) -> OutputWorkspacePort:
+        """Return one unique output workspace."""
