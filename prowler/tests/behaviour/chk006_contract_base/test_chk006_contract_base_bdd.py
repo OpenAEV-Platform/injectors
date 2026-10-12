@@ -11,8 +11,8 @@ from unittest.mock import Mock
 
 import pytest
 from pydantic import SecretStr, ValidationError
-from pyoaev.contracts.contract_config import (  # type: ignore[import-untyped]
-    ContractText,
+from pyoaev.contracts.contract_config import (
+    ContractText,  # type: ignore[import-untyped]
 )
 
 from prowler._core.cli_engine import (

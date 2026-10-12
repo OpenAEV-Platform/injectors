@@ -46,6 +46,7 @@ from prowler.services.output_trace import generate
 
 from .provider_fields import CREDENTIAL_REFERENCE_KEY as CREDENTIAL_REFERENCE_KEY
 from .provider_fields import ProviderName as ProviderName
+from .provider_fields import RouteProviderName as RouteProviderName
 from .provider_fields import build_provider_fields as _build_provider_fields
 
 __all__ = [
@@ -56,6 +57,7 @@ __all__ = [
     "ContractInputError",
     "ContractInputIssue",
     "ProviderName",
+    "RouteProviderName",
     "RouteFamily",
 ]
 
@@ -304,33 +306,6 @@ class BaseProwlerContract(ABC):
                 if selector_kind is not None
                 else mapping.findings
             ),
-            raw_record_count=mapping.raw_record_count,
-            raw_output_bytes=mapping.raw_output_bytes,
-            raw_preview=mapping.raw_preview,
-        )
-
-    def _execute_compliance(
-        self,
-        config: ProwlerConfig,
-        provider: ProviderInput,
-        compliance_selector: ComplianceSelector,
-    ) -> ContractExecutionOutcome:
-        """Run one validated compliance selector and retain provider findings."""
-        result = self._client_factory.run(
-            config,
-            provider,
-            check_filters=self.check_filters,
-            compliance_selector=compliance_selector,
-        )
-        if result.error is not None or result.return_code != 0:
-            return ContractExecutionOutcome(command_result=result, error=result.error)
-        try:
-            mapping = map_command_result_with_evidence(result)
-        except (OcsfDecodeError, OcsfMappingError) as error:
-            return ContractExecutionOutcome(command_result=result, error=error)
-        return ContractExecutionOutcome(
-            command_result=result,
-            findings=self._provider_findings(mapping.findings),
             raw_record_count=mapping.raw_record_count,
             raw_output_bytes=mapping.raw_output_bytes,
             raw_preview=mapping.raw_preview,
