@@ -103,9 +103,7 @@ def test_selector_type_is_exactly_iam_or_compute() -> None:
     assert get_args(selector_type) == ("iam", "compute")
 
 
-def test_registry_has_exact_fifteen_canonical_contracts_without_selector_fields() -> (
-    None
-):
+def test_registry_has_22_canonical_contracts_without_selector_fields() -> None:
     """The public surface is ordered, stable, labelled, and not user-selectable."""
     serialized = DEFAULT_PROWLER_CONTRACTS.contracts()
     routes = (
@@ -123,6 +121,13 @@ def test_registry_has_exact_fifteen_canonical_contracts_without_selector_fields(
         "cis/azure",
         "cis/gcp",
         "cis/kubernetes",
+        "nis2/aws",
+        "nis2/azure",
+        "nis2/gcp",
+        "iso27001/aws",
+        "iso27001/azure",
+        "iso27001/gcp",
+        "iso27001/kubernetes",
     )
 
     assert [item["contract_id"] for item in serialized] == [

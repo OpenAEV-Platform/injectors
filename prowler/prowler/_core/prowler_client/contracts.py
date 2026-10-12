@@ -16,6 +16,13 @@ ComplianceSelector = Literal[
     "cis_3.0_azure",
     "cis_3.0_gcp",
     "cis_1.12_kubernetes",
+    "nis2_aws",
+    "nis2_azure",
+    "nis2_gcp",
+    "iso27001_2022_aws",
+    "iso27001_2022_azure",
+    "iso27001_2022_gcp",
+    "iso27001_2022_kubernetes",
 ]
 
 

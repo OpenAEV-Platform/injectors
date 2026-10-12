@@ -398,7 +398,7 @@ def test_runtime_start_logs_one_fixed_listener_event() -> None:
     assert message == _LISTENER_START
     assert metadata["injector_id"] == "injector-test"
     assert metadata["injector_name"] == "Prowler"
-    assert metadata["registered_contract_count"] == 15
+    assert metadata["registered_contract_count"] == 22
     assert metadata["configured_executable_path"] == "/usr/local/bin/prowler"
     assert set(metadata) == {
         "injector_id",
@@ -1317,7 +1317,7 @@ def test_runtime_resolved_contract_uses_renderer_for_safe_error(
 
 
 def test_default_registry_and_daemon_config_register_executable_routes() -> None:
-    """CHK.014 adds four CIS routes after the CHK.013 executable routes."""
+    """The daemon registers all executable routes through CHK.015."""
     subject = _subject()
     contracts = subject.DEFAULT_PROWLER_CONTRACTS.contracts()
     assert [item["contract_id"] for item in contracts] == [
@@ -1336,6 +1336,13 @@ def test_default_registry_and_daemon_config_register_executable_routes() -> None
         str(subject.stable_contract_id("cis/azure")),
         str(subject.stable_contract_id("cis/gcp")),
         str(subject.stable_contract_id("cis/kubernetes")),
+        str(subject.stable_contract_id("nis2/aws")),
+        str(subject.stable_contract_id("nis2/azure")),
+        str(subject.stable_contract_id("nis2/gcp")),
+        str(subject.stable_contract_id("iso27001/aws")),
+        str(subject.stable_contract_id("iso27001/azure")),
+        str(subject.stable_contract_id("iso27001/gcp")),
+        str(subject.stable_contract_id("iso27001/kubernetes")),
     ]
     daemon = _config().to_daemon_config()
     assert daemon.get("injector_contracts") == contracts

@@ -14,6 +14,15 @@ from .catalog import ROUTE_CATALOG
 from .cis import AwsCisContract, AzureCisContract, GcpCisContract, KubernetesCisContract
 from .gcp import GcpBaseContract, GcpComputeContract, GcpIamContract
 from .kubernetes import KubernetesBaseContract
+from .nis2_iso27001 import (
+    AwsIso27001Contract,
+    AwsNis2Contract,
+    AzureIso27001Contract,
+    AzureNis2Contract,
+    GcpIso27001Contract,
+    GcpNis2Contract,
+    KubernetesIso27001Contract,
+)
 
 # Committed project namespace: changing it would break stable platform identities.
 PROWLER_CONTRACT_NAMESPACE = UUID("ee49522d-80b9-5d71-b164-569ee61a75bd")
@@ -99,5 +108,12 @@ DEFAULT_PROWLER_CONTRACTS = ProwlerContracts(
         AzureCisContract,
         GcpCisContract,
         KubernetesCisContract,
+        AwsNis2Contract,
+        AzureNis2Contract,
+        GcpNis2Contract,
+        AwsIso27001Contract,
+        AzureIso27001Contract,
+        GcpIso27001Contract,
+        KubernetesIso27001Contract,
     )
 )

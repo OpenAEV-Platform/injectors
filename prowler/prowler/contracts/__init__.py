@@ -32,6 +32,17 @@ from .cis import (
 from .dispatcher import ContractDispatcher, RouteHandler, RouteNotFoundError
 from .gcp import GcpBaseContract, GcpComputeContract, GcpIamContract, GcpServiceContract
 from .kubernetes import KubernetesBaseContract
+from .nis2_iso27001 import (
+    AwsIso27001Contract,
+    AwsNis2Contract,
+    AzureIso27001Contract,
+    AzureNis2Contract,
+    GcpIso27001Contract,
+    GcpNis2Contract,
+    Iso27001ComplianceContract,
+    KubernetesIso27001Contract,
+    Nis2ComplianceContract,
+)
 from .registry import (
     DEFAULT_PROWLER_CONTRACTS,
     PROWLER_CONTRACT_NAMESPACE,
@@ -51,15 +62,24 @@ __all__ = [
     "AzureServiceContract",
     "AzureStorageContract",
     "AwsCisContract",
+    "AwsIso27001Contract",
+    "AwsNis2Contract",
     "AzureCisContract",
+    "AzureIso27001Contract",
+    "AzureNis2Contract",
     "CisComplianceContract",
     "GcpBaseContract",
     "GcpComputeContract",
     "GcpIamContract",
     "GcpServiceContract",
     "GcpCisContract",
+    "GcpIso27001Contract",
+    "GcpNis2Contract",
+    "Iso27001ComplianceContract",
     "KubernetesBaseContract",
     "KubernetesCisContract",
+    "KubernetesIso27001Contract",
+    "Nis2ComplianceContract",
     "ContractDispatcher",
     "ContractExecutionOutcome",
     "ContractInputError",
