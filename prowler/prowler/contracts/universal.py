@@ -11,7 +11,6 @@ from prowler._core.prowler_client import ComplianceSelector, ServiceSelector
 from prowler.models.configs.config_loader import ProwlerConfig
 from prowler.models.findings import OcsfPreviewRecord, OpenAevFinding
 from prowler.models.provider_inputs import (
-    PROVIDER_INPUT_ADAPTER,
     AwsProviderInput,
     AzureProviderInput,
     GcpProviderInput,
@@ -22,8 +21,11 @@ from prowler.models.provider_inputs import (
 )
 from prowler.services.output_trace import generate
 
-from .base import (CREDENTIAL_REFERENCE_KEY, ClientFactoryPort,
-                   ContractExecutionOutcome)
+from .base import (
+    CREDENTIAL_REFERENCE_KEY,
+    ClientFactoryPort,
+    ContractExecutionOutcome,
+)
 from .provider_fields import _PROVIDER_FIELDS, ProviderName
 from .provider_fields import build_provider_fields as _build_provider_fields
 from .registry import stable_contract_id

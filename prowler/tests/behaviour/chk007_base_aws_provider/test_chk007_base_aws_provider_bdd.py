@@ -18,11 +18,14 @@ from prowler._core.cli_engine import (
     ValidatedCommandRequest,
 )
 from prowler._core.prowler_client import (
-    CREDENTIAL_REFERENCE_KEY,
     OUTPUT_ARTIFACT_FILENAME,
     ProwlerClientFactory,
 )
-from prowler.contracts import DEFAULT_PROWLER_CONTRACTS, stable_contract_id
+from prowler.contracts import (
+    CREDENTIAL_REFERENCE_KEY,
+    DEFAULT_PROWLER_CONTRACTS,
+    stable_contract_id,
+)
 from prowler.models.configs.config_loader import (
     ConfigLoader,
     ProwlerConfig,

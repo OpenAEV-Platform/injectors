@@ -30,7 +30,6 @@ from prowler.contracts import (
 from prowler.injector import ProwlerInjector
 from prowler.models.configs.config_loader import (
     ConfigLoader,
-    InjectorConfig,
     ProwlerConfig,
 )
 from prowler.models.configs.injector_config_override import InjectorConfigOverride

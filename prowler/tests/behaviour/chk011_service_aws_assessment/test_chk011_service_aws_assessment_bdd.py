@@ -22,6 +22,7 @@ from prowler._core.prowler_client import (
     ProwlerClientFactory,
 )
 from prowler.contracts import (
+    CREDENTIAL_REFERENCE_KEY,
     DEFAULT_PROWLER_CONTRACTS,
     AwsServiceContract,
     stable_contract_id,
