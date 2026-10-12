@@ -46,6 +46,7 @@ _CHK015_ROUTES = (
     "iso27001/gcp",
     "iso27001/kubernetes",
 )
+_CHK016_ROUTES = ("mitre/aws", "mitre/azure", "mitre/gcp")
 _TEMP_PATHS = {
     "gcp": Path("/tmp/CANARY-GCP-CREDENTIAL.json"),  # noqa: S108
     "kubernetes": Path("/tmp/CANARY-KUBE-CREDENTIAL.yaml"),  # noqa: S108
@@ -152,6 +153,7 @@ def test_registry_retains_cis_contracts_without_selector_fields() -> None:
         "gcp/compute",
         *(item[0] for item in _ROUTES),
         *_CHK015_ROUTES,
+        *_CHK016_ROUTES,
     )
 
     assert [item["contract_id"] for item in serialized] == [

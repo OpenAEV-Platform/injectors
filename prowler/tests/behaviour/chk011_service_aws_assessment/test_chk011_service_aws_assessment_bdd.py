@@ -95,7 +95,7 @@ def test_route_selects_exact_service_once(
     assert factory.calls[0][2:] == ((), service)
 
 
-def test_registry_has_22_canonical_contracts_without_selector_fields() -> None:
+def test_registry_has_25_canonical_contracts_without_selector_fields() -> None:
     """The public surface is ordered, stable, labelled, and not user-selectable."""
     serialized = DEFAULT_PROWLER_CONTRACTS.contracts()
     routes = (
@@ -119,6 +119,9 @@ def test_registry_has_22_canonical_contracts_without_selector_fields() -> None:
         "iso27001/azure",
         "iso27001/gcp",
         "iso27001/kubernetes",
+        "mitre/aws",
+        "mitre/azure",
+        "mitre/gcp",
     )
 
     assert [item["contract_id"] for item in serialized] == [

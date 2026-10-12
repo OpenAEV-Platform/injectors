@@ -113,6 +113,9 @@ def test_default_registration_identity_fields_and_outputs() -> None:
         str(stable_contract_id("iso27001/azure")),
         str(stable_contract_id("iso27001/gcp")),
         str(stable_contract_id("iso27001/kubernetes")),
+        str(stable_contract_id("mitre/aws")),
+        str(stable_contract_id("mitre/azure")),
+        str(stable_contract_id("mitre/gcp")),
     ]
     assert UUID(serialized[0]["contract_id"]) == expected_id
     assert expected_id.version == 5

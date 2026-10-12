@@ -14,6 +14,7 @@ from .catalog import ROUTE_CATALOG
 from .cis import AwsCisContract, AzureCisContract, GcpCisContract, KubernetesCisContract
 from .gcp import GcpBaseContract, GcpComputeContract, GcpIamContract
 from .kubernetes import KubernetesBaseContract
+from .mitre import AwsMitreContract, AzureMitreContract, GcpMitreContract
 from .nis2_iso27001 import (
     AwsIso27001Contract,
     AwsNis2Contract,
@@ -115,5 +116,8 @@ DEFAULT_PROWLER_CONTRACTS = ProwlerContracts(
         AzureIso27001Contract,
         GcpIso27001Contract,
         KubernetesIso27001Contract,
+        AwsMitreContract,
+        AzureMitreContract,
+        GcpMitreContract,
     )
 )
