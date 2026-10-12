@@ -311,33 +311,6 @@ class BaseProwlerContract(ABC):
             raw_preview=mapping.raw_preview,
         )
 
-    def _execute_compliance(
-        self,
-        config: ProwlerConfig,
-        provider: ProviderInput,
-        compliance_selector: ComplianceSelector,
-    ) -> ContractExecutionOutcome:
-        """Run one validated compliance selector and retain provider findings."""
-        result = self._client_factory.run(
-            config,
-            provider,
-            check_filters=self.check_filters,
-            compliance_selector=compliance_selector,
-        )
-        if result.error is not None or result.return_code != 0:
-            return ContractExecutionOutcome(command_result=result, error=result.error)
-        try:
-            mapping = map_command_result_with_evidence(result)
-        except (OcsfDecodeError, OcsfMappingError) as error:
-            return ContractExecutionOutcome(command_result=result, error=error)
-        return ContractExecutionOutcome(
-            command_result=result,
-            findings=self._provider_findings(mapping.findings),
-            raw_record_count=mapping.raw_record_count,
-            raw_output_bytes=mapping.raw_output_bytes,
-            raw_preview=mapping.raw_preview,
-        )
-
     @staticmethod
     def output_trace_config() -> dict[str, object]:
         """Return the common flattened-field trace contract."""

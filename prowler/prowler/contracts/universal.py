@@ -11,7 +11,6 @@ from prowler._core.prowler_client import ComplianceSelector, ServiceSelector
 from prowler.models.configs.config_loader import ProwlerConfig
 from prowler.models.findings import OcsfPreviewRecord, OpenAevFinding
 from prowler.models.provider_inputs import (
-    PROVIDER_INPUT_ADAPTER,
     AwsProviderInput,
     AzureProviderInput,
     GcpProviderInput,
