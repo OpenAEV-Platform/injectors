@@ -12,7 +12,7 @@ dependencies = [
     "pyoaev (==3.261013.0); extra != 'dev'",
     "injector_common @ ../injector_common",
     "pydantic (>=2.11.3,<2.14.0)",
-    "pydantic-settings (>=2.11.0,<2.15.0)",
+    "pydantic-settings (>=2.15.0,<2.16.0)",
     "requests~=2.33",
 ]
 
