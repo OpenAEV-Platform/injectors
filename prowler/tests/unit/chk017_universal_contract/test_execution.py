@@ -25,6 +25,13 @@ from prowler.models.configs.config_loader import ProwlerConfig
 from prowler.models.provider_inputs import AzureProviderInput
 
 
+def _fixed_manual(provider: str, form: dict[str, object]) -> dict[str, object]:
+    """Return a fixed-route form selecting manual credentials, as universal does."""
+    if provider == "kubernetes":
+        return dict(form)
+    return {**form, "credential_source": "manual"}
+
+
 def _specification() -> ExecutionSpecification:
     """Build the immutable fake execution specification."""
     return ExecutionSpecification(
@@ -339,7 +346,7 @@ def test_failed_run_preserves_error_and_empty_findings(
 
     fixed = DEFAULT_PROWLER_CONTRACTS.resolve(str(stable_contract_id("gcp/compute")))
     fixed._client_factory = _ClientFactory(failed)
-    fixed_parsed = fixed.parse_input(dict(provider_forms["gcp"]))
+    fixed_parsed = fixed.parse_input(_fixed_manual("gcp", provider_forms["gcp"]))
     fixed_outcome = fixed.execute(ProwlerConfig(), fixed_parsed)
     assert fixed_outcome.error is engine_error
     assert fixed_outcome.findings == outcome.findings

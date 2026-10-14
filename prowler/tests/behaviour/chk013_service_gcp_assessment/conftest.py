@@ -62,6 +62,7 @@ class RecordingLogger:
 def gcp_form() -> dict[str, object]:
     """Return structurally valid placeholder-only GCP form input."""
     return {
+        "credential_source": "manual",
         "gcp_service_account_json": "SERVICE-ACCOUNT-CANARY\nFORM-CANARY",
         "gcp_project_id": "PROJECT-CANARY",
     }

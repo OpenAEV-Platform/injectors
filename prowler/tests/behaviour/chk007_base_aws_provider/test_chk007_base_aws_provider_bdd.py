@@ -23,6 +23,7 @@ from prowler._core.prowler_client import (
 )
 from prowler.contracts import (
     CREDENTIAL_REFERENCE_KEY,
+    CREDENTIAL_SOURCE_KEY,
     DEFAULT_PROWLER_CONTRACTS,
     stable_contract_id,
 )
@@ -133,13 +134,14 @@ def test_default_registration_identity_fields_and_outputs() -> None:
     content = json.loads(serialized[0]["contract_content"])
     assert content["external_id"] == "prowler:aws"
     assert tuple(field["key"] for field in content["fields"]) == (
+        CREDENTIAL_SOURCE_KEY,
+        CREDENTIAL_REFERENCE_KEY,
         "aws_access_key_id",
         "aws_secret_access_key",
         "aws_account_id",
         "aws_region",
         "aws_endpoint_url",
         "aws_session_token",
-        CREDENTIAL_REFERENCE_KEY,
     )
     assert tuple(output["field"] for output in content["outputs"]) == (
         "findings",
@@ -277,7 +279,7 @@ def test_fake_engine_proves_exact_aws_subprocess_arguments(
         "--output-filename",
         "findings",
         "-z",
-        "--only-logs",
+        "-b",
         "--no-color",
         "-M",
         "json-ocsf",

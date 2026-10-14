@@ -257,7 +257,7 @@ def test_request_has_small_console_limit_and_exact_ordered_output_controls(
         "--output-filename",
         "findings",
         "-z",
-        "--only-logs",
+        "-b",
         "--no-color",
         "-M",
         "json-ocsf",

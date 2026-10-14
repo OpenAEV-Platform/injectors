@@ -8,6 +8,13 @@ from hashlib import sha256
 from time import monotonic
 from typing import Literal
 
+from pyoaev.credential import (
+    AwsAssumeRoleSecret,
+    CredentialErrorCode,
+    CredentialResolutionError,
+    get_credential_attachment,
+    resolve_credential_attachment,
+)
 from pyoaev.helpers import OpenAEVInjectorHelper
 from pyoaev.utils import AppLogger
 
@@ -17,6 +24,13 @@ from prowler.contracts.base import (
     ContractExecutionOutcome,
     ContractInputError,
 )
+from prowler.injector.authentication import (
+    AwsAccountMismatchError,
+    CloudAuthentication,
+    CredentialScopeMissingError,
+    aws_account_from_role_arn,
+    parse_authentication,
+)
 from prowler.injector.failure_classifier import FailureClassifier
 from prowler.injector.failure_presentation import FailurePresenter
 from prowler.injector.failure_taxonomy import (
@@ -24,9 +38,12 @@ from prowler.injector.failure_taxonomy import (
     _ASSESSMENT_RECEIVED,
     _ASSESSMENT_SUCCEEDED,
     _ASSESSMENT_VALIDATED,
+    _AWS_ACCOUNT_MISMATCH,
     _CALLBACK_COMPLETED,
     _CALLBACK_FAILED,
+    _CLOUD_AUTHENTICATED,
     _CONTRACT_RESOLVED,
+    _CREDENTIAL_RESOLVED,
     _EXECUTION_STARTED,
     _INJECT_ID_PATTERN,
     _INVALID_INJECT_ID_DIGEST_LENGTH,
@@ -35,11 +52,19 @@ from prowler.injector.failure_taxonomy import (
     _MAXIMUM_ACCEPTED_STRUCTURED_OUTPUT_BYTES,
     _RECEPTION_ACKNOWLEDGED,
     _FailurePresentation,
+    _safe_text,
     _terminal_callback,
 )
 from prowler.injector.lifecycle_metadata import LifecycleMetadataBuilder
 from prowler.models import ConfigLoader
-from prowler.models.provider_inputs import ProviderInput
+from prowler.models.provider_inputs import (
+    AWS_PROVIDER_INPUTS,
+    CredentialReferenceProviderInput,
+    KubernetesReferenceProviderInput,
+    ProviderInput,
+)
+
+_LEGACY_CREDENTIAL_SOURCE = "the inject credential fields"
 
 
 class _Stage(Enum):
@@ -49,6 +74,7 @@ class _Stage(Enum):
     RECEPTION_ACKNOWLEDGED = "reception_acknowledged"
     CONTRACT_RESOLUTION = "contract_resolution"
     INPUT_VALIDATION = "input_validation"
+    CREDENTIAL_RESOLUTION = "credential_resolution"
     ASSESSMENT_EXECUTION = "assessment_execution"
     OUTPUT_PREPARATION = "output_preparation"
 
@@ -136,7 +162,8 @@ class ProwlerInjector:
             return
         try:
             contract = self._resolve_contract(run, injection)
-            provider = self._validate_input(run, injection, contract)
+            provider = self._validate_input(run, data, injection, contract)
+            provider = self._resolve_credential(run, contract, provider)
             run.stage = _Stage.ASSESSMENT_EXECUTION
             self._log(
                 "info",
@@ -152,6 +179,7 @@ class ProwlerInjector:
                 ),
             )
             outcome = contract.execute(self.config.prowler, provider)
+            self._report_authentication(run, provider, outcome)
             if outcome.error is not None or outcome.command_result.return_code != 0:
                 duration = int(monotonic() - started)
                 failure = self._classifier._classify_assessment_failure(
@@ -271,15 +299,23 @@ class ProwlerInjector:
     def _validate_input(
         self,
         run: _MessageRun,
+        data: dict[str, object],
         injection: Mapping[str, object],
         contract: BaseProwlerContract,
     ) -> ProviderInput:
-        """Strictly parse the injection content into a provider input."""
+        """Strictly parse the injection content into a provider input.
+
+        The credential attachment of the job, when present, selects the
+        reference path of the contract input instead of its legacy fields.
+        """
         run.stage = _Stage.INPUT_VALIDATION
         content = injection.get("inject_content")
         if not isinstance(content, Mapping):
             raise ContractInputError(())
-        provider = contract.parse_input(content)
+        credential_attachment = get_credential_attachment(data)
+        provider = contract.parse_input(
+            content, credential_attachment=credential_attachment
+        )
         run.provider = provider
         self._log(
             "debug",
@@ -295,6 +331,167 @@ class ProwlerInjector:
             ),
         )
         return provider
+
+    def _resolve_credential(
+        self,
+        run: _MessageRun,
+        contract: BaseProwlerContract,
+        provider: ProviderInput,
+    ) -> ProviderInput:
+        """Resolve the referenced credential just in time for this execution.
+
+        Runs after the reception acknowledgment and before the callback, while
+        the inject authorisation code is valid. Legacy inputs are returned
+        unchanged and send no resolution request.
+        """
+        if not isinstance(provider, CredentialReferenceProviderInput):
+            return provider
+        run.stage = _Stage.CREDENTIAL_RESOLUTION
+        reference = provider.credential_attachment.reference
+        if isinstance(provider, KubernetesReferenceProviderInput):
+            # No credential type maps to Kubernetes: no secret can be used.
+            raise CredentialResolutionError(
+                CredentialErrorCode.CREDENTIAL_INCOMPATIBLE, reference
+            )
+        resolved_secret = resolve_credential_attachment(
+            self.helper.api,
+            run.inject_id,
+            provider.credential_attachment,
+            provider.provider,
+        )
+        resolved = provider.with_resolved_secret(resolved_secret)
+        run.provider = resolved
+        self._log(
+            "info",
+            _CREDENTIAL_RESOLVED,
+            self._guard(
+                lambda: self._context_metadata(
+                    run.started,
+                    run.safe_inject_id,
+                    stage=run.stage.value,
+                    contract=contract,
+                    provider=resolved,
+                )
+            ),
+        )
+        missing = resolved.missing_scope_fields()
+        if missing:
+            # The form fields are hidden with the credential manager: the
+            # region, subscription, or project must be set on the credential.
+            raise CredentialScopeMissingError(reference, missing)
+        if isinstance(resolved_secret, AwsAssumeRoleSecret) and isinstance(
+            resolved, AWS_PROVIDER_INPUTS
+        ):
+            # The role ARN names the account it lives in: a credential for
+            # another account is rejected before Prowler scans it.
+            account = aws_account_from_role_arn(resolved_secret.aws_role_arn)
+            if account is not None and account != resolved.aws_account_id:
+                raise AwsAccountMismatchError(
+                    reference, resolved.aws_account_id, account
+                )
+        return resolved
+
+    def _report_authentication(
+        self,
+        run: _MessageRun,
+        provider: ProviderInput,
+        outcome: ContractExecutionOutcome,
+    ) -> None:
+        """Log and trace the cloud identity Prowler authenticated as.
+
+        Prowler prints its credentials box only once the provider authenticated,
+        so its presence is the authentication success evidence, even when the
+        scan fails afterwards. An AWS account other than the one set on the
+        inject is reported as a warning: the findings belong to that account.
+        """
+        try:
+            authentication = parse_authentication(outcome.command_result.stdout)
+        except Exception:
+            return
+        if authentication is None:
+            return
+        source = self._credential_source(provider)
+        identity = ", ".join(
+            f"{key}: {value}" for key, value in authentication.identity
+        )
+        message = f"Authenticated against {authentication.provider}" + (
+            f" ({identity})" if identity else ""
+        )
+        message = f"{message} with {source}"
+        self._log(
+            "info",
+            _CLOUD_AUTHENTICATED,
+            self._guard(
+                lambda: {
+                    **self._context_metadata(
+                        run.started, run.safe_inject_id, stage=run.stage.value
+                    ),
+                    "authenticated_provider": authentication.provider,
+                    "authenticated_identity": dict(authentication.identity),
+                    "credential_source": source,
+                }
+            ),
+        )
+        self._send_trace(run, "prerequisite_check", "INFO", message)
+        self._report_aws_account_mismatch(run, provider, authentication)
+
+    def _report_aws_account_mismatch(
+        self,
+        run: _MessageRun,
+        provider: ProviderInput,
+        authentication: CloudAuthentication,
+    ) -> None:
+        """Warn when Prowler scanned another AWS account than the inject's."""
+        if not isinstance(provider, AWS_PROVIDER_INPUTS):
+            return
+        account = authentication.aws_account_id
+        if account is None or account == provider.aws_account_id:
+            return
+        self._log(
+            "warning",
+            _AWS_ACCOUNT_MISMATCH,
+            {
+                "inject_id": run.safe_inject_id,
+                "expected_aws_account_id": provider.aws_account_id,
+                "authenticated_aws_account_id": account,
+            },
+        )
+        self._send_trace(
+            run,
+            "prerequisite_check",
+            "WARNING",
+            f"Prowler authenticated against AWS account {account}, not the AWS "
+            f"account {provider.aws_account_id} set on this inject: the findings "
+            f"belong to account {account}.",
+        )
+
+    @staticmethod
+    def _credential_source(provider: ProviderInput) -> str:
+        """Name the credential used, never its value."""
+        if not isinstance(provider, CredentialReferenceProviderInput):
+            return _LEGACY_CREDENTIAL_SOURCE
+        reference = _safe_text(provider.credential_attachment.reference)
+        source = f"credential reference {reference}"
+        if provider.resolved_secret is not None:
+            source = f"{source} ({provider.resolved_secret.secret_type.value})"
+        return source
+
+    def _send_trace(
+        self, run: _MessageRun, action: str, status: str, message: str
+    ) -> None:
+        """Send one intermediate trace; a delivery failure never fails the run."""
+        try:
+            self.helper.api.inject.execution_callback(
+                inject_id=run.inject_id,
+                data={
+                    "execution_message": message,
+                    "execution_status": status,
+                    "execution_duration": int(monotonic() - run.started),
+                    "execution_action": action,
+                },
+            )
+        except Exception:
+            return
 
     def _prepare_output(
         self,

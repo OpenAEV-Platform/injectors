@@ -13,6 +13,14 @@ from prowler.contracts import (
 )
 from prowler.models.provider_inputs import AwsProviderInput
 
+
+def _fixed_manual(provider: str, form: dict[str, object]) -> dict[str, object]:
+    """Return a fixed-route form selecting manual credentials, as universal does."""
+    if provider == "kubernetes":
+        return dict(form)
+    return {**form, "credential_source": "manual"}
+
+
 PROVIDER_KEY = "prowler_provider"
 SERVICE_KEYS = {
     "aws": "prowler_service_aws",
@@ -85,7 +93,7 @@ def test_provider_select_parses_each_provider_to_strict_model(
     form = {**provider_forms[provider], PROVIDER_KEY: [provider]}
     parsed = contract.parse_input(form)
     fixed = _fixed(provider)
-    expected = fixed.parse_input(dict(provider_forms[provider]))
+    expected = fixed.parse_input(_fixed_manual(provider, provider_forms[provider]))
     assert type(parsed) is type(expected)
     assert parsed == expected
     # Explicit empty scope selects mean the same "none" scope.
@@ -392,8 +400,13 @@ def test_wrong_provider_fields_stripped_without_issues(
 ) -> None:
     """Assert non-selected-provider fields are stripped, never validated or reported."""
     contract = _contract()
+    # The credential source select is shared by every provider, not foreign.
     foreign_keys = tuple(
-        key for other in PROVIDERS if other != provider for key in provider_forms[other]
+        key
+        for other in PROVIDERS
+        if other != provider
+        for key in provider_forms[other]
+        if key != "credential_source"
     )
     if mode == "absent":
         form: dict[str, object] = {PROVIDER_KEY: [provider]}
@@ -410,11 +423,12 @@ def test_wrong_provider_fields_stripped_without_issues(
             },
             PROVIDER_KEY: [provider],
         }
+    form = {**form, **_fixed_manual(provider, {})}
     with pytest.raises(ContractInputError) as excinfo:
         contract.parse_input(form)
     fixed = _fixed(provider)
     with pytest.raises(ContractInputError) as fixed_error:
-        fixed.parse_input({})
+        fixed.parse_input(_fixed_manual(provider, {}))
     assert excinfo.value.issues == fixed_error.value.issues
     for key in foreign_keys:
         assert not any(key in issue.location for issue in excinfo.value.issues)
@@ -430,7 +444,7 @@ def test_aws_empty_optional_normalization_only_when_aws_selected(
         "aws_session_token": "",
     }
     fixed = _fixed("aws")
-    expected = fixed.parse_input(dict(aws_form))
+    expected = fixed.parse_input(_fixed_manual("aws", aws_form))
     contract = _contract()
     parsed = contract.parse_input({**aws_form, PROVIDER_KEY: ["aws"]})
     assert parsed == expected
