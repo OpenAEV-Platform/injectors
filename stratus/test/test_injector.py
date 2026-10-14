@@ -6,10 +6,20 @@ import tempfile
 from unittest import TestCase
 from unittest.mock import MagicMock, patch
 
-from pyoaev.credential import CredentialErrorCode, CredentialResolutionError
+from injector_common.stratus_executor import (
+    AUTH_FAILED,
+    AUTH_PASSED,
+    StratusExecutor,
+    StratusResult,
+    parse_authentication,
+)
+from pyoaev.credential import (
+    CredentialCleanupError,
+    CredentialErrorCode,
+    CredentialResolutionError,
+)
 
 import stratus.openaev_stratus as mod
-from injector_common.stratus_executor import StratusExecutor, StratusResult
 from stratus.contracts import CONTRACT_REGISTRY, technique_contract_id
 from stratus.contracts.platforms import (
     AWS_CUSTOM_CONTRACT,
@@ -49,6 +59,13 @@ def make_injector():
 
 
 def _data(content, contract_id, attachments=None):
+    # The credential source the form sends, unless the test sets its own: the
+    # credential manager with a credential reference, manual credentials
+    # otherwise. Platforms without a credential type ignore it.
+    content = {
+        "credential_source": "credential_manager" if attachments else "manual",
+        **content,
+    }
     data = {
         "injection": {
             "inject_id": "i1",
@@ -85,6 +102,7 @@ AZURE_SERVICE_PRINCIPAL_PAYLOAD = {
         "azure_client_id": "ref-client",
         "azure_client_secret": "ref-azure-secret",
         "azure_tenant_id": "ref-tenant",
+        "azure_subscription_id": "ref-subscription",
     },
 }
 GCP_SERVICE_ACCOUNT_KEY = b'{"type": "service_account", "private_key": "ref-gcp-key"}'
@@ -484,7 +502,9 @@ class ProcessMessageCredentialReferenceTest(TestCase):
         self.assertEqual(env["AWS_REGION"], "us-west-2")
         self.assertEqual(env["AWS_DEFAULT_REGION"], "us-west-2")
 
-    def test_inject_region_used_when_the_credential_omits_it(self):
+    def test_default_region_used_when_the_credential_omits_it(self):
+        # The inject region field is hidden with the credential manager: a
+        # stale form value is ignored, the Stratus default applies.
         payload = {
             "type": "AWS_ACCESS_KEY",
             "value": {
@@ -492,16 +512,13 @@ class ProcessMessageCredentialReferenceTest(TestCase):
                 "aws_secret_access_key": "ref-aws-secret",
             },
         }
-        for content, expected in (
-            ({"aws_region": " eu-west-3 "}, "eu-west-3"),
-            ({}, "us-east-1"),
-        ):
+        for content in ({"aws_region": " eu-west-3 "}, {}):
             with self.subTest(content=content):
                 injector = self._injector(payload)
                 injector.process_message(_data(content, AWS_TECH_CONTRACT, ATTACHMENTS))
                 env = self._detonate_env(injector)
-                self.assertEqual(env["AWS_REGION"], expected)
-                self.assertEqual(env["AWS_DEFAULT_REGION"], expected)
+                self.assertEqual(env["AWS_REGION"], "us-east-1")
+                self.assertEqual(env["AWS_DEFAULT_REGION"], "us-east-1")
 
     def test_assume_role_region_is_not_overridden(self):
         payload = {
@@ -522,7 +539,7 @@ class ProcessMessageCredentialReferenceTest(TestCase):
         self.assertNotIn("AWS_REGION", env)
         self.assertEqual(env["AWS_PROFILE"], "srt-target")
 
-    def test_inject_subscription_used_when_the_credential_omits_it(self):
+    def test_resolved_subscription_wins_over_the_inject_fields(self):
         injector = self._injector(AZURE_SERVICE_PRINCIPAL_PAYLOAD)
         content = {
             "azure_subscription_id": "form-subscription",
@@ -531,8 +548,55 @@ class ProcessMessageCredentialReferenceTest(TestCase):
         }
         injector.process_message(_data(content, AZURE_CUSTOM_CONTRACT, ATTACHMENTS))
         env = self._detonate_env(injector)
-        self.assertEqual(env["AZURE_SUBSCRIPTION_ID"], "form-subscription")
+        self.assertEqual(env["AZURE_SUBSCRIPTION_ID"], "ref-subscription")
         self.assertEqual(env["AZURE_CLIENT_SECRET"], "ref-azure-secret")
+
+    def test_credential_without_subscription_is_reported_on_the_credential(self):
+        payload = json.loads(json.dumps(AZURE_SERVICE_PRINCIPAL_PAYLOAD))
+        del payload["value"]["azure_subscription_id"]
+        injector = self._injector(payload)
+        content = {"azure_subscription_id": "form-subscription", "technique_id": "x"}
+        injector.process_message(_data(content, AZURE_CUSTOM_CONTRACT, ATTACHMENTS))
+        injector.stratus.detonate.assert_not_called()
+        callback = self._callback(injector)
+        self.assertEqual(callback["execution_status"], "ERROR")
+        self.assertEqual(
+            callback["execution_message"],
+            f"The credential {REFERENCE} has no Azure Subscription ID. Set it on "
+            "the credential, then run it again.",
+        )
+
+    def test_credential_manager_without_credential_is_reported(self):
+        injector = self._injector()
+        injector.process_message(
+            _data({"credential_source": "credential_manager"}, AWS_TECH_CONTRACT)
+        )
+        injector.stratus.detonate.assert_not_called()
+        injector.helper.api.inject.resolve_attachment_secret.assert_not_called()
+        callback = self._callback(injector)
+        self.assertEqual(callback["execution_status"], "ERROR")
+        self.assertEqual(callback["execution_message"], mod.CREDENTIAL_MISSING_MESSAGE)
+
+    def test_manual_credentials_ignore_an_attached_credential(self):
+        injector = self._injector()
+        content = {"credential_source": "manual", **AWS_CREDS}
+        injector.process_message(_data(content, AWS_TECH_CONTRACT, ATTACHMENTS))
+        injector.helper.api.inject.resolve_attachment_secret.assert_not_called()
+        env = injector.stratus.detonate.call_args.kwargs["env"]
+        self.assertEqual(env["AWS_ACCESS_KEY_ID"], "AKIA")
+
+    def test_unknown_credential_source_is_reported(self):
+        for source in (None, "", "other", ["manual", "credential_manager"]):
+            with self.subTest(source=source):
+                injector = self._injector()
+                content = {"credential_source": source, **AWS_CREDS}
+                injector.process_message(_data(content, AWS_TECH_CONTRACT))
+                injector.stratus.detonate.assert_not_called()
+                callback = self._callback(injector)
+                self.assertEqual(
+                    callback["execution_message"],
+                    mod.CREDENTIAL_SOURCE_INVALID_MESSAGE,
+                )
 
     def test_resolved_project_wins_and_key_file_is_removed_after_success(self):
         seen = {}
@@ -688,3 +752,253 @@ class StratusExecutorTest(TestCase):
         result = StratusExecutor().cleanup("aws.foo")
         self.assertFalse(result.success)
         self.assertEqual(result.status, "ERROR")
+
+
+def _stratus_output(*lines):
+    return "".join(f"2026/10/13 12:00:00 {line}\n" for line in lines)
+
+
+class ParseAuthenticationTest(TestCase):
+    def test_passed_when_stratus_exits_successfully(self):
+        output = _stratus_output("Checking your authentication against AWS")
+        self.assertEqual(parse_authentication(output, 0), ("AWS", AUTH_PASSED, None))
+
+    def test_passed_when_stratus_goes_on_then_fails_later(self):
+        output = _stratus_output(
+            "Checking your authentication against AWS",
+            "Warming up aws.persistence.iam-backdoor-user",
+            "Error: terraform apply failed",
+        )
+        self.assertEqual(parse_authentication(output, 1), ("AWS", AUTH_PASSED, None))
+
+    def test_failed_with_the_stratus_failure_message(self):
+        for platform, failure in (
+            ("AWS", "you are not authenticated against AWS, *or* you have not set "),
+            ("azure", "AZURE_SUBSCRIPTION_ID is not set."),
+            ("GCP", "you are not authenticated against GCP, or you have not set "),
+            ("kubernetes", "You do not have a kubeconfig set up, or you do not"),
+            ("EKS", "unable to load AWS configuration, boom"),
+        ):
+            with self.subTest(platform=platform):
+                output = _stratus_output(
+                    f"Checking your authentication against {platform}", failure
+                )
+                self.assertEqual(
+                    parse_authentication(output, 1),
+                    (platform, AUTH_FAILED, failure.strip()),
+                )
+
+    def test_failed_when_stratus_stops_right_after_the_check(self):
+        output = _stratus_output("Checking your authentication against GCP")
+        self.assertEqual(parse_authentication(output, 1), ("GCP", AUTH_FAILED, None))
+
+    def test_no_check_reached(self):
+        for output, returncode in (("", 0), ("", 1), ("unknown technique\n", 1)):
+            with self.subTest(output=output):
+                self.assertEqual(
+                    parse_authentication(output, returncode), (None, None, None)
+                )
+
+    def test_line_without_go_log_prefix_is_accepted(self):
+        output = "Checking your authentication against entra-id\nok\n"
+        self.assertEqual(
+            parse_authentication(output, 0), ("entra-id", AUTH_PASSED, None)
+        )
+
+
+class StratusExecutorAuthenticationTest(TestCase):
+    @patch("injector_common.stratus_executor.subprocess.run")
+    def test_success_reports_the_passed_check(self, run):
+        run.return_value = MagicMock(
+            returncode=0,
+            stdout=_stratus_output("Checking your authentication against AWS"),
+            stderr="",
+        )
+        result = StratusExecutor().detonate("aws.foo")
+        self.assertEqual(result.auth_platform, "AWS")
+        self.assertEqual(result.auth_status, AUTH_PASSED)
+
+    @patch("injector_common.stratus_executor.subprocess.run")
+    def test_authentication_failure_has_a_clean_message(self, run):
+        run.return_value = MagicMock(
+            returncode=1,
+            stdout=_stratus_output(
+                "Checking your authentication against AWS",
+                "you are not authenticated against AWS, *or* you have not set your "
+                "region.",
+                "",
+                "Troubleshooting:",
+            ),
+            stderr="",
+        )
+        result = StratusExecutor().detonate("aws.foo")
+        self.assertFalse(result.success)
+        self.assertEqual(result.auth_status, AUTH_FAILED)
+        self.assertEqual(
+            result.message,
+            "Authentication against AWS failed: you are not authenticated against "
+            "AWS, *or* you have not set your region.",
+        )
+
+    @patch("injector_common.stratus_executor.subprocess.run")
+    def test_other_failure_reports_the_tail_of_the_output(self, run):
+        run.return_value = MagicMock(
+            returncode=1,
+            stdout=_stratus_output(
+                "Checking your authentication against AWS", "x" * 600, "real error"
+            ),
+            stderr="",
+        )
+        result = StratusExecutor().detonate("aws.foo")
+        self.assertEqual(result.auth_status, AUTH_PASSED)
+        self.assertTrue(result.message.endswith("real error"))
+        self.assertLessEqual(len(result.message), 500)
+
+
+class ProcessMessageAuthenticationTest(TestCase):
+    def _injector(self, result, payload=AWS_ACCESS_KEY_PAYLOAD):
+        injector = make_injector()
+        injector.helper.api.inject.resolve_attachment_secret.return_value = payload
+        injector.stratus.detonate.return_value = result
+        return injector
+
+    @staticmethod
+    def _result(platform, status=AUTH_PASSED, success=True, message="Detonated t"):
+        return StratusResult(
+            success=success,
+            technique_id="t",
+            status="DETONATED" if success else "ERROR",
+            message=message,
+            auth_platform=platform,
+            auth_status=status,
+        )
+
+    def _callbacks(self, injector):
+        return [
+            call.kwargs["data"]
+            for call in injector.helper.api.inject.execution_callback.call_args_list
+        ]
+
+    def _info_logs(self, injector):
+        return [
+            call.args[0] for call in injector.helper.injector_logger.info.call_args_list
+        ]
+
+    def test_passed_check_is_traced_before_completion(self):
+        injector = self._injector(self._result("AWS"))
+        injector.process_message(_data({}, AWS_TECH_CONTRACT, ATTACHMENTS))
+        auth, complete = self._callbacks(injector)
+        self.assertEqual(auth["execution_action"], "prerequisite_check")
+        self.assertEqual(auth["execution_status"], "INFO")
+        self.assertEqual(
+            auth["execution_message"],
+            f"Authenticated against AWS with credential reference {REFERENCE} "
+            "(AWS_ACCESS_KEY)",
+        )
+        self.assertEqual(complete["execution_action"], "complete")
+        self.assertEqual(complete["execution_status"], "SUCCESS")
+        self.assertTrue(
+            any(
+                log.startswith("Authenticated against AWS")
+                for log in self._info_logs(injector)
+            )
+        )
+        for data in self._callbacks(injector):
+            for secret in SECRET_VALUES:
+                self.assertNotIn(secret, json.dumps(data))
+
+    def test_legacy_path_names_the_inject_fields(self):
+        injector = self._injector(self._result("AWS"))
+        injector.process_message(_data(AWS_CREDS, AWS_TECH_CONTRACT))
+        auth = self._callbacks(injector)[0]
+        self.assertEqual(
+            auth["execution_message"],
+            "Authenticated against AWS with the inject credential fields",
+        )
+        injector.helper.api.inject.resolve_attachment_secret.assert_not_called()
+
+    def test_azure_and_gcp_checks_do_not_claim_a_verified_credential(self):
+        for platform, label, contract, payload in (
+            ("azure", "Azure", AZURE_CUSTOM_CONTRACT, AZURE_SERVICE_PRINCIPAL_PAYLOAD),
+            ("GCP", "Google Cloud", GCP_TECH_CONTRACT, GCP_SERVICE_ACCOUNT_PAYLOAD),
+        ):
+            with self.subTest(platform=platform):
+                injector = self._injector(self._result(platform), payload)
+                content = {"technique_id": "x"}
+                injector.process_message(_data(content, contract, ATTACHMENTS))
+                message = self._callbacks(injector)[0]["execution_message"]
+                self.assertNotIn("Authenticated against", message)
+                self.assertIn(f"Stratus does not contact {label}", message)
+
+    def test_failed_check_sends_no_auth_trace_and_logs_an_error(self):
+        result = self._result(
+            "AWS",
+            status=AUTH_FAILED,
+            success=False,
+            message="Authentication against AWS failed: you are not authenticated",
+        )
+        injector = self._injector(result)
+        injector.process_message(_data({}, AWS_TECH_CONTRACT, ATTACHMENTS))
+        (complete,) = self._callbacks(injector)
+        self.assertEqual(complete["execution_status"], "ERROR")
+        self.assertEqual(complete["execution_message"], result.message)
+        injector.helper.injector_logger.error.assert_called_once()
+
+    def test_no_check_reached_sends_no_auth_trace(self):
+        injector = self._injector(self._result(None, status=None))
+        injector.process_message(_data({}, AWS_TECH_CONTRACT, ATTACHMENTS))
+        self.assertEqual(len(self._callbacks(injector)), 1)
+
+    def test_credential_resolution_is_logged_without_secret(self):
+        injector = self._injector(self._result("AWS"))
+        injector.process_message(_data({}, AWS_TECH_CONTRACT, ATTACHMENTS))
+        resolved = [log for log in self._info_logs(injector) if "resolved" in log]
+        self.assertEqual(
+            resolved,
+            [
+                f"Credential reference {REFERENCE} resolved (AWS_ACCESS_KEY) for inject i1"
+            ],
+        )
+
+    def test_resolution_failure_is_logged(self):
+        injector = make_injector()
+        injector.helper.api.inject.resolve_attachment_secret.side_effect = (
+            CredentialResolutionError(
+                CredentialErrorCode.CREDENTIAL_INACTIVE, reference=REFERENCE
+            )
+        )
+        injector.process_message(_data({}, AWS_TECH_CONTRACT, ATTACHMENTS))
+        logged = injector.helper.injector_logger.error.call_args.args[0]
+        self.assertIn("CREDENTIAL_INACTIVE", logged)
+        self.assertIn(REFERENCE, logged)
+
+    def test_cleanup_failure_after_detonation_keeps_the_result(self):
+        injector = self._injector(self._result("AWS"))
+        with patch.object(
+            mod.OpenAEVStratus,
+            "_detonate_with_credential",
+            return_value=(self._result("AWS"), True),
+        ):
+            injector.process_message(_data({}, AWS_TECH_CONTRACT, ATTACHMENTS))
+        auth, cleanup, complete = self._callbacks(injector)
+        self.assertEqual(cleanup["execution_action"], "cleanup_execution")
+        self.assertEqual(cleanup["execution_status"], "WARNING")
+        self.assertEqual(complete["execution_status"], "SUCCESS")
+
+    def test_detonate_with_credential_reports_a_cleanup_failure(self):
+        injector = self._injector(self._result("AWS"))
+        credential = mod.resolve_credential_attachment(
+            injector.helper.api,
+            "i1",
+            mod.get_credential_attachment(_data({}, AWS_TECH_CONTRACT, ATTACHMENTS)),
+            "aws",
+        )
+        with patch(
+            "pyoaev.credential.materializer._Workspace.cleanup",
+            side_effect=CredentialCleanupError(),
+        ):
+            result, cleanup_failed = injector._detonate_with_credential(
+                "t", PLATFORMS_BY_KEY["aws"], REFERENCE, credential
+            )
+        self.assertTrue(result.success)
+        self.assertTrue(cleanup_failed)
