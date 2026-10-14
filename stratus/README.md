@@ -166,18 +166,22 @@ failure path). Credentials are never persisted in `config.yml` / `.env` and neve
 
 ## Credential reference
 
-Instead of typing secrets into the inject, every contract also offers a credential reference field to select a
-credential stored on the platform. When an inject carries a reference, the injector resolves it just in time, after
-acknowledging the job and before reporting its result, through the platform resolution endpoint, presenting the
-authorisation code received with the job. The injector token therefore needs the `RESOLVE_INJECT_SECRET` capability.
+Instead of typing secrets into the inject, a contract can use a credential stored on the platform. Every contract of a
+platform with a credential type starts with a **Credentials** select: **Credential manager** (the default) or
+**<platform> - manual credentials**. The inject form shows either the credential picker or the credential fields,
+never both: it can only react to a select, not to the picker itself.
 
-- **The reference wins**: the legacy credential fields of the inject are ignored, even if filled, and the two sources
-  are never combined. The host credential variables of the injector (`AWS_*`, `AZURE_*`, `ARM_*`, `GOOGLE_*`,
-  `GCLOUD_*`, `CLOUDSDK_*`, `KUBECONFIG`) are not passed to Stratus either.
-- **Non-secret values**: the region, project and subscription come from the credential; the inject fields (`AWS
-  Region`, `GCP Project ID`, `Azure Subscription ID`) are only used when the credential omits them.
-- **No reference**: the inject runs exactly as before from its credential fields, and no resolution request is sent.
-  Injects configured before credential references keep working without any change.
+- **Credential manager**: the credential picker is shown and required, the credential fields are hidden. The injector
+  resolves the credential just in time, after acknowledging the job and before reporting its result, through the
+  platform resolution endpoint, presenting the authorisation code received with the job. The injector token therefore
+  needs the `RESOLVE_INJECT_SECRET` capability. Inject credential fields are ignored, even if filled, and the host
+  credential variables of the injector (`AWS_*`, `AZURE_*`, `ARM_*`, `GOOGLE_*`, `GCLOUD_*`, `CLOUDSDK_*`,
+  `KUBECONFIG`) are not passed to Stratus either. The region, project and subscription come from the credential only:
+  without a region, the Stratus default `us-east-1` applies; without a required subscription or project, the execution
+  ends in `ERROR` asking to set it on the credential. Without a selected credential, the execution ends in `ERROR`.
+- **Manual credentials**: the credential fields are shown and required, and the inject runs from them as before. A
+  credential picked before switching to manual credentials is ignored and never resolved.
+- **Kubernetes**: no credential type applies, so there is no select and the kubeconfig is required.
 
 | Platform              | Accepted credential types                                                   |
 |-----------------------|-----------------------------------------------------------------------------|
@@ -198,7 +202,19 @@ message in the execution trace:
 | `CREDENTIAL_NOT_FOUND`     | The credential no longer exists at execution time                                   |
 | `CREDENTIAL_INACTIVE`      | The credential exists but is inactive                                               |
 | `CREDENTIAL_ACCESS_DENIED` | The execution is not entitled to use the credential                                 |
-| `CREDENTIAL_INCOMPATIBLE`  | The credential type does not match the platform of the contract (see table above)   |
+| `CREDENTIAL_INCOMPATIBLE`  | The credential type does not match the platform of the contract (see table above), or its Azure cloud cannot be targeted (e.g. the retired `AzureGermanCloud`) |
+| `CREDENTIAL_RESOLUTION_UNAVAILABLE` | The platform could not be reached, or failed, while resolving the credential |
+
+### Authentication trace
+
+Stratus checks its authentication against the target platform before warming up the technique, and prints nothing
+when the check passes. The injector reads that check from the Stratus output and, when it passed, logs it and adds an
+`INFO` prerequisite check trace naming the platform and the credential source (the credential reference id and type, or
+the inject credential fields) - never a secret value. A failed check ends the execution in `ERROR` with
+`Authentication against <platform> failed: <reason>`.
+
+For Azure and Google Cloud, the Stratus check only loads the credentials without contacting the cloud, so the trace says
+so: the credentials are only confirmed by the detonation itself.
 
 ## Target selection
 

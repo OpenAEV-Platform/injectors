@@ -7,6 +7,7 @@ from pyoaev.credential.types import CredentialType
 from stratus.contracts import (
     CONTRACT_REGISTRY,
     CONTRACT_TYPE,
+    CREDENTIAL_SOURCE_KEY,
     CUSTOM_TECHNIQUE_FIELD_KEY,
     build_all_contracts,
     technique_contract_id,
@@ -136,14 +137,18 @@ class ContractsTest(TestCase):
             cred_keys = {cred.key for cred in platform.cred_fields}
             self.assertNotIn(CREDENTIAL_REFERENCE_KEY, cred_keys)
 
-    def test_credential_reference_sits_after_credentials_before_expectations(self):
+    def test_credential_source_and_reference_lead_the_credential_fields(self):
+        # Without a credential type, no select: the picker follows the fields.
         for technique in TECHNIQUES:
             platform = PLATFORMS_BY_KEY[technique.platform]
             content = self.content_by_id[technique_contract_id(technique.id)]
             keys = [f["key"] for f in content["fields"]]
-            self.assertEqual(
-                keys.index(CREDENTIAL_REFERENCE_KEY), len(platform.cred_fields)
-            )
+            cred_keys = [cred.key for cred in platform.cred_fields]
+            if platform.credential_provider is None:
+                expected = [*cred_keys, CREDENTIAL_REFERENCE_KEY]
+            else:
+                expected = [CREDENTIAL_SOURCE_KEY, CREDENTIAL_REFERENCE_KEY, *cred_keys]
+            self.assertEqual(keys[: len(expected)], expected)
             self.assertLess(
                 keys.index(CREDENTIAL_REFERENCE_KEY), keys.index("expectations")
             )
@@ -156,3 +161,80 @@ class ContractsTest(TestCase):
                 keys.index(CREDENTIAL_REFERENCE_KEY),
                 keys.index(CUSTOM_TECHNIQUE_FIELD_KEY),
             )
+
+
+class CredentialFieldRequirementTest(TestCase):
+    """The credential source select shows the picker or the manual fields."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.content_by_id = {
+            c["contract_id"]: json.loads(c["contract_content"])
+            for c in build_all_contracts()
+        }
+
+    def _cred_fields(self, platform):
+        content = self.content_by_id[platform.custom_contract_id]
+        keys = {cred.key for cred in platform.cred_fields}
+        return {f["key"]: f for f in content["fields"] if f["key"] in keys}
+
+    def _field(self, contract_id, key):
+        content = self.content_by_id[contract_id]
+        (field,) = [f for f in content["fields"] if f["key"] == key]
+        return field
+
+    def test_credential_fields_are_shown_with_manual_credentials_only(self):
+        manual = {CREDENTIAL_SOURCE_KEY: "manual"}
+        for platform in PLATFORMS:
+            if platform.credential_provider is None:
+                continue
+            fields = self._cred_fields(platform)
+            for cred in platform.cred_fields:
+                with self.subTest(platform=platform.key, field=cred.key):
+                    field = fields[cred.key]
+                    self.assertFalse(field["mandatory"])
+                    self.assertEqual(field["mandatoryGroups"], [])
+                    self.assertEqual(field["visibleConditionValues"], manual)
+                    expected = manual if cred.mandatory else []
+                    self.assertEqual(field["mandatoryConditionValues"], expected)
+
+    def test_credential_source_select_defaults_to_the_credential_manager(self):
+        for platform in PLATFORMS:
+            if platform.credential_provider is None:
+                continue
+            with self.subTest(platform=platform.key):
+                select = self._field(platform.custom_contract_id, CREDENTIAL_SOURCE_KEY)
+                self.assertEqual(select["type"], "select")
+                self.assertTrue(select["mandatory"])
+                self.assertEqual(select["defaultValue"], ["credential_manager"])
+                self.assertEqual(
+                    select["choices"],
+                    {
+                        "credential_manager": "Credential manager",
+                        "manual": f"{platform.label} - manual credentials",
+                    },
+                )
+
+    def test_reference_is_required_with_the_credential_manager_only(self):
+        manager = {CREDENTIAL_SOURCE_KEY: "credential_manager"}
+        for platform in PLATFORMS:
+            if platform.credential_provider is None:
+                continue
+            with self.subTest(platform=platform.key):
+                reference = self._field(
+                    platform.custom_contract_id, CREDENTIAL_REFERENCE_KEY
+                )
+                self.assertFalse(reference["mandatory"])
+                self.assertEqual(reference["visibleConditionValues"], manager)
+                self.assertEqual(reference["mandatoryConditionValues"], manager)
+
+    def test_kubernetes_has_no_credential_source_select(self):
+        content = self.content_by_id[PLATFORMS_BY_KEY["k8s"].custom_contract_id]
+        keys = [f["key"] for f in content["fields"]]
+        self.assertNotIn(CREDENTIAL_SOURCE_KEY, keys)
+
+    def test_kubernetes_fields_stay_mandatory(self):
+        platform = PLATFORMS_BY_KEY["k8s"]
+        field = self._cred_fields(platform)["kubeconfig"]
+        self.assertTrue(field["mandatory"])
+        self.assertEqual(field["mandatoryGroups"], [])
