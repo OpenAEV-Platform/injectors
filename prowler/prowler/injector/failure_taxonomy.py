@@ -4,6 +4,12 @@ import re
 from dataclasses import dataclass
 from typing import TypedDict, Unpack
 
+from pyoaev.credential import (
+    CredentialErrorCode,
+    credential_error_guidance,
+    credential_error_summary,
+)
+
 _LISTENER_START = "[PROWLER_INJECTOR] - Listener starting"
 _INVALID_MESSAGE = "[PROWLER_INJECTOR] - Invalid injection message rejected"
 _ASSESSMENT_RECEIVED = "[PROWLER_INJECTOR] - Assessment received"
@@ -11,6 +17,8 @@ _RECEPTION_ACKNOWLEDGED = "[PROWLER_INJECTOR] - Reception acknowledged"
 _CONTRACT_RESOLVED = "[PROWLER_INJECTOR] - Contract resolved"
 _ASSESSMENT_VALIDATED = "[PROWLER_INJECTOR] - Assessment input validated"
 _CREDENTIAL_RESOLVED = "[PROWLER_INJECTOR] - Referenced credential resolved"
+_CLOUD_AUTHENTICATED = "[PROWLER_INJECTOR] - Cloud authentication succeeded"
+_AWS_ACCOUNT_MISMATCH = "[PROWLER_INJECTOR] - Authenticated AWS account mismatch"
 _EXECUTION_STARTED = "[PROWLER_INJECTOR] - Assessment execution starting"
 _ASSESSMENT_SUCCEEDED = "[PROWLER_INJECTOR] - Assessment completed"
 _ASSESSMENT_FAILED = "[PROWLER_INJECTOR] - Assessment failed"
@@ -34,6 +42,8 @@ _ALLOWED_CLI_FAILURE_KINDS = frozenset(
 _ALLOWED_ISSUE_LOCATIONS = frozenset(
     {
         "provider",
+        "credential_reference",
+        "credential_source",
         "aws",
         "aws_access_key_id",
         "aws_secret_access_key",
@@ -262,59 +272,55 @@ _SUMMARY_BY_FAILURE_KIND = {
     "unexpected_failure": "The assessment failed at an unexpected internal boundary.",
 }
 # Fixed human-readable messages of the credential error taxonomy, split into
-# what happened (summary) and what to do (guidance). For the codes raised by
-# pyoaev, "<summary> <guidance>" is exactly the CredentialResolutionError
-# message. ``{reference}`` is the credential reference id, never a secret.
+# what happened (summary) and what to do (guidance). pyoaev owns the messages of
+# the codes it raises, so "<summary> <guidance>" stays exactly the
+# CredentialResolutionError message; only the injector-side kinds are defined
+# here. ``{reference}`` is the credential reference id, never a secret.
 _CREDENTIAL_FAILURE_KIND_BY_CODE = {
-    "CREDENTIAL_NOT_FOUND": "credential_not_found",
-    "CREDENTIAL_INACTIVE": "credential_inactive",
-    "CREDENTIAL_ACCESS_DENIED": "credential_access_denied",
-    "CREDENTIAL_INCOMPATIBLE": "credential_incompatible",
+    **{code.value: code.value.lower() for code in CredentialErrorCode},
     "CREDENTIAL_MISSING": "credential_missing",
+    "CREDENTIAL_ACCOUNT_MISMATCH": "credential_account_mismatch",
+    "CREDENTIAL_SCOPE_MISSING": "credential_scope_missing",
 }
 _CREDENTIAL_CODE_BY_FAILURE_KIND = {
     kind: code for code, kind in _CREDENTIAL_FAILURE_KIND_BY_CODE.items()
 }
 _CREDENTIAL_SUMMARY_BY_FAILURE_KIND = {
-    "credential_not_found": (
-        "The credential configured on this inject ({reference}) no longer exists "
-        "at the moment of execution."
-    ),
-    "credential_inactive": (
-        "The credential {reference} is inactive at the moment of execution."
-    ),
-    "credential_access_denied": (
-        "This execution is not entitled to use the credential configured on this "
-        "inject."
-    ),
-    "credential_incompatible": (
-        "The credential {reference} is not compatible with this inject."
-    ),
+    # The placeholder is passed as the reference so the template keeps it.
+    **{
+        code.value.lower(): credential_error_summary(code, "{reference}")
+        for code in CredentialErrorCode
+    },
     "credential_missing": (
-        "No credential is available for this inject: no credential is selected "
-        "and the credential fields are empty."
+        "No credential is selected on this inject, which uses the credential manager."
     ),
+    "credential_account_mismatch": (
+        "The credential {reference} reaches AWS account {credential_account}, not "
+        "the AWS account {expected_account} set on this inject."
+    ),
+    "credential_scope_missing": "The credential {reference} has no {fields}.",
 }
 _CREDENTIAL_GUIDANCE_BY_FAILURE_KIND = {
-    "credential_not_found": (
-        "Select an existing credential on the inject, then run it again."
+    **{
+        code.value.lower(): credential_error_guidance(code)
+        for code in CredentialErrorCode
+    },
+    "credential_missing": (
+        "Select a credential on the inject, or choose manual credentials, then run "
+        "it again."
     ),
-    "credential_inactive": (
-        "Update or replace this credential, then run the inject again."
+    "credential_account_mismatch": (
+        "Select a credential of that account, or correct the AWS account ID on the "
+        "inject, then run it again."
     ),
-    "credential_access_denied": "Contact your Cloud platform administrator",
-    "credential_incompatible": (
-        "Select a credential of the type expected by the inject, then run it again."
-    ),
-    "credential_missing": "Select a credential on the inject, then run it again.",
+    "credential_scope_missing": "Set it on the credential, then run it again.",
 }
-_CREDENTIAL_INCOMPATIBLE_TYPED_GUIDANCE = (
-    "Select a credential of type {type} on the inject, then run it again."
-)
 _CREDENTIAL_REFERENCE_PATTERN = re.compile(r"[A-Za-z0-9._:-]{1,128}")
 _CREDENTIAL_REFERENCE_SENTINEL = "unknown reference"
 _ISSUE_FIELD_LABELS = {
     "provider": "Provider",
+    "credential_reference": "Credential",
+    "credential_source": "Credentials",
     "aws_access_key_id": "AWS access key ID",
     "aws_secret_access_key": "AWS secret access key",
     "aws_account_id": "AWS account ID",

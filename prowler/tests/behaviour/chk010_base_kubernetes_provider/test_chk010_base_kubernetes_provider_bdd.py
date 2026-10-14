@@ -282,7 +282,7 @@ def test_fake_engine_proves_exact_kubernetes_subprocess_arguments(
         "--output-filename",
         "findings",
         "-z",
-        "--only-logs",
+        "-b",
         "--no-color",
         "-M",
         "json-ocsf",

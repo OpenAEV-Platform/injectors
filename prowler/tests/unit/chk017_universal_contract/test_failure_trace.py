@@ -72,6 +72,7 @@ def _run_universal_aws(client_factory: Any) -> tuple[str, dict[str, Any]]:
                 "injector_contract_id": str(stable_contract_id("universal")),
                 "inject_content": {
                     "prowler_provider": "aws",
+                    "credential_source": "manual",
                     "aws_access_key_id": "AKIAEXAMPLEKEYID",
                     "aws_secret_access_key": "SECRET-CANARY",
                     "aws_account_id": "123456789012",

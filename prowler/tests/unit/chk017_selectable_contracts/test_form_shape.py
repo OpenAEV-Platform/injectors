@@ -14,6 +14,7 @@ from prowler._core.prowler_client import (
     GcpServiceSelector,
 )
 from prowler.contracts import (
+    CREDENTIAL_SOURCE_KEY,
     DEFAULT_PROWLER_CONTRACTS,
     AwsSelectComplianceContract,
     AwsSelectServiceContract,
@@ -122,7 +123,10 @@ def test_serialized_form_has_one_closed_select_after_provider_fields(
     )
     content = json.loads(str(item["contract_content"]))
     fields = content["fields"]
-    select_fields = [f for f in fields if f["type"] == "select"]
+    # The scope select, besides the credential source select.
+    select_fields = [
+        f for f in fields if f["type"] == "select" and f["key"] != CREDENTIAL_SOURCE_KEY
+    ]
     assert len(select_fields) == 1
     select = select_fields[0]
     assert select["key"] == key

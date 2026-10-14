@@ -6,12 +6,14 @@ from typing import Any
 import pytest
 
 AWS_FORM: dict[str, str] = {
+    "credential_source": "manual",
     "aws_access_key_id": "AKIAEXAMPLEKEYID",
     "aws_secret_access_key": "example-secret",
     "aws_account_id": "123456789012",
     "aws_region": "eu-west-1",
 }
 AZURE_FORM: dict[str, str] = {
+    "credential_source": "manual",
     "azure_tenant_id": "tenant-id",
     "azure_client_id": "client-id",
     "azure_client_secret": "client-secret",
@@ -19,6 +21,7 @@ AZURE_FORM: dict[str, str] = {
     "azure_provider": "AzureCloud",
 }
 GCP_FORM: dict[str, str] = {
+    "credential_source": "manual",
     "gcp_service_account_json": '{"type": "service_account"}',
     "gcp_project_id": "project-id",
 }

@@ -82,7 +82,17 @@ PREVIOUS_FAILURE_KINDS = frozenset(
         "unexpected_failure",
     }
 )
-AWS_SCOPE = {"aws_account_id": "123456789012", "aws_region": "eu-west-1"}
+# The credential manager: the credential provides everything but the account.
+AWS_SCOPE = {
+    "credential_source": "credential_manager",
+    "aws_account_id": "123456789012",
+}
+AWS_MANUAL = {
+    "credential_source": "manual",
+    "aws_account_id": "123456789012",
+    "aws_region": "eu-west-1",
+}
+MANAGER = {"credential_source": "credential_manager"}
 
 
 def _injector() -> ProwlerInjector:
@@ -159,16 +169,14 @@ def test_an_unsafe_reference_never_reaches_the_trace(reference: str | None) -> N
     ("route", "content"),
     (
         ("aws", AWS_SCOPE),
-        (
-            "aws",
-            {**AWS_SCOPE, "aws_access_key_id": "", "aws_secret_access_key": ""},
-        ),
-        ("azure/iam", {"azure_subscription_id": "sub", "azure_provider": "Azure"}),
-        ("gcp", {"gcp_project_id": "project"}),
-        ("universal", {"prowler_provider": "gcp", "gcp_project_id": "project"}),
+        # Filled manual fields do not replace the credential manager's credential.
+        ("aws", {**AWS_SCOPE, "aws_access_key_id": "K", "aws_secret_access_key": "S"}),
+        ("azure/iam", MANAGER),
+        ("gcp", MANAGER),
+        ("universal", {"prowler_provider": "gcp", **MANAGER}),
     ),
 )
-def test_no_reference_and_no_credential_is_credential_missing(
+def test_credential_manager_without_credential_is_credential_missing(
     route: str, content: dict[str, str]
 ) -> None:
     error = _parse_error(route, content)
@@ -179,7 +187,8 @@ def test_no_reference_and_no_credential_is_credential_missing(
     assert failure.credential_error_code == "CREDENTIAL_MISSING"
     assert failure.credential_reference is None
     assert failure.operator_guidance == (
-        "Select a credential on the inject, then run it again."
+        "Select a credential on the inject, or choose manual credentials, then run "
+        "it again."
     )
     assert failure.issues
 
@@ -187,8 +196,17 @@ def test_no_reference_and_no_credential_is_credential_missing(
 @pytest.mark.parametrize(
     ("route", "content"),
     (
-        ("aws", {**AWS_SCOPE, "aws_access_key_id": "AKIA-CANARY"}),
-        ("aws", {"aws_access_key_id": "AKIA", "aws_secret_access_key": "CANARY"}),
+        ("aws", {**AWS_MANUAL, "aws_access_key_id": "AKIA-CANARY"}),
+        (
+            "aws",
+            {
+                "credential_source": "manual",
+                "aws_access_key_id": "AKIA",
+                "aws_secret_access_key": "CANARY",
+            },
+        ),
+        # Manual credentials, every field empty: an invalid input, no credential.
+        ("aws", {**AWS_MANUAL, "aws_access_key_id": "", "aws_secret_access_key": ""}),
         ("kubernetes", {"kubernetes_context": "context"}),
     ),
 )
@@ -203,10 +221,7 @@ def test_partial_or_non_cloud_credentials_stay_invalid_input(
 
 def test_untrusted_missing_issues_stay_invalid_input() -> None:
     error = ContractInputError(
-        (
-            ContractInputIssue(("aws", "aws_access_key_id"), "missing"),
-            ContractInputIssue(("aws", "aws_secret_access_key"), "missing"),
-        )
+        (ContractInputIssue(("credential_reference",), "missing"),)
     )
 
     assert _classify("input_validation", error).failure_kind == "invalid_input"
@@ -265,7 +280,7 @@ def test_other_invalid_input_is_still_invalid_input() -> None:
     error = _parse_error(
         "aws",
         {
-            **AWS_SCOPE,
+            **AWS_MANUAL,
             "aws_account_id": "not-an-account",
             "aws_access_key_id": "AKIA",
             "aws_secret_access_key": "secret",
@@ -367,8 +382,9 @@ def test_runtime_reports_a_missing_authorisation_code_as_access_denied() -> None
     callback = _process(Mock(), AWS_SCOPE, {"credential_references": [REFERENCE]})
 
     assert callback["execution_status"] == "ERROR"
-    assert "Credential error code: CREDENTIAL_ACCESS_DENIED" in (
-        callback["execution_message"]
+    assert (
+        "Credential error code: CREDENTIAL_ACCESS_DENIED"
+        in (callback["execution_message"])
     )
 
 
