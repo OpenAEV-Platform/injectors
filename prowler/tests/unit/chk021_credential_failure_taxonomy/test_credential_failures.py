@@ -382,9 +382,8 @@ def test_runtime_reports_a_missing_authorisation_code_as_access_denied() -> None
     callback = _process(Mock(), AWS_SCOPE, {"credential_references": [REFERENCE]})
 
     assert callback["execution_status"] == "ERROR"
-    assert (
-        "Credential error code: CREDENTIAL_ACCESS_DENIED"
-        in (callback["execution_message"])
+    assert "Credential error code: CREDENTIAL_ACCESS_DENIED" in (
+        callback["execution_message"]
     )
 
 
