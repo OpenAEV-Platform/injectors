@@ -1,9 +1,8 @@
 """Tests for the OpenAEVConfigHelper legacy configuration accessor."""
 
 import pytest
-from xtm_oaev_sdk import Configuration
-
 from injectors_sdk import OpenAEVConfigHelper
+from xtm_oaev_sdk import Configuration
 
 
 def _given_helper(hints: dict) -> OpenAEVConfigHelper:

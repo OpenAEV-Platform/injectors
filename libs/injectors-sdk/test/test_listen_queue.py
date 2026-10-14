@@ -45,7 +45,7 @@ def test_process_message_acks_then_hands_json_to_the_callback() -> None:
     callback.assert_called_once_with(json.loads('{"a": 1}'))
 
 
-@patch("injectors_sdk._core.helpers.listen_queue.ssl")
+@patch("injectors_sdk._core.helpers.mq_ssl.ssl")
 def test_ssl_context_is_unverified_unless_rejection_is_enabled(mock_ssl) -> None:
     """It mirrors MQ_USE_SSL_REJECT_UNAUTHORIZED (default: unverified)."""
     create_mq_ssl_context({})

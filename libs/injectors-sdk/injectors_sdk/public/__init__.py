@@ -3,7 +3,7 @@
 __version__ = "0.1.0"
 
 # --- Helpers ---
-from injectors_sdk.seam.helpers import (
+from injectors_sdk.public.helpers import (
     ListenQueue,
     OpenAEVConfigHelper,
     OpenAEVInjectorHelper,

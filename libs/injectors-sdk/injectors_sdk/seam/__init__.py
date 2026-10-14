@@ -1,8 +1,11 @@
-"""The seam: the stable boundary between the public surface and ``_core``.
+"""The seam: the contracts between the public adapters and the core.
 
-- **``helpers``** — the injector runtime: registration, heartbeat and inject
-  queue listening.
+- **``helpers``** — the ports of the injector runtime: configuration access,
+  registration, inject queue consumption and its SSL context.
 
-The public layer reaches ``_core`` exclusively through this layer; nothing in
-``_core`` imports ``public``.
+A seam is **closed**: it imports only the standard library, third-party
+libraries (including the ``xtm_oaev_sdk`` public package) and sibling seam
+modules — never ``_core`` nor ``public``. The core implements its ports; the
+public adapters speak its types and delegate to the core. A seam change is a
+contract change (``SEAM_VERSION`` bump, changelog).
 """

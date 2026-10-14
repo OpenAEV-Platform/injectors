@@ -3,9 +3,8 @@
 from unittest.mock import MagicMock, patch
 
 import pytest
-from xtm_oaev_sdk import Configuration, OpenAEVError
-
 from injectors_sdk import OpenAEVConfigHelper, OpenAEVInjectorHelper
+from xtm_oaev_sdk import Configuration, OpenAEVError
 
 HINTS = {
     "injector_id": {"data": "injector-id"},
@@ -60,7 +59,7 @@ def test_hook_builds_the_api_client_when_none_is_injected(_) -> None:
     assert _Helper(_given_config(), MagicMock()).api is api
 
 
-@patch("injectors_sdk._core.helpers.injector_helper.ListenQueue")
+@patch("injectors_sdk.public.helpers.ListenQueue")
 @patch("xtm_oaev_sdk.PingAlive.start")
 def test_listen_starts_the_queue_listener(_, mock_listen_queue) -> None:
     """It hands the callback to a started ListenQueue."""

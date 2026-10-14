@@ -1,15 +1,26 @@
-"""Injector runtime helpers (API client injected, see ``xtm_oaev_sdk.BaseClient``)."""
+"""Injector helpers seam: the contract between the public helpers and the core.
 
-from injectors_sdk._core.helpers import (
-    ListenQueue,
-    OpenAEVConfigHelper,
-    OpenAEVInjectorHelper,
-    create_mq_ssl_context,
+Closed: it imports nothing from ``injectors_sdk._core`` nor
+``injectors_sdk.public``. Any change to these contracts must bump
+:data:`SEAM_VERSION`.
+"""
+
+from injectors_sdk.seam.helpers.ports import (
+    ConfigLookupPort,
+    InjectorRegistrationPort,
+    MqSslPort,
+    QueueConsumerPort,
+    QueueListenerProtocol,
 )
 
+#: Version of the injector helpers seam. Bump on any contract change.
+SEAM_VERSION = "1.0.0"
+
 __all__ = [
-    "ListenQueue",
-    "OpenAEVConfigHelper",
-    "OpenAEVInjectorHelper",
-    "create_mq_ssl_context",
+    "SEAM_VERSION",
+    "ConfigLookupPort",
+    "InjectorRegistrationPort",
+    "MqSslPort",
+    "QueueConsumerPort",
+    "QueueListenerProtocol",
 ]
