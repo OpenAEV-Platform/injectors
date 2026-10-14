@@ -22,6 +22,7 @@ from prowler._core.prowler_client import (
 )
 from prowler.contracts import (
     CREDENTIAL_REFERENCE_KEY,
+    CREDENTIAL_SOURCE_KEY,
     DEFAULT_PROWLER_CONTRACTS,
     stable_contract_id,
 )
@@ -133,12 +134,13 @@ def test_default_registration_identity_fields_and_outputs() -> None:
     content = json.loads(serialized[1]["contract_content"])
     assert content["external_id"] == "prowler:azure"
     assert tuple(field["key"] for field in content["fields"]) == (
+        CREDENTIAL_SOURCE_KEY,
+        CREDENTIAL_REFERENCE_KEY,
         "azure_tenant_id",
         "azure_client_id",
         "azure_client_secret",
         "azure_subscription_id",
         "azure_provider",
-        CREDENTIAL_REFERENCE_KEY,
     )
     assert tuple(output["field"] for output in content["outputs"]) == (
         "findings",
@@ -268,7 +270,7 @@ def test_fake_engine_proves_exact_azure_subprocess_arguments(
         "--output-filename",
         "findings",
         "-z",
-        "--only-logs",
+        "-b",
         "--no-color",
         "-M",
         "json-ocsf",

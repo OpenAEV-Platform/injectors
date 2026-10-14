@@ -4,7 +4,12 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Literal
 
-from pyoaev.credential import CredentialResolutionError, CredentialType
+from pyoaev.credential import (
+    CredentialErrorCode,
+    CredentialResolutionError,
+    CredentialType,
+    credential_error_guidance,
+)
 
 from prowler._core.cli_engine import CliEngineError, ExecutionError, ParsingError
 from prowler._core.prowler_client import (
@@ -12,7 +17,15 @@ from prowler._core.prowler_client import (
     OutputWorkspaceCleanupError,
     OutputWorkspacePreparationError,
 )
-from prowler.contracts.base import ContractExecutionOutcome, ContractInputError
+from prowler.contracts.base import (
+    CREDENTIAL_REFERENCE_KEY,
+    ContractExecutionOutcome,
+    ContractInputError,
+)
+from prowler.injector.authentication import (
+    AwsAccountMismatchError,
+    CredentialScopeMissingError,
+)
 from prowler.injector.failure_taxonomy import (
     _ALLOWED_CLI_FAILURE_KINDS,
     _ALLOWED_ISSUE_LOCATIONS,
@@ -21,7 +34,6 @@ from prowler.injector.failure_taxonomy import (
     _CREDENTIAL_CODE_BY_FAILURE_KIND,
     _CREDENTIAL_FAILURE_KIND_BY_CODE,
     _CREDENTIAL_GUIDANCE_BY_FAILURE_KIND,
-    _CREDENTIAL_INCOMPATIBLE_TYPED_GUIDANCE,
     _CREDENTIAL_REFERENCE_PATTERN,
     _CREDENTIAL_REFERENCE_SENTINEL,
     _CREDENTIAL_SUMMARY_BY_FAILURE_KIND,
@@ -55,7 +67,6 @@ from prowler.injector.failure_taxonomy import (
     _UnexpectedFailure,
 )
 from prowler.models.findings import OcsfDecodeError, OcsfMappingError
-from prowler.models.provider_inputs import REQUIRED_CLOUD_CREDENTIAL_KEYS
 
 if TYPE_CHECKING:
     from prowler.injector.lifecycle_metadata import LifecycleMetadataBuilder
@@ -265,6 +276,10 @@ class FailureClassifier:
         """Classify a raised failure without reading its text or representation."""
         if isinstance(error, CredentialResolutionError):
             return self._classify_credential_failure(stage, error)
+        if isinstance(error, AwsAccountMismatchError):
+            return self._account_mismatch_failure(stage, error)
+        if isinstance(error, CredentialScopeMissingError):
+            return self._scope_missing_failure(stage, error)
         if stage == "input_validation" and isinstance(error, ContractInputError):
             issues, omitted, truncated = self._safe_input_issues(error)
             if self._is_credential_missing(error):
@@ -367,8 +382,8 @@ class FailureClassifier:
         if failure_kind == "credential_incompatible" and isinstance(
             expected_type, CredentialType
         ):
-            guidance = _CREDENTIAL_INCOMPATIBLE_TYPED_GUIDANCE.format(
-                type=expected_type.value
+            guidance = credential_error_guidance(
+                CredentialErrorCode.CREDENTIAL_INCOMPATIBLE, expected_type
             )
         return _CredentialFailure(
             stage=stage,
@@ -385,23 +400,67 @@ class FailureClassifier:
         )
 
     @staticmethod
-    def _is_credential_missing(error: ContractInputError) -> bool:
-        """Detect a form with no reference and every cloud credential absent.
+    def _account_mismatch_failure(
+        stage: str, error: AwsAccountMismatchError
+    ) -> _CredentialFailure:
+        """Render the account mismatch with the reference and account IDs only."""
+        reference = error.reference
+        safe_reference = (
+            reference
+            if isinstance(reference, str)
+            and _CREDENTIAL_REFERENCE_PATTERN.fullmatch(reference)
+            else None
+        )
+        kind = "credential_account_mismatch"
+        return _CredentialFailure(
+            stage=stage,
+            failure_kind=kind,
+            failure_summary=_CREDENTIAL_SUMMARY_BY_FAILURE_KIND[kind].format(
+                reference=safe_reference or _CREDENTIAL_REFERENCE_SENTINEL,
+                credential_account=_aws_account_or_unknown(error.credential_account),
+                expected_account=_aws_account_or_unknown(error.expected_account),
+            ),
+            operator_guidance=_CREDENTIAL_GUIDANCE_BY_FAILURE_KIND[kind],
+            credential_error_code=_CREDENTIAL_CODE_BY_FAILURE_KIND[kind],
+            credential_reference=safe_reference,
+        )
 
-        A reference input has no legacy credential field, so these issues can
-        only come from the legacy path. Blank values are rejected as
-        ``value_error`` by the credential fields, and count as absent.
-        """
-        if not error.issues_are_trusted:
-            return False
-        absent = {
-            issue.location
+    @staticmethod
+    def _scope_missing_failure(
+        stage: str, error: CredentialScopeMissingError
+    ) -> _CredentialFailure:
+        """Render the missing scope with the reference and field labels only."""
+        reference = error.reference
+        safe_reference = (
+            reference
+            if isinstance(reference, str)
+            and _CREDENTIAL_REFERENCE_PATTERN.fullmatch(reference)
+            else None
+        )
+        fields = " and ".join(
+            _ISSUE_FIELD_LABELS.get(field, _ISSUE_LOCATION_SENTINEL)
+            for field in error.fields
+        )
+        kind = "credential_scope_missing"
+        return _CredentialFailure(
+            stage=stage,
+            failure_kind=kind,
+            failure_summary=_CREDENTIAL_SUMMARY_BY_FAILURE_KIND[kind].format(
+                reference=safe_reference or _CREDENTIAL_REFERENCE_SENTINEL,
+                fields=fields or _ISSUE_LOCATION_SENTINEL,
+            ),
+            operator_guidance=_CREDENTIAL_GUIDANCE_BY_FAILURE_KIND[kind],
+            credential_error_code=_CREDENTIAL_CODE_BY_FAILURE_KIND[kind],
+            credential_reference=safe_reference,
+        )
+
+    @staticmethod
+    def _is_credential_missing(error: ContractInputError) -> bool:
+        """Detect an inject using the credential manager without credential."""
+        return error.issues_are_trusted and any(
+            issue.location == (CREDENTIAL_REFERENCE_KEY,)
+            and issue.error_type == "missing"
             for issue in error.issues
-            if issue.error_type in {"missing", "value_error"}
-        }
-        return any(
-            all((provider, key) in absent for key in keys)
-            for provider, keys in REQUIRED_CLOUD_CREDENTIAL_KEYS.items()
         )
 
     def _classify_artifact_failure(
@@ -557,3 +616,10 @@ class FailureClassifier:
                 truncated = True
             issues.append({"location": location, "type": error_type})
         return issues, omitted, truncated
+
+
+def _aws_account_or_unknown(value: object) -> str:
+    """Keep only a 12-digit AWS account ID in a rendered message."""
+    if isinstance(value, str) and len(value) == 12 and value.isdigit():
+        return value
+    return "unknown"

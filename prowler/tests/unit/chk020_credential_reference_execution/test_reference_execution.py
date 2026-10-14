@@ -87,7 +87,11 @@ PAYLOADS: dict[str, dict[str, Any]] = {
     },
     "AZURE_MANAGED_IDENTITY": {
         "type": "AZURE_MANAGED_IDENTITY",
-        "value": {"azure_environment": "AzureUSGovernment", "azure_client_id": "mi"},
+        "value": {
+            "azure_environment": "AzureUSGovernment",
+            "azure_client_id": "mi",
+            "azure_subscription_id": "mi-subscription",
+        },
     },
     "GCP_SERVICE_ACCOUNT": {
         "type": "GCP_SERVICE_ACCOUNT",
@@ -104,13 +108,16 @@ PAYLOADS: dict[str, dict[str, Any]] = {
             "gcp_oauth_client_id": "oauth-client",
             "gcp_oauth_client_secret": "OAUTH-SECRET-CANARY",
             "gcp_oauth_refresh_token": "REFRESH-TOKEN-CANARY",
+            "gcp_project_id": "oauth-project",
         },
     },
 }
 
-AWS_INPUT = {"aws_account_id": "123456789012", "aws_region": "eu-west-1"}
-AZURE_INPUT = {"azure_subscription_id": "form-subscription", "azure_provider": "Azure"}
-GCP_INPUT = {"gcp_project_id": "form-project"}
+# The fields shown with the credential manager: region, subscription, and
+# project come from the credential only.
+AWS_INPUT = {"aws_account_id": "123456789012"}
+AZURE_INPUT: dict[str, str] = {}
+GCP_INPUT: dict[str, str] = {}
 
 
 PROVIDER_NAMES: dict[type[Any], str] = {
@@ -166,25 +173,12 @@ def _leftovers(tmp_path: Path) -> list[Path]:
     return list(tmp_path.iterdir())
 
 
-@pytest.mark.parametrize(
-    ("form", "expected_region"),
-    (
-        ({}, "us-east-1"),
-        ({"aws_default_region": None}, "eu-west-1"),
-    ),
-)
-def test_aws_access_key_uses_the_secret_region_then_the_form_region(
-    tmp_path: Path, form: dict[str, Any], expected_region: str
-) -> None:
-    payload = json.loads(json.dumps(PAYLOADS["AWS_ACCESS_KEY"]))
-    payload["value"].update(form)
-    provider = AwsReferenceProviderInput(
-        provider="aws", credential_attachment=ATTACHMENT, **AWS_INPUT
-    ).with_resolved_secret(parse_resolved_secret(payload))
+def test_aws_access_key_uses_the_secret_region(tmp_path: Path) -> None:
+    provider = _reference_input(AwsReferenceProviderInput, AWS_INPUT, "AWS_ACCESS_KEY")
 
     invocation = _adapter(tmp_path).adapt(provider)
 
-    assert invocation.arguments == ("aws", "--region", expected_region)
+    assert invocation.arguments == ("aws", "--region", "us-east-1")
     environment = _environment(invocation)
     assert environment["AWS_ACCESS_KEY_ID"] == "ACCESS-KEY-CANARY"
     assert environment["AWS_SECRET_ACCESS_KEY"] == "SECRET-KEY-CANARY"
@@ -239,7 +233,7 @@ def test_aws_assume_role_selects_a_private_profile(tmp_path: Path) -> None:
         (
             "AZURE_MANAGED_IDENTITY",
             "--managed-identity-auth",
-            "form-subscription",
+            "mi-subscription",
             "AzureUSGovernment",
         ),
     ),
@@ -275,7 +269,7 @@ def test_azure_flags_follow_the_secret_type(
 
 @pytest.mark.parametrize(
     ("secret_type", "project"),
-    (("GCP_SERVICE_ACCOUNT", "secret-project"), ("GCP_OAUTH2", "form-project")),
+    (("GCP_SERVICE_ACCOUNT", "secret-project"), ("GCP_OAUTH2", "oauth-project")),
 )
 def test_gcp_uses_the_materialized_credentials_file(
     tmp_path: Path, secret_type: str, project: str
@@ -487,8 +481,17 @@ _ATTACHMENTS = {
     "credential_references": [REFERENCE],
     "authorisation_code": AUTHORISATION_CODE,
 }
-_LEGACY_AWS = {
+# Credential manager, with stale manual fields that must be ignored.
+_MANAGER_AWS = {
+    "credential_source": "credential_manager",
     **AWS_INPUT,
+    "aws_access_key_id": "LEGACY-KEY-CANARY",
+    "aws_secret_access_key": "LEGACY-SECRET-CANARY",
+}
+_MANUAL_AWS = {
+    "credential_source": "manual",
+    **AWS_INPUT,
+    "aws_region": "eu-west-1",
     "aws_access_key_id": "LEGACY-KEY-CANARY",
     "aws_secret_access_key": "LEGACY-SECRET-CANARY",
 }
@@ -500,7 +503,7 @@ def test_injector_resolves_between_reception_and_callback() -> None:
         "AWS_ACCESS_KEY"
     ]
 
-    callback = _process(helper, _LEGACY_AWS, attachments=_ATTACHMENTS)
+    callback = _process(helper, _MANAGER_AWS, attachments=_ATTACHMENTS)
 
     assert callback["execution_status"] == "SUCCESS"
     helper.api.inject.resolve_attachment_secret.assert_called_once_with(
@@ -521,7 +524,7 @@ def test_injector_resolves_between_reception_and_callback() -> None:
 def test_injector_without_reference_sends_no_resolution_request() -> None:
     helper = Mock()
 
-    callback = _process(helper, _LEGACY_AWS, attachments=None)
+    callback = _process(helper, _MANUAL_AWS, attachments=None)
 
     assert callback["execution_status"] == "SUCCESS"
     helper.api.inject.resolve_attachment_secret.assert_not_called()

@@ -53,7 +53,7 @@ class CredentialLeaseFactoryPort(Protocol):
         """Return a newly materialized credential lease."""
 
     def materialize(
-        self, resolved_secret: ResolvedSecret
+        self, resolved_secret: ResolvedSecret, *, reference: str | None = None
     ) -> MaterializedCredentialLeasePort:
         """Return the materialized credential of one resolved secret."""
 

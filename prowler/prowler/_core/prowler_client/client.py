@@ -49,11 +49,14 @@ _ALL_SEVERITIES = (
     "low",
     "informational",
 )
+# ``-b`` (no banner) rather than ``--only-logs``: ``--only-logs`` also hides the
+# credentials box Prowler prints once it authenticated, which is the cloud
+# authentication success evidence the injector reports.
 _OUTPUT_ARGUMENTS_PREFIX = (
     "--output-filename",
     OUTPUT_ARTIFACT_BASENAME,
     "-z",
-    "--only-logs",
+    "-b",
     "--no-color",
 )
 _OUTPUT_FORMAT_ARGUMENTS = ("-M", "json-ocsf")

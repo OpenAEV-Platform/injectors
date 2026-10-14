@@ -323,6 +323,19 @@ class CredentialReferenceProviderInput(ImmutableProviderInput):
         """Return a copy holding the secret resolved for this execution."""
         return self.model_copy(update={"resolved_secret": resolved_secret})
 
+    def scope_value(self, secret_field: str) -> str | None:
+        """Return one scope value of the credential: region, subscription..."""
+        value = getattr(self.resolved_secret, secret_field, None)
+        return value if isinstance(value, str) and value else None
+
+    def missing_scope_fields(self) -> tuple[str, ...]:
+        """Return the scope fields the resolved credential does not provide.
+
+        With the credential manager, the region, subscription, and project
+        come from the credential only: the form fields are hidden.
+        """
+        return ()
+
     def reference_log_metadata(self) -> dict[str, object]:
         """Return the log-safe facts about the credential reference."""
         from prowler.injector.failure_taxonomy import _safe_text
@@ -340,8 +353,8 @@ class AwsReferenceProviderInput(CredentialReferenceProviderInput):
     """AWS provider form input whose credential comes from a reference."""
 
     provider: Literal["aws"]
+    # No credential carries the account: it is always taken from the form.
     aws_account_id: AwsAccountId
-    aws_region: NonBlankStr
     aws_endpoint_url: str | None = None
 
     @field_validator("aws_endpoint_url", mode="before")
@@ -350,31 +363,47 @@ class AwsReferenceProviderInput(CredentialReferenceProviderInput):
         """Accept only absolute HTTP(S) endpoints without unsafe URL extras."""
         return _validate_aws_endpoint_url(value)
 
+    def missing_scope_fields(self) -> tuple[str, ...]:
+        """Return ``aws_region`` when the credential has no region."""
+        return () if self.scope_value("aws_default_region") else ("aws_region",)
+
     def safe_log_metadata(self) -> dict[str, object]:
         """Return the log-safe metadata facts for this AWS input."""
         metadata = _aws_scope_log_metadata(
-            self.aws_account_id, self.aws_region, self.aws_endpoint_url
+            self.aws_account_id,
+            self.scope_value("aws_default_region"),
+            self.aws_endpoint_url,
         )
         metadata.update(self.reference_log_metadata())
         return metadata
 
 
 class AzureReferenceProviderInput(CredentialReferenceProviderInput):
-    """Azure provider form input whose credential comes from a reference."""
+    """Azure provider form input whose credential comes from a reference.
+
+    The Azure cloud environment and subscription come from the credential, so
+    every Azure form field is a manual credentials field, ignored here.
+    """
 
     provider: Literal["azure"]
-    azure_subscription_id: NonBlankStr
-    azure_provider: NonBlankStr
+
+    def missing_scope_fields(self) -> tuple[str, ...]:
+        """Return ``azure_subscription_id`` when the credential has none."""
+        if self.scope_value("azure_subscription_id"):
+            return ()
+        return ("azure_subscription_id",)
 
     def safe_log_metadata(self) -> dict[str, object]:
         """Return the log-safe metadata facts for this Azure input."""
         from prowler.injector.failure_taxonomy import _safe_text
 
         metadata = self.reference_log_metadata()
-        if isinstance(self.azure_subscription_id, str):
-            metadata["azure_subscription_id"] = _safe_text(self.azure_subscription_id)
-        if isinstance(self.azure_provider, str):
-            metadata["azure_provider"] = _safe_text(self.azure_provider)
+        subscription = self.scope_value("azure_subscription_id")
+        if subscription is not None:
+            metadata["azure_subscription_id"] = _safe_text(subscription)
+        environment = getattr(self.resolved_secret, "azure_environment", None)
+        if isinstance(environment, str):
+            metadata["azure_provider"] = _safe_text(environment)
         return metadata
 
 
@@ -382,15 +411,19 @@ class GcpReferenceProviderInput(CredentialReferenceProviderInput):
     """GCP provider form input whose credential comes from a reference."""
 
     provider: Literal["gcp"]
-    gcp_project_id: NonBlankStr
+
+    def missing_scope_fields(self) -> tuple[str, ...]:
+        """Return ``gcp_project_id`` when the credential has no project."""
+        return () if self.scope_value("gcp_project_id") else ("gcp_project_id",)
 
     def safe_log_metadata(self) -> dict[str, object]:
         """Return the log-safe metadata facts for this GCP input."""
         from prowler.injector.failure_taxonomy import _safe_text
 
         metadata = self.reference_log_metadata()
-        if isinstance(self.gcp_project_id, str):
-            metadata["gcp_project_id"] = _safe_text(self.gcp_project_id)
+        project = self.scope_value("gcp_project_id")
+        if project is not None:
+            metadata["gcp_project_id"] = _safe_text(project)
         return metadata
 
 
@@ -444,8 +477,11 @@ REFERENCE_PROVIDER_INPUT_ADAPTER: TypeAdapter[ReferenceProviderInput] = TypeAdap
     config=ConfigDict(hide_input_in_errors=True),
 )
 
-# The legacy credential text fields are exactly the legacy model fields that
-# the reference model does not keep, so both stay derived from one place.
+# The manual credentials fields (the credential text fields, and the region,
+# subscription, project, and Azure cloud the credential carries) are exactly
+# the legacy model fields that the reference model does not keep, so both stay
+# derived from one place. They are ignored, even when filled, on the reference
+# path.
 LEGACY_CREDENTIAL_KEYS: Mapping[str, frozenset[str]] = {
     provider: frozenset(legacy.model_fields) - frozenset(reference.model_fields)
     for provider, (legacy, reference) in (
@@ -456,18 +492,18 @@ LEGACY_CREDENTIAL_KEYS: Mapping[str, frozenset[str]] = {
     )
 }
 
-# Required legacy credential fields of the providers whose credential can come
-# from a reference: when all of them are absent, no credential is available.
-REQUIRED_CLOUD_CREDENTIAL_KEYS: Mapping[str, frozenset[str]] = {
+# Optional form fields of each reference model (scope fallbacks, AWS endpoint).
+_REFERENCE_OPTIONAL_KEYS: Mapping[str, frozenset[str]] = {
     provider: frozenset(
         key
-        for key in LEGACY_CREDENTIAL_KEYS[provider]
-        if legacy.model_fields[key].is_required()
+        for key, model_field in reference.model_fields.items()
+        if not model_field.is_required() and not model_field.exclude
     )
-    for provider, legacy in (
-        ("aws", AwsProviderInput),
-        ("azure", AzureProviderInput),
-        ("gcp", GcpProviderInput),
+    for provider, (_, reference) in (
+        ("aws", AWS_PROVIDER_INPUTS),
+        ("azure", AZURE_PROVIDER_INPUTS),
+        ("gcp", GCP_PROVIDER_INPUTS),
+        ("kubernetes", KUBERNETES_PROVIDER_INPUTS),
     )
 }
 
@@ -533,9 +569,15 @@ def validate_provider_input(
     """
     if credential_attachment is None:
         return parse_provider_input(candidate)
-    ignored_keys = LEGACY_CREDENTIAL_KEYS.get(str(candidate.get("provider")), ())
+    provider = str(candidate.get("provider"))
+    ignored_keys = LEGACY_CREDENTIAL_KEYS.get(provider, ())
+    optional_keys = _REFERENCE_OPTIONAL_KEYS.get(provider, frozenset())
     reference_candidate = {
-        key: value for key, value in candidate.items() if key not in ignored_keys
+        # The form sends "" for every field left empty: an optional field, such
+        # as a scope fallback the credential may provide, is then absent.
+        key: None if key in optional_keys and value == "" else value
+        for key, value in candidate.items()
+        if key not in ignored_keys
     }
     reference_candidate["credential_attachment"] = credential_attachment
     return _validate_value_free(REFERENCE_PROVIDER_INPUT_ADAPTER, reference_candidate)

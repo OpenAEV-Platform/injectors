@@ -119,7 +119,9 @@ class ProviderInvocationAdapter:
         resolved = provider.resolved_secret
         if resolved is None:
             raise ValueError("a credential reference must be resolved before use")
-        lease = self._credential_leases.materialize(resolved)
+        lease = self._credential_leases.materialize(
+            resolved, reference=provider.credential_attachment.reference
+        )
         try:
             arguments = _reference_arguments(provider, resolved, lease.credential)
             environment: list[tuple[str, EnvironmentValue]] = [
@@ -141,6 +143,13 @@ class ProviderInvocationAdapter:
         )
 
 
+def _required(value: object) -> str:
+    """Return a scope value checked by ``missing_scope_fields`` beforehand."""
+    if not isinstance(value, str) or not value:
+        raise ValueError("a referenced credential scope value must be checked first")
+    return value
+
+
 def _reference_arguments(
     provider: CredentialReferenceProviderInput,
     resolved: ResolvedSecret,
@@ -148,14 +157,14 @@ def _reference_arguments(
 ) -> tuple[str, ...]:
     """Pick the Prowler provider flags from the resolved secret type.
 
-    Region, subscription, and project come from the secret when it carries
-    them; the form values are only used when the secret omits them.
+    Region, subscription, and project come from the secret only, checked
+    beforehand by ``missing_scope_fields``.
     """
     if isinstance(provider, AwsReferenceProviderInput) and isinstance(
         resolved, AwsAccessKeySecret | AwsAssumeRoleSecret
     ):
         # The assume-role profile is selected through AWS_PROFILE.
-        region = resolved.aws_default_region or provider.aws_region
+        region = _required(provider.scope_value("aws_default_region"))
         return ("aws", "--region", region)
     if isinstance(provider, AzureReferenceProviderInput) and isinstance(
         resolved, AzureServicePrincipalSecret | AzureManagedIdentitySecret
@@ -165,7 +174,7 @@ def _reference_arguments(
             if isinstance(resolved, AzureServicePrincipalSecret)
             else "--managed-identity-auth"
         )
-        subscription = resolved.azure_subscription_id or provider.azure_subscription_id
+        subscription = _required(provider.scope_value("azure_subscription_id"))
         return (
             "azure",
             authentication,
@@ -177,7 +186,7 @@ def _reference_arguments(
     if isinstance(provider, GcpReferenceProviderInput) and isinstance(
         resolved, GcpServiceAccountSecret | GcpOAuth2Secret
     ):
-        project = resolved.gcp_project_id or provider.gcp_project_id
+        project = _required(provider.scope_value("gcp_project_id"))
         return (
             "gcp",
             "--credentials-file",

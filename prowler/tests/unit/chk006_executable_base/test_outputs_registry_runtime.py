@@ -132,6 +132,7 @@ def test_contract_forwards_dynamic_trace_config_and_safe_request_info(
     contract = contract_class()
     provider = contract.parse_input(
         {
+            "credential_source": "manual",
             "aws_access_key_id": "CANARY-ACCESS-KEY",
             "aws_secret_access_key": "CANARY-SECRET",
             "aws_account_id": "123456789012",
@@ -244,6 +245,7 @@ def _message(
         "injector_contract_id": identifier,
         "inject_content": content
         or {
+            "credential_source": "manual",
             "aws_access_key_id": "runtime-access",
             "aws_secret_access_key": "runtime-secret",
             "aws_account_id": "123456789012",
@@ -665,6 +667,7 @@ def test_runtime_guides_a_real_invalid_aws_account_without_echoing_it(
         _message(
             identifier,
             content={
+                "credential_source": "manual",
                 "aws_access_key_id": "runtime-access",
                 "aws_secret_access_key": "runtime-secret",
                 "aws_account_id": invalid_account,
@@ -704,6 +707,7 @@ def test_runtime_guides_a_real_known_field_with_allowlisted_words(
         _message(
             identifier,
             content={
+                "credential_source": "manual",
                 "aws_access_key_id": "runtime-access",
                 "aws_secret_access_key": "runtime-secret",
                 "aws_account_id": "123456789012",
@@ -1257,7 +1261,7 @@ def test_runtime_accepts_both_id_shapes_and_calls_success_once(
     injector.process_message(message)
     assert _RuntimeContract.events == [
         "reception",
-        "parse:('aws_access_key_id', 'aws_secret_access_key', "
+        "parse:('credential_source', 'aws_access_key_id', 'aws_secret_access_key', "
         "'aws_account_id', 'aws_region')",
         "execute",
         "render:success",
@@ -1305,7 +1309,7 @@ def test_runtime_resolved_contract_uses_renderer_for_safe_error(
 
     assert _RuntimeContract.events == [
         "reception",
-        "parse:('aws_access_key_id', 'aws_secret_access_key', "
+        "parse:('credential_source', 'aws_access_key_id', 'aws_secret_access_key', "
         "'aws_account_id', 'aws_region')",
         "render:error",
     ]
