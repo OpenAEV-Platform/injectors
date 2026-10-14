@@ -5,14 +5,6 @@ import time
 from importlib.resources import files
 from typing import Dict, List, Optional, Tuple
 
-from injector_common.data_helpers import DataHelpers
-from injector_common.dump_config import intercept_dump_argument
-from injector_common.stratus_executor import (
-    AUTH_FAILED,
-    AUTH_PASSED,
-    StratusExecutor,
-    StratusResult,
-)
 from pyoaev.credential import (
     CredentialCleanupError,
     CredentialErrorCode,
@@ -24,6 +16,14 @@ from pyoaev.credential import (
 )
 from pyoaev.helpers import OpenAEVConfigHelper, OpenAEVInjectorHelper
 
+from injector_common.data_helpers import DataHelpers
+from injector_common.dump_config import intercept_dump_argument
+from injector_common.stratus_executor import (
+    AUTH_FAILED,
+    AUTH_PASSED,
+    StratusExecutor,
+    StratusResult,
+)
 from stratus.configuration.config_loader import ConfigLoader
 from stratus.contracts import (
     CONTRACT_REGISTRY,

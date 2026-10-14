@@ -6,13 +6,6 @@ import tempfile
 from unittest import TestCase
 from unittest.mock import MagicMock, patch
 
-from injector_common.stratus_executor import (
-    AUTH_FAILED,
-    AUTH_PASSED,
-    StratusExecutor,
-    StratusResult,
-    parse_authentication,
-)
 from pyoaev.credential import (
     CredentialCleanupError,
     CredentialErrorCode,
@@ -20,6 +13,13 @@ from pyoaev.credential import (
 )
 
 import stratus.openaev_stratus as mod
+from injector_common.stratus_executor import (
+    AUTH_FAILED,
+    AUTH_PASSED,
+    StratusExecutor,
+    StratusResult,
+    parse_authentication,
+)
 from stratus.contracts import CONTRACT_REGISTRY, technique_contract_id
 from stratus.contracts.platforms import (
     AWS_CUSTOM_CONTRACT,
