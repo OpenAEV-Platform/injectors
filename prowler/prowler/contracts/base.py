@@ -49,11 +49,13 @@ from prowler.services.output_trace import generate
 
 from .provider_fields import (
     CREDENTIAL_MANAGER_PROVIDERS,
+)
+from .provider_fields import CREDENTIAL_REFERENCE_KEY as CREDENTIAL_REFERENCE_KEY
+from .provider_fields import (
     CREDENTIAL_SOURCE_KEY,
     CREDENTIAL_SOURCE_VALUES,
     MANUAL_CREDENTIALS,
 )
-from .provider_fields import CREDENTIAL_REFERENCE_KEY as CREDENTIAL_REFERENCE_KEY
 from .provider_fields import ProviderName as ProviderName
 from .provider_fields import RouteProviderName as RouteProviderName
 from .provider_fields import build_provider_fields as _build_provider_fields
