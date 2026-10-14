@@ -33,6 +33,8 @@ class CredField:
 
     key: str
     label: str
+    # Required on the legacy path. On a platform accepting a credential
+    # reference, the contract field is satisfied by this field or a reference.
     mandatory: bool = True
     # Render the input as a multi-line text area (secrets like a kubeconfig or a
     # service account key JSON) instead of a single-line text field.
@@ -60,6 +62,10 @@ class PlatformSpec:
     custom_contract_id: str
     label: str
     cred_fields: List[CredField] = field(default_factory=list)
+    # Provider whose credential type a credential reference must resolve to, in
+    # the pyoaev mapping shared with the contract field; None when no
+    # referenced credential can be used on the platform.
+    credential_provider: Optional[str] = None
 
 
 _AWS_CRED_FIELDS = [
@@ -164,14 +170,21 @@ _K8S_CRED_FIELDS = [
 
 
 PLATFORMS: List[PlatformSpec] = [
-    PlatformSpec("aws", AWS_CUSTOM_CONTRACT, "AWS", _AWS_CRED_FIELDS),
-    PlatformSpec("azure", AZURE_CUSTOM_CONTRACT, "Azure", _AZURE_CRED_FIELDS),
-    PlatformSpec("entra-id", ENTRA_CUSTOM_CONTRACT, "Entra ID", _ENTRA_CRED_FIELDS),
-    PlatformSpec("gcp", GCP_CUSTOM_CONTRACT, "Google Cloud Platform", _GCP_CRED_FIELDS),
+    PlatformSpec("aws", AWS_CUSTOM_CONTRACT, "AWS", _AWS_CRED_FIELDS, "aws"),
+    PlatformSpec("azure", AZURE_CUSTOM_CONTRACT, "Azure", _AZURE_CRED_FIELDS, "azure"),
+    # Entra ID declares no credential type on its contract but authenticates
+    # with an Azure credential.
+    PlatformSpec(
+        "entra-id", ENTRA_CUSTOM_CONTRACT, "Entra ID", _ENTRA_CRED_FIELDS, "azure"
+    ),
+    PlatformSpec(
+        "gcp", GCP_CUSTOM_CONTRACT, "Google Cloud Platform", _GCP_CRED_FIELDS, "gcp"
+    ),
+    # Kubernetes needs a kubeconfig, which no referenced credential provides.
     PlatformSpec("k8s", K8S_CUSTOM_CONTRACT, "Kubernetes", _K8S_CRED_FIELDS),
     # EKS techniques authenticate to AWS and then to the cluster; they use the
     # same AWS credentials as the AWS platform.
-    PlatformSpec("eks", EKS_CUSTOM_CONTRACT, "Amazon EKS", _AWS_CRED_FIELDS),
+    PlatformSpec("eks", EKS_CUSTOM_CONTRACT, "Amazon EKS", _AWS_CRED_FIELDS, "eks"),
 ]
 
 PLATFORMS_BY_KEY: Dict[str, PlatformSpec] = {p.key: p for p in PLATFORMS}
