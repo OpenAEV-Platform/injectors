@@ -33,6 +33,8 @@ class CredField:
 
     key: str
     label: str
+    # Required on the legacy path. On a platform accepting a credential
+    # reference, the contract field is satisfied by this field or a reference.
     mandatory: bool = True
     # Render the input as a multi-line text area (secrets like a kubeconfig or a
     # service account key JSON) instead of a single-line text field.
@@ -47,6 +49,11 @@ class CredField:
     file_mode: Optional[int] = None
     # Default applied when the field is optional and left empty.
     default: Optional[str] = None
+    # Non-secret value (region, project, subscription) also carried by a
+    # resolved credential, as this attribute. With a credential reference the
+    # resolved value wins, and this field is only read when the credential
+    # omits it. Secret fields leave it unset: they are never read in that case.
+    reference_attribute: Optional[str] = None
 
 
 @dataclass(frozen=True)
@@ -55,6 +62,10 @@ class PlatformSpec:
     custom_contract_id: str
     label: str
     cred_fields: List[CredField] = field(default_factory=list)
+    # Provider whose credential type a credential reference must resolve to, in
+    # the pyoaev mapping shared with the contract field; None when no
+    # referenced credential can be used on the platform.
+    credential_provider: Optional[str] = None
 
 
 _AWS_CRED_FIELDS = [
@@ -80,6 +91,7 @@ _AWS_CRED_FIELDS = [
         mandatory=False,
         env_vars=("AWS_REGION", "AWS_DEFAULT_REGION"),
         default="us-east-1",
+        reference_attribute="aws_default_region",
     ),
 ]
 
@@ -91,6 +103,7 @@ _AZURE_CRED_FIELDS = [
         key="azure_subscription_id",
         label="Azure Subscription ID",
         env_vars=("AZURE_SUBSCRIPTION_ID",),
+        reference_attribute="azure_subscription_id",
     ),
     CredField(
         key="azure_client_id",
@@ -123,6 +136,7 @@ _ENTRA_CRED_FIELDS = [
         label="Azure Subscription ID (optional)",
         mandatory=False,
         env_vars=("AZURE_SUBSCRIPTION_ID",),
+        reference_attribute="azure_subscription_id",
     ),
 ]
 
@@ -131,6 +145,7 @@ _GCP_CRED_FIELDS = [
         key="gcp_project_id",
         label="GCP Project ID",
         env_vars=("GOOGLE_PROJECT", "CLOUDSDK_CORE_PROJECT"),
+        reference_attribute="gcp_project_id",
     ),
     CredField(
         key="gcp_service_account_key",
@@ -155,14 +170,21 @@ _K8S_CRED_FIELDS = [
 
 
 PLATFORMS: List[PlatformSpec] = [
-    PlatformSpec("aws", AWS_CUSTOM_CONTRACT, "AWS", _AWS_CRED_FIELDS),
-    PlatformSpec("azure", AZURE_CUSTOM_CONTRACT, "Azure", _AZURE_CRED_FIELDS),
-    PlatformSpec("entra-id", ENTRA_CUSTOM_CONTRACT, "Entra ID", _ENTRA_CRED_FIELDS),
-    PlatformSpec("gcp", GCP_CUSTOM_CONTRACT, "Google Cloud Platform", _GCP_CRED_FIELDS),
+    PlatformSpec("aws", AWS_CUSTOM_CONTRACT, "AWS", _AWS_CRED_FIELDS, "aws"),
+    PlatformSpec("azure", AZURE_CUSTOM_CONTRACT, "Azure", _AZURE_CRED_FIELDS, "azure"),
+    # Entra ID declares no credential type on its contract but authenticates
+    # with an Azure credential.
+    PlatformSpec(
+        "entra-id", ENTRA_CUSTOM_CONTRACT, "Entra ID", _ENTRA_CRED_FIELDS, "azure"
+    ),
+    PlatformSpec(
+        "gcp", GCP_CUSTOM_CONTRACT, "Google Cloud Platform", _GCP_CRED_FIELDS, "gcp"
+    ),
+    # Kubernetes needs a kubeconfig, which no referenced credential provides.
     PlatformSpec("k8s", K8S_CUSTOM_CONTRACT, "Kubernetes", _K8S_CRED_FIELDS),
     # EKS techniques authenticate to AWS and then to the cluster; they use the
     # same AWS credentials as the AWS platform.
-    PlatformSpec("eks", EKS_CUSTOM_CONTRACT, "Amazon EKS", _AWS_CRED_FIELDS),
+    PlatformSpec("eks", EKS_CUSTOM_CONTRACT, "Amazon EKS", _AWS_CRED_FIELDS, "eks"),
 ]
 
 PLATFORMS_BY_KEY: Dict[str, PlatformSpec] = {p.key: p for p in PLATFORMS}
