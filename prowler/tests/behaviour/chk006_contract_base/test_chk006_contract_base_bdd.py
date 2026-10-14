@@ -21,7 +21,7 @@ from prowler._core.cli_engine import (
     OutputSpecification,
 )
 from prowler._core.prowler_client.provider_adapter import ProviderInvocationAdapter
-from prowler.contracts import CREDENTIAL_REFERENCE_KEY
+from prowler.contracts import CREDENTIAL_REFERENCE_KEY, CREDENTIAL_SOURCE_KEY
 from prowler.models.configs.config_loader import ProwlerConfig
 from prowler.models.provider_inputs import (
     PROVIDER_INPUT_ADAPTER,
@@ -43,6 +43,7 @@ PROVIDER_CASES = {
     "aws": (
         AwsProviderInput,
         {
+            "credential_source": "manual",
             "aws_access_key_id": "AKIA_TEST_PLACEHOLDER",
             "aws_secret_access_key": "aws-secret-placeholder",
             "aws_account_id": "123456789012",
@@ -52,6 +53,7 @@ PROVIDER_CASES = {
     "azure": (
         AzureProviderInput,
         {
+            "credential_source": "manual",
             "azure_tenant_id": "tenant-placeholder",
             "azure_client_id": "client-placeholder",
             "azure_client_secret": "azure-secret-placeholder",
@@ -62,6 +64,7 @@ PROVIDER_CASES = {
     "gcp": (
         GcpProviderInput,
         {
+            "credential_source": "manual",
             "gcp_service_account_json": (
                 '{"type":"service_account","private_key":"placeholder"}'
             ),
@@ -85,7 +88,11 @@ AWS_CREDENTIAL_TEXT_KEYS = (
     "aws_endpoint_url",
     "aws_session_token",
 )
-AWS_FIELD_KEYS = (*AWS_CREDENTIAL_TEXT_KEYS, CREDENTIAL_REFERENCE_KEY)
+AWS_FIELD_KEYS = (
+    CREDENTIAL_SOURCE_KEY,
+    CREDENTIAL_REFERENCE_KEY,
+    *AWS_CREDENTIAL_TEXT_KEYS,
+)
 
 
 def _contract_class(provider: str, **overrides: Any) -> type[Any]:
@@ -146,12 +153,20 @@ def test_minimal_subclass_builds_provider_specific_openaev_contract() -> None:
     assert fields["aws_endpoint_url"].label == "AWS endpoint URL (optional)"
     assert fields["aws_endpoint_url"].mandatory is False
     assert fields["aws_session_token"].mandatory is False
+    # The credential picker is required with the credential manager only.
+    manager = {CREDENTIAL_SOURCE_KEY: "credential_manager"}
     assert fields[CREDENTIAL_REFERENCE_KEY].mandatory is False
+    assert fields[CREDENTIAL_REFERENCE_KEY].mandatoryConditionValues == manager
+    # No credential carries the account: it stays mandatory on its own.
+    assert fields["aws_account_id"].mandatory is True
+    assert fields["aws_account_id"].visibleConditionFields == []
+    # The fields a credential provides are required with manual credentials.
+    manual = {CREDENTIAL_SOURCE_KEY: "manual"}
     assert all(
-        field.mandatory
-        for key, field in fields.items()
-        if key
-        not in {"aws_endpoint_url", "aws_session_token", CREDENTIAL_REFERENCE_KEY}
+        fields[key].mandatory is False
+        and fields[key].visibleConditionValues == manual
+        and fields[key].mandatoryConditionValues == manual
+        for key in ("aws_access_key_id", "aws_secret_access_key", "aws_region")
     )
 
 

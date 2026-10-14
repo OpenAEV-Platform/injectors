@@ -57,12 +57,16 @@ class MaterializedCredentialLease:
     """
 
     def __init__(
-        self, resolved_secret: ResolvedSecret, *, temporary_root: Path | None = None
+        self,
+        resolved_secret: ResolvedSecret,
+        *,
+        temporary_root: Path | None = None,
+        reference: str | None = None,
     ) -> None:
         self._exit_stack = ExitStack()
         self._lock = Lock()
         self.credential: MaterializedCredential = self._exit_stack.enter_context(
-            materialize(resolved_secret, temporary_root)
+            materialize(resolved_secret, temporary_root, reference=reference)
         )
 
     def cleanup(self) -> None:
@@ -108,9 +112,9 @@ class TemporaryCredentialLeaseFactory:
         return lease
 
     def materialize(
-        self, resolved_secret: ResolvedSecret
+        self, resolved_secret: ResolvedSecret, *, reference: str | None = None
     ) -> MaterializedCredentialLease:
         """Materialize one resolved secret under the same temporary root."""
         return MaterializedCredentialLease(
-            resolved_secret, temporary_root=self.temporary_root
+            resolved_secret, temporary_root=self.temporary_root, reference=reference
         )

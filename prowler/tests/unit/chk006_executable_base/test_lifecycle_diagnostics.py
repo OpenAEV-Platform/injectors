@@ -164,6 +164,7 @@ def _config(executable: str = "/opt/prowler/bin/prowler") -> ConfigLoader:
 
 def _aws_content(**overrides: Any) -> dict[str, Any]:
     return {
+        "credential_source": "manual",
         "aws_access_key_id": "ACCESS-KEY-CANARY",
         "aws_secret_access_key": "SECRET-CANARY",
         "aws_account_id": "123456789012",
@@ -953,6 +954,7 @@ def test_executable_diagnostic_extraction_failure_cannot_escape(
             "azure",
             "azure",
             {
+                "credential_source": "manual",
                 "azure_tenant_id": "TENANT-ID-CANARY",
                 "azure_client_id": "CLIENT-ID-CANARY",
                 "azure_client_secret": "SECRET-CANARY",
@@ -971,6 +973,7 @@ def test_executable_diagnostic_extraction_failure_cannot_escape(
             "gcp",
             "gcp",
             {
+                "credential_source": "manual",
                 "gcp_service_account_json": "GCP-JSON-CANARY",
                 "gcp_project_id": "project-safe",
             },
