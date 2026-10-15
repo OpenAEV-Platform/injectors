@@ -41,7 +41,8 @@ ARG PROWLER_VERSION=5.36.0
 RUN apk --no-cache upgrade && apk --no-cache add \
     gcc \
     musl-dev
-RUN python3 -m venv /opt/prowler \
+RUN apk add --repository=https://dl-cdn.alpinelinux.org/alpine/v3.22/main --no-cache python3=~3.12 python3-dev=~3.12
+RUN python3.12 -m venv /opt/prowler \
     && /opt/prowler/bin/python -m pip install --no-cache-dir "prowler==${PROWLER_VERSION}" \
     && ln -s /opt/prowler/bin/prowler /usr/local/bin/prowler
 
