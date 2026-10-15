@@ -77,7 +77,7 @@ docker build -t openaev/injector-http-query:test .
 - `nuclei/nuclei/` - Source (helpers/, nuclei_contracts/), pyproject.toml
 - `nmap/src/` - Source (contracts/, helpers/)
 - `http-query/src/` - Source (contracts_http.py), requirements in src/
-- `aws/src/` - Source (contracts_aws.py, helpers/), Python 3.14-slim Docker
+- `aws/src/` - Source (contracts_aws.py, helpers/), Python 3.14-alpine Docker
 - `injector_common/injector_common/` - Shared: targets.py, pagination.py, constants.py
 
 **Config/CI:**
@@ -129,7 +129,7 @@ Docker builds use `--build-context injector_common=../injector_common` for nmap/
 
 ## Key Dependencies
 
-**All:** pyoaev==2.0.10 | **nuclei:** Nuclei 3.4.3, Python 3.14-alpine | **nmap:** nmap+jc, Python 3.14-alpine | **aws:** Pacu+AWS CLI, Python 3.14-slim | **http-query:** Python 3.14-alpine
+**All:** pyoaev==2.0.10 | **nuclei:** Nuclei 3.4.3, Python 3.14-alpine | **nmap:** nmap+jc, Python 3.14-alpine | **aws:** Pacu+AWS CLI, Python 3.14-alpine | **http-query:** Python 3.14-alpine
 
 ## Pre-Commit Checklist
 

@@ -23,7 +23,7 @@ class TemplateAccessLock:
     Built on ``multiprocessing`` primitives so it works across the boundary
     the injector actually has: reader threads live in the main process, the
     writer runs in a child process forked from it (the primitives are shared
-    through fork inheritance, which is the default start method on Linux
+    through forkserver inheritance, which is the default start method on Linux
     where the injector container runs).
     """
 

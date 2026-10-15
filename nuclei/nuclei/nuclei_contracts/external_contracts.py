@@ -71,9 +71,9 @@ class ExternalContractsManager:
         self._api_client = api_client
         self._injector_id = injector_id
         self._logger = logger
-        # TemplateAccessLock shared with the scan path (fork-inherited by the
-        # child process spawn_process creates). None means "no coordination"
-        # (unit tests / standalone use).
+        # TemplateAccessLock shared with the scan path (fork-inherited through
+        # forkserver by the child process spawn_process creates).
+        # None means "no coordination" (unit tests / standalone use).
         self._templates_lock = templates_lock
         # Hard ceiling for the update subprocess so a hung refresh cannot hold
         # the writer lock (and block every scan) forever. None means no ceiling.
@@ -114,11 +114,11 @@ class ExternalContractsManager:
                         )
                     except Exception as e:
                         self._logger.error(e)
-                    finally:
-                        # we found a match and updated it (or an error occurred)
-                        # therefore we should exit the inner loop
-                        found = True
-                        break
+
+                    # we found a match and updated it (or an error occurred)
+                    # therefore we should exit the inner loop
+                    found = True
+                    break
             # when we exit the above inner loop, we need to check
             # whether we had a match or not
             if not found:
