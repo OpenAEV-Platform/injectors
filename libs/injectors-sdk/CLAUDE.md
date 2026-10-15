@@ -25,6 +25,10 @@ deprecation shims.
    loop runs in the core against `QueueListenerProtocol`: a new piece of listener state
    goes in that protocol first, and the adapter methods stay one-line delegations.
 6. A seam change bumps the `helpers` `SEAM_VERSION` and gets an entry in `CHANGELOG.md`.
+   Then regenerate the seam golden in the same change:
+   `(cd libs/injectors-sdk && python test/seam/generate_seam_golden.py)`. NEVER
+   regenerate it to make a failing `test/seam/test_seam_golden.py` pass without a
+   deliberate seam change.
 
 ## Scope
 
@@ -37,6 +41,7 @@ xtm-oaev-sdk belongs to `client-python`: stop and say so instead of working arou
 - changing a seam contract or the `SEAM_VERSION`;
 - renaming or removing any public name;
 - adding or changing a dependency in `pyproject.toml`;
+- editing the seam golden `test/seam/fixtures/seam_golden.json`;
 - deleting any file.
 
 ## Done when
