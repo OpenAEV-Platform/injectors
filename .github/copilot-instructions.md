@@ -2,7 +2,7 @@
 
 ## Repository Overview
 
-**Python monorepo** (~5,700 lines) with 4 injector modules: `nuclei/` (Nuclei scanner), `nmap/` (Nmap scanner), `http-query/` (HTTP testing), `aws/` (AWS/Pacu security), plus `injector_common/` (shared code for nmap/nuclei). Python 3.11-3.13, Docker, CircleCI, pyoaev client.
+**Python monorepo** with one directory per injector (`nuclei/`, `nmap/`, `http-query/`, `aws/`, `shodan/`, `netexec/`…), plus `injector_common/` (shared code for nmap/nuclei) and `libs/injectors-sdk/` (the injector runtime SDK). Python 3.12+ (`pyoaev` needs it; Docker images: Python 3.13), Docker, CircleCI, pyoaev client.
 
 ## Critical Build & Test Commands
 
@@ -36,17 +36,17 @@ Each injector has its own test suite. Tests MUST pass before committing.
 # Nuclei injector
 cd nuclei
 pip install -r requirements.txt
-python -m unittest  # Runs 11 tests, should complete in <1 second
+python -m unittest
 
 # Nmap injector  
 cd nmap
 pip install -r requirements.txt
-python -m unittest  # Runs 4 tests, should complete in <1 second
+python -m unittest
 
 # HTTP Query injector
 cd http-query
 pip install -r src/requirements.txt
-python -m unittest  # Runs 4 tests, should complete in <1 second
+python -m unittest
 ```
 
 **AWS injector has no tests currently.**
@@ -68,12 +68,36 @@ docker build --build-context injector_common=../injector_common -t openaev/injec
 cd http-query
 docker build -t openaev/injector-http-query:test .
 
-# AWS (uses Python 3.11-slim, not Alpine)
+# AWS
 cd aws
 docker build -t openaev/injector-aws:test .
 ```
 
 **Build Context Note:** The `--build-context injector_common=../injector_common` flag is required for nuclei and nmap. This is a Docker buildx feature that makes the shared code available during build.
+
+## pyoaev and the SDKs
+
+**Read this before touching imports or dependencies.** The shared runtime of `pyoaev` is
+moving into SDKs: `libs/injectors-sdk/` in this repository and `xtm-oaev-sdk` in `client-python`.
+`pyoaev` keeps the OpenAEV API client and serves the former names through deprecation
+shims. The released `pyoaev` versions the injectors pin today do **not** ship the SDKs.
+
+- **Keep the existing `pyoaev` imports** as long as the injector's pinned `pyoaev` does not
+  depend on the SDKs. **NEVER** import `injectors_sdk` or `xtm_oaev_sdk` in such a injector: the
+  production install takes `pyoaev` from PyPI, where the SDKs do not exist, and the
+  injector fails at runtime.
+- **Check:** in the injector's environment, `pip show pyoaev` lists `injectors-sdk` under `Requires`.
+- **NEVER** change a `pyoaev` pin or extra marker, or add an SDK dependency, without team
+  approval.
+- With a local `client-python`, `pyoaev` now also requires `xtm-oaev-sdk`,
+  `collectors-sdk` and `injectors-sdk`. If they cannot be resolved, report it instead of
+  editing pins.
+- **Migrating** (only when requested, and once the check passes): replace each legacy
+  import with the one its `DeprecationWarning` names, from the package root
+  (`from injectors_sdk import OpenAEVInjectorHelper`, never `public`, `seam` or `_core`), and pass the client yourself:
+  `OpenAEVInjectorHelper(config, icon, api_client=OpenAEV(...))`. See the [migration guide](https://github.com/OpenAEV-Platform/client-python/blob/main/libs/xtm-oaev-sdk/docs/migration_guide.md).
+- **Working in `libs/injectors-sdk/`:** follow `libs/injectors-sdk/CONTRIBUTING.md`. Run its linters from
+  the repository root and its tests from `libs/injectors-sdk/`; CI does not run them.
 
 ## Repository Structure (Key Files Only)
 
@@ -81,7 +105,8 @@ docker build -t openaev/injector-aws:test .
 - `nuclei/nuclei/` - Source (helpers/, nuclei_contracts/), pyproject.toml
 - `nmap/src/` - Source (contracts/, helpers/)
 - `http-query/src/` - Source (contracts_http.py), requirements in src/
-- `aws/src/` - Source (contracts_aws.py, helpers/), Python 3.11-slim Docker
+- `aws/src/` - Source (contracts_aws.py, helpers/)
+- `libs/injectors-sdk/` - The injector runtime SDK (see "pyoaev and the SDKs")
 - `injector_common/injector_common/` - Shared: targets.py, pagination.py, constants.py
 
 **Config/CI:**
@@ -100,7 +125,7 @@ docker build -t openaev/injector-aws:test .
 3. **test-{injector}** - `pip install -r requirements.txt`, overwrite pyoaev from main/release branch, `python -m unittest` (Python 3.13)
 
 **Build jobs** (main/release/tags only):
-- **build_rolling_1** - Builds all 4 injectors with `rolling` tag, runs on main
+- **build_rolling_1** - Builds all injectors with `rolling` tag, runs on main
 - **build_prerelease_1** - Builds with `prerelease` tag, runs on release/current  
 - **build_1** - Versioned release builds on tags (x.x.x format)
 
@@ -124,16 +149,16 @@ Docker builds use `--build-context injector_common=../injector_common` for nmap/
 **black:** 88 char lines, must pass `black --check .`
 **flake8:** Max line 120, ignores E,W. Config: `.flake8`
 **Testing:** `python -m unittest` from injector root. Tests in `test/` dirs.
-**Versioning:** Current 2.0.10 (pyoaev). Update in requirements.txt, docker-compose.yml, __version__.
+**Versioning:** all injectors pin the same exact `pyoaev` version. Update in requirements.txt, docker-compose.yml, __version__.
 
 ## GitHub Workflows
 
-**PR Title:** `[category] type(scope): description (#123)` - Types: feat|fix|chore|docs|style|refactor|perf|test|build|ci|revert
+**PR Title:** see "Commit, PR & issue conventions" below (Conventional Commits, no bracket prefix).
 **Release:** scripts/release.py updates versions via grep/sed, creates tags, generates notes with gren.
 
 ## Key Dependencies
 
-**All:** pyoaev==2.0.10 | **nuclei:** Nuclei 3.4.3, Python 3.13-alpine | **nmap:** nmap+jc, Python 3.13-alpine | **aws:** Pacu+AWS CLI, Python 3.11-slim | **http-query:** Python 3.13-alpine
+**All:** pyoaev (exact pin, same version everywhere) | **nuclei:** Nuclei 3.4.3, Python 3.13-alpine | **nmap:** nmap+jc, Python 3.13-alpine | **aws:** Pacu+AWS CLI, Python 3.13-alpine | **http-query:** Python 3.13-alpine
 
 ## Pre-Commit Checklist
 
@@ -153,6 +178,7 @@ Each injector has `config.yml.sample`: openaev.url, openaev.token, injector.id, 
 - **Entry points:** Named `openaev_<name>.py` in each injector
 - **Module isolation:** Each injector is independent with own tests
 - **pyoaev consistency:** Keep version same across all injectors unless specifically updating
+- **SDK split:** NEVER import `injectors_sdk` or `xtm_oaev_sdk` in an injector before reading "pyoaev and the SDKs"
 - **Trust these instructions:** Validated against actual codebase. Search only if incomplete/incorrect.
 
 

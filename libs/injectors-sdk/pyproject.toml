@@ -1,0 +1,30 @@
+[project]
+name = "injectors-sdk"
+version = "0.1.0"
+description = "OpenAEV Injectors SDK (DDD + Light Hex Architecture): injector runtime helpers."
+authors = [
+    {name = "Filigran", email = "contact@filigran.io"}
+]
+license = { text = "Apache-2.0" }
+requires-python = ">=3.12"
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: Apache Software License",
+    "Programming Language :: Python :: 3",
+    "Topic :: Software Development :: Libraries :: Python Modules"
+]
+dependencies = [
+    "pika (>=1.4.4,<1.5.0)",
+    "xtm-oaev-sdk (>=0.1.0,<0.2.0)",
+]
+
+[build-system]
+requires = ["setuptools", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+include = ["injectors_sdk*"]
+
+[tool.setuptools.package-data]
+injectors_sdk = ["py.typed"]
