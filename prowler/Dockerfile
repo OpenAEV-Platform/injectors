@@ -1,4 +1,4 @@
-FROM python:3.13-alpine AS builder
+FROM python:3.14-alpine AS builder
 
 RUN apk update && apk upgrade && apk add git
 
@@ -15,12 +15,12 @@ ADD . ${installdir}
 WORKDIR ${installdir}
 RUN poetry install
 
-FROM python:3.13-alpine AS runner
+FROM python:3.14-alpine AS runner
 
 ARG installdir=/opt/injector
 WORKDIR ${installdir}
 COPY --from=builder ${installdir} ${installdir}
-COPY --from=builder /usr/local/lib/python3.13/site-packages /usr/local/lib/python3.13/site-packages
+COPY --from=builder /usr/local/lib/python3.14/site-packages /usr/local/lib/python3.14/site-packages
 
 # Declare the build argument
 ARG PYOAEV_GIT_BRANCH_OVERRIDE
@@ -41,7 +41,8 @@ ARG PROWLER_VERSION=5.36.0
 RUN apk update && apk upgrade && apk add \
     gcc \
     musl-dev
-RUN python3 -m venv /opt/prowler \
+RUN apk add --repository=https://dl-cdn.alpinelinux.org/alpine/v3.22/main --no-cache python3=~3.12 python3-dev=~3.12
+RUN python3.12 -m venv /opt/prowler \
     && /opt/prowler/bin/python -m pip install --no-cache-dir "prowler==${PROWLER_VERSION}" \
     && ln -s /opt/prowler/bin/prowler /usr/local/bin/prowler
 
