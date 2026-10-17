@@ -1,0 +1,30 @@
+services:
+  injector-strix:
+    image: openaev/injector-strix:latest
+    environment:
+      - OPENAEV_URL=${OPENAEV_URL}
+      - OPENAEV_TOKEN=${OPENAEV_TOKEN}
+      # only required for multi-tenancy (Enterprise Edition), keep commented otherwise
+      # - OPENAEV_TENANT_ID=${OPENAEV_TENANT_ID}
+      - INJECTOR_ID=${INJECTOR_ID}
+      - INJECTOR_NAME=${INJECTOR_NAME}
+      - INJECTOR_LOG_LEVEL=${INJECTOR_LOG_LEVEL}
+      # -- LLM provider Strix reasons with --
+      - STRIX_LLM_MODEL=${STRIX_LLM_MODEL}
+      - STRIX_LLM_API_KEY=${STRIX_LLM_API_KEY}
+      # optional OpenAI-compatible base URL (e.g. a local Ollama/vLLM server)
+      - STRIX_LLM_API_BASE=${STRIX_LLM_API_BASE}
+      # optional Perplexity key to enable Strix search
+      # - STRIX_PERPLEXITY_API_KEY=${STRIX_PERPLEXITY_API_KEY}
+      # -- scan behavior --
+      - STRIX_SCAN_MODE=${STRIX_SCAN_MODE}
+      - STRIX_MAX_TURNS=${STRIX_MAX_TURNS}
+      - STRIX_MAX_BUDGET_USD=${STRIX_MAX_BUDGET_USD}
+      - STRIX_SCAN_TIMEOUT=${STRIX_SCAN_TIMEOUT}
+      - STRIX_MAX_CONCURRENT_SCANS=${STRIX_MAX_CONCURRENT_SCANS}
+    volumes:
+      # Strix launches its sandbox container via this daemon. Mounting the host
+      # socket grants this container control of the host Docker daemon; run it
+      # only on a host you trust and dedicate to authorized assessments.
+      - ${DOCKER_SOCK:-/var/run/docker.sock}:/var/run/docker.sock
+    restart: always
