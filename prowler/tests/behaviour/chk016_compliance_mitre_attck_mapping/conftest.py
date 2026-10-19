@@ -63,7 +63,6 @@ def provider_forms() -> dict[str, dict[str, object]]:
     """Return valid placeholder-only forms for the three MITRE providers."""
     return {
         "aws": {
-            "credential_source": "manual",
             "aws_access_key_id": "CANARY-AWS-ACCESS",
             "aws_secret_access_key": "CANARY-AWS-SECRET",
             "aws_account_id": "123456789012",
@@ -71,7 +70,6 @@ def provider_forms() -> dict[str, dict[str, object]]:
             "aws_session_token": "CANARY-AWS-SESSION",
         },
         "azure": {
-            "credential_source": "manual",
             "azure_tenant_id": "CANARY-AZURE-TENANT",
             "azure_client_id": "CANARY-AZURE-CLIENT",
             "azure_client_secret": "CANARY-AZURE-SECRET",
@@ -79,7 +77,6 @@ def provider_forms() -> dict[str, dict[str, object]]:
             "azure_provider": "AzureCloud",
         },
         "gcp": {
-            "credential_source": "manual",
             "gcp_service_account_json": "CANARY-GCP-SERVICE-ACCOUNT",
             "gcp_project_id": "acme-prod",
         },

@@ -26,7 +26,6 @@ from prowler.contracts import (
     BaseProwlerContract,
     ContractExecutionOutcome,
     ContractInputError,
-    ContractInputIssue,
     ProwlerContracts,
     stable_contract_id,
 )
@@ -82,17 +81,14 @@ PREVIOUS_FAILURE_KINDS = frozenset(
         "unexpected_failure",
     }
 )
-# The credential manager: the credential provides everything but the account.
+# With a credential reference: it provides everything but the account.
 AWS_SCOPE = {
-    "credential_source": "credential_manager",
     "aws_account_id": "123456789012",
 }
 AWS_MANUAL = {
-    "credential_source": "manual",
     "aws_account_id": "123456789012",
     "aws_region": "eu-west-1",
 }
-MANAGER = {"credential_source": "credential_manager"}
 
 
 def _injector() -> ProwlerInjector:
@@ -168,63 +164,31 @@ def test_an_unsafe_reference_never_reaches_the_trace(reference: str | None) -> N
 @pytest.mark.parametrize(
     ("route", "content"),
     (
+        # Without a credential, the legacy fields are required.
         ("aws", AWS_SCOPE),
-        # Filled manual fields do not replace the credential manager's credential.
-        ("aws", {**AWS_SCOPE, "aws_access_key_id": "K", "aws_secret_access_key": "S"}),
-        ("azure/iam", MANAGER),
-        ("gcp", MANAGER),
-        ("universal", {"prowler_provider": "gcp", **MANAGER}),
-    ),
-)
-def test_credential_manager_without_credential_is_credential_missing(
-    route: str, content: dict[str, str]
-) -> None:
-    error = _parse_error(route, content)
-
-    failure = _classify("input_validation", error)
-
-    assert failure.failure_kind == "credential_missing"
-    assert failure.credential_error_code == "CREDENTIAL_MISSING"
-    assert failure.credential_reference is None
-    assert failure.operator_guidance == (
-        "Select a credential on the inject, or choose manual credentials, then run "
-        "it again."
-    )
-    assert failure.issues
-
-
-@pytest.mark.parametrize(
-    ("route", "content"),
-    (
+        ("azure/iam", {}),
+        ("gcp", {}),
+        ("universal", {"prowler_provider": "gcp"}),
         ("aws", {**AWS_MANUAL, "aws_access_key_id": "AKIA-CANARY"}),
         (
             "aws",
             {
-                "credential_source": "manual",
                 "aws_access_key_id": "AKIA",
                 "aws_secret_access_key": "CANARY",
             },
         ),
-        # Manual credentials, every field empty: an invalid input, no credential.
+        # Every credential field empty: an invalid input, no credential.
         ("aws", {**AWS_MANUAL, "aws_access_key_id": "", "aws_secret_access_key": ""}),
         ("kubernetes", {"kubernetes_context": "context"}),
     ),
 )
-def test_partial_or_non_cloud_credentials_stay_invalid_input(
+def test_missing_partial_or_non_cloud_credentials_are_invalid_input(
     route: str, content: dict[str, str]
 ) -> None:
     failure = _classify("input_validation", _parse_error(route, content))
 
     assert failure.failure_kind == "invalid_input"
     assert not hasattr(failure, "credential_error_code")
-
-
-def test_untrusted_missing_issues_stay_invalid_input() -> None:
-    error = ContractInputError(
-        (ContractInputIssue(("credential_reference",), "missing"),)
-    )
-
-    assert _classify("input_validation", error).failure_kind == "invalid_input"
 
 
 def test_presentation_shows_the_code_the_reference_and_the_fixed_message() -> None:
@@ -387,11 +351,13 @@ def test_runtime_reports_a_missing_authorisation_code_as_access_denied() -> None
     )
 
 
-def test_runtime_reports_a_missing_credential() -> None:
+def test_runtime_reports_a_missing_credential_as_invalid_input() -> None:
     helper = Mock()
 
     callback = _process(helper, AWS_SCOPE, None)
 
     assert callback["execution_status"] == "ERROR"
-    assert "Credential error code: CREDENTIAL_MISSING" in callback["execution_message"]
+    assert "Error code: invalid_input" in callback["execution_message"]
+    assert "Credential error code" not in callback["execution_message"]
+    assert _TraceContract.executed == 0
     helper.api.inject.resolve_attachment_secret.assert_not_called()

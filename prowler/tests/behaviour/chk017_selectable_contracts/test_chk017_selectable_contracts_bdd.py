@@ -21,7 +21,6 @@ from prowler._core.prowler_client import (
     GcpServiceSelector,
 )
 from prowler.contracts import (
-    CREDENTIAL_SOURCE_KEY,
     DEFAULT_PROWLER_CONTRACTS,
     ROUTE_CATALOG,
     AwsSelectComplianceContract,
@@ -282,12 +281,8 @@ def test_select_field_is_closed_single_selection(
         if entry["contract_id"] == str(stable_contract_id(route))
     )
     content = json.loads(str(item["contract_content"]))
-    # The scope select, besides the credential source select.
-    select_fields = [
-        f
-        for f in content["fields"]
-        if f["type"] == "select" and f["key"] != CREDENTIAL_SOURCE_KEY
-    ]
+    # The scope select is the only select.
+    select_fields = [f for f in content["fields"] if f["type"] == "select"]
     assert len(select_fields) == 1
     select_field = select_fields[0]
     key = _SELECT_KEY[route]

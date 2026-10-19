@@ -39,8 +39,8 @@ ATTACHMENTS = {
 }
 ACCOUNT = "123456789012"
 OTHER_ACCOUNT = "210987654321"
-# The credential manager: the region comes from the credential.
-AWS_FORM = {"credential_source": "credential_manager", "aws_account_id": ACCOUNT}
+# With a credential reference: the region comes from the credential.
+AWS_FORM = {"aws_account_id": ACCOUNT}
 AWS_ACCESS_KEY = {
     "type": "AWS_ACCESS_KEY",
     "value": {
@@ -270,7 +270,6 @@ def test_authentication_is_traced_before_the_terminal_callback() -> None:
 
 def test_legacy_path_names_the_inject_fields() -> None:
     legacy = {
-        "credential_source": "manual",
         "aws_account_id": ACCOUNT,
         "aws_region": "eu-west-1",
         "aws_access_key_id": "K",
@@ -355,7 +354,7 @@ def test_missing_subscription_is_reported_on_the_credential() -> None:
 
     (terminal,) = _process(
         _helper(managed_identity),
-        {"credential_source": "credential_manager"},
+        {},
         attachments=ATTACHMENTS,
         contract=_AzureContract,
     )

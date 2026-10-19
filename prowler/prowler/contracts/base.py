@@ -47,22 +47,13 @@ from prowler.models.provider_inputs import (
 )
 from prowler.services.output_trace import generate
 
-from .provider_fields import (
-    CREDENTIAL_MANAGER_PROVIDERS,
-)
 from .provider_fields import CREDENTIAL_REFERENCE_KEY as CREDENTIAL_REFERENCE_KEY
-from .provider_fields import (
-    CREDENTIAL_SOURCE_KEY,
-    CREDENTIAL_SOURCE_VALUES,
-    MANUAL_CREDENTIALS,
-)
 from .provider_fields import ProviderName as ProviderName
 from .provider_fields import RouteProviderName as RouteProviderName
 from .provider_fields import build_provider_fields as _build_provider_fields
 
 __all__ = [
     "CREDENTIAL_REFERENCE_KEY",
-    "CREDENTIAL_SOURCE_KEY",
     "BaseProwlerContract",
     "ClientFactoryPort",
     "ContractExecutionOutcome",
@@ -128,45 +119,6 @@ class ContractInputError(ValueError):
     ) -> ContractInputError:
         """Mark issues produced by this contract's strict validation boundary."""
         return cls(issues, _trusted_issues=True)
-
-
-def attachment_for_credential_source(
-    manual: bool, credential_attachment: CredentialAttachment | None
-) -> CredentialAttachment | None:
-    """Return the attachment the selected credential source uses, if any.
-
-    With manual credentials, a credential still attached to the inject (picked
-    before switching to manual) is ignored. With the credential manager, an
-    inject without credential is reported as missing its credential.
-    """
-    if manual:
-        return None
-    if credential_attachment is None:
-        raise ContractInputError.from_validation(
-            (ContractInputIssue((CREDENTIAL_REFERENCE_KEY,), "missing"),)
-        )
-    return credential_attachment
-
-
-def parse_credential_source(raw_input: Mapping[str, object]) -> bool:
-    """Return True when the inject selects manual credentials.
-
-    Same rules as ``selection.parse_closed_select``, which cannot be imported
-    here without an import cycle.
-    """
-    submitted = raw_input.get(CREDENTIAL_SOURCE_KEY)
-    if submitted is None or submitted == "" or submitted == []:
-        error_type = "select_missing"
-    elif isinstance(submitted, list) and len(submitted) > 1:
-        error_type = "select_multiple"
-    else:
-        element = submitted[0] if isinstance(submitted, list) else submitted
-        if type(element) is str and element in CREDENTIAL_SOURCE_VALUES:
-            return element == MANUAL_CREDENTIALS
-        error_type = "select_unknown_value"
-    raise ContractInputError.from_validation(
-        (ContractInputIssue((CREDENTIAL_SOURCE_KEY,), error_type),)
-    )
 
 
 @dataclass(frozen=True)
@@ -493,25 +445,20 @@ class BaseProwlerContract(ABC):
         provider model field, so it is dropped before the ``extra="forbid"``
         boundary instead of being rejected there as an unknown input.
 
-        The credential source select picks the path: with the credential
-        manager, the reference variant of the provider model is validated and
-        the credential fields are ignored, even when filled; with manual
-        credentials, the strict legacy model is validated and an attached
-        credential is ignored. Kubernetes credentials are always manual, but
-        an attached credential is kept so that it fails as incompatible.
+        The attached credential picks the path: with one, the reference variant
+        of the provider model is validated and the credential fields are
+        ignored, even when filled; without one, the strict legacy model is
+        validated. Kubernetes credentials are always legacy, but an attached
+        credential is kept so that it fails as incompatible.
         """
         if "provider" in raw_input:
             raise ContractInputError.from_validation(
                 (ContractInputIssue(("provider",), "extra_forbidden"),)
             )
-        if self.provider in CREDENTIAL_MANAGER_PROVIDERS:
-            credential_attachment = attachment_for_credential_source(
-                parse_credential_source(raw_input), credential_attachment
-            )
         candidate = {
             key: value
             for key, value in raw_input.items()
-            if key not in (CREDENTIAL_REFERENCE_KEY, CREDENTIAL_SOURCE_KEY)
+            if key != CREDENTIAL_REFERENCE_KEY
         }
         if self.provider == "aws":
             for field in ("aws_session_token", "aws_endpoint_url"):

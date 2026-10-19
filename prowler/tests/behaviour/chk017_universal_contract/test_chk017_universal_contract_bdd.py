@@ -16,7 +16,6 @@ from prowler._core.cli_engine import (
 )
 from prowler.contracts import (
     CREDENTIAL_REFERENCE_KEY,
-    CREDENTIAL_SOURCE_KEY,
     DEFAULT_PROWLER_CONTRACTS,
     ROUTE_CATALOG,
     ContractInputError,
@@ -26,14 +25,6 @@ from prowler.contracts import (
 from prowler.models.configs.config_loader import ProwlerConfig
 
 from .conftest import PROVIDER_FORMS
-
-
-def _fixed_manual(provider: str, form: dict[str, object]) -> dict[str, object]:
-    """Return a fixed-route form selecting manual credentials, as universal does."""
-    if provider == "kubernetes":
-        return dict(form)
-    return {**form, "credential_source": "manual"}
-
 
 PROVIDER_KEY = "prowler_provider"
 SERVICE_KEYS = {
@@ -141,38 +132,19 @@ def _contract(route_name: str) -> Any:
 def _expected_credential_fields() -> list[tuple[str, str, bool]]:
     """Derive the fifteen credential fields from the four fixed contracts.
 
-    The credential source select and the credential reference are excluded:
-    the universal provider select replaces the first, and the key of the
-    second is pinned by pyoaev, so the universal form carries one copy.
+    The credential reference is excluded: its key is pinned by pyoaev, so the
+    universal form carries one copy.
     The flag tells whether the field is required, alone or conditionally.
     """
     expected: list[tuple[str, str, bool]] = []
     for provider in ("aws", "azure", "gcp", "kubernetes"):
         fixed = _contract(provider)
         for element in fixed.build_provider_fields():
-            if element.key in (CREDENTIAL_REFERENCE_KEY, CREDENTIAL_SOURCE_KEY):
+            if element.key == CREDENTIAL_REFERENCE_KEY:
                 continue
             mandatory = element.mandatory or bool(element.mandatoryConditionFields)
             expected.append((provider, element.key, mandatory))
     return expected
-
-
-# The fields a credential provides: shown with manual credentials only.
-_MANUAL_ONLY_FIELDS = frozenset(
-    {
-        "aws_access_key_id",
-        "aws_secret_access_key",
-        "aws_region",
-        "aws_session_token",
-        "azure_tenant_id",
-        "azure_client_id",
-        "azure_client_secret",
-        "azure_subscription_id",
-        "azure_provider",
-        "gcp_service_account_json",
-        "gcp_project_id",
-    }
-)
 
 
 def test_form_conditions_every_credential_field_on_provider_select() -> None:
@@ -186,10 +158,9 @@ def test_form_conditions_every_credential_field_on_provider_select() -> None:
     content = json.loads(str(item["contract_content"]))
     fields = content["fields"]
     expected_credential = _expected_credential_fields()
-    assert len(fields) == 22
+    assert len(fields) == 21
     assert [f["key"] for f in fields] == [
         PROVIDER_KEY,
-        CREDENTIAL_SOURCE_KEY,
         CREDENTIAL_REFERENCE_KEY,
         *(key for _provider, key, _mandatory in expected_credential),
         *SERVICE_KEYS.values(),
@@ -208,42 +179,24 @@ def test_form_conditions_every_credential_field_on_provider_select() -> None:
     }
     assert provider_select["visibleConditionFields"] == []
     assert provider_select["mandatoryConditionFields"] == []
-    credential_source = fields[1]
-    assert credential_source["choices"] == {
-        "credential_manager": "Credential manager",
-        "manual": "Manual credentials",
-    }
-    assert credential_source["visibleConditionValues"] == {
-        PROVIDER_KEY: ["aws", "azure", "gcp"]
-    }
-    credential_reference = fields[2]
+    credential_reference = fields[1]
     assert credential_reference["key"] == CREDENTIAL_REFERENCE_KEY
     assert credential_reference["type"] == "credential-reference"
     assert credential_reference["mandatory"] is False
     assert credential_reference["multiple"] is False
     # The provider is chosen through PROVIDER_KEY, so no CredentialType filter.
     assert credential_reference["credential_reference_type"] is None
-    # Shown for a credential provider with the credential manager.
+    # Shown for a credential provider, next to its legacy credential fields.
     assert credential_reference["visibleConditionValues"] == {
-        PROVIDER_KEY: ["aws", "azure", "gcp"],
-        CREDENTIAL_SOURCE_KEY: "credential_manager",
+        PROVIDER_KEY: ["aws", "azure", "gcp"]
     }
-    assert credential_reference["mandatoryConditionValues"] == {
-        CREDENTIAL_SOURCE_KEY: "credential_manager"
-    }
+    assert credential_reference["mandatoryConditionFields"] == []
     mandatory_count = 0
-    for field_entry, (provider, key, base_mandatory) in zip(
-        fields[3:18], expected_credential, strict=True
+    for field_entry, (provider, _key, base_mandatory) in zip(
+        fields[2:17], expected_credential, strict=True
     ):
         assert field_entry["mandatory"] is False
         assert field_entry["mandatoryGroups"] == []
-        if key in _MANUAL_ONLY_FIELDS:
-            assert field_entry["visibleConditionValues"] == {
-                PROVIDER_KEY: provider,
-                CREDENTIAL_SOURCE_KEY: "manual",
-            }
-            assert field_entry["mandatoryConditionFields"] == []
-            continue
         assert field_entry["visibleConditionValues"] == {PROVIDER_KEY: provider}
         if base_mandatory:
             mandatory_count += 1
@@ -251,7 +204,7 @@ def test_form_conditions_every_credential_field_on_provider_select() -> None:
         else:
             assert field_entry["mandatoryConditionFields"] == []
     assert mandatory_count == 3
-    for provider, select in zip(("aws", "azure", "gcp"), fields[18:21], strict=True):
+    for provider, select in zip(("aws", "azure", "gcp"), fields[17:20], strict=True):
         assert select["type"] == "select"
         assert select["mandatory"] is False
         assert select["cardinality"] == "1"
@@ -274,7 +227,7 @@ def test_form_conditions_every_credential_field_on_provider_select() -> None:
                 if route.startswith(f"{provider}/")
             ),
         }
-    compliance = fields[21]
+    compliance = fields[20]
     assert compliance["defaultValue"] == ["__none__"]
     assert compliance["visibleConditionFields"] == []
     assert len(compliance["choices"]) == 15
@@ -492,7 +445,7 @@ def test_wrong_provider_fields_cannot_satisfy_selected_provider() -> None:
         universal.parse_input(form)
     fixed = _contract("aws")
     with pytest.raises(ContractInputError) as fixed_error:
-        fixed.parse_input(_fixed_manual("aws", {}))
+        fixed.parse_input({})
     assert universal_error.value.issues == fixed_error.value.issues
     for key in PROVIDER_FORMS["azure"]:
         assert not any(key in issue.location for issue in universal_error.value.issues)
@@ -549,7 +502,7 @@ def test_failed_universal_run_preserves_error_unchanged() -> None:
 
     fixed = _contract("gcp/compute")
     fixed._client_factory = _ClientFactory(failed)
-    fixed_parsed = fixed.parse_input(_fixed_manual("gcp", PROVIDER_FORMS["gcp"]))
+    fixed_parsed = fixed.parse_input(PROVIDER_FORMS["gcp"])
     fixed_outcome = fixed.execute(ProwlerConfig(), fixed_parsed)
 
     assert len(universal_factory.calls) == 1
