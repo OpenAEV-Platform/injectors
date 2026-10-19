@@ -55,7 +55,6 @@ class _Contract(BaseProwlerContract):
 def _provider(contract: BaseProwlerContract) -> Any:
     return contract.parse_input(
         {
-            "credential_source": "manual",
             "aws_access_key_id": "ACCESS-KEY-CANARY",
             "aws_secret_access_key": "SECRET-CANARY",
             "aws_account_id": "123456789012",

@@ -5,11 +5,9 @@ from typing import Literal
 
 from pyoaev.contracts.contract_config import (
     ContractElement,
-    ContractSelect,
     ContractText,
     ContractTextArea,
 )
-from pyoaev.contracts.contract_utils import ContractCardinality
 from pyoaev.credential.utils import build_single_referenced_credential_element
 
 ProviderName = Literal["aws", "azure", "gcp", "kubernetes"]
@@ -28,20 +26,9 @@ PROVIDER_LABELS: dict[ProviderName, str] = {
     "kubernetes": "Kubernetes",
 }
 
-# Where the credential of an inject comes from. The inject form shows either
-# the credential picker or the manual credential fields, never both: it cannot
-# react to the picker itself, only to a select. Kubernetes has no credential
-# type on the platform, so its credentials are always manual.
-CREDENTIAL_SOURCE_KEY = "credential_source"
-CREDENTIAL_MANAGER = "credential_manager"
-MANUAL_CREDENTIALS = "manual"
-CREDENTIAL_SOURCE_VALUES = (CREDENTIAL_MANAGER, MANUAL_CREDENTIALS)
+# Kubernetes has no credential type on the platform, so its credentials are
+# always the legacy fields.
 CREDENTIAL_MANAGER_PROVIDERS: tuple[ProviderName, ...] = ("aws", "azure", "gcp")
-
-
-def manual_credentials_label(provider: ProviderName) -> str:
-    """Return the label of the manual credentials option of one provider."""
-    return f"{PROVIDER_LABELS[provider]} - manual credentials"
 
 
 @dataclass(frozen=True, slots=True)
@@ -50,8 +37,9 @@ class _FieldSpec:
     label: str
     mandatory: bool
     multiline: bool = False
-    # A field a stored credential provides: only shown, and required, with
-    # manual credentials. The others are shown with both credential sources.
+    # A field a stored credential provides: never required by the form, since
+    # a credential reference replaces it. The parse boundary requires it
+    # without a reference.
     from_credential: bool = True
 
 
@@ -128,57 +116,21 @@ def build_provider_field(
 def build_provider_fields(provider: ProviderName) -> list[ContractElement]:
     """Declare exact provider model fields using current plaintext controls.
 
-    A provider with a platform credential type starts with the credential
-    source select: the credential picker is shown, and required, with the
-    credential manager; the fields a credential provides are shown, and
-    required, with manual credentials only. Kubernetes credentials are always
-    manual.
+    The credential picker and the legacy credential fields are shown together.
+    The form cannot require either alone, so the fields a credential provides
+    are not required here: an inject with a credential reference uses it, and
+    one without is validated against the legacy fields. A provider with a
+    platform credential type leads with the picker; Kubernetes, which has none,
+    keeps it last.
     """
-    specifications = _PROVIDER_FIELDS[provider]
-    fields: list[ContractElement]
-    if provider not in CREDENTIAL_MANAGER_PROVIDERS:
-        fields = [
-            build_provider_field(specification, mandatory=specification.mandatory)
-            for specification in specifications
-        ]
-        fields.append(build_single_referenced_credential_element(provider))
-        return fields
-    manager: dict[str, str | list[str]] = {CREDENTIAL_SOURCE_KEY: CREDENTIAL_MANAGER}
-    manual: dict[str, str | list[str]] = {CREDENTIAL_SOURCE_KEY: MANUAL_CREDENTIALS}
-    reference = build_single_referenced_credential_element(provider)
-    reference.visibleConditionFields = list(manager)
-    reference.visibleConditionValues = dict(manager)
-    reference.mandatoryConditionFields = list(manager)
-    reference.mandatoryConditionValues = dict(manager)
-    fields = [build_credential_source_select(provider), reference]
-    for specification in specifications:
-        fields.append(
-            build_provider_field(
-                specification,
-                mandatory=specification.mandatory,
-                condition=manual if specification.from_credential else None,
-            )
+    fields = [
+        build_provider_field(
+            specification,
+            mandatory=specification.mandatory and not specification.from_credential,
         )
-    return fields
-
-
-def build_credential_source_select(provider: ProviderName | None) -> ContractSelect:
-    """Build the select choosing the credential manager or manual credentials.
-
-    ``None`` is the universal form, where the provider is selected separately.
-    """
-    return ContractSelect(
-        key=CREDENTIAL_SOURCE_KEY,
-        label="Credentials",
-        mandatory=True,
-        cardinality=ContractCardinality.One.value,
-        defaultValue=[CREDENTIAL_MANAGER],
-        choices={
-            CREDENTIAL_MANAGER: "Credential manager",
-            MANUAL_CREDENTIALS: (
-                "Manual credentials"
-                if provider is None
-                else manual_credentials_label(provider)
-            ),
-        },
-    )
+        for specification in _PROVIDER_FIELDS[provider]
+    ]
+    reference = build_single_referenced_credential_element(provider)
+    if provider in CREDENTIAL_MANAGER_PROVIDERS:
+        return [reference, *fields]
+    return [*fields, reference]

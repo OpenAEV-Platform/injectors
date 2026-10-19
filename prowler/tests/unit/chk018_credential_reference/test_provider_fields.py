@@ -15,7 +15,6 @@ from prowler.contracts.provider_fields import (
     _PROVIDER_FIELDS,
     CREDENTIAL_MANAGER_PROVIDERS,
     CREDENTIAL_REFERENCE_KEY,
-    CREDENTIAL_SOURCE_KEY,
     ProviderName,
     build_provider_fields,
 )
@@ -66,52 +65,44 @@ def test_exactly_one_credential_reference_is_appended(provider: ProviderName) ->
 
 
 @pytest.mark.parametrize("provider", CREDENTIAL_PROVIDERS)
-def test_credential_source_and_reference_lead_the_form(provider: ProviderName) -> None:
-    """The credential source select and the picker come before the fields.
+def test_reference_leads_the_form_of_a_credential_provider(
+    provider: ProviderName,
+) -> None:
+    """The picker comes before the fields.
 
-    Kubernetes has no credential type: no select, the picker stays last.
+    Kubernetes has no credential type: the picker stays last.
     """
     elements = build_provider_fields(provider)
     specification_keys = [spec.key for spec in _PROVIDER_FIELDS[provider]]
     if provider in CREDENTIAL_MANAGER_PROVIDERS:
         expected = [
-            CREDENTIAL_SOURCE_KEY,
             CREDENTIAL_REFERENCE_KEY,
             *specification_keys,
         ]
-        assert type(elements[1]) is ContractReferencedCredential
+        assert type(elements[0]) is ContractReferencedCredential
     else:
         expected = [*specification_keys, CREDENTIAL_REFERENCE_KEY]
         assert type(elements[-1]) is ContractReferencedCredential
     assert [element.key for element in elements] == expected
 
 
-@pytest.mark.parametrize("provider", CREDENTIAL_MANAGER_PROVIDERS)
-def test_credential_source_select_defaults_to_the_credential_manager(
+@pytest.mark.parametrize("provider", CREDENTIAL_PROVIDERS)
+def test_form_has_no_select_between_the_credential_paths(
     provider: ProviderName,
 ) -> None:
-    """A closed, required select: the credential manager or manual credentials."""
-    (select,) = [
-        e for e in build_provider_fields(provider) if e.key == CREDENTIAL_SOURCE_KEY
-    ]
-    assert select.mandatory is True
-    assert select.defaultValue == ["credential_manager"]
-    assert list(select.choices) == ["credential_manager", "manual"]
-    assert select.choices["manual"].endswith(" - manual credentials")
+    """The picker and the legacy fields coexist: nothing selects between them."""
+    assert not [e for e in build_provider_fields(provider) if e.type == "select"]
 
 
-@pytest.mark.parametrize("provider", CREDENTIAL_MANAGER_PROVIDERS)
-def test_credential_reference_is_required_with_the_credential_manager_only(
+@pytest.mark.parametrize("provider", CREDENTIAL_PROVIDERS)
+def test_credential_reference_is_neither_required_nor_conditional(
     provider: ProviderName,
 ) -> None:
-    """The picker is shown, and required, when the credential manager is chosen."""
+    """The picker is always shown and optional: the legacy fields are the fallback."""
     element = _credential_reference(provider)
-    manager = {CREDENTIAL_SOURCE_KEY: "credential_manager"}
     assert element.mandatory is False
-    assert element.visibleConditionFields == [CREDENTIAL_SOURCE_KEY]
-    assert element.visibleConditionValues == manager
-    assert element.mandatoryConditionFields == [CREDENTIAL_SOURCE_KEY]
-    assert element.mandatoryConditionValues == manager
+    assert element.visibleConditionFields == []
+    assert element.mandatoryConditionFields == []
 
 
 @pytest.mark.parametrize("provider", CREDENTIAL_PROVIDERS)
@@ -156,7 +147,7 @@ def test_provider_text_fields_keep_their_specification(provider: ProviderName) -
     elements = [
         element
         for element in build_provider_fields(provider)
-        if element.key not in (CREDENTIAL_SOURCE_KEY, CREDENTIAL_REFERENCE_KEY)
+        if element.key != CREDENTIAL_REFERENCE_KEY
     ]
     for element, specification in zip(
         elements, _PROVIDER_FIELDS[provider], strict=True
@@ -167,26 +158,21 @@ def test_provider_text_fields_keep_their_specification(provider: ProviderName) -
 
 
 @pytest.mark.parametrize("provider", CREDENTIAL_MANAGER_PROVIDERS)
-def test_credential_fields_are_shown_with_manual_credentials_only(
+def test_credential_fields_are_always_shown_but_not_required(
     provider: ProviderName,
 ) -> None:
-    """The fields a credential provides belong to manual credentials.
+    """The fields a credential provides are shown with the picker, not required.
 
-    They are shown, and required when the specification says so, only when
-    manual credentials are chosen; the other fields are always shown.
+    A credential reference replaces them, so the form cannot require them; the
+    other fields are required when the specification says so.
     """
     fields = {element.key: element for element in build_provider_fields(provider)}
-    manual = {CREDENTIAL_SOURCE_KEY: "manual"}
     for specification in _PROVIDER_FIELDS[provider]:
         element = fields[specification.key]
-        if specification.from_credential:
-            assert element.mandatory is False
-            assert element.visibleConditionValues == manual
-            expected = manual if specification.mandatory else []
-            assert element.mandatoryConditionValues == expected
-        else:
-            assert element.mandatory is specification.mandatory
-            assert element.visibleConditionFields == []
+        expected = specification.mandatory and not specification.from_credential
+        assert element.mandatory is expected
+        assert element.visibleConditionFields == []
+        assert element.mandatoryConditionFields == []
 
 
 def test_aws_account_id_stays_mandatory_with_a_reference() -> None:
@@ -222,7 +208,6 @@ def test_build_provider_fields_returns_independent_elements(
 # --- Parse boundary: the selector key must never reach the strict model -----
 
 _LEGACY_AWS_FORM = {
-    "credential_source": "manual",
     "aws_access_key_id": "AKIAEXAMPLE",
     "aws_secret_access_key": "secret",
     "aws_account_id": "123456789012",

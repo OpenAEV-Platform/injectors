@@ -15,7 +15,6 @@ from .azure import (
 )
 from .base import (
     CREDENTIAL_REFERENCE_KEY,
-    CREDENTIAL_SOURCE_KEY,
     BaseProwlerContract,
     ContractExecutionOutcome,
     ContractInputError,
@@ -70,7 +69,6 @@ from .universal import UniversalProwlerContract
 
 __all__ = [
     "CREDENTIAL_REFERENCE_KEY",
-    "CREDENTIAL_SOURCE_KEY",
     "BaseProwlerContract",
     "AwsBaseContract",
     "AwsEc2Contract",

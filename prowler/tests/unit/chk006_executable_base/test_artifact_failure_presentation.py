@@ -89,7 +89,6 @@ def _message() -> dict[str, Any]:
             "inject_id": "inject-artifact-failure",
             "injector_contract_id": _CONTRACT_ID,
             "inject_content": {
-                "credential_source": "manual",
                 "aws_access_key_id": "ACCESS-KEY-CANARY",
                 "aws_secret_access_key": "SECRET-CANARY",
                 "aws_account_id": "123456789012",

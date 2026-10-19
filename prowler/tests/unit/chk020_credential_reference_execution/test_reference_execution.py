@@ -483,13 +483,11 @@ _ATTACHMENTS = {
 }
 # Credential manager, with stale manual fields that must be ignored.
 _MANAGER_AWS = {
-    "credential_source": "credential_manager",
     **AWS_INPUT,
     "aws_access_key_id": "LEGACY-KEY-CANARY",
     "aws_secret_access_key": "LEGACY-SECRET-CANARY",
 }
 _MANUAL_AWS = {
-    "credential_source": "manual",
     **AWS_INPUT,
     "aws_region": "eu-west-1",
     "aws_access_key_id": "LEGACY-KEY-CANARY",

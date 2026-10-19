@@ -23,7 +23,6 @@ from prowler._core.prowler_client import (
 )
 from prowler.contracts import (
     CREDENTIAL_REFERENCE_KEY,
-    CREDENTIAL_SOURCE_KEY,
     DEFAULT_PROWLER_CONTRACTS,
     stable_contract_id,
 )
@@ -152,7 +151,6 @@ def test_registry_has_32_canonical_contracts_with_exact_provider_fields() -> Non
         content = json.loads(item["contract_content"])
         assert service.casefold() in content["label"]["en"].casefold()
         assert tuple(field["key"] for field in content["fields"]) == (
-            CREDENTIAL_SOURCE_KEY,
             CREDENTIAL_REFERENCE_KEY,
             "gcp_service_account_json",
             "gcp_project_id",
@@ -209,7 +207,6 @@ def test_nonblank_provider_fields_receive_no_semantic_or_live_validation() -> No
     """Opaque nonblank values parse locally without cloud access."""
     provider = _contract("gcp/compute").parse_input(
         {
-            "credential_source": "manual",
             "gcp_service_account_json": "!",
             "gcp_project_id": "?",
         }

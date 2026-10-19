@@ -62,7 +62,6 @@ class RecordingLogger:
 def aws_form() -> dict[str, object]:
     """Return structurally valid placeholder-only AWS form input."""
     return {
-        "credential_source": "manual",
         "aws_access_key_id": "CANARY-ACCESS-KEY",
         "aws_secret_access_key": "CANARY-SECRET-KEY",
         "aws_account_id": "123456789012",

@@ -17,11 +17,7 @@ from prowler._core.prowler_client import (
     OutputWorkspaceCleanupError,
     OutputWorkspacePreparationError,
 )
-from prowler.contracts.base import (
-    CREDENTIAL_REFERENCE_KEY,
-    ContractExecutionOutcome,
-    ContractInputError,
-)
+from prowler.contracts.base import ContractExecutionOutcome, ContractInputError
 from prowler.injector.authentication import (
     AwsAccountMismatchError,
     CredentialScopeMissingError,
@@ -282,14 +278,6 @@ class FailureClassifier:
             return self._scope_missing_failure(stage, error)
         if stage == "input_validation" and isinstance(error, ContractInputError):
             issues, omitted, truncated = self._safe_input_issues(error)
-            if self._is_credential_missing(error):
-                return self._credential_failure(
-                    stage,
-                    "credential_missing",
-                    issues=tuple(issues),
-                    issues_omitted=omitted,
-                    issues_truncated=truncated,
-                )
             return _InputValidationFailure(
                 stage=stage,
                 failure_kind="invalid_input",
@@ -367,9 +355,6 @@ class FailureClassifier:
         *,
         reference: object = None,
         expected_type: object = None,
-        issues: tuple[dict[str, object], ...] | None = None,
-        issues_omitted: int = 0,
-        issues_truncated: bool = False,
     ) -> _CredentialFailure:
         """Render the fixed taxonomy messages with the reference id only."""
         safe_reference = (
@@ -392,9 +377,6 @@ class FailureClassifier:
                 reference=safe_reference or _CREDENTIAL_REFERENCE_SENTINEL
             ),
             operator_guidance=guidance,
-            issues=issues,
-            issues_omitted=issues_omitted,
-            issues_truncated=issues_truncated,
             credential_error_code=_CREDENTIAL_CODE_BY_FAILURE_KIND[failure_kind],
             credential_reference=safe_reference,
         )
@@ -452,15 +434,6 @@ class FailureClassifier:
             operator_guidance=_CREDENTIAL_GUIDANCE_BY_FAILURE_KIND[kind],
             credential_error_code=_CREDENTIAL_CODE_BY_FAILURE_KIND[kind],
             credential_reference=safe_reference,
-        )
-
-    @staticmethod
-    def _is_credential_missing(error: ContractInputError) -> bool:
-        """Detect an inject using the credential manager without credential."""
-        return error.issues_are_trusted and any(
-            issue.location == (CREDENTIAL_REFERENCE_KEY,)
-            and issue.error_type == "missing"
-            for issue in error.issues
         )
 
     def _classify_artifact_failure(

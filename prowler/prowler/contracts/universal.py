@@ -26,18 +26,12 @@ from .base import (
     CREDENTIAL_REFERENCE_KEY,
     ClientFactoryPort,
     ContractExecutionOutcome,
-    attachment_for_credential_source,
-    parse_credential_source,
 )
 from .provider_fields import (
     _PROVIDER_FIELDS,
-    CREDENTIAL_MANAGER,
     CREDENTIAL_MANAGER_PROVIDERS,
-    CREDENTIAL_SOURCE_KEY,
-    MANUAL_CREDENTIALS,
     PROVIDER_LABELS,
     ProviderName,
-    build_credential_source_select,
     build_provider_field,
 )
 from .registry import stable_contract_id
@@ -69,7 +63,6 @@ SERVICE_KEYS: Mapping[str, str] = {
 COMPLIANCE_KEY = "prowler_compliance"
 _SELECT_KEYS = (
     PROVIDER_KEY,
-    CREDENTIAL_SOURCE_KEY,
     *SERVICE_KEYS.values(),
     COMPLIANCE_KEY,
 )
@@ -174,30 +167,17 @@ class UniversalProwlerContract(SelectionScopedContract):
         reference, built from the ``all`` meta-token so the platform applies no
         provider-specific credential filter.
 
-        The credential source select is shown for the providers with a platform
-        credential type. The picker is shown for those providers with the
-        credential manager, and required with the credential manager: hidden
-        fields are cleared when the inject is saved, so the select is empty
-        for Kubernetes.
+        The picker is shown for the providers with a platform credential type,
+        next to their legacy credential fields, and is not required: an inject
+        without a credential is validated against the legacy fields.
         """
-        manager_providers = list(CREDENTIAL_MANAGER_PROVIDERS)
-        source = build_credential_source_select(None)
-        source.visibleConditionFields = [PROVIDER_KEY]
-        source.visibleConditionValues = {PROVIDER_KEY: manager_providers}
-        source.mandatory = False
-        source.mandatoryConditionFields = [PROVIDER_KEY]
-        source.mandatoryConditionValues = {PROVIDER_KEY: manager_providers}
         reference = build_single_referenced_credential_element(self.provider)
-        reference.visibleConditionFields = [PROVIDER_KEY, CREDENTIAL_SOURCE_KEY]
+        reference.visibleConditionFields = [PROVIDER_KEY]
         reference.visibleConditionValues = {
-            PROVIDER_KEY: manager_providers,
-            CREDENTIAL_SOURCE_KEY: CREDENTIAL_MANAGER,
+            PROVIDER_KEY: list(CREDENTIAL_MANAGER_PROVIDERS)
         }
-        reference.mandatoryConditionFields = [CREDENTIAL_SOURCE_KEY]
-        reference.mandatoryConditionValues = {CREDENTIAL_SOURCE_KEY: CREDENTIAL_MANAGER}
         fields: list[ContractElement] = [
             self._build_provider_select(),
-            source,
             reference,
         ]
         for provider_name in _CREDENTIAL_FIELD_KEYS:
@@ -229,35 +209,20 @@ class UniversalProwlerContract(SelectionScopedContract):
     def _build_credential_group(provider_name: ProviderName) -> list[ContractElement]:
         """Build one provider's fields, shown for that provider.
 
-        The fields a credential provides are shown with manual credentials
-        only. They are not marked required: the platform checks each
-        condition alone, so "this provider and manual credentials" would also
-        require them for another provider. A missing one is reported at
-        execution time. The other fields stay required for their provider.
+        The fields a credential provides are not marked required: a credential
+        reference replaces them, so a missing one is reported when the inject
+        is parsed without a reference. The other fields stay required for
+        their provider.
         """
-        fields: list[ContractElement] = []
         provider_condition: dict[str, str | list[str]] = {PROVIDER_KEY: provider_name}
-        for specification in _PROVIDER_FIELDS[provider_name]:
-            if (
-                specification.from_credential
-                and provider_name in CREDENTIAL_MANAGER_PROVIDERS
-            ):
-                element = build_provider_field(
-                    specification,
-                    mandatory=False,
-                    condition={
-                        **provider_condition,
-                        CREDENTIAL_SOURCE_KEY: MANUAL_CREDENTIALS,
-                    },
-                )
-            else:
-                element = build_provider_field(
-                    specification,
-                    mandatory=specification.mandatory,
-                    condition=provider_condition,
-                )
-            fields.append(element)
-        return fields
+        return [
+            build_provider_field(
+                specification,
+                mandatory=specification.mandatory and not specification.from_credential,
+                condition=provider_condition,
+            )
+            for specification in _PROVIDER_FIELDS[provider_name]
+        ]
 
     @staticmethod
     def _build_service_scope_select(
@@ -308,11 +273,10 @@ class UniversalProwlerContract(SelectionScopedContract):
     ) -> ProviderInput:
         """Validate the closed selects before the strict provider model.
 
-        For a provider with a platform credential type, the credential source
-        select picks the path. With the credential manager, only the selected
+        The attached credential picks the path. With one, only the selected
         provider's reference model is validated: its credential fields are
-        ignored, like every other provider's. With manual credentials, an
-        attached credential is ignored.
+        ignored, like every other provider's. Without one, the strict legacy
+        model is validated.
         """
         # Clear this thread's selection before any rejection path can run,
         # so no early return can expose a selection from an earlier parse.
@@ -331,11 +295,6 @@ class UniversalProwlerContract(SelectionScopedContract):
         self._validate_scope_selection(
             selected_provider, service_key, service_route, compliance_route
         )
-        # Checked once every select is valid, so a select error is reported first.
-        if selected_provider in CREDENTIAL_MANAGER_PROVIDERS:
-            credential_attachment = attachment_for_credential_source(
-                parse_credential_source(raw_input), credential_attachment
-            )
         candidate = self._build_provider_candidate(raw_input, selected_provider)
         try:
             parsed = validate_provider_input(candidate, credential_attachment)

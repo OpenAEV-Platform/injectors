@@ -62,7 +62,6 @@ class RecordingLogger:
 def azure_form() -> dict[str, object]:
     """Return structurally valid placeholder-only Azure form input."""
     return {
-        "credential_source": "manual",
         "azure_tenant_id": "TENANT-CANARY",
         "azure_client_id": "CLIENT-ID-CANARY",
         "azure_client_secret": "CLIENT-SECRET-CANARY\nFORM-CANARY",

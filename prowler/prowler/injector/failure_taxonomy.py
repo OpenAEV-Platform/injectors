@@ -43,7 +43,6 @@ _ALLOWED_ISSUE_LOCATIONS = frozenset(
     {
         "provider",
         "credential_reference",
-        "credential_source",
         "aws",
         "aws_access_key_id",
         "aws_secret_access_key",
@@ -278,7 +277,6 @@ _SUMMARY_BY_FAILURE_KIND = {
 # here. ``{reference}`` is the credential reference id, never a secret.
 _CREDENTIAL_FAILURE_KIND_BY_CODE = {
     **{code.value: code.value.lower() for code in CredentialErrorCode},
-    "CREDENTIAL_MISSING": "credential_missing",
     "CREDENTIAL_ACCOUNT_MISMATCH": "credential_account_mismatch",
     "CREDENTIAL_SCOPE_MISSING": "credential_scope_missing",
 }
@@ -291,9 +289,6 @@ _CREDENTIAL_SUMMARY_BY_FAILURE_KIND = {
         code.value.lower(): credential_error_summary(code, "{reference}")
         for code in CredentialErrorCode
     },
-    "credential_missing": (
-        "No credential is selected on this inject, which uses the credential manager."
-    ),
     "credential_account_mismatch": (
         "The credential {reference} reaches AWS account {credential_account}, not "
         "the AWS account {expected_account} set on this inject."
@@ -305,10 +300,6 @@ _CREDENTIAL_GUIDANCE_BY_FAILURE_KIND = {
         code.value.lower(): credential_error_guidance(code)
         for code in CredentialErrorCode
     },
-    "credential_missing": (
-        "Select a credential on the inject, or choose manual credentials, then run "
-        "it again."
-    ),
     "credential_account_mismatch": (
         "Select a credential of that account, or correct the AWS account ID on the "
         "inject, then run it again."
@@ -320,7 +311,6 @@ _CREDENTIAL_REFERENCE_SENTINEL = "unknown reference"
 _ISSUE_FIELD_LABELS = {
     "provider": "Provider",
     "credential_reference": "Credential",
-    "credential_source": "Credentials",
     "aws_access_key_id": "AWS access key ID",
     "aws_secret_access_key": "AWS secret access key",
     "aws_account_id": "AWS account ID",
@@ -484,11 +474,7 @@ class _InputValidationFailure(_FailurePresentation):
 
 @dataclass(frozen=True)
 class _CredentialFailure(_InputValidationFailure):
-    """Credential failure with its taxonomy code and reference id.
-
-    Issues are only carried when the failure is detected on the form input
-    (no credential available).
-    """
+    """Credential failure with its taxonomy code and reference id."""
 
     credential_error_code: str | None = None
     credential_reference: str | None = None

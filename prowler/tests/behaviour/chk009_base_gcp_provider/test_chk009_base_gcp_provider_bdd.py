@@ -23,7 +23,6 @@ from prowler._core.prowler_client import (
 )
 from prowler.contracts import (
     CREDENTIAL_REFERENCE_KEY,
-    CREDENTIAL_SOURCE_KEY,
     DEFAULT_PROWLER_CONTRACTS,
     stable_contract_id,
 )
@@ -138,7 +137,6 @@ def test_default_registration_identity_fields_and_outputs() -> None:
     content = json.loads(serialized[2]["contract_content"])
     assert content["external_id"] == "prowler:gcp"
     assert tuple(field["key"] for field in content["fields"]) == (
-        CREDENTIAL_SOURCE_KEY,
         CREDENTIAL_REFERENCE_KEY,
         "gcp_service_account_json",
         "gcp_project_id",

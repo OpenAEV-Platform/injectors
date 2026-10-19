@@ -22,7 +22,6 @@ from prowler._core.prowler_client import (
 )
 from prowler.contracts import (
     CREDENTIAL_REFERENCE_KEY,
-    CREDENTIAL_SOURCE_KEY,
     DEFAULT_PROWLER_CONTRACTS,
     stable_contract_id,
 )
@@ -139,7 +138,6 @@ def test_registry_has_32_canonical_contracts_with_exact_provider_fields() -> Non
         content = json.loads(item["contract_content"])
         assert service.casefold() in content["label"]["en"].casefold()
         assert tuple(field["key"] for field in content["fields"]) == (
-            CREDENTIAL_SOURCE_KEY,
             CREDENTIAL_REFERENCE_KEY,
             "azure_tenant_id",
             "azure_client_id",
@@ -203,7 +201,6 @@ def test_nonblank_provider_fields_receive_no_semantic_or_live_validation() -> No
     contract = _contract("azure/storage")
     provider = contract.parse_input(
         {
-            "credential_source": "manual",
             "azure_tenant_id": "!",
             "azure_client_id": "?",
             "azure_client_secret": "#",

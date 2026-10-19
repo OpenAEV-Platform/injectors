@@ -23,7 +23,6 @@ from prowler._core.prowler_client import (
 )
 from prowler.contracts import (
     CREDENTIAL_REFERENCE_KEY,
-    CREDENTIAL_SOURCE_KEY,
     DEFAULT_PROWLER_CONTRACTS,
     stable_contract_id,
 )
@@ -134,7 +133,6 @@ def test_default_registration_identity_fields_and_outputs() -> None:
     content = json.loads(serialized[0]["contract_content"])
     assert content["external_id"] == "prowler:aws"
     assert tuple(field["key"] for field in content["fields"]) == (
-        CREDENTIAL_SOURCE_KEY,
         CREDENTIAL_REFERENCE_KEY,
         "aws_access_key_id",
         "aws_secret_access_key",

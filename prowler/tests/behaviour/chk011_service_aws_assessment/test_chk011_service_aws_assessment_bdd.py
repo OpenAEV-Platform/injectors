@@ -23,7 +23,6 @@ from prowler._core.prowler_client import (
 )
 from prowler.contracts import (
     CREDENTIAL_REFERENCE_KEY,
-    CREDENTIAL_SOURCE_KEY,
     DEFAULT_PROWLER_CONTRACTS,
     AwsServiceContract,
     stable_contract_id,
@@ -140,7 +139,6 @@ def test_registry_has_32_canonical_contracts_with_exact_provider_fields() -> Non
         content = json.loads(item["contract_content"])
         assert service.upper() in content["label"]["en"]
         assert tuple(field["key"] for field in content["fields"]) == (
-            CREDENTIAL_SOURCE_KEY,
             CREDENTIAL_REFERENCE_KEY,
             "aws_access_key_id",
             "aws_secret_access_key",

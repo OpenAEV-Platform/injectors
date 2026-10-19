@@ -42,15 +42,15 @@ REFERENCE = "3f1c1e5e-0000-4000-8000-000000000001"
 AUTHORISATION_CODE = "AUTHORISATION-CODE-CANARY"
 ATTACHMENT = CredentialAttachment(REFERENCE, AUTHORISATION_CODE)
 
-# The fields shown with both credential sources: no credential provides them.
+# The fields no credential provides: required with and without a reference.
 NON_CREDENTIAL_FORMS: dict[str, dict[str, str]] = {
     "aws": {"aws_account_id": "123456789012"},
     "azure": {},
     "gcp": {},
     "kubernetes": {"kubernetes_context": "context-id"},
 }
-# The scope and cloud settings a credential carries: manual credentials only,
-# dropped with the credential manager like the credential fields.
+# The scope and cloud settings a credential carries: dropped with a credential
+# reference like the credential fields.
 LEGACY_SETTING_FORMS: dict[str, dict[str, str]] = {
     "aws": {"aws_region": "eu-west-1"},
     "azure": {
@@ -61,27 +61,12 @@ LEGACY_SETTING_FORMS: dict[str, dict[str, str]] = {
 }
 
 
-def _source(provider: str, source: str) -> dict[str, str]:
-    """Return the credential source select of a fixed form (none for Kubernetes)."""
-    return {} if provider == "kubernetes" else {"credential_source": source}
-
-
-def _manager(provider: str) -> dict[str, str]:
-    """Return the credential source select of the credential manager."""
-    return _source(provider, "credential_manager")
-
-
-def _manual(provider: str) -> dict[str, str]:
-    """Return the credential source select of manual credentials."""
-    return _source(provider, "manual")
-
-
 # Non-credential fields no credential provides: still required with a reference.
 REQUIRED_REFERENCE_FIELDS: dict[str, str] = {
     "aws": "aws_account_id",
     "kubernetes": "kubernetes_context",
 }
-# Scope fields: with the credential manager, from the credential only.
+# Scope fields: with a credential reference, from the credential only.
 SCOPE_FIELDS: dict[str, str] = {
     "aws": "aws_region",
     "azure": "azure_subscription_id",
@@ -209,7 +194,6 @@ def test_reference_with_empty_legacy_fields_parses_the_reference_model(
     """The credential manager needs no manual credentials field at all."""
     parsed = _contract(route).parse_input(
         {
-            **_manager(provider),
             **NON_CREDENTIAL_FORMS[provider],
             **selects,
             "credential_reference": REFERENCE,
@@ -233,7 +217,7 @@ def test_reference_with_blank_legacy_fields_parses_the_reference_model(
         "",
     )
     parsed = _contract(route).parse_input(
-        {**_manager(provider), **NON_CREDENTIAL_FORMS[provider], **blank, **selects},
+        {**NON_CREDENTIAL_FORMS[provider], **blank, **selects},
         credential_attachment=ATTACHMENT,
     )
 
@@ -247,7 +231,6 @@ def test_reference_ignores_filled_legacy_fields(
     """The credential wins: filled manual fields are dropped, not merged."""
     parsed = _contract(route).parse_input(
         {
-            **_manager(provider),
             **NON_CREDENTIAL_FORMS[provider],
             **LEGACY_CREDENTIAL_FORMS[provider],
             **LEGACY_SETTING_FORMS.get(provider, {}),
@@ -267,13 +250,12 @@ def test_reference_ignores_filled_legacy_fields(
 
 
 @pytest.mark.parametrize(("route", "provider", "selects"), ROUTE_CASES)
-def test_manual_credentials_keep_the_strict_legacy_model(
+def test_without_a_credential_the_strict_legacy_model_is_kept(
     route: str, provider: str, selects: dict[str, str]
 ) -> None:
-    """With manual credentials, the credential fields are required."""
+    """Without an attached credential, the credential fields are required."""
     contract = _contract(route)
     form = {
-        **_manual(provider),
         **NON_CREDENTIAL_FORMS[provider],
         **LEGACY_SETTING_FORMS.get(provider, {}),
         **selects,
@@ -289,80 +271,13 @@ def test_manual_credentials_keep_the_strict_legacy_model(
 
 @pytest.mark.parametrize(
     ("route", "provider", "selects"),
-    [case for case in ROUTE_CASES if case[1] != "kubernetes"],
-)
-def test_manual_credentials_ignore_an_attached_credential(
-    route: str, provider: str, selects: dict[str, str]
-) -> None:
-    """A credential picked before switching to manual credentials is ignored."""
-    form = {
-        **_manual(provider),
-        **NON_CREDENTIAL_FORMS[provider],
-        **LEGACY_SETTING_FORMS.get(provider, {}),
-        **LEGACY_CREDENTIAL_FORMS[provider],
-        **selects,
-        "credential_reference": REFERENCE,
-    }
-
-    parsed = _contract(route).parse_input(form, credential_attachment=ATTACHMENT)
-    assert type(parsed) is LEGACY_MODELS[provider]
-
-
-@pytest.mark.parametrize(
-    ("route", "provider", "selects"),
-    [case for case in ROUTE_CASES if case[1] != "kubernetes"],
-)
-def test_credential_manager_without_credential_is_missing_its_credential(
-    route: str, provider: str, selects: dict[str, str]
-) -> None:
-    """The credential manager without a selected credential: nothing to run."""
-    form = {
-        **_manager(provider),
-        **NON_CREDENTIAL_FORMS[provider],
-        **LEGACY_CREDENTIAL_FORMS[provider],
-        **selects,
-    }
-
-    with pytest.raises(ContractInputError) as raised:
-        _contract(route).parse_input(form)
-    assert raised.value.issues == (
-        ContractInputIssue(("credential_reference",), "missing"),
-    )
-
-
-@pytest.mark.parametrize(
-    "source", (None, "", [], ["credential_manager", "manual"], "other")
-)
-def test_credential_source_must_be_one_known_value(source: object) -> None:
-    """The credential source select is a closed, required, single choice."""
-    form: dict[str, object] = {
-        **NON_CREDENTIAL_FORMS["aws"],
-        **LEGACY_CREDENTIAL_FORMS["aws"],
-        **LEGACY_SETTING_FORMS["aws"],
-    }
-    if source is not None:
-        form["credential_source"] = source
-
-    with pytest.raises(ContractInputError) as raised:
-        _contract("aws").parse_input(form, credential_attachment=ATTACHMENT)
-    (issue,) = raised.value.issues
-    assert issue.location == ("credential_source",)
-    assert issue.error_type in {
-        "select_missing",
-        "select_multiple",
-        "select_unknown_value",
-    }
-
-
-@pytest.mark.parametrize(
-    ("route", "provider", "selects"),
     [case for case in ROUTE_CASES if case[1] in REQUIRED_REFERENCE_FIELDS],
 )
 def test_reference_still_validates_non_credential_fields(
     route: str, provider: str, selects: dict[str, str]
 ) -> None:
     """Dropping the credential fields does not relax the other fields."""
-    form = {**_manager(provider), **NON_CREDENTIAL_FORMS[provider], **selects}
+    form = {**NON_CREDENTIAL_FORMS[provider], **selects}
     missing_key = REQUIRED_REFERENCE_FIELDS[provider]
     del form[missing_key]
 
@@ -382,7 +297,6 @@ def test_reference_scope_comes_from_the_credential_only(
 ) -> None:
     """Region, subscription, and project of the form are ignored."""
     form = {
-        **_manager(provider),
         **NON_CREDENTIAL_FORMS[provider],
         **LEGACY_SETTING_FORMS[provider],
         **selects,
@@ -411,17 +325,15 @@ def test_universal_reference_with_every_field_blank(provider: str) -> None:
         **every_field_blank,
         **NON_CREDENTIAL_FORMS[provider],
         "prowler_provider": provider,
-        "credential_source": "credential_manager",
     }
 
     parsed = _contract("universal").parse_input(form, credential_attachment=ATTACHMENT)
     assert type(parsed) is REFERENCE_MODELS[provider]
 
 
-def test_manual_blank_aws_region_is_still_rejected() -> None:
-    """With manual credentials, the form is the region source: "" is invalid."""
+def test_legacy_blank_aws_region_is_still_rejected() -> None:
+    """Without a credential, the form is the region source: "" is invalid."""
     form = {
-        **_manual("aws"),
         **NON_CREDENTIAL_FORMS["aws"],
         **LEGACY_CREDENTIAL_FORMS["aws"],
     }
@@ -436,7 +348,7 @@ def test_reference_rejects_an_invalid_aws_account_without_echoing_it() -> None:
     """The AWS account pattern still applies on the reference path."""
     with pytest.raises(ContractInputError) as raised:
         _contract("aws").parse_input(
-            {**_manager("aws"), "aws_account_id": "ACCOUNT-CANARY"},
+            {"aws_account_id": "ACCOUNT-CANARY"},
             credential_attachment=ATTACHMENT,
         )
     assert raised.value.issues == (
@@ -450,7 +362,6 @@ def test_reference_rejects_an_unsafe_aws_endpoint() -> None:
     with pytest.raises(ContractInputError) as raised:
         _contract("aws").parse_input(
             {
-                **_manager("aws"),
                 **NON_CREDENTIAL_FORMS["aws"],
                 "aws_endpoint_url": "https://user:pass@example.test",
             },
@@ -464,7 +375,7 @@ def test_reference_rejects_an_unsafe_aws_endpoint() -> None:
 def test_reference_normalizes_a_blank_aws_endpoint_to_none() -> None:
     """An empty optional endpoint is treated as absent, as on the legacy path."""
     parsed = _contract("aws").parse_input(
-        {**_manager("aws"), **NON_CREDENTIAL_FORMS["aws"], "aws_endpoint_url": ""},
+        {**NON_CREDENTIAL_FORMS["aws"], "aws_endpoint_url": ""},
         credential_attachment=ATTACHMENT,
     )
     assert isinstance(parsed, AwsReferenceProviderInput)
@@ -479,7 +390,6 @@ def test_form_cannot_forge_a_credential_attachment() -> None:
         _contract("aws").parse_input(
             {
                 **forged,
-                **_manual("aws"),
                 **LEGACY_CREDENTIAL_FORMS["aws"],
                 **LEGACY_SETTING_FORMS["aws"],
             }
@@ -488,9 +398,7 @@ def test_form_cannot_forge_a_credential_attachment() -> None:
         ContractInputIssue(("aws", "credential_attachment"), "extra_forbidden"),
     )
 
-    parsed = _contract("aws").parse_input(
-        {**forged, **_manager("aws")}, credential_attachment=ATTACHMENT
-    )
+    parsed = _contract("aws").parse_input(forged, credential_attachment=ATTACHMENT)
     assert isinstance(parsed, AwsReferenceProviderInput)
     assert parsed.credential_attachment is ATTACHMENT
 
@@ -533,7 +441,7 @@ def test_reference_input_passes_the_contract_execution_type_gates(
     factory = _ClientFactory()
     contract = type(_contract(route))(factory)
     parsed = contract.parse_input(
-        {**_manager(provider), **NON_CREDENTIAL_FORMS[provider], **selects},
+        {**NON_CREDENTIAL_FORMS[provider], **selects},
         credential_attachment=ATTACHMENT,
     )
 
@@ -559,7 +467,6 @@ def test_universal_reference_is_scoped_to_the_selected_provider(provider: str) -
         {
             **every_credential,
             "prowler_provider": provider,
-            "credential_source": "credential_manager",
             **NON_CREDENTIAL_FORMS[provider],
             "credential_reference": REFERENCE,
         },
@@ -574,29 +481,15 @@ def test_universal_reference_is_scoped_to_the_selected_provider(provider: str) -
     assert contract.safe_request_info(parsed)["selected_provider"] == provider
 
 
-def test_universal_credential_manager_without_credential_is_missing_it() -> None:
-    """The credential manager option without a selected credential."""
-    contract = _contract("universal")
-    with pytest.raises(ContractInputError) as raised:
-        contract.parse_input(
-            {"prowler_provider": "gcp", "credential_source": "credential_manager"}
-        )
-    assert raised.value.issues == (
-        ContractInputIssue(("credential_reference",), "missing"),
-    )
-
-
-def test_universal_manual_credentials_keep_the_strict_legacy_model() -> None:
-    """The manual credentials option requires the provider's credential fields."""
+def test_universal_without_a_credential_keeps_the_strict_legacy_model() -> None:
+    """Without an attached credential, the provider's credential fields are required."""
     contract = _contract("universal")
     with pytest.raises(ContractInputError) as raised:
         contract.parse_input(
             {
                 "prowler_provider": "gcp",
-                "credential_source": "manual",
                 **LEGACY_SETTING_FORMS["gcp"],
-            },
-            credential_attachment=ATTACHMENT,
+            }
         )
     assert raised.value.issues == (
         ContractInputIssue(("gcp", "gcp_service_account_json"), "missing"),
@@ -662,7 +555,6 @@ def _callback_status(helper: Mock) -> str:
 
 
 _MANUAL_AWS_CONTENT = {
-    **_manual("aws"),
     **NON_CREDENTIAL_FORMS["aws"],
     **LEGACY_SETTING_FORMS["aws"],
     **LEGACY_CREDENTIAL_FORMS["aws"],
@@ -677,7 +569,6 @@ def test_runtime_forwards_the_first_reference_of_the_job_attachment() -> None:
             "authorisation_code": AUTHORISATION_CODE,
         },
         {
-            **_manager("aws"),
             **NON_CREDENTIAL_FORMS["aws"],
             "credential_reference": REFERENCE,
         },
@@ -689,21 +580,10 @@ def test_runtime_forwards_the_first_reference_of_the_job_attachment() -> None:
 
 @pytest.mark.parametrize("attachments", (None, {}, {"credential_references": []}))
 def test_runtime_without_reference_keeps_the_legacy_path(attachments: object) -> None:
-    """Manual credentials without reference: the legacy fields are parsed."""
+    """Without a reference, the legacy fields are parsed."""
     helper = _process(attachments, _MANUAL_AWS_CONTENT)
 
     assert _RecordingContract.attachments == [None]
-    assert _callback_status(helper) == "SUCCESS"
-    helper.api.inject.resolve_attachment_secret.assert_not_called()
-
-
-def test_runtime_manual_credentials_never_resolve_an_attached_credential() -> None:
-    """A credential still attached to a manual credentials inject is not read."""
-    helper = _process(
-        {"credential_references": [REFERENCE], "authorisation_code": "code"},
-        _MANUAL_AWS_CONTENT,
-    )
-
     assert _callback_status(helper) == "SUCCESS"
     helper.api.inject.resolve_attachment_secret.assert_not_called()
 
