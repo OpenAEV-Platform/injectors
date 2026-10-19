@@ -1,7 +1,8 @@
 """Strict, secret-safe provider inputs for future OpenAEV form contracts."""
 
+from collections.abc import Mapping
 from dataclasses import dataclass
-from typing import Annotated, Any, Literal, NoReturn
+from typing import Annotated, Any, Literal, NoReturn, Self
 from urllib.parse import urlsplit
 
 import yaml
@@ -10,11 +11,13 @@ from pydantic import (
     BeforeValidator,
     ConfigDict,
     Field,
+    InstanceOf,
     SecretStr,
     TypeAdapter,
     ValidationError,
     field_validator,
 )
+from pyoaev.credential import CredentialAttachment, ResolvedSecret
 
 
 def _reject_blank(value: object) -> object:
@@ -143,6 +146,60 @@ def _aws_endpoint_origin(value: str) -> str | None:
         return None
 
 
+def _validate_aws_endpoint_url(value: object) -> object:
+    """Accept only absolute HTTP(S) endpoints without unsafe URL extras."""
+    if value is None:
+        return None
+    if not isinstance(value, str):
+        raise ValueError("AWS endpoint URL must be a string")
+    if not value.strip():
+        raise ValueError("AWS endpoint URL must not be blank")
+    if any(character.isspace() for character in value):
+        raise ValueError("AWS endpoint URL must not contain whitespace")
+    if "\x00" in value:
+        raise ValueError("AWS endpoint URL must not contain NUL characters")
+    if "?" in value or "#" in value:
+        raise ValueError("AWS endpoint URL must not include query or fragment")
+    try:
+        endpoint = urlsplit(value)
+        if endpoint.netloc.rsplit("@", maxsplit=1)[-1].endswith(":"):
+            raise ValueError("AWS endpoint URL port must not be empty")
+        port = endpoint.port
+    except ValueError as error:
+        raise ValueError("AWS endpoint URL must be valid") from error
+    if endpoint.scheme not in {"http", "https"}:
+        raise ValueError("AWS endpoint URL must use HTTP or HTTPS")
+    if not endpoint.netloc or endpoint.hostname is None:
+        raise ValueError("AWS endpoint URL must include a host")
+    if endpoint.username is not None or endpoint.password is not None:
+        raise ValueError("AWS endpoint URL must not include user information")
+    if port is not None and not 1 <= port <= 65535:
+        raise ValueError("AWS endpoint URL port must be between 1 and 65535")
+    return value
+
+
+def _aws_scope_log_metadata(
+    aws_account_id: object, aws_region: object, aws_endpoint_url: str | None
+) -> dict[str, object]:
+    """Return the log-safe AWS account, region, and endpoint facts."""
+    from prowler.injector.failure_taxonomy import _safe_text
+
+    metadata: dict[str, object] = {}
+    if isinstance(aws_account_id, str):
+        metadata["aws_account_id"] = _safe_text(aws_account_id)
+    if isinstance(aws_region, str):
+        metadata["aws_region"] = _safe_text(aws_region)
+    if aws_endpoint_url is None:
+        metadata["aws_endpoint_override_present"] = False
+        return metadata
+    endpoint = _safe_text(aws_endpoint_url)
+    metadata["aws_endpoint_override_present"] = True
+    origin = _aws_endpoint_origin(endpoint)
+    if origin is not None:
+        metadata["aws_endpoint_origin"] = origin
+    return metadata
+
+
 class ImmutableProviderInput(BaseModel):
     """Provider boundary that rejects assignment without retaining its value."""
 
@@ -170,53 +227,14 @@ class AwsProviderInput(ImmutableProviderInput):
     @classmethod
     def validate_aws_endpoint_url(cls, value: object) -> object:
         """Accept only absolute HTTP(S) endpoints without unsafe URL extras."""
-        if value is None:
-            return None
-        if not isinstance(value, str):
-            raise ValueError("AWS endpoint URL must be a string")
-        if not value.strip():
-            raise ValueError("AWS endpoint URL must not be blank")
-        if any(character.isspace() for character in value):
-            raise ValueError("AWS endpoint URL must not contain whitespace")
-        if "\x00" in value:
-            raise ValueError("AWS endpoint URL must not contain NUL characters")
-        if "?" in value or "#" in value:
-            raise ValueError("AWS endpoint URL must not include query or fragment")
-        try:
-            endpoint = urlsplit(value)
-            if endpoint.netloc.rsplit("@", maxsplit=1)[-1].endswith(":"):
-                raise ValueError("AWS endpoint URL port must not be empty")
-            port = endpoint.port
-        except ValueError as error:
-            raise ValueError("AWS endpoint URL must be valid") from error
-        if endpoint.scheme not in {"http", "https"}:
-            raise ValueError("AWS endpoint URL must use HTTP or HTTPS")
-        if not endpoint.netloc or endpoint.hostname is None:
-            raise ValueError("AWS endpoint URL must include a host")
-        if endpoint.username is not None or endpoint.password is not None:
-            raise ValueError("AWS endpoint URL must not include user information")
-        if port is not None and not 1 <= port <= 65535:
-            raise ValueError("AWS endpoint URL port must be between 1 and 65535")
-        return value
+        return _validate_aws_endpoint_url(value)
 
     def safe_log_metadata(self) -> dict[str, object]:
         """Return the log-safe metadata facts for this AWS input."""
-        from prowler.injector.failure_taxonomy import _safe_text
-
-        metadata: dict[str, object] = {}
-        if isinstance(self.aws_account_id, str):
-            metadata["aws_account_id"] = _safe_text(self.aws_account_id)
-        if isinstance(self.aws_region, str):
-            metadata["aws_region"] = _safe_text(self.aws_region)
+        metadata = _aws_scope_log_metadata(
+            self.aws_account_id, self.aws_region, self.aws_endpoint_url
+        )
         metadata["aws_session_token_present"] = self.aws_session_token is not None
-        if self.aws_endpoint_url is None:
-            metadata["aws_endpoint_override_present"] = False
-            return metadata
-        endpoint = _safe_text(self.aws_endpoint_url)
-        metadata["aws_endpoint_override_present"] = True
-        origin = _aws_endpoint_origin(endpoint)
-        if origin is not None:
-            metadata["aws_endpoint_origin"] = origin
         return metadata
 
 
@@ -286,16 +304,208 @@ class KubernetesProviderInput(ImmutableProviderInput):
         return metadata
 
 
+class CredentialReferenceProviderInput(ImmutableProviderInput):
+    """Provider input whose credential is resolved from an inject reference.
+
+    It keeps only the non-credential fields of its legacy model: the credential
+    itself is resolved just in time from ``credential_attachment``, then held
+    in ``resolved_secret`` for the duration of the execution only. Neither is
+    ever serialized, and pyoaev keeps the authorisation code and the secret
+    values out of their ``repr``.
+    """
+
+    credential_attachment: Annotated[CredentialAttachment, Field(exclude=True)]
+    resolved_secret: Annotated[
+        InstanceOf[ResolvedSecret] | None, Field(exclude=True, repr=False)
+    ] = None
+
+    def with_resolved_secret(self, resolved_secret: ResolvedSecret) -> Self:
+        """Return a copy holding the secret resolved for this execution."""
+        return self.model_copy(update={"resolved_secret": resolved_secret})
+
+    def scope_value(self, secret_field: str) -> str | None:
+        """Return one scope value of the credential: region, subscription..."""
+        value = getattr(self.resolved_secret, secret_field, None)
+        return value if isinstance(value, str) and value else None
+
+    def missing_scope_fields(self) -> tuple[str, ...]:
+        """Return the scope fields the resolved credential does not provide.
+
+        With the credential manager, the region, subscription, and project
+        come from the credential only: the form fields are hidden.
+        """
+        return ()
+
+    def reference_log_metadata(self) -> dict[str, object]:
+        """Return the log-safe facts about the credential reference."""
+        from prowler.injector.failure_taxonomy import _safe_text
+
+        metadata: dict[str, object] = {
+            "credential_reference_present": True,
+            "credential_reference": _safe_text(self.credential_attachment.reference),
+        }
+        if self.resolved_secret is not None:
+            metadata["credential_secret_type"] = self.resolved_secret.secret_type.value
+        return metadata
+
+
+class AwsReferenceProviderInput(CredentialReferenceProviderInput):
+    """AWS provider form input whose credential comes from a reference."""
+
+    provider: Literal["aws"]
+    # No credential carries the account: it is always taken from the form.
+    aws_account_id: AwsAccountId
+    aws_endpoint_url: str | None = None
+
+    @field_validator("aws_endpoint_url", mode="before")
+    @classmethod
+    def validate_aws_endpoint_url(cls, value: object) -> object:
+        """Accept only absolute HTTP(S) endpoints without unsafe URL extras."""
+        return _validate_aws_endpoint_url(value)
+
+    def missing_scope_fields(self) -> tuple[str, ...]:
+        """Return ``aws_region`` when the credential has no region."""
+        return () if self.scope_value("aws_default_region") else ("aws_region",)
+
+    def safe_log_metadata(self) -> dict[str, object]:
+        """Return the log-safe metadata facts for this AWS input."""
+        metadata = _aws_scope_log_metadata(
+            self.aws_account_id,
+            self.scope_value("aws_default_region"),
+            self.aws_endpoint_url,
+        )
+        metadata.update(self.reference_log_metadata())
+        return metadata
+
+
+class AzureReferenceProviderInput(CredentialReferenceProviderInput):
+    """Azure provider form input whose credential comes from a reference.
+
+    The Azure cloud environment and subscription come from the credential, so
+    every Azure form field is a manual credentials field, ignored here.
+    """
+
+    provider: Literal["azure"]
+
+    def missing_scope_fields(self) -> tuple[str, ...]:
+        """Return ``azure_subscription_id`` when the credential has none."""
+        if self.scope_value("azure_subscription_id"):
+            return ()
+        return ("azure_subscription_id",)
+
+    def safe_log_metadata(self) -> dict[str, object]:
+        """Return the log-safe metadata facts for this Azure input."""
+        from prowler.injector.failure_taxonomy import _safe_text
+
+        metadata = self.reference_log_metadata()
+        subscription = self.scope_value("azure_subscription_id")
+        if subscription is not None:
+            metadata["azure_subscription_id"] = _safe_text(subscription)
+        environment = getattr(self.resolved_secret, "azure_environment", None)
+        if isinstance(environment, str):
+            metadata["azure_provider"] = _safe_text(environment)
+        return metadata
+
+
+class GcpReferenceProviderInput(CredentialReferenceProviderInput):
+    """GCP provider form input whose credential comes from a reference."""
+
+    provider: Literal["gcp"]
+
+    def missing_scope_fields(self) -> tuple[str, ...]:
+        """Return ``gcp_project_id`` when the credential has no project."""
+        return () if self.scope_value("gcp_project_id") else ("gcp_project_id",)
+
+    def safe_log_metadata(self) -> dict[str, object]:
+        """Return the log-safe metadata facts for this GCP input."""
+        from prowler.injector.failure_taxonomy import _safe_text
+
+        metadata = self.reference_log_metadata()
+        project = self.scope_value("gcp_project_id")
+        if project is not None:
+            metadata["gcp_project_id"] = _safe_text(project)
+        return metadata
+
+
+class KubernetesReferenceProviderInput(CredentialReferenceProviderInput):
+    """Kubernetes provider form input whose credential comes from a reference.
+
+    No credential type is mapped to Kubernetes, so the resolution of such a
+    reference is expected to fail as incompatible rather than fall back on the
+    kubeconfig field.
+    """
+
+    provider: Literal["kubernetes"]
+    kubernetes_context: NonBlankStr
+
+    def safe_log_metadata(self) -> dict[str, object]:
+        """Return the log-safe metadata facts for this Kubernetes input."""
+        from prowler.injector.failure_taxonomy import _safe_text
+
+        metadata = self.reference_log_metadata()
+        if isinstance(self.kubernetes_context, str):
+            metadata["kubernetes_context"] = _safe_text(self.kubernetes_context)
+        return metadata
+
+
 _PROVIDER_DISCRIMINATOR = "provider"
-ProviderInput = Annotated[
+LegacyProviderInput = Annotated[
     AwsProviderInput | AzureProviderInput | GcpProviderInput | KubernetesProviderInput,
     Field(discriminator=_PROVIDER_DISCRIMINATOR),
 ]
+ReferenceProviderInput = Annotated[
+    AwsReferenceProviderInput
+    | AzureReferenceProviderInput
+    | GcpReferenceProviderInput
+    | KubernetesReferenceProviderInput,
+    Field(discriminator=_PROVIDER_DISCRIMINATOR),
+]
+ProviderInput = LegacyProviderInput | ReferenceProviderInput
 
-PROVIDER_INPUT_ADAPTER: TypeAdapter[ProviderInput] = TypeAdapter(
-    ProviderInput,
+# Per-provider model pairs, for type gates that accept both credential paths.
+AWS_PROVIDER_INPUTS = (AwsProviderInput, AwsReferenceProviderInput)
+AZURE_PROVIDER_INPUTS = (AzureProviderInput, AzureReferenceProviderInput)
+GCP_PROVIDER_INPUTS = (GcpProviderInput, GcpReferenceProviderInput)
+KUBERNETES_PROVIDER_INPUTS = (KubernetesProviderInput, KubernetesReferenceProviderInput)
+
+PROVIDER_INPUT_ADAPTER: TypeAdapter[LegacyProviderInput] = TypeAdapter(
+    LegacyProviderInput,
     config=ConfigDict(hide_input_in_errors=True),
 )
+REFERENCE_PROVIDER_INPUT_ADAPTER: TypeAdapter[ReferenceProviderInput] = TypeAdapter(
+    ReferenceProviderInput,
+    config=ConfigDict(hide_input_in_errors=True),
+)
+
+# The manual credentials fields (the credential text fields, and the region,
+# subscription, project, and Azure cloud the credential carries) are exactly
+# the legacy model fields that the reference model does not keep, so both stay
+# derived from one place. They are ignored, even when filled, on the reference
+# path.
+LEGACY_CREDENTIAL_KEYS: Mapping[str, frozenset[str]] = {
+    provider: frozenset(legacy.model_fields) - frozenset(reference.model_fields)
+    for provider, (legacy, reference) in (
+        ("aws", AWS_PROVIDER_INPUTS),
+        ("azure", AZURE_PROVIDER_INPUTS),
+        ("gcp", GCP_PROVIDER_INPUTS),
+        ("kubernetes", KUBERNETES_PROVIDER_INPUTS),
+    )
+}
+
+# Optional form fields of each reference model (scope fallbacks, AWS endpoint).
+_REFERENCE_OPTIONAL_KEYS: Mapping[str, frozenset[str]] = {
+    provider: frozenset(
+        key
+        for key, model_field in reference.model_fields.items()
+        if not model_field.is_required() and not model_field.exclude
+    )
+    for provider, (_, reference) in (
+        ("aws", AWS_PROVIDER_INPUTS),
+        ("azure", AZURE_PROVIDER_INPUTS),
+        ("gcp", GCP_PROVIDER_INPUTS),
+        ("kubernetes", KUBERNETES_PROVIDER_INPUTS),
+    )
+}
 
 
 @dataclass(frozen=True)
@@ -318,15 +528,15 @@ class ProviderInputError(ValueError):
         super().__init__(f"Invalid provider input ({summary})")
 
 
-def parse_provider_input(payload: object) -> ProviderInput:
-    """Validate one provider payload, raising only value-free issues.
+def _validate_value_free(adapter: TypeAdapter[Any], payload: object) -> ProviderInput:
+    """Validate with ``adapter``, raising only value-free issues.
 
     Pydantic's structured errors keep rejected inputs even when they are hidden
     from the rendered message, so they never leave this boundary. The error is
     raised outside the handler so it does not chain the original exception.
     """
     try:
-        return PROVIDER_INPUT_ADAPTER.validate_python(payload)
+        return adapter.validate_python(payload)  # type: ignore[no-any-return]
     except ValidationError as error:
         issues = tuple(
             ProviderInputIssue(
@@ -338,3 +548,36 @@ def parse_provider_input(payload: object) -> ProviderInput:
             )
         )
     raise ProviderInputError(issues)
+
+
+def parse_provider_input(payload: object) -> ProviderInput:
+    """Validate one legacy provider payload, raising only value-free issues."""
+    return _validate_value_free(PROVIDER_INPUT_ADAPTER, payload)
+
+
+def validate_provider_input(
+    candidate: Mapping[str, object],
+    credential_attachment: CredentialAttachment | None = None,
+) -> ProviderInput:
+    """Validate one form candidate on the legacy or the reference path.
+
+    Without an attachment, the strict legacy model is validated unchanged.
+    With one, the legacy credential fields of the provider are removed from
+    the candidate before validation, so they are ignored even when filled and
+    are never combined with the referenced credential. A candidate that does
+    not match the selected model raises a value-free ``ProviderInputError``.
+    """
+    if credential_attachment is None:
+        return parse_provider_input(candidate)
+    provider = str(candidate.get("provider"))
+    ignored_keys = LEGACY_CREDENTIAL_KEYS.get(provider, ())
+    optional_keys = _REFERENCE_OPTIONAL_KEYS.get(provider, frozenset())
+    reference_candidate = {
+        # The form sends "" for every field left empty: an optional field, such
+        # as a scope fallback the credential may provide, is then absent.
+        key: None if key in optional_keys and value == "" else value
+        for key, value in candidate.items()
+        if key not in ignored_keys
+    }
+    reference_candidate["credential_attachment"] = credential_attachment
+    return _validate_value_free(REFERENCE_PROVIDER_INPUT_ADAPTER, reference_candidate)

@@ -137,9 +137,9 @@ def test_default_registration_identity_fields_and_outputs() -> None:
     content = json.loads(serialized[2]["contract_content"])
     assert content["external_id"] == "prowler:gcp"
     assert tuple(field["key"] for field in content["fields"]) == (
+        CREDENTIAL_REFERENCE_KEY,
         "gcp_service_account_json",
         "gcp_project_id",
-        CREDENTIAL_REFERENCE_KEY,
     )
     assert tuple(output["field"] for output in content["outputs"]) == (
         "findings",
@@ -282,7 +282,7 @@ def test_fake_engine_proves_exact_gcp_subprocess_arguments(
         "--output-filename",
         "findings",
         "-z",
-        "--only-logs",
+        "-b",
         "--no-color",
         "-M",
         "json-ocsf",

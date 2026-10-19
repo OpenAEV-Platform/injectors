@@ -139,13 +139,13 @@ def test_registry_has_32_canonical_contracts_with_exact_provider_fields() -> Non
         content = json.loads(item["contract_content"])
         assert service.upper() in content["label"]["en"]
         assert tuple(field["key"] for field in content["fields"]) == (
+            CREDENTIAL_REFERENCE_KEY,
             "aws_access_key_id",
             "aws_secret_access_key",
             "aws_account_id",
             "aws_region",
             "aws_endpoint_url",
             "aws_session_token",
-            CREDENTIAL_REFERENCE_KEY,
         )
         assert all(route in output["labels"] for output in content["outputs"])
 
@@ -352,7 +352,7 @@ def test_runtime_one_call_exact_service_argv_and_canaries(
         "--output-filename",
         "findings",
         "-z",
-        "--only-logs",
+        "-b",
         "--no-color",
         "-M",
         "json-ocsf",

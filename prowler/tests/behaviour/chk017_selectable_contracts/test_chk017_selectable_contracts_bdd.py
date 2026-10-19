@@ -281,6 +281,7 @@ def test_select_field_is_closed_single_selection(
         if entry["contract_id"] == str(stable_contract_id(route))
     )
     content = json.loads(str(item["contract_content"]))
+    # The scope select is the only select.
     select_fields = [f for f in content["fields"] if f["type"] == "select"]
     assert len(select_fields) == 1
     select_field = select_fields[0]

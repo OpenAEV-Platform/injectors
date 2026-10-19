@@ -339,7 +339,7 @@ def test_failed_run_preserves_error_and_empty_findings(
 
     fixed = DEFAULT_PROWLER_CONTRACTS.resolve(str(stable_contract_id("gcp/compute")))
     fixed._client_factory = _ClientFactory(failed)
-    fixed_parsed = fixed.parse_input(dict(provider_forms["gcp"]))
+    fixed_parsed = fixed.parse_input(provider_forms["gcp"])
     fixed_outcome = fixed.execute(ProwlerConfig(), fixed_parsed)
     assert fixed_outcome.error is engine_error
     assert fixed_outcome.findings == outcome.findings

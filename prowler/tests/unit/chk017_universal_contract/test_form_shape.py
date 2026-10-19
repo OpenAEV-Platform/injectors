@@ -27,6 +27,7 @@ _EXPECTED_PROVIDER_CHOICES = {
     "gcp": "GCP",
     "kubernetes": "Kubernetes",
 }
+_CREDENTIAL_MANAGER_PROVIDERS = ["aws", "azure", "gcp"]
 _EXPECTED_SERVICE_CHOICES = {
     "aws": {
         "__none__": "None (base scan)",
@@ -62,7 +63,6 @@ _EXPECTED_COMPLIANCE_CHOICES = {
     "mitre/azure": "MITRE ATT&CK (Azure)",
     "mitre/gcp": "MITRE ATT&CK (GCP)",
 }
-_OPTIONAL_AWS_FIELDS = frozenset({"aws_endpoint_url", "aws_session_token"})
 
 
 def _serialized() -> dict[str, Any]:
@@ -79,10 +79,9 @@ def _serialized() -> dict[str, Any]:
 def _expected_credential_fields() -> list[tuple[str, str, str, str, bool]]:
     """Derive the 15 credential fields from the four fixed provider contracts.
 
-    The fixed contracts also expose a credential reference, but its key is
-    pinned by pyoaev, so the universal form carries exactly one unconditioned
-    copy instead of one per provider. It is excluded here and asserted on its
-    own in ``test_single_unconditioned_credential_reference``.
+    The fixed contracts also expose a credential reference: the pyoaev-pinned
+    key allows exactly one copy. It is excluded here and asserted on its own in
+    ``test_single_credential_reference_for_the_credential_manager``.
     """
     expected: list[tuple[str, str, str, str, bool]] = []
     for provider in PROVIDERS:
@@ -90,8 +89,10 @@ def _expected_credential_fields() -> list[tuple[str, str, str, str, bool]]:
         for element in fixed.build_provider_fields():
             if element.key == CREDENTIAL_REFERENCE_KEY:
                 continue
+            # Required on its own.
+            mandatory = element.mandatory or bool(element.mandatoryConditionFields)
             expected.append(
-                (provider, element.key, element.label, element.type, element.mandatory)
+                (provider, element.key, element.label, element.type, mandatory)
             )
     return expected
 
@@ -132,8 +133,8 @@ def test_serialized_form_has_21_fields_in_exact_order() -> None:
     ]
 
 
-def test_single_unconditioned_credential_reference() -> None:
-    """Assert one always-visible credential reference with no provider filter."""
+def test_single_credential_reference_for_the_credential_manager() -> None:
+    """Assert one credential reference, shown for the credential providers."""
     fields = _serialized()["fields"]
     references = [f for f in fields if f["key"] == CREDENTIAL_REFERENCE_KEY]
     assert len(references) == 1
@@ -145,10 +146,20 @@ def test_single_unconditioned_credential_reference() -> None:
     # The operator selects the provider through PROVIDER_KEY, so the universal
     # contract deliberately carries no CredentialType filter.
     assert reference["credential_reference_type"] is None
-    assert reference["visibleConditionFields"] == []
-    assert reference["visibleConditionValues"] == []
+    # Shown for a provider with a credential type, never required: without a
+    # credential, the legacy fields are validated instead.
+    assert reference["visibleConditionFields"] == [PROVIDER_KEY]
+    assert reference["visibleConditionValues"] == {
+        PROVIDER_KEY: _CREDENTIAL_MANAGER_PROVIDERS
+    }
     assert reference["mandatoryConditionFields"] == []
-    assert reference["mandatoryConditionValues"] == []
+    assert reference["mandatoryConditionValues"] == {}
+
+
+def test_form_has_no_credential_source_select() -> None:
+    """Assert the legacy and the reference credentials are not selected between."""
+    keys = [f["key"] for f in _serialized()["fields"]]
+    assert "credential_source" not in keys
 
 
 def test_form_field_keys_are_unique() -> None:
@@ -167,7 +178,7 @@ def test_provider_select_shape_and_conditions_empty() -> None:
     assert select["cardinality"] == "1"
     assert select["defaultValue"] == ["aws"]
     assert select["choices"] == _EXPECTED_PROVIDER_CHOICES
-    assert list(select["choices"]) == list(PROVIDERS)
+    assert list(select["choices"]) == list(_EXPECTED_PROVIDER_CHOICES)
     assert select["visibleConditionFields"] == []
     assert select["visibleConditionValues"] == {}
     assert select["mandatoryConditionFields"] == []
@@ -187,18 +198,19 @@ def test_credential_fields_carry_exact_condition_attributes() -> None:
         _type,
         base_mandatory,
     ) in zip(fields, expected_credential, strict=True):
-        assert field["visibleConditionFields"] == [PROVIDER_KEY]
-        assert field["visibleConditionValues"] == {PROVIDER_KEY: provider}
         assert field["mandatory"] is False
+        assert field["mandatoryGroups"] == []
+        assert field["visibleConditionValues"] == {PROVIDER_KEY: provider}
         if base_mandatory:
             mandatory_count += 1
             assert field["mandatoryConditionFields"] == [PROVIDER_KEY]
             assert field["mandatoryConditionValues"] == {PROVIDER_KEY: provider}
         else:
-            assert field["key"] in _OPTIONAL_AWS_FIELDS
+            # A credential reference replaces the fields a credential provides,
+            # so they are not marked required; checked when the inject is parsed.
             assert field["mandatoryConditionFields"] == []
-            assert field["mandatoryConditionValues"] == {}
-    assert mandatory_count == 13
+    # The AWS account ID and the Kubernetes fields: no credential carries them.
+    assert mandatory_count == 3
 
 
 def test_scope_selects_are_conditioned_single_with_explicit_none_defaults() -> None:
