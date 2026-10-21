@@ -1,6 +1,6 @@
 FROM python:3.13-alpine AS builder
 
-ENV PIP_VERSION=25.0.1
+ENV PIP_VERSION=26.2.2
 
 RUN apk --no-cache upgrade && apk --no-cache add git curl
 
@@ -14,6 +14,8 @@ RUN curl -sS https://bootstrap.pypa.io/get-pip.py -o get-pip.py && \
     python3 get-pip.py pip==${PIP_VERSION} && \
     rm get-pip.py
 
+RUN python3 -m pip install -U pip certifi
+
 RUN python3 -m pip install poetry==2.3.2 \
     && poetry config installer.re-resolve false \
     && poetry config virtualenvs.create false
@@ -26,11 +28,14 @@ RUN poetry install && \
 
 FROM python:3.13-alpine AS runner
 
-ENV PIP_VERSION=25.0.1
+ENV PIP_VERSION=26.2.2
 ENV STRATUS_VERSION=2.24.0
 # SHA256 of stratus-red-team_Linux_x86_64.tar.gz for STRATUS_VERSION, taken
 # from the release checksums.txt. Bump both together when upgrading Stratus.
 ENV STRATUS_SHA256=bcc307e72427e785431a89c025388141201fa82d64d2337de20d6a602b0576a0
+
+RUN apk --no-cache upgrade
+RUN pip install -U pip certifi
 
 WORKDIR /opt/injector_common
 COPY --from=injector_common ./ ./
@@ -57,6 +62,7 @@ RUN if [ -n "${PYOAEV_GIT_BRANCH_OVERRIDE}" ] ; then \
         curl -sS https://bootstrap.pypa.io/get-pip.py -o get-pip.py && \
         python3 get-pip.py pip==${PIP_VERSION} && \
         rm get-pip.py && \
+        pip install -U pip certifi && \
         pip install pip3-autoremove && \
         pip-autoremove pyoaev -y && \
         pip install "git+https://github.com/OpenAEV-Platform/client-python@${PYOAEV_GIT_BRANCH_OVERRIDE}" ; \
