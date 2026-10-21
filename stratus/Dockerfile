@@ -2,7 +2,7 @@ FROM python:3.13-alpine AS builder
 
 ENV PIP_VERSION=25.0.1
 
-RUN apk update && apk upgrade && apk add git curl
+RUN apk --no-cache upgrade && apk add git curl
 
 WORKDIR /opt/injector_common
 COPY --from=injector_common ./ ./
@@ -42,7 +42,8 @@ COPY --from=builder /usr/local/lib/python3.13/site-packages /usr/local/lib/pytho
 
 ARG PYOAEV_GIT_BRANCH_OVERRIDE
 
-RUN apk add --no-cache curl tar libc6-compat && \
+RUN apk --no-cache upgrade && \
+    apk add --no-cache curl tar libc6-compat && \
     curl -fSsL "https://github.com/DataDog/stratus-red-team/releases/download/v${STRATUS_VERSION}/stratus-red-team_Linux_x86_64.tar.gz" \
         -o /tmp/stratus.tar.gz && \
     echo "${STRATUS_SHA256}  /tmp/stratus.tar.gz" | sha256sum -c - && \

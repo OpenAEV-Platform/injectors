@@ -1,6 +1,6 @@
 FROM python:3.13-alpine AS builder
 
-RUN apk update && apk upgrade && apk add \
+RUN apk --no-cache upgrade && apk add \
     git \
     gcc \
     musl-dev \
@@ -26,7 +26,7 @@ RUN poetry install
 
 FROM python:3.13-alpine AS runner
 
-RUN apk update && apk upgrade && apk add \
+RUN apk --no-cache upgrade && apk add \
     gcc \
     musl-dev \
     python3-dev \
