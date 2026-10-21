@@ -12,6 +12,9 @@ jobs:
     steps:
       - checkout
       - run:
+          name: update pip
+          command: pip3 install -U pip certifi
+      - run:
           name: install dependencies
           command: pip install black isort --user
       - run:
@@ -34,6 +37,9 @@ jobs:
       - checkout
       - run: apk update && apk upgrade && apk --no-cache add curl gettext bash
       - run:
+          name: update pip
+          command: pip3 install -U pip certifi
+      - run:
           name: flake8
           command: flake8 --ignore=E,W ~/repo
       - slack/notify:
@@ -49,6 +55,9 @@ jobs:
     steps:
       - checkout
       - setup_remote_docker
+      - run:
+          name: update pip
+          command: pip3 install -U pip certifi
       - run:
           working_directory: ~/openaev/<< parameters.injector_name >>
           name: Check if injector exists
