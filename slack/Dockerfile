@@ -1,6 +1,6 @@
 FROM python:3.13-alpine AS builder
 
-RUN apk --no-cache upgrade && apk add git
+RUN apk --no-cache upgrade && apk --no-cache add git
 
 WORKDIR /opt/injector_common
 COPY --from=injector_common ./ ./

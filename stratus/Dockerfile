@@ -2,7 +2,7 @@ FROM python:3.13-alpine AS builder
 
 ENV PIP_VERSION=25.0.1
 
-RUN apk --no-cache upgrade && apk add git curl
+RUN apk --no-cache upgrade && apk --no-cache add git curl
 
 WORKDIR /opt/injector_common
 COPY --from=injector_common ./ ./
