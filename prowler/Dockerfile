@@ -1,6 +1,6 @@
 FROM python:3.13-alpine AS builder
 
-RUN apk update && apk upgrade && apk add git
+RUN apk --no-cache upgrade && apk --no-cache add git
 
 WORKDIR /
 RUN git clone https://github.com/OpenAEV-Platform/client-python
@@ -38,7 +38,7 @@ RUN if [[ ${PYOAEV_GIT_BRANCH_OVERRIDE} ]] ; then \
 # (same import name as this injector) and pins pydantic==2.12.5, so it cannot
 # share the injector's environment. lz4 and zstd have no musl wheels.
 ARG PROWLER_VERSION=5.36.0
-RUN apk update && apk upgrade && apk add \
+RUN apk --no-cache upgrade && apk --no-cache add \
     gcc \
     musl-dev
 RUN python3 -m venv /opt/prowler \

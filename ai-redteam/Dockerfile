@@ -9,6 +9,8 @@ RUN cd ${installdir} && poetry build
 
 FROM python:3.13-slim AS runner
 
+RUN apt-get update && apt-get upgrade -y && rm -rf /var/lib/apt/lists/*
+
 ARG installdir=/injector
 
 # Declare the build argument

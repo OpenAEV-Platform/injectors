@@ -1,6 +1,6 @@
 FROM python:3.13-alpine AS builder
 
-RUN apk update && apk upgrade && apk add git
+RUN apk --no-cache upgrade && apk --no-cache add git
 
 WORKDIR /opt/injector_common
 COPY --from=injector_common ./ ./
@@ -19,6 +19,8 @@ WORKDIR ${installdir}
 RUN poetry install
 
 FROM python:3.13-alpine AS runner
+
+RUN apk --no-cache upgrade
 
 WORKDIR /opt/injector_common
 COPY --from=injector_common ./ ./
