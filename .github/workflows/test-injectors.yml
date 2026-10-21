@@ -57,7 +57,7 @@ jobs:
         working-directory: ..
         run: git clone -b main https://github.com/OpenAEV-Platform/client-python
 
-      - name: Update pip and certify
+      - name: Update pip and certifi
         run: pip install -U pip certifi
 
       - name: Install poetry

@@ -1,6 +1,6 @@
 FROM python:3.13-alpine AS builder
 
-ENV PIP_VERSION=25.0.1
+ENV PIP_VERSION=26.2.2
 
 RUN apk --no-cache upgrade && apk --no-cache add git curl
 
@@ -15,6 +15,8 @@ RUN curl -sS https://bootstrap.pypa.io/get-pip.py -o get-pip.py && \
     python3 get-pip.py pip==${PIP_VERSION} && \
     rm get-pip.py
 
+RUN pip install -U pip certifi
+
 # poetry version available on Ubuntu 24.04
 RUN python3 -m pip install poetry==2.3.2 \
     && poetry config installer.re-resolve false \
@@ -28,9 +30,10 @@ RUN poetry install && \
 
 FROM python:3.13-alpine AS runner
 
-RUN apk --no-cache upgrade
+ENV PIP_VERSION=26.2.2
 
-ENV PIP_VERSION=25.0.1
+RUN apk --no-cache upgrade
+RUN pip install -U pip certifi
 
 WORKDIR /opt/injector_common
 COPY --from=injector_common ./ ./
@@ -49,6 +52,7 @@ RUN if [[ ${PYOAEV_GIT_BRANCH_OVERRIDE} ]] ; then \
         curl -sS https://bootstrap.pypa.io/get-pip.py -o get-pip.py && \
         python3 get-pip.py pip==${PIP_VERSION} && \
         rm get-pip.py && \
+        pip install -U pip certifi && \
         pip install pip3-autoremove && \
         pip-autoremove pyoaev -y && \
         pip install git+https://github.com/OpenAEV-Platform/client-python@${PYOAEV_GIT_BRANCH_OVERRIDE} ; \

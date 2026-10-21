@@ -5,6 +5,8 @@ RUN apk --no-cache upgrade && apk --no-cache add git
 WORKDIR /
 RUN git clone https://github.com/OpenAEV-Platform/client-python
 
+RUN pip3 install -U pip certifi
+
 # poetry version available on Ubuntu 24.04
 RUN pip3 install poetry==2.3.2 \
     && poetry config installer.re-resolve false \
@@ -16,6 +18,9 @@ WORKDIR ${installdir}
 RUN poetry install
 
 FROM python:3.13-alpine AS runner
+
+RUN apk --no-cache upgrade
+RUN pip install -U pip certifi
 
 ARG installdir=/opt/injector
 WORKDIR ${installdir}
