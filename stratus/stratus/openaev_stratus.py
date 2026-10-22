@@ -5,20 +5,72 @@ import time
 from importlib.resources import files
 from typing import Dict, List, Optional, Tuple
 
+from pyoaev.credential import (
+    CredentialCleanupError,
+    CredentialErrorCode,
+    CredentialResolutionError,
+    ResolvedSecret,
+    get_credential_attachment,
+    materialize,
+    resolve_credential_attachment,
+)
 from pyoaev.helpers import OpenAEVConfigHelper, OpenAEVInjectorHelper
 
 from injector_common.data_helpers import DataHelpers
 from injector_common.dump_config import intercept_dump_argument
-from injector_common.stratus_executor import StratusExecutor
+from injector_common.stratus_executor import (
+    AUTH_FAILED,
+    AUTH_PASSED,
+    StratusExecutor,
+    StratusResult,
+)
 from stratus.configuration.config_loader import ConfigLoader
 from stratus.contracts import (
     CONTRACT_REGISTRY,
+    CREDENTIAL_SOURCE_KEY,
+    CREDENTIAL_SOURCE_VALUES,
     CUSTOM_TECHNIQUE_FIELD_KEY,
+    MANUAL_CREDENTIALS,
+    PLATFORMS,
     PlatformSpec,
     ResolvedContract,
 )
 
 ICON_PATH = "img/icon-stratus.png"
+
+# Provider whose credential type a platform expects from a credential reference,
+# looked up in the pyoaev mapping shared with the contract field (see
+# ``PlatformSpec.credential_provider``).
+CREDENTIAL_PROVIDER_BY_PLATFORM = {
+    platform.key: platform.credential_provider
+    for platform in PLATFORMS
+    if platform.credential_provider is not None
+}
+
+# Platform names as printed by the Stratus authentication check.
+AUTH_PLATFORM_LABELS = {
+    "AWS": "AWS",
+    "EKS": "Amazon EKS",
+    "azure": "Azure",
+    "entra-id": "Entra ID",
+    "GCP": "Google Cloud",
+    "kubernetes": "Kubernetes",
+}
+# Stratus only builds a client for these platforms, without contacting them: a
+# passed check proves the credentials were loaded, not that they are valid.
+UNVERIFIED_AUTH_PLATFORMS = frozenset({"azure", "GCP"})
+
+LEGACY_CREDENTIAL_SOURCE = "the inject credential fields"
+
+CREDENTIAL_MISSING_MESSAGE = (
+    "No credential is selected on this inject, which uses the credential manager. "
+    "Select a credential on the inject, or choose manual credentials, then run it "
+    "again."
+)
+CREDENTIAL_SOURCE_INVALID_MESSAGE = (
+    "Choose the credential manager or manual credentials in the 'Credentials' "
+    "field of the inject, then run it again."
+)
 
 
 class OpenAEVStratus:
@@ -104,6 +156,150 @@ class OpenAEVStratus:
             raise
         return env, temp_files
 
+    @staticmethod
+    def _uses_manual_credentials(
+        platform: PlatformSpec, content: Dict
+    ) -> Optional[bool]:
+        """Return whether the inject selects manual credentials.
+
+        ``None`` for a platform without a credential type, which has no
+        credential source select: its credentials are the inject fields.
+        """
+        if platform.credential_provider is None:
+            return None
+        submitted = content.get(CREDENTIAL_SOURCE_KEY)
+        if isinstance(submitted, list) and len(submitted) == 1:
+            submitted = submitted[0]
+        if submitted not in CREDENTIAL_SOURCE_VALUES:
+            raise ValueError(CREDENTIAL_SOURCE_INVALID_MESSAGE)
+        return submitted == MANUAL_CREDENTIALS
+
+    def _resolve_credential(
+        self, inject_id: str, data: Dict, platform: PlatformSpec
+    ) -> Optional[Tuple[str, ResolvedSecret]]:
+        """Resolve the credential referenced by the job, if any.
+
+        Returns ``None`` when the job carries no credential reference: the
+        legacy credential fields of the inject are then used. Otherwise returns
+        the reference id with its resolved secret.
+        """
+        attachment = get_credential_attachment(data)
+        if attachment is None:
+            return None
+        provider = CREDENTIAL_PROVIDER_BY_PLATFORM.get(platform.key)
+        if provider is None:
+            # Fail before resolving: the secret is never fetched for nothing.
+            raise CredentialResolutionError(
+                CredentialErrorCode.CREDENTIAL_INCOMPATIBLE, attachment.reference
+            )
+        credential = resolve_credential_attachment(
+            self.helper.api, inject_id, attachment, provider
+        )
+        self.helper.injector_logger.info(
+            f"Credential reference {attachment.reference} resolved "
+            f"({credential.secret_type.value}) for inject {inject_id}"
+        )
+        return attachment.reference, credential
+
+    @staticmethod
+    def _reference_default_env(
+        platform: PlatformSpec, reference: str, credential: ResolvedSecret
+    ) -> Dict[str, str]:
+        """Defaults of the scope values the resolved credential omits.
+
+        With the credential manager, the region, subscription, and project come
+        from the credential only: the inject fields are hidden. A required one
+        the credential lacks, with no default, ends the execution.
+        """
+        env: Dict[str, str] = {}
+        for cred in platform.cred_fields:
+            if cred.reference_attribute is None or getattr(
+                credential, cred.reference_attribute, None
+            ):
+                continue
+            if cred.default is not None:
+                for env_var in cred.env_vars:
+                    env[env_var] = cred.default
+            elif cred.mandatory:
+                raise ValueError(
+                    f"The credential {reference} has no {cred.label}. Set it on the "
+                    "credential, then run it again."
+                )
+        return env
+
+    def _detonate_with_credential(
+        self,
+        technique_id: str,
+        platform: PlatformSpec,
+        reference: str,
+        credential: ResolvedSecret,
+    ) -> Tuple[StratusResult, bool]:
+        """Detonate with the resolved credential only.
+
+        Returns the result and whether the temporary credential files could not
+        be removed afterwards. A cleanup failure after the detonation ran does
+        not hide its result; it is still raised when the detonation did not run.
+        """
+        result: Optional[StratusResult] = None
+        default_env = self._reference_default_env(platform, reference, credential)
+        try:
+            # The legacy credential fields are not read at all, and the host
+            # credentials are not inherited: the resolved credential is the only
+            # one Stratus can use.
+            with materialize(credential, reference=reference) as materialized:
+                env = {**default_env, **materialized.env}
+                result = self.stratus.detonate(
+                    technique_id, env=env, cleanup=True, isolate_host_credentials=True
+                )
+        except CredentialCleanupError:
+            if result is None:
+                raise
+            return result, True
+        return result, False
+
+    def _send_trace(
+        self, inject_id: str, action: str, status: str, message: str, start: float
+    ) -> None:
+        """Send an intermediate execution trace, never failing the execution."""
+        try:
+            self.helper.api.inject.execution_callback(
+                inject_id=inject_id,
+                data={
+                    "execution_message": message,
+                    "execution_status": status,
+                    "execution_duration": int(time.time() - start),
+                    "execution_action": action,
+                },
+            )
+        except Exception as exc:  # noqa: BLE001
+            self.helper.injector_logger.error(
+                f"Failed to send the {action} trace for inject {inject_id}: {exc}"
+            )
+
+    def _report_authentication(
+        self, inject_id: str, result: StratusResult, source: str, start: float
+    ) -> None:
+        """Log and trace the outcome of the Stratus authentication check."""
+        if result.auth_status == AUTH_FAILED:
+            self.helper.injector_logger.error(
+                f"Stratus authentication check failed for inject {inject_id} "
+                f"with {source}: {result.message}"
+            )
+            return
+        if result.auth_status != AUTH_PASSED:
+            return
+        label = AUTH_PLATFORM_LABELS.get(result.auth_platform, result.auth_platform)
+        if result.auth_platform in UNVERIFIED_AUTH_PLATFORMS:
+            message = (
+                f"Stratus authentication check passed for {label} with {source}: "
+                f"the credentials were loaded, but Stratus does not contact {label} "
+                "during this check, the detonation confirms them"
+            )
+        else:
+            message = f"Authenticated against {label} with {source}"
+        self.helper.injector_logger.info(f"{message} (inject {inject_id})")
+        self._send_trace(inject_id, "prerequisite_check", "INFO", message, start)
+
     def process_message(self, data: Dict) -> None:
         start = time.time()
         inject_id = DataHelpers.get_inject_id(data)
@@ -119,8 +315,46 @@ class OpenAEVStratus:
             if not technique_id:
                 raise ValueError("No Stratus technique id provided")
 
-            env, temp_files = self._build_env(resolved.platform, content)
-            result = self.stratus.detonate(technique_id, env=env, cleanup=True)
+            # Resolved just in time, after the reception and before the callback,
+            # while the inject is in progress. With manual credentials, a
+            # credential still attached to the inject is ignored.
+            manual = self._uses_manual_credentials(resolved.platform, content)
+            referenced = (
+                None
+                if manual
+                else self._resolve_credential(inject_id, data, resolved.platform)
+            )
+            if referenced is None and manual is False:
+                raise ValueError(CREDENTIAL_MISSING_MESSAGE)
+            cleanup_failed = False
+            if referenced is None:
+                source = LEGACY_CREDENTIAL_SOURCE
+                env, temp_files = self._build_env(resolved.platform, content)
+                result = self.stratus.detonate(technique_id, env=env, cleanup=True)
+            else:
+                reference, credential = referenced
+                source = (
+                    f"credential reference {reference} "
+                    f"({credential.secret_type.value})"
+                )
+                result, cleanup_failed = self._detonate_with_credential(
+                    technique_id, resolved.platform, reference, credential
+                )
+
+            self._report_authentication(inject_id, result, source, start)
+            if cleanup_failed:
+                self.helper.injector_logger.error(
+                    f"Temporary credential files of inject {inject_id} could not "
+                    "be removed after the detonation"
+                )
+                self._send_trace(
+                    inject_id,
+                    "cleanup_execution",
+                    "WARNING",
+                    "The temporary credential files could not be removed after the "
+                    "detonation",
+                    start,
+                )
 
             callback_data = {
                 "execution_message": result.message,
@@ -136,6 +370,12 @@ class OpenAEVStratus:
                 inject_id=inject_id, data=callback_data
             )
         except Exception as e:
+            if isinstance(e, CredentialResolutionError):
+                # The code and its fixed message only: never a secret value.
+                self.helper.injector_logger.error(
+                    f"Credential reference resolution failed for inject "
+                    f"{inject_id}: {e}"
+                )
             self.helper.api.inject.execution_callback(
                 inject_id=inject_id,
                 data={

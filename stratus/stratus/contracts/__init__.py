@@ -25,6 +25,7 @@ from pyoaev.contracts.contract_config import (
     ContractExpectations,
     ContractOutputElement,
     ContractOutputType,
+    ContractSelect,
     ContractText,
     ContractTextArea,
     Expectation,
@@ -84,12 +85,65 @@ def _build_config() -> ContractConfig:
     )
 
 
-def _credential_element(cred: CredField) -> ContractElement:
-    if cred.textarea:
-        return ContractTextArea(
-            key=cred.key, label=cred.label, mandatory=cred.mandatory
-        )
-    return ContractText(key=cred.key, label=cred.label, mandatory=cred.mandatory)
+# Where the credential of an inject comes from, for the platforms with a
+# platform credential type. The inject form shows either the credential picker
+# or the manual credential fields, never both: it can only react to a select,
+# not to the picker itself.
+CREDENTIAL_SOURCE_KEY = "credential_source"
+CREDENTIAL_MANAGER = "credential_manager"
+MANUAL_CREDENTIALS = "manual"
+CREDENTIAL_SOURCE_VALUES = (CREDENTIAL_MANAGER, MANUAL_CREDENTIALS)
+
+
+def _source_condition(source: str) -> Dict[str, str]:
+    return {CREDENTIAL_SOURCE_KEY: source}
+
+
+def _credential_source_element(platform: PlatformSpec) -> ContractSelect:
+    """Declare the select choosing the credential manager or manual credentials."""
+    return ContractSelect(
+        key=CREDENTIAL_SOURCE_KEY,
+        label="Credentials",
+        mandatory=True,
+        cardinality=ContractCardinality.One,
+        defaultValue=[CREDENTIAL_MANAGER],
+        choices={
+            CREDENTIAL_MANAGER: "Credential manager",
+            MANUAL_CREDENTIALS: f"{platform.label} - manual credentials",
+        },
+    )
+
+
+def _credential_reference_element(platform: PlatformSpec) -> ContractElement:
+    """Declare the credential picker, shown and required with the manager."""
+    element = build_single_referenced_credential_element(platform.key)
+    if platform.credential_provider is not None:
+        manager = _source_condition(CREDENTIAL_MANAGER)
+        element.visibleConditionFields = list(manager)
+        element.visibleConditionValues = manager
+        element.mandatoryConditionFields = list(manager)
+        element.mandatoryConditionValues = manager
+    return element
+
+
+def _credential_element(cred: CredField, platform: PlatformSpec) -> ContractElement:
+    """Declare one credential field of the platform.
+
+    When the platform accepts a credential reference, every credential field
+    is provided by the credential: it is shown, and required when the field
+    is, with manual credentials only.
+    """
+    element_type = ContractTextArea if cred.textarea else ContractText
+    if platform.credential_provider is None:
+        return element_type(key=cred.key, label=cred.label, mandatory=cred.mandatory)
+    element = element_type(key=cred.key, label=cred.label, mandatory=False)
+    manual = _source_condition(MANUAL_CREDENTIALS)
+    element.visibleConditionFields = list(manual)
+    element.visibleConditionValues = manual
+    if cred.mandatory:
+        element.mandatoryConditionFields = list(manual)
+        element.mandatoryConditionValues = manual
+    return element
 
 
 def _expectations_element() -> ContractExpectations:
@@ -138,12 +192,16 @@ def _make_contract(
     extra_fields: List[ContractElement],
     attack_patterns: List[str],
 ) -> Contract:
-    elements: List[ContractElement] = [
-        _credential_element(cred) for cred in platform.cred_fields
+    credential_fields = [
+        _credential_element(cred, platform) for cred in platform.cred_fields
     ]
     # Centralized credential-reference field: lets the OpenAEV inject form ask
     # for a stored credential, filtered on the platform credential type.
-    elements.append(build_single_referenced_credential_element(platform.key))
+    reference = _credential_reference_element(platform)
+    if platform.credential_provider is None:
+        elements: List[ContractElement] = [*credential_fields, reference]
+    else:
+        elements = [_credential_source_element(platform), reference, *credential_fields]
     elements.extend(extra_fields)
     elements.append(_expectations_element())
 
