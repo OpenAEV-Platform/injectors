@@ -21,7 +21,11 @@ from prowler._core.prowler_client import (
     ProwlerClientFactory,
 )
 from prowler._core.prowler_client.credentials import TemporaryCredentialLeaseFactory
-from prowler.contracts import DEFAULT_PROWLER_CONTRACTS, stable_contract_id
+from prowler.contracts import (
+    CREDENTIAL_REFERENCE_KEY,
+    DEFAULT_PROWLER_CONTRACTS,
+    stable_contract_id,
+)
 from prowler.models.configs.config_loader import (
     ConfigLoader,
     ProwlerConfig,
@@ -135,6 +139,7 @@ def test_default_registration_identity_fields_and_outputs() -> None:
     assert tuple(field["key"] for field in content["fields"]) == (
         "kubernetes_kubeconfig",
         "kubernetes_context",
+        CREDENTIAL_REFERENCE_KEY,
     )
     assert tuple(output["field"] for output in content["outputs"]) == (
         "findings",
