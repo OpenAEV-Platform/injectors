@@ -1,17 +1,24 @@
 FROM python:3.13-slim AS builder
 
+WORKDIR /injector_common
+COPY --from=injector_common ./ ./
+
 RUN pip3 install poetry==2.3.2
 RUN apt-get update && apt-get upgrade -y
 
 ARG installdir=/injector
+WORKDIR ${installdir}
 ADD . ${installdir}
 RUN cd ${installdir} && poetry build
 
 FROM python:3.13-slim AS runner
 
 RUN apt-get update && apt-get upgrade -y && rm -rf /var/lib/apt/lists/*
+WORKDIR /injector_common
+COPY --from=injector_common ./ ./
 
 ARG installdir=/injector
+WORKDIR ${installdir}
 
 # Declare the build argument
 ARG PYOAEV_GIT_BRANCH_OVERRIDE
@@ -20,7 +27,7 @@ ARG PYOAEV_GIT_BRANCH_OVERRIDE
 ARG INSTALL_OSS_ENGINES=false
 
 COPY --from=builder ${installdir} ${installdir}
-RUN cd ${installdir}/dist && pip3 install --no-cache-dir "$(ls *.whl)[prod]"
+RUN cd ${installdir}/dist && pip3 install --no-cache-dir "$(ls *.whl)"
 
 RUN if [ "${PYOAEV_GIT_BRANCH_OVERRIDE}" ] ; then \
         echo "Forcing specific version of client-python" && \

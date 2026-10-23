@@ -16,9 +16,6 @@ RELEASE_REF="${RELEASE_REF:-main}"
 BRANCH="${CIRCLE_BRANCH:-${GITHUB_REF_NAME:-$RELEASE_REF}}"
 REPO_ROOT="$(cd "$(dirname "$0")" && pwd)"
 
-# Determine pyoaev git branch
-PYOAEV_BRANCH="main"
-
 # Discover injectors with test directories
 discover_injectors() {
   find "$REPO_ROOT" -maxdepth 2 \( -name "test" -o -name "tests" \) -type d \
@@ -42,7 +39,7 @@ get_install_args() {
     args="$args --with test"
   # Check if dev optional-dependencies contain pytest
   elif sed -n '/\[project\.optional-dependencies\]/,/^\[/p' "$pyproject" 2>/dev/null | grep -q 'pytest'; then
-    args="$args --extras dev"
+    args="$args --with test,dev"
   # Check if poetry dev group contains pytest
   elif grep -q '\[tool\.poetry\.group\.dev' "$pyproject" 2>/dev/null; then
     if sed -n '/\[tool\.poetry\.group\.dev/,/^\[/p' "$pyproject" | grep -q 'pytest'; then
@@ -108,10 +105,7 @@ run_injector_tests() {
     install_args=$(get_install_args "$injector_dir")
     poetry install $install_args
 
-    echo "→ Installing pyoaev from branch $PYOAEV_BRANCH"
-    poetry run pip install --force-reinstall -q \
-      "git+https://github.com/OpenAEV-Platform/client-python.git@$PYOAEV_BRANCH"
-
+    echo "→ pip install coverage"
     poetry run pip install -q coverage
 
     local test_rc=0
@@ -130,10 +124,7 @@ run_injector_tests() {
 
     pip install -q -e .
 
-    echo "→ Installing pyoaev from branch $PYOAEV_BRANCH"
-    pip install --force-reinstall -q \
-      "git+https://github.com/OpenAEV-Platform/client-python.git@$PYOAEV_BRANCH"
-
+    echo "→ pip install coverage"
     pip install -q coverage
 
     local test_rc=0
