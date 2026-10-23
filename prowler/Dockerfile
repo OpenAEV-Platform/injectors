@@ -20,7 +20,6 @@ RUN poetry install
 FROM python:3.13-alpine AS runner
 
 RUN apk --no-cache upgrade
-RUN pip install -U pip certifi
 
 ARG installdir=/opt/injector
 WORKDIR ${installdir}
@@ -43,10 +42,10 @@ RUN if [[ ${PYOAEV_GIT_BRANCH_OVERRIDE} ]] ; then \
 # (same import name as this injector) and pins pydantic==2.12.5, so it cannot
 # share the injector's environment. lz4 and zstd have no musl wheels.
 ARG PROWLER_VERSION=5.36.0
-RUN apk --no-cache upgrade && apk --no-cache add \
+RUN apk --no-cache add \
     gcc \
     musl-dev
-RUN python3 -m venv /opt/prowler \
+RUN python3 -m venv --upgrade-deps /opt/prowler \
     && /opt/prowler/bin/python -m pip install --no-cache-dir "prowler==${PROWLER_VERSION}" \
     && ln -s /opt/prowler/bin/prowler /usr/local/bin/prowler
 
