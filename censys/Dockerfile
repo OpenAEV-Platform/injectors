@@ -1,7 +1,5 @@
 FROM python:3.13-alpine AS builder
 
-ENV PIP_VERSION=26.2.2
-
 RUN apk --no-cache upgrade && apk --no-cache add git curl
 
 WORKDIR /opt/injector_common
@@ -9,10 +7,6 @@ COPY --from=injector_common ./ ./
 
 WORKDIR /
 RUN git clone https://github.com/OpenAEV-Platform/client-python
-
-RUN curl -sS https://bootstrap.pypa.io/get-pip.py -o get-pip.py && \
-    python3 get-pip.py pip==${PIP_VERSION} && \
-    rm get-pip.py
 
 RUN pip install -U pip certifi
 
@@ -24,11 +18,9 @@ ARG installdir=/opt/injector
 ADD . ${installdir}
 WORKDIR ${installdir}
 RUN poetry install && \
-    python3 -m pip install --no-cache-dir pip==${PIP_VERSION}
+    python3 -m pip install --no-cache-dir -U pip certifi
 
 FROM python:3.13-alpine AS runner
-
-ENV PIP_VERSION=26.2.2
 
 RUN apk --no-cache upgrade
 RUN pip install -U pip certifi
@@ -47,7 +39,7 @@ RUN if [[ ${PYOAEV_GIT_BRANCH_OVERRIDE} ]] ; then \
         echo "Forcing specific version of client-python" && \
         apk add --no-cache git curl && \
         curl -sS https://bootstrap.pypa.io/get-pip.py -o get-pip.py && \
-        python3 get-pip.py pip==${PIP_VERSION} && \
+        python3 get-pip.py && \
         rm get-pip.py && \
         pip install -U pip certifi && \
         pip install pip3-autoremove && \
