@@ -55,7 +55,7 @@ the AI target endpoint being tested.
     `promptfoo` Node CLI). When absent, those contracts return a clear error instead of failing silently. In Docker,
     bake them in with the `INSTALL_OSS_ENGINES=true` build argument.
 - For a manual (non-Docker) deployment:
-  - Python >= 3.11 and [Poetry](https://python-poetry.org/) >= 2.1
+  - Python >= 3.14 and [Poetry](https://python-poetry.org/) >= 2.1
   - Optionally `garak` (`pip install garak`) and `promptfoo` (`npm install -g promptfoo`) on the `PATH` to enable those
     engines
 
