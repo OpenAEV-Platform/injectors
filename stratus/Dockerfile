@@ -28,7 +28,6 @@ ENV STRATUS_VERSION=2.24.0
 ENV STRATUS_SHA256=bcc307e72427e785431a89c025388141201fa82d64d2337de20d6a602b0576a0
 
 RUN apk --no-cache upgrade
-RUN pip install -U pip certifi
 
 WORKDIR /opt/injector_common
 COPY --from=injector_common ./ ./
@@ -51,11 +50,7 @@ RUN apk --no-cache upgrade && \
 
 RUN if [ -n "${PYOAEV_GIT_BRANCH_OVERRIDE}" ] ; then \
         echo "Forcing specific version of client-python" && \
-        apk add --no-cache git curl && \
-        curl -sS https://bootstrap.pypa.io/get-pip.py -o get-pip.py && \
-        python3 get-pip.py && \
-        rm get-pip.py && \
-        pip install -U pip certifi && \
+        apk add --no-cache git && \
         pip install pip3-autoremove && \
         pip-autoremove pyoaev -y && \
         pip install "git+https://github.com/OpenAEV-Platform/client-python@${PYOAEV_GIT_BRANCH_OVERRIDE}" ; \

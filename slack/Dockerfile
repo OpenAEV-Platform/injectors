@@ -23,7 +23,6 @@ RUN poetry install
 FROM python:3.13-alpine AS runner
 
 RUN apk --no-cache upgrade
-RUN pip3 install -U pip certifi
 
 WORKDIR /opt/injector_common
 COPY --from=injector_common ./ ./

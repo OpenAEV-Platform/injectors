@@ -23,7 +23,6 @@ RUN poetry install && \
 FROM python:3.13-alpine AS runner
 
 RUN apk --no-cache upgrade
-RUN pip install -U pip certifi
 
 WORKDIR /opt/injector_common
 COPY --from=injector_common ./ ./
@@ -37,11 +36,7 @@ ARG PYOAEV_GIT_BRANCH_OVERRIDE
 
 RUN if [[ ${PYOAEV_GIT_BRANCH_OVERRIDE} ]] ; then \
         echo "Forcing specific version of client-python" && \
-        apk add --no-cache git curl && \
-        curl -sS https://bootstrap.pypa.io/get-pip.py -o get-pip.py && \
-        python3 get-pip.py && \
-        rm get-pip.py && \
-        pip install -U pip certifi && \
+        apk add --no-cache git && \
         pip install pip3-autoremove && \
         pip-autoremove pyoaev -y && \
         pip install git+https://github.com/OpenAEV-Platform/client-python@${PYOAEV_GIT_BRANCH_OVERRIDE} ; \
