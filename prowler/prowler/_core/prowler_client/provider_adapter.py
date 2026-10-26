@@ -1,9 +1,12 @@
 """Translate frozen provider inputs into Prowler 5.36 CLI invocations."""
 
+import os
+
 from pydantic import SecretStr
 from pyoaev.credential import (
     AwsAccessKeySecret,
     AwsAssumeRoleSecret,
+    AwsSourceIdentityType,
     AzureManagedIdentitySecret,
     AzureServicePrincipalSecret,
     CredentialErrorCode,
@@ -29,6 +32,15 @@ from prowler.models.provider_inputs import (
 
 from .contracts import ProviderInvocation
 from .ports import CredentialLeaseFactoryPort
+
+# Ambient AWS identity of the injector host, used as the assume-role source.
+_INSTANCE_IDENTITY_VARIABLES = (
+    "AWS_ACCESS_KEY_ID",
+    "AWS_SECRET_ACCESS_KEY",
+    "AWS_SESSION_TOKEN",
+    "AWS_PROFILE",
+    "AWS_REGION",
+)
 
 
 class ProviderInvocationAdapter:
@@ -133,6 +145,17 @@ class ProviderInvocationAdapter:
                 and provider.aws_endpoint_url is not None
             ):
                 environment.append(("AWS_ENDPOINT_URL", provider.aws_endpoint_url))
+            if (
+                isinstance(resolved, AwsAssumeRoleSecret)
+                and resolved.aws_source_identity_type
+                == AwsSourceIdentityType.INSTANCE_DEFAULT
+            ):
+                # The source identity is the one of the injector host: hand its
+                # ambient credentials over to the exact Prowler environment.
+                for name in _INSTANCE_IDENTITY_VARIABLES:
+                    value = os.environ.get(name)
+                    if value is not None:
+                        environment.append((name, SecretStr(value)))
         except BaseException:
             lease.cleanup()
             raise
