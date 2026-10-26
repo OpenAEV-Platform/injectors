@@ -33,11 +33,38 @@ from prowler.models.provider_inputs import (
 from .contracts import ProviderInvocation
 from .ports import CredentialLeaseFactoryPort
 
-# Ambient AWS identity of the injector host, used as the assume-role source.
-_INSTANCE_IDENTITY_VARIABLES = (
+# Prowler runs with an exact environment. An identity inherited from the injector
+# host (no secret in the credential) only works if the variables that describe it
+# are handed over, so each such credential lists the host variables it relies on.
+
+# Ambient AWS identity of the injector host, used as the assume-role source, and
+# the settings of the EC2 instance metadata service the profile falls back on.
+_AWS_INSTANCE_IDENTITY_VARIABLES = (
     "AWS_ACCESS_KEY_ID",
     "AWS_SECRET_ACCESS_KEY",
     "AWS_SESSION_TOKEN",
+    "AWS_EC2_METADATA_SERVICE_ENDPOINT",
+    "AWS_EC2_METADATA_SERVICE_ENDPOINT_MODE",
+    "AWS_EC2_METADATA_V1_DISABLED",
+    "AWS_METADATA_SERVICE_TIMEOUT",
+    "AWS_METADATA_SERVICE_NUM_ATTEMPTS",
+)
+
+# Endpoints and secrets the Azure platform defines for a managed identity: App
+# Service, Container Apps and Functions (IDENTITY_*), Service Fabric, Arc
+# (IMDS_ENDPOINT), Azure ML and Cloud Shell (MSI_*), pod identity, and workload
+# identity. AZURE_CLIENT_ID is left out on purpose: it would turn the
+# system-assigned identity of the credential into a user-assigned one.
+_AZURE_MANAGED_IDENTITY_VARIABLES = (
+    "IDENTITY_ENDPOINT",
+    "IDENTITY_HEADER",
+    "IDENTITY_SERVER_THUMBPRINT",
+    "IMDS_ENDPOINT",
+    "MSI_ENDPOINT",
+    "MSI_SECRET",
+    "AZURE_POD_IDENTITY_AUTHORITY_HOST",
+    "AZURE_FEDERATED_TOKEN_FILE",
+    "AZURE_TENANT_ID",
 )
 
 
@@ -143,17 +170,9 @@ class ProviderInvocationAdapter:
                 and provider.aws_endpoint_url is not None
             ):
                 environment.append(("AWS_ENDPOINT_URL", provider.aws_endpoint_url))
-            if (
-                isinstance(resolved, AwsAssumeRoleSecret)
-                and resolved.aws_source_identity_type
-                == AwsSourceIdentityType.INSTANCE_DEFAULT
-            ):
-                # The source identity is the one of the injector host: hand its
-                # ambient credentials over to the exact Prowler environment.
-                for name in _INSTANCE_IDENTITY_VARIABLES:
-                    value = os.environ.get(name)
-                    if value is not None:
-                        environment.append((name, SecretStr(value)))
+            environment.extend(
+                _host_environment(_ambient_identity_variables(resolved), environment)
+            )
         except BaseException:
             lease.cleanup()
             raise
@@ -162,6 +181,34 @@ class ProviderInvocationAdapter:
             environment=tuple(environment),
             credential_leases=(lease,),
         )
+
+
+def _ambient_identity_variables(resolved: ResolvedSecret) -> tuple[str, ...]:
+    """Name the host variables of a credential whose identity is the host's."""
+    if (
+        isinstance(resolved, AwsAssumeRoleSecret)
+        and resolved.aws_source_identity_type == AwsSourceIdentityType.INSTANCE_DEFAULT
+    ):
+        return _AWS_INSTANCE_IDENTITY_VARIABLES
+    if isinstance(resolved, AzureManagedIdentitySecret):
+        return _AZURE_MANAGED_IDENTITY_VARIABLES
+    return ()
+
+
+def _host_environment(
+    names: tuple[str, ...], environment: list[tuple[str, EnvironmentValue]]
+) -> list[tuple[str, EnvironmentValue]]:
+    """Return the listed host variables that are set and not already provided.
+
+    A value the credential materialized itself always wins over the host one.
+    Every value is wrapped as a secret, like the materialized ones.
+    """
+    provided = {name for name, _ in environment}
+    return [
+        (name, SecretStr(os.environ[name]))
+        for name in names
+        if name in os.environ and name not in provided
+    ]
 
 
 def _required(value: object) -> str:

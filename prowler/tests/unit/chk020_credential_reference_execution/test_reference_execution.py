@@ -32,7 +32,11 @@ from prowler._core.prowler_client import (
     TemporaryCredentialLeaseFactory,
     TemporaryOutputWorkspaceFactory,
 )
-from prowler._core.prowler_client.provider_adapter import ProviderInvocationAdapter
+from prowler._core.prowler_client.provider_adapter import (
+    _AWS_INSTANCE_IDENTITY_VARIABLES,
+    _AZURE_MANAGED_IDENTITY_VARIABLES,
+    ProviderInvocationAdapter,
+)
 from prowler.contracts import (
     BaseProwlerContract,
     ContractExecutionOutcome,
@@ -113,6 +117,25 @@ PAYLOADS: dict[str, dict[str, Any]] = {
     },
 }
 
+# Credentials without any secret: the identity is the one of the injector host.
+AMBIENT_IDENTITY_PAYLOADS: dict[str, dict[str, Any]] = {
+    "AWS_ASSUME_ROLE_INSTANCE_DEFAULT": {
+        "type": "AWS_ASSUME_ROLE",
+        "value": {
+            "aws_default_region": "us-east-2",
+            "aws_role_arn": "arn:aws:iam::123456789012:role/audit",
+            "aws_source_identity_type": "INSTANCE_DEFAULT",
+        },
+    },
+    "AZURE_MANAGED_IDENTITY_SYSTEM": {
+        "type": "AZURE_MANAGED_IDENTITY",
+        "value": {
+            "azure_environment": "AzureCloud",
+            "azure_subscription_id": "system-subscription",
+        },
+    },
+}
+
 # The fields shown with the credential manager: region, subscription, and
 # project come from the credential only.
 AWS_INPUT = {"aws_account_id": "123456789012"}
@@ -141,7 +164,8 @@ def _specification() -> ExecutionSpecification:
 
 
 def _resolved(secret_type: str) -> Any:
-    return parse_resolved_secret(PAYLOADS[secret_type], reference=REFERENCE)
+    payload = {**PAYLOADS, **AMBIENT_IDENTITY_PAYLOADS}[secret_type]
+    return parse_resolved_secret(payload, reference=REFERENCE)
 
 
 def _reference_input(model: type[Any], form: dict[str, str], secret_type: str) -> Any:
@@ -171,6 +195,17 @@ def _environment(invocation: Any) -> dict[str, str]:
 
 def _leftovers(tmp_path: Path) -> list[Path]:
     return list(tmp_path.iterdir())
+
+
+@pytest.fixture(autouse=True)
+def _isolated_host_identity(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Keep the identity variables of the machine running the tests out."""
+    for name in (
+        *_AWS_INSTANCE_IDENTITY_VARIABLES,
+        *_AZURE_MANAGED_IDENTITY_VARIABLES,
+        "AZURE_CLIENT_ID",
+    ):
+        monkeypatch.delenv(name, raising=False)
 
 
 def test_aws_access_key_uses_the_secret_region(tmp_path: Path) -> None:
@@ -209,6 +244,8 @@ def test_aws_assume_role_selects_a_private_profile(tmp_path: Path) -> None:
         "AWS_PROFILE",
         "AWS_CONFIG_FILE",
         "AWS_SHARED_CREDENTIALS_FILE",
+        "AWS_REGION",
+        "AWS_DEFAULT_REGION",
     }
     config = Path(environment["AWS_CONFIG_FILE"]).read_text(encoding="utf-8")
     assert "role_arn = arn:aws:iam::123456789012:role/audit" in config
@@ -219,6 +256,107 @@ def test_aws_assume_role_selects_a_private_profile(tmp_path: Path) -> None:
     for lease in invocation.credential_leases:
         lease.cleanup()
     assert _leftovers(tmp_path) == []
+
+
+def test_aws_assume_role_with_a_static_source_ignores_the_host_identity(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("AWS_ACCESS_KEY_ID", "HOST-KEY-CANARY")
+    provider = _reference_input(AwsReferenceProviderInput, AWS_INPUT, "AWS_ASSUME_ROLE")
+
+    invocation = _adapter(tmp_path).adapt(provider)
+
+    assert "AWS_ACCESS_KEY_ID" not in _environment(invocation)
+
+
+def test_aws_instance_default_hands_the_host_identity_over(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("AWS_ACCESS_KEY_ID", "HOST-KEY-CANARY")
+    monkeypatch.setenv("AWS_SECRET_ACCESS_KEY", "HOST-SECRET-CANARY")
+    monkeypatch.setenv("AWS_EC2_METADATA_SERVICE_ENDPOINT", "http://imds.example.test")
+    monkeypatch.setenv("UNRELATED_HOST_VARIABLE", "UNRELATED-CANARY")
+    provider = _reference_input(
+        AwsReferenceProviderInput, AWS_INPUT, "AWS_ASSUME_ROLE_INSTANCE_DEFAULT"
+    )
+
+    invocation = _adapter(tmp_path).adapt(provider)
+
+    environment = _environment(invocation)
+    assert environment["AWS_ACCESS_KEY_ID"] == "HOST-KEY-CANARY"
+    assert environment["AWS_SECRET_ACCESS_KEY"] == "HOST-SECRET-CANARY"
+    assert environment["AWS_EC2_METADATA_SERVICE_ENDPOINT"] == "http://imds.example.test"
+    assert "AWS_SESSION_TOKEN" not in environment
+    assert "UNRELATED_HOST_VARIABLE" not in environment
+    assert environment["AWS_PROFILE"] == "srt-target"
+
+
+def test_aws_instance_default_without_host_variables_adds_nothing(
+    tmp_path: Path,
+) -> None:
+    provider = _reference_input(
+        AwsReferenceProviderInput, AWS_INPUT, "AWS_ASSUME_ROLE_INSTANCE_DEFAULT"
+    )
+
+    invocation = _adapter(tmp_path).adapt(provider)
+
+    assert set(_environment(invocation)) == {
+        "AWS_PROFILE",
+        "AWS_CONFIG_FILE",
+        "AWS_REGION",
+        "AWS_DEFAULT_REGION",
+    }
+
+
+def test_azure_managed_identity_hands_the_platform_variables_over(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("IDENTITY_ENDPOINT", "http://127.0.0.1:42356/msi/token")
+    monkeypatch.setenv("IDENTITY_HEADER", "IDENTITY-HEADER-CANARY")
+    monkeypatch.setenv("AZURE_FEDERATED_TOKEN_FILE", "/var/run/token")
+    monkeypatch.setenv("UNRELATED_HOST_VARIABLE", "UNRELATED-CANARY")
+    provider = _reference_input(
+        AzureReferenceProviderInput, AZURE_INPUT, "AZURE_MANAGED_IDENTITY_SYSTEM"
+    )
+
+    invocation = _adapter(tmp_path).adapt(provider)
+
+    environment = _environment(invocation)
+    assert environment["IDENTITY_ENDPOINT"] == "http://127.0.0.1:42356/msi/token"
+    assert environment["IDENTITY_HEADER"] == "IDENTITY-HEADER-CANARY"
+    assert environment["AZURE_FEDERATED_TOKEN_FILE"] == "/var/run/token"
+    assert "UNRELATED_HOST_VARIABLE" not in environment
+
+
+def test_azure_managed_identity_never_takes_the_client_id_from_the_host(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("AZURE_CLIENT_ID", "host-client-id")
+    system_assigned = _reference_input(
+        AzureReferenceProviderInput, AZURE_INPUT, "AZURE_MANAGED_IDENTITY_SYSTEM"
+    )
+    user_assigned = _reference_input(
+        AzureReferenceProviderInput, AZURE_INPUT, "AZURE_MANAGED_IDENTITY"
+    )
+
+    system_environment = _environment(_adapter(tmp_path).adapt(system_assigned))
+    user_environment = _environment(_adapter(tmp_path).adapt(user_assigned))
+
+    assert "AZURE_CLIENT_ID" not in system_environment
+    assert user_environment["AZURE_CLIENT_ID"] == "mi"
+
+
+def test_azure_service_principal_ignores_the_platform_variables(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("IDENTITY_ENDPOINT", "http://127.0.0.1:42356/msi/token")
+    provider = _reference_input(
+        AzureReferenceProviderInput, AZURE_INPUT, "AZURE_SERVICE_PRINCIPAL"
+    )
+
+    invocation = _adapter(tmp_path).adapt(provider)
+
+    assert "IDENTITY_ENDPOINT" not in _environment(invocation)
 
 
 @pytest.mark.parametrize(
