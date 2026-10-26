@@ -2,6 +2,7 @@ import json
 from unittest import TestCase
 
 from pyoaev.contracts.contract_config import ContractFieldKey, ContractFieldType
+from pyoaev.contracts.contract_utils import ContractCardinality
 from pyoaev.credential.types import CredentialType
 
 from stratus.contracts import (
@@ -106,7 +107,7 @@ class ContractsTest(TestCase):
         for content in self.content_by_id.values():
             field = self._credential_reference_field(content)
             self.assertFalse(field["mandatory"])
-            self.assertFalse(field["multiple"])
+            self.assertEqual(field["cardinality"], ContractCardinality.One.value)
 
     def test_custom_contracts_credential_reference_type_matches_platform(self):
         for platform in PLATFORMS:

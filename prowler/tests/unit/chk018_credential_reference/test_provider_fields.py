@@ -8,6 +8,7 @@ from pyoaev.contracts.contract_config import (
     ContractFieldType,
     ContractReferencedCredential,
 )
+from pyoaev.contracts.contract_utils import ContractCardinality
 from pyoaev.credential.types import CredentialType
 
 from prowler.contracts.provider_fields import (
@@ -83,7 +84,7 @@ def test_credential_reference_declares_the_expected_wire_shape(
     assert element.type == ContractFieldType.CredentialReference.value
     assert element.type == "credential-reference"
     assert element.mandatory is False
-    assert element.multiple is False
+    assert element.cardinality == ContractCardinality.One
     assert element.label == "Select a credential reference"
 
 
