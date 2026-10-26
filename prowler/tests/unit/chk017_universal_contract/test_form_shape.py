@@ -141,7 +141,7 @@ def test_single_unconditioned_credential_reference() -> None:
     assert fields.index(reference) == 1
     assert reference["type"] == "credential-reference"
     assert reference["mandatory"] is False
-    assert reference["multiple"] is False
+    assert reference["cardinality"] == "1"
     # The operator selects the provider through PROVIDER_KEY, so the universal
     # contract deliberately carries no CredentialType filter.
     assert reference["credential_reference_type"] is None
