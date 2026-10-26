@@ -182,7 +182,7 @@ def test_form_conditions_every_credential_field_on_provider_select() -> None:
     assert credential_reference["key"] == CREDENTIAL_REFERENCE_KEY
     assert credential_reference["type"] == "credential-reference"
     assert credential_reference["mandatory"] is False
-    assert credential_reference["multiple"] is False
+    assert credential_reference["cardinality"] == "1"
     # The provider is chosen through PROVIDER_KEY, so no CredentialType filter.
     assert credential_reference["credential_reference_type"] is None
     assert credential_reference["visibleConditionFields"] == []
