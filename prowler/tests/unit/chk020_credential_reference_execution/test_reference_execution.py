@@ -285,7 +285,9 @@ def test_aws_instance_default_hands_the_host_identity_over(
     environment = _environment(invocation)
     assert environment["AWS_ACCESS_KEY_ID"] == "HOST-KEY-CANARY"
     assert environment["AWS_SECRET_ACCESS_KEY"] == "HOST-SECRET-CANARY"
-    assert environment["AWS_EC2_METADATA_SERVICE_ENDPOINT"] == "http://imds.example.test"
+    assert (
+        environment["AWS_EC2_METADATA_SERVICE_ENDPOINT"] == "http://imds.example.test"
+    )
     assert "AWS_SESSION_TOKEN" not in environment
     assert "UNRELATED_HOST_VARIABLE" not in environment
     assert environment["AWS_PROFILE"] == "srt-target"
