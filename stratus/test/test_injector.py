@@ -534,9 +534,10 @@ class ProcessMessageCredentialReferenceTest(TestCase):
             _data({"aws_region": "eu-west-3"}, AWS_TECH_CONTRACT, ATTACHMENTS)
         )
         env = self._detonate_env(injector)
-        # The region lives in the materialized profile: an AWS_REGION variable
-        # would take precedence over it.
-        self.assertNotIn("AWS_REGION", env)
+        # The credential region wins over the stale inject form value, and
+        # matches the one written in the materialized profile.
+        self.assertEqual(env["AWS_REGION"], "us-west-2")
+        self.assertEqual(env["AWS_DEFAULT_REGION"], "us-west-2")
         self.assertEqual(env["AWS_PROFILE"], "srt-target")
 
     def test_resolved_subscription_wins_over_the_inject_fields(self):
