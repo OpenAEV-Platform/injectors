@@ -150,6 +150,33 @@ def test_trace_limits_rows_cells_and_request_values() -> None:
     assert "third-hidden" not in trace
 
 
+def test_raw_preview_shows_bracketed_cloud_ids_as_plain_text() -> None:
+    """A resource UID is cloud data: it is never read as Rich markup."""
+    subscription = "/subscriptions/00000000-0000-0000-0000-000000000000"
+    trace = _generate(
+        [],
+        raw_record_count=2,
+        raw_output_bytes=100,
+        raw_preview=[
+            {
+                "finding_title": "Finding",
+                "status": "FAIL",
+                "resource_name": "a" * 36,
+                "resource_uid": subscription,
+            },
+            {
+                "finding_title": "Finding",
+                "status": "FAIL",
+                "resource_name": "role",
+                "resource_uid": "arn:aws:iam::123456789012:role/audit",
+            },
+        ],
+    )
+
+    assert f"[{subscription}]" in trace
+    assert "[arn:aws:iam::123456789012:role/audit]" in trace
+
+
 def test_renderer_only_displays_supplied_safe_inputs() -> None:
     """Canary secrets and command internals are absent from safe display inputs."""
     canaries = (
