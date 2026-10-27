@@ -17,4 +17,4 @@ repos:
     hooks:
     - id: isort
       name: isort (python)
-      arts: ['--profile black']
+      args: ['--profile', 'black']
