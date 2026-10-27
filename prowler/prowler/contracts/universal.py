@@ -176,6 +176,8 @@ class UniversalProwlerContract(SelectionScopedContract):
         reference.visibleConditionValues = {
             PROVIDER_KEY: list(CREDENTIAL_MANAGER_PROVIDERS)
         }
+        reference.mandatoryConditionFields = []
+        reference.mandatoryConditionValues = {}
         fields: list[ContractElement] = [
             self._build_provider_select(),
             reference,
