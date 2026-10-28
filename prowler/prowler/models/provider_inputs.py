@@ -229,6 +229,11 @@ class AwsProviderInput(ImmutableProviderInput):
         """Accept only absolute HTTP(S) endpoints without unsafe URL extras."""
         return _validate_aws_endpoint_url(value)
 
+    @property
+    def effective_aws_account_id(self) -> str:
+        """Return the account of the form, the only one of a legacy input."""
+        return self.aws_account_id
+
     def safe_log_metadata(self) -> dict[str, object]:
         """Return the log-safe metadata facts for this AWS input."""
         metadata = _aws_scope_log_metadata(
@@ -353,7 +358,8 @@ class AwsReferenceProviderInput(CredentialReferenceProviderInput):
     """AWS provider form input whose credential comes from a reference."""
 
     provider: Literal["aws"]
-    # No credential carries the account: it is always taken from the form.
+    # The account and the endpoint of the credential win over these form
+    # values, which stay as the fallback of a credential that has none.
     aws_account_id: AwsAccountId
     aws_endpoint_url: str | None = None
 
@@ -363,6 +369,20 @@ class AwsReferenceProviderInput(CredentialReferenceProviderInput):
         """Accept only absolute HTTP(S) endpoints without unsafe URL extras."""
         return _validate_aws_endpoint_url(value)
 
+    @property
+    def effective_aws_account_id(self) -> str:
+        """Return the account of the credential, else the one of the form.
+
+        The credential value is not checked against the form pattern: a
+        sovereign or mocked cloud may use another account format.
+        """
+        return self.scope_value("aws_account_id") or self.aws_account_id
+
+    @property
+    def effective_aws_endpoint_url(self) -> str | None:
+        """Return the endpoint of the credential, else the one of the form."""
+        return self.scope_value("aws_endpoint_url") or self.aws_endpoint_url
+
     def missing_scope_fields(self) -> tuple[str, ...]:
         """Return ``aws_region`` when the credential has no region."""
         return () if self.scope_value("aws_default_region") else ("aws_region",)
@@ -370,9 +390,9 @@ class AwsReferenceProviderInput(CredentialReferenceProviderInput):
     def safe_log_metadata(self) -> dict[str, object]:
         """Return the log-safe metadata facts for this AWS input."""
         metadata = _aws_scope_log_metadata(
-            self.aws_account_id,
+            self.effective_aws_account_id,
             self.scope_value("aws_default_region"),
-            self.aws_endpoint_url,
+            self.effective_aws_endpoint_url,
         )
         metadata.update(self.reference_log_metadata())
         return metadata

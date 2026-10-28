@@ -168,6 +168,8 @@ class ProviderInvocationAdapter:
             if (
                 isinstance(provider, AwsReferenceProviderInput)
                 and provider.aws_endpoint_url is not None
+                # The endpoint of the credential wins over the form one.
+                and "AWS_ENDPOINT_URL" not in lease.credential.env
             ):
                 environment.append(("AWS_ENDPOINT_URL", provider.aws_endpoint_url))
             environment.extend(
