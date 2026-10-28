@@ -55,6 +55,9 @@ REFERENCE = "3f1c1e5e-0000-4000-8000-000000000001"
 AUTHORISATION_CODE = "AUTHORISATION-CODE-CANARY"
 ATTACHMENT = CredentialAttachment(REFERENCE, AUTHORISATION_CODE)
 GCP_SERVICE_ACCOUNT_JSON = b'{"type": "service_account", "private_key": "KEY-CANARY"}'
+CA_CERTIFICATE = (
+    b"-----BEGIN CERTIFICATE-----\nCERTIFICATE-CANARY\n-----END CERTIFICATE-----\n"
+)
 
 # One resolution payload per cloud secret type; every secret value ends with
 # CANARY so that leaks can be detected in any textual output.
@@ -175,6 +178,21 @@ def _reference_input(model: type[Any], form: dict[str, str], secret_type: str) -
     return provider.with_resolved_secret(_resolved(secret_type))
 
 
+def _sovereign_input(
+    model: type[Any], form: dict[str, str], secret_type: str, **values: str
+) -> Any:
+    """Build a reference input whose credential carries sovereign cloud values."""
+    payload = PAYLOADS[secret_type]
+    resolved = parse_resolved_secret(
+        {"type": payload["type"], "value": {**payload["value"], **values}},
+        reference=REFERENCE,
+    )
+    provider = model(
+        provider=PROVIDER_NAMES[model], credential_attachment=ATTACHMENT, **form
+    )
+    return provider.with_resolved_secret(resolved)
+
+
 def _adapter(tmp_path: Path) -> ProviderInvocationAdapter:
     return ProviderInvocationAdapter(
         TemporaryCredentialLeaseFactory(temporary_root=tmp_path)
@@ -185,11 +203,12 @@ def _environment(invocation: Any) -> dict[str, str]:
     """Reveal the invocation environment, asserting every value is wrapped."""
     revealed: dict[str, str] = {}
     for name, value in invocation.environment:
-        if name == "AWS_ENDPOINT_URL":
-            revealed[name] = value
+        if isinstance(value, SecretStr):
+            revealed[name] = value.get_secret_value()
             continue
-        assert isinstance(value, SecretStr), name
-        revealed[name] = value.get_secret_value()
+        # The endpoint of the form is the only value that is not a secret.
+        assert name == "AWS_ENDPOINT_URL", name
+        revealed[name] = value
     return revealed
 
 
@@ -439,6 +458,265 @@ def test_gcp_uses_the_materialized_credentials_file(
         lease.cleanup()
     assert not credentials_file.exists()
     assert _leftovers(tmp_path) == []
+
+
+@pytest.mark.parametrize("secret_type", ("AWS_ACCESS_KEY", "AWS_ASSUME_ROLE"))
+def test_aws_credential_endpoint_reaches_the_api_and_sts_calls(
+    tmp_path: Path, secret_type: str
+) -> None:
+    provider = _sovereign_input(
+        AwsReferenceProviderInput,
+        AWS_INPUT,
+        secret_type,
+        aws_endpoint_url="http://mock.example.test:4566",
+    )
+
+    invocation = _adapter(tmp_path).adapt(provider)
+
+    environment = _environment(invocation)
+    assert environment["AWS_ENDPOINT_URL"] == "http://mock.example.test:4566"
+    assert environment["AWS_ENDPOINT_URL_STS"] == "http://mock.example.test:4566"
+    for lease in invocation.credential_leases:
+        lease.cleanup()
+
+
+def test_aws_credential_endpoint_wins_over_the_form_endpoint(tmp_path: Path) -> None:
+    provider = _sovereign_input(
+        AwsReferenceProviderInput,
+        {**AWS_INPUT, "aws_endpoint_url": "https://form.example.test"},
+        "AWS_ACCESS_KEY",
+        aws_endpoint_url="http://credential.example.test",
+    )
+
+    invocation = _adapter(tmp_path).adapt(provider)
+
+    names = [name for name, _value in invocation.environment]
+    assert names.count("AWS_ENDPOINT_URL") == 1
+    environment = _environment(invocation)
+    assert environment["AWS_ENDPOINT_URL"] == "http://credential.example.test"
+    assert environment["AWS_ENDPOINT_URL_STS"] == "http://credential.example.test"
+    assert provider.effective_aws_endpoint_url == "http://credential.example.test"
+    metadata = provider.safe_log_metadata()
+    assert metadata["aws_endpoint_origin"] == "http://credential.example.test"
+
+
+def test_aws_form_endpoint_does_not_set_the_sts_endpoint(tmp_path: Path) -> None:
+    provider = _reference_input(
+        AwsReferenceProviderInput,
+        {**AWS_INPUT, "aws_endpoint_url": "https://form.example.test"},
+        "AWS_ACCESS_KEY",
+    )
+
+    environment = _environment(_adapter(tmp_path).adapt(provider))
+
+    assert environment["AWS_ENDPOINT_URL"] == "https://form.example.test"
+    assert "AWS_ENDPOINT_URL_STS" not in environment
+    assert provider.effective_aws_endpoint_url == "https://form.example.test"
+
+
+def test_aws_credential_without_endpoint_sets_no_endpoint(tmp_path: Path) -> None:
+    provider = _reference_input(AwsReferenceProviderInput, AWS_INPUT, "AWS_ACCESS_KEY")
+
+    environment = _environment(_adapter(tmp_path).adapt(provider))
+
+    assert "AWS_ENDPOINT_URL" not in environment
+    assert "AWS_ENDPOINT_URL_STS" not in environment
+    assert provider.safe_log_metadata()["aws_endpoint_override_present"] is False
+
+
+@pytest.mark.parametrize(
+    "secret_type", ("AZURE_SERVICE_PRINCIPAL", "AZURE_MANAGED_IDENTITY")
+)
+@pytest.mark.parametrize(
+    "authority", ("http://mock.example.test", "http://mock.example.test/")
+)
+def test_azure_credential_authority_host_is_normalized(
+    tmp_path: Path, secret_type: str, authority: str
+) -> None:
+    provider = _sovereign_input(
+        AzureReferenceProviderInput,
+        AZURE_INPUT,
+        secret_type,
+        azure_authority_host_uri=authority,
+    )
+
+    environment = _environment(_adapter(tmp_path).adapt(provider))
+
+    assert environment["AZURE_AUTHORITY_HOST"] == "http://mock.example.test/"
+    assert environment["AZURE_POD_IDENTITY_AUTHORITY_HOST"] == (
+        "http://mock.example.test/"
+    )
+
+
+def test_azure_credential_authority_host_wins_over_the_host_variable(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("AZURE_POD_IDENTITY_AUTHORITY_HOST", "http://host.example.test/")
+    provider = _sovereign_input(
+        AzureReferenceProviderInput,
+        AZURE_INPUT,
+        "AZURE_MANAGED_IDENTITY",
+        azure_authority_host_uri="http://mock.example.test/",
+    )
+
+    invocation = _adapter(tmp_path).adapt(provider)
+
+    names = [name for name, _value in invocation.environment]
+    assert names.count("AZURE_POD_IDENTITY_AUTHORITY_HOST") == 1
+    environment = _environment(invocation)
+    assert environment["AZURE_POD_IDENTITY_AUTHORITY_HOST"] == (
+        "http://mock.example.test/"
+    )
+
+
+def test_azure_host_authority_variable_is_kept_without_a_credential_one(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("AZURE_POD_IDENTITY_AUTHORITY_HOST", "http://host.example.test/")
+    provider = _reference_input(
+        AzureReferenceProviderInput, AZURE_INPUT, "AZURE_MANAGED_IDENTITY"
+    )
+
+    environment = _environment(_adapter(tmp_path).adapt(provider))
+
+    assert environment["AZURE_POD_IDENTITY_AUTHORITY_HOST"] == (
+        "http://host.example.test/"
+    )
+
+
+@pytest.mark.parametrize(
+    "secret_type", ("AZURE_SERVICE_PRINCIPAL", "AZURE_MANAGED_IDENTITY")
+)
+def test_azure_certificate_is_trusted_by_python_and_go_until_cleanup(
+    tmp_path: Path, secret_type: str
+) -> None:
+    provider = _sovereign_input(
+        AzureReferenceProviderInput,
+        AZURE_INPUT,
+        secret_type,
+        azure_requests_certificate=base64.b64encode(CA_CERTIFICATE).decode(),
+    )
+
+    invocation = _adapter(tmp_path).adapt(provider)
+
+    environment = _environment(invocation)
+    bundle = Path(environment["REQUESTS_CA_BUNDLE"])
+    assert environment["SSL_CERT_FILE"] == str(bundle)
+    assert bundle.read_bytes() == CA_CERTIFICATE
+    assert bundle.parent.parent == tmp_path
+    for lease in invocation.credential_leases:
+        lease.cleanup()
+    assert not bundle.exists()
+    assert _leftovers(tmp_path) == []
+
+
+def test_azure_credential_without_certificate_sets_no_trust_store(
+    tmp_path: Path,
+) -> None:
+    provider = _reference_input(
+        AzureReferenceProviderInput, AZURE_INPUT, "AZURE_SERVICE_PRINCIPAL"
+    )
+
+    environment = _environment(_adapter(tmp_path).adapt(provider))
+
+    assert "REQUESTS_CA_BUNDLE" not in environment
+    assert "SSL_CERT_FILE" not in environment
+    assert "AZURE_POD_IDENTITY_AUTHORITY_HOST" not in environment
+
+
+def test_gcp_oauth2_sovereign_values_reach_the_environment(tmp_path: Path) -> None:
+    provider = _sovereign_input(
+        GcpReferenceProviderInput,
+        GCP_INPUT,
+        "GCP_OAUTH2",
+        gcp_custom_token_uri="http://mock.example.test/token",
+        gcp_custom_iam_uri="http://mock.example.test/iam",
+        gcp_custom_oauth_access_token="OAUTH-ACCESS-TOKEN-CANARY",
+    )
+
+    invocation = _adapter(tmp_path).adapt(provider)
+
+    environment = _environment(invocation)
+    assert environment["GOOGLE_OAUTH2_TOKEN_URI_OVERRIDE"] == (
+        "http://mock.example.test/token"
+    )
+    assert environment["GOOGLE_IAM_CUSTOM_ENDPOINT"] == "http://mock.example.test/iam"
+    assert environment["GOOGLE_OAUTH_ACCESS_TOKEN"] == "OAUTH-ACCESS-TOKEN-CANARY"
+    assert "GOOGLE_RESOURCE_MANAGER_CUSTOM_ENDPOINT" not in environment
+    for lease in invocation.credential_leases:
+        lease.cleanup()
+
+
+def test_gcp_service_account_resource_manager_uri_reaches_the_environment(
+    tmp_path: Path,
+) -> None:
+    provider = _sovereign_input(
+        GcpReferenceProviderInput,
+        GCP_INPUT,
+        "GCP_SERVICE_ACCOUNT",
+        gcp_custom_resource_manager_uri="http://mock.example.test/resource-manager",
+    )
+
+    invocation = _adapter(tmp_path).adapt(provider)
+
+    environment = _environment(invocation)
+    assert environment["GOOGLE_RESOURCE_MANAGER_CUSTOM_ENDPOINT"] == (
+        "http://mock.example.test/resource-manager"
+    )
+    assert "GOOGLE_OAUTH2_TOKEN_URI_OVERRIDE" not in environment
+    for lease in invocation.credential_leases:
+        lease.cleanup()
+
+
+@pytest.mark.parametrize(
+    ("model", "form", "secret_type", "values"),
+    (
+        (
+            AwsReferenceProviderInput,
+            AWS_INPUT,
+            "AWS_ACCESS_KEY",
+            {
+                "aws_endpoint_url": "http://mock.example.test",
+                "aws_account_id": "ACCOUNT",
+            },
+        ),
+        (
+            AzureReferenceProviderInput,
+            AZURE_INPUT,
+            "AZURE_SERVICE_PRINCIPAL",
+            {
+                "azure_authority_host_uri": "http://mock.example.test/",
+                "azure_requests_certificate": base64.b64encode(CA_CERTIFICATE).decode(),
+            },
+        ),
+        (
+            GcpReferenceProviderInput,
+            GCP_INPUT,
+            "GCP_OAUTH2",
+            {"gcp_custom_oauth_access_token": "OAUTH-ACCESS-TOKEN-CANARY"},
+        ),
+    ),
+)
+def test_sovereign_values_never_appear_in_renderings_or_logs(
+    tmp_path: Path,
+    model: type[Any],
+    form: dict[str, str],
+    secret_type: str,
+    values: dict[str, str],
+) -> None:
+    provider = _sovereign_input(model, form, secret_type, **values)
+
+    invocation = _adapter(tmp_path).adapt(provider)
+
+    for rendering in (
+        repr(invocation),
+        repr(provider),
+        json.dumps(provider.model_dump(mode="json")),
+        json.dumps(provider.safe_log_metadata()),
+    ):
+        assert "CANARY" not in rendering
+    for lease in invocation.credential_leases:
+        lease.cleanup()
 
 
 @pytest.mark.parametrize("secret_type", tuple(PAYLOADS))

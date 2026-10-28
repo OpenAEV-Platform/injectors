@@ -114,13 +114,34 @@ GCP_SERVICE_ACCOUNT_PAYLOAD = {
         "gcp_private_key_json": base64.b64encode(GCP_SERVICE_ACCOUNT_KEY).decode(),
     },
 }
+GCP_OAUTH2_PAYLOAD = {
+    "type": "GCP_OAUTH2",
+    "value": {
+        "gcp_scope": "googleapis.com",
+        "gcp_project_id": "ref-project",
+        "gcp_oauth_client_id": "ref-oauth-client",
+        "gcp_oauth_client_secret": "ref-oauth-secret",
+        "gcp_oauth_refresh_token": "ref-oauth-refresh",
+    },
+}
+AZURE_CONTENT = {"technique_id": "azure.x"}
+SOVEREIGN_CA_CERTIFICATE = (
+    b"-----BEGIN CERTIFICATE-----\nref-ca-pem\n-----END CERTIFICATE-----\n"
+)
 SECRET_VALUES = (
     "AKIA-REF",
     "ref-aws-secret",
     "ref-azure-secret",
     "ref-gcp-key",
+    "ref-oauth-token",
+    "ref-ca-pem",
     AUTHORISATION_CODE,
 )
+
+
+def _with_values(payload, **values):
+    """Copy of a resolved secret payload with extra (sovereign cloud) values."""
+    return {"type": payload["type"], "value": {**payload["value"], **values}}
 
 
 class ResolveContractTest(TestCase):
@@ -634,6 +655,182 @@ class ProcessMessageCredentialReferenceTest(TestCase):
         self.assertFalse(os.path.exists(path))
         self.assertFalse(os.path.exists(os.path.dirname(path)))
 
+    def test_aws_endpoint_url_is_applied_to_the_api_and_sts_calls(self):
+        payloads = (
+            _with_values(AWS_ACCESS_KEY_PAYLOAD, aws_endpoint_url="http://mock:4566"),
+            {
+                "type": "AWS_ASSUME_ROLE",
+                "value": {
+                    "aws_role_arn": "arn:aws:iam::123456789012:role/r",
+                    "aws_source_identity_type": "INSTANCE_DEFAULT",
+                    "aws_default_region": "us-west-2",
+                    "aws_account_id": "123456789012",
+                    "aws_endpoint_url": "http://mock:4566",
+                },
+            },
+        )
+        for payload in payloads:
+            with self.subTest(secret_type=payload["type"]):
+                injector = self._injector(payload)
+                injector.process_message(_data({}, AWS_TECH_CONTRACT, ATTACHMENTS))
+                self.assertEqual(
+                    self._callback(injector)["execution_status"], "SUCCESS"
+                )
+                env = self._detonate_env(injector)
+                self.assertEqual(env["AWS_ENDPOINT_URL"], "http://mock:4566")
+                self.assertEqual(env["AWS_ENDPOINT_URL_STS"], "http://mock:4566")
+
+    def test_aws_endpoint_url_is_absent_from_a_credential_without_it(self):
+        injector = self._injector(AWS_ACCESS_KEY_PAYLOAD)
+        injector.process_message(_data({}, AWS_TECH_CONTRACT, ATTACHMENTS))
+        env = self._detonate_env(injector)
+        self.assertNotIn("AWS_ENDPOINT_URL", env)
+        self.assertNotIn("AWS_ENDPOINT_URL_STS", env)
+
+    def test_gcp_oauth2_sovereign_values_are_applied(self):
+        payload = _with_values(
+            GCP_OAUTH2_PAYLOAD,
+            gcp_custom_token_uri="http://mock/token",
+            gcp_custom_iam_uri="http://mock/iam",
+            gcp_custom_oauth_access_token="ref-oauth-token",
+        )
+        injector = self._injector(payload)
+        injector.process_message(_data({}, GCP_TECH_CONTRACT, ATTACHMENTS))
+        self.assertEqual(self._callback(injector)["execution_status"], "SUCCESS")
+        env = self._detonate_env(injector)
+        self.assertEqual(env["GOOGLE_OAUTH2_TOKEN_URI_OVERRIDE"], "http://mock/token")
+        self.assertEqual(env["GOOGLE_IAM_CUSTOM_ENDPOINT"], "http://mock/iam")
+        self.assertEqual(env["GOOGLE_OAUTH_ACCESS_TOKEN"], "ref-oauth-token")
+        self.assertNotIn("GOOGLE_RESOURCE_MANAGER_CUSTOM_ENDPOINT", env)
+        self._assert_no_secret_reported(injector)
+
+    def test_gcp_service_account_resource_manager_uri_is_applied(self):
+        payload = _with_values(
+            GCP_SERVICE_ACCOUNT_PAYLOAD,
+            gcp_custom_resource_manager_uri="http://mock/resource-manager",
+        )
+        injector = self._injector(payload)
+        injector.process_message(_data({}, GCP_TECH_CONTRACT, ATTACHMENTS))
+        env = self._detonate_env(injector)
+        self.assertEqual(
+            env["GOOGLE_RESOURCE_MANAGER_CUSTOM_ENDPOINT"],
+            "http://mock/resource-manager",
+        )
+        self.assertNotIn("GOOGLE_OAUTH2_TOKEN_URI_OVERRIDE", env)
+
+    def test_gcp_credentials_without_sovereign_values_keep_the_official_endpoints(self):
+        for payload in (GCP_OAUTH2_PAYLOAD, GCP_SERVICE_ACCOUNT_PAYLOAD):
+            with self.subTest(secret_type=payload["type"]):
+                injector = self._injector(payload)
+                injector.process_message(_data({}, GCP_TECH_CONTRACT, ATTACHMENTS))
+                env = self._detonate_env(injector)
+                self.assertFalse(
+                    {
+                        "GOOGLE_OAUTH2_TOKEN_URI_OVERRIDE",
+                        "GOOGLE_IAM_CUSTOM_ENDPOINT",
+                        "GOOGLE_OAUTH_ACCESS_TOKEN",
+                        "GOOGLE_RESOURCE_MANAGER_CUSTOM_ENDPOINT",
+                    }
+                    & set(env)
+                )
+
+    def test_azure_authority_host_is_normalized_and_applied(self):
+        managed_identity = {
+            "type": "AZURE_MANAGED_IDENTITY",
+            "value": {
+                "azure_environment": "AzureCloud",
+                "azure_subscription_id": "ref-subscription",
+            },
+        }
+        for payload in (AZURE_SERVICE_PRINCIPAL_PAYLOAD, managed_identity):
+            for uri in ("http://mock:8080", "http://mock:8080/"):
+                with self.subTest(secret_type=payload["type"], uri=uri):
+                    injector = self._injector(
+                        _with_values(payload, azure_authority_host_uri=uri)
+                    )
+                    injector.process_message(
+                        _data(AZURE_CONTENT, AZURE_CUSTOM_CONTRACT, ATTACHMENTS)
+                    )
+                    self.assertEqual(
+                        self._callback(injector)["execution_status"], "SUCCESS"
+                    )
+                    env = self._detonate_env(injector)
+                    self.assertEqual(env["AZURE_AUTHORITY_HOST"], "http://mock:8080/")
+                    self.assertEqual(
+                        env["AZURE_POD_IDENTITY_AUTHORITY_HOST"], "http://mock:8080/"
+                    )
+                    self.assertNotIn("REQUESTS_CA_BUNDLE", env)
+                    self.assertNotIn("SSL_CERT_FILE", env)
+
+    def test_azure_without_sovereign_values_uses_the_official_authority(self):
+        injector = self._injector(AZURE_SERVICE_PRINCIPAL_PAYLOAD)
+        injector.process_message(
+            _data(AZURE_CONTENT, AZURE_CUSTOM_CONTRACT, ATTACHMENTS)
+        )
+        env = self._detonate_env(injector)
+        self.assertEqual(
+            env["AZURE_AUTHORITY_HOST"], "https://login.microsoftonline.com/"
+        )
+        self.assertNotIn("AZURE_POD_IDENTITY_AUTHORITY_HOST", env)
+
+    def test_azure_certificate_is_trusted_by_python_and_go_then_removed(self):
+        seen = {}
+
+        def _detonate(technique_id, env, **kwargs):
+            seen["env"] = dict(env)
+            with open(env["REQUESTS_CA_BUNDLE"], "rb") as handle:
+                seen["content"] = handle.read()
+            return StratusResult(
+                success=True, technique_id=technique_id, status="DETONATED", message=""
+            )
+
+        payload = _with_values(
+            AZURE_SERVICE_PRINCIPAL_PAYLOAD,
+            azure_requests_certificate=base64.b64encode(
+                SOVEREIGN_CA_CERTIFICATE
+            ).decode(),
+        )
+        injector = self._injector(payload, detonate=_detonate)
+        injector.process_message(
+            _data(AZURE_CONTENT, AZURE_CUSTOM_CONTRACT, ATTACHMENTS)
+        )
+        self.assertEqual(self._callback(injector)["execution_status"], "SUCCESS")
+        env = seen["env"]
+        self.assertEqual(env["REQUESTS_CA_BUNDLE"], env["SSL_CERT_FILE"])
+        self.assertEqual(seen["content"], SOVEREIGN_CA_CERTIFICATE)
+        self.assertFalse(os.path.exists(env["REQUESTS_CA_BUNDLE"]))
+        self.assertFalse(os.path.exists(os.path.dirname(env["REQUESTS_CA_BUNDLE"])))
+        self._assert_no_secret_reported(injector)
+
+    def test_azure_certificate_is_removed_when_detonate_raises(self):
+        payload = _with_values(
+            AZURE_SERVICE_PRINCIPAL_PAYLOAD,
+            azure_requests_certificate=base64.b64encode(
+                SOVEREIGN_CA_CERTIFICATE
+            ).decode(),
+        )
+        injector = self._injector(payload, detonate=RuntimeError("boom"))
+        injector.process_message(
+            _data(AZURE_CONTENT, AZURE_CUSTOM_CONTRACT, ATTACHMENTS)
+        )
+        self.assertEqual(self._callback(injector)["execution_status"], "ERROR")
+        path = self._detonate_env(injector)["REQUESTS_CA_BUNDLE"]
+        self.assertFalse(os.path.exists(path))
+        self.assertFalse(os.path.exists(os.path.dirname(path)))
+
+    def test_invalid_certificate_is_reported_without_its_value(self):
+        payload = _with_values(
+            AZURE_SERVICE_PRINCIPAL_PAYLOAD, azure_requests_certificate="not base64 !"
+        )
+        injector = self._injector(payload)
+        injector.process_message(
+            _data(AZURE_CONTENT, AZURE_CUSTOM_CONTRACT, ATTACHMENTS)
+        )
+        injector.stratus.detonate.assert_not_called()
+        callback = self._callback(injector)
+        self.assertEqual(callback["execution_status"], "ERROR")
+        self.assertNotIn("not base64", json.dumps(callback))
+
 
 class StratusExecutorTest(TestCase):
     @patch("injector_common.stratus_executor.subprocess.run")
@@ -676,6 +873,34 @@ class StratusExecutorTest(TestCase):
         self.assertEqual(run_env["AWS_ACCESS_KEY_ID"], "resolved")
         self.assertEqual(run_env["STRATUS_KEEP_ME"], "kept")
         self.assertNotIn("host", run_env.values())
+
+    @patch("injector_common.stratus_executor.subprocess.run")
+    def test_isolation_drops_host_sovereign_cloud_variables(self, run):
+        run.return_value = MagicMock(returncode=0, stdout="", stderr="")
+        host = {
+            "AWS_ENDPOINT_URL": "host",
+            "AWS_ENDPOINT_URL_STS": "host",
+            "AZURE_AUTHORITY_HOST": "host",
+            "AZURE_POD_IDENTITY_AUTHORITY_HOST": "host",
+            "GOOGLE_OAUTH2_TOKEN_URI_OVERRIDE": "host",
+            "GOOGLE_IAM_CUSTOM_ENDPOINT": "host",
+            "GOOGLE_OAUTH_ACCESS_TOKEN": "host",
+            "GOOGLE_RESOURCE_MANAGER_CUSTOM_ENDPOINT": "host",
+            "REQUESTS_CA_BUNDLE": "/host/ca.pem",
+        }
+        with patch.dict(os.environ, host):
+            StratusExecutor().detonate(
+                "aws.foo",
+                env={"AWS_ENDPOINT_URL": "resolved"},
+                isolate_host_credentials=True,
+            )
+        run_env = run.call_args.kwargs["env"]
+        self.assertEqual(run_env["AWS_ENDPOINT_URL"], "resolved")
+        for name in host:
+            if name not in ("AWS_ENDPOINT_URL", "REQUESTS_CA_BUNDLE"):
+                self.assertNotIn(name, run_env)
+        # Not a cloud credential: a trust store of the host (proxy) is kept.
+        self.assertEqual(run_env["REQUESTS_CA_BUNDLE"], "/host/ca.pem")
 
     @patch("injector_common.stratus_executor.subprocess.run")
     def test_detonate_appends_cleanup_flag(self, run):
