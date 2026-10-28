@@ -138,12 +138,12 @@ def test_registry_has_32_canonical_contracts_with_exact_provider_fields() -> Non
         content = json.loads(item["contract_content"])
         assert service.casefold() in content["label"]["en"].casefold()
         assert tuple(field["key"] for field in content["fields"]) == (
+            CREDENTIAL_REFERENCE_KEY,
             "azure_tenant_id",
             "azure_client_id",
             "azure_client_secret",
             "azure_subscription_id",
             "azure_provider",
-            CREDENTIAL_REFERENCE_KEY,
         )
         assert all(route in output["labels"] for output in content["outputs"])
 
@@ -404,7 +404,7 @@ def test_runtime_one_call_exact_service_argv_outputs_and_canaries(
         "--output-filename",
         "findings",
         "-z",
-        "--only-logs",
+        "-b",
         "--no-color",
         "-M",
         "json-ocsf",

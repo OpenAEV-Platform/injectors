@@ -85,7 +85,7 @@ def test_provider_select_parses_each_provider_to_strict_model(
     form = {**provider_forms[provider], PROVIDER_KEY: [provider]}
     parsed = contract.parse_input(form)
     fixed = _fixed(provider)
-    expected = fixed.parse_input(dict(provider_forms[provider]))
+    expected = fixed.parse_input(provider_forms[provider])
     assert type(parsed) is type(expected)
     assert parsed == expected
     # Explicit empty scope selects mean the same "none" scope.
@@ -430,7 +430,7 @@ def test_aws_empty_optional_normalization_only_when_aws_selected(
         "aws_session_token": "",
     }
     fixed = _fixed("aws")
-    expected = fixed.parse_input(dict(aws_form))
+    expected = fixed.parse_input(aws_form)
     contract = _contract()
     parsed = contract.parse_input({**aws_form, PROVIDER_KEY: ["aws"]})
     assert parsed == expected

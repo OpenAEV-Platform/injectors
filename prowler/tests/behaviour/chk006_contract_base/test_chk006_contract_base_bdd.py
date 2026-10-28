@@ -85,7 +85,10 @@ AWS_CREDENTIAL_TEXT_KEYS = (
     "aws_endpoint_url",
     "aws_session_token",
 )
-AWS_FIELD_KEYS = (*AWS_CREDENTIAL_TEXT_KEYS, CREDENTIAL_REFERENCE_KEY)
+AWS_FIELD_KEYS = (
+    CREDENTIAL_REFERENCE_KEY,
+    *AWS_CREDENTIAL_TEXT_KEYS,
+)
 
 
 def _contract_class(provider: str, **overrides: Any) -> type[Any]:
@@ -146,12 +149,19 @@ def test_minimal_subclass_builds_provider_specific_openaev_contract() -> None:
     assert fields["aws_endpoint_url"].label == "AWS endpoint URL (optional)"
     assert fields["aws_endpoint_url"].mandatory is False
     assert fields["aws_session_token"].mandatory is False
+    # The credential picker is never required by the form, nor conditional.
     assert fields[CREDENTIAL_REFERENCE_KEY].mandatory is False
+    assert fields[CREDENTIAL_REFERENCE_KEY].visibleConditionFields == []
+    assert fields[CREDENTIAL_REFERENCE_KEY].mandatoryConditionFields == []
+    # No credential carries the account: it stays mandatory on its own.
+    assert fields["aws_account_id"].mandatory is True
+    assert fields["aws_account_id"].visibleConditionFields == []
+    # The fields a credential provides are shown with the picker, not required.
     assert all(
-        field.mandatory
-        for key, field in fields.items()
-        if key
-        not in {"aws_endpoint_url", "aws_session_token", CREDENTIAL_REFERENCE_KEY}
+        fields[key].mandatory is False
+        and fields[key].visibleConditionFields == []
+        and fields[key].mandatoryConditionFields == []
+        for key in ("aws_access_key_id", "aws_secret_access_key", "aws_region")
     )
 
 

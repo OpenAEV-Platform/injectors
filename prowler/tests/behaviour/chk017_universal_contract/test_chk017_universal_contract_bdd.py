@@ -133,8 +133,8 @@ def _expected_credential_fields() -> list[tuple[str, str, bool]]:
     """Derive the fifteen credential fields from the four fixed contracts.
 
     The credential reference is excluded: its key is pinned by pyoaev, so the
-    universal form carries exactly one unconditioned copy rather than one per
-    provider.
+    universal form carries one copy.
+    The flag tells whether the field is required, alone or conditionally.
     """
     expected: list[tuple[str, str, bool]] = []
     for provider in ("aws", "azure", "gcp", "kubernetes"):
@@ -142,7 +142,8 @@ def _expected_credential_fields() -> list[tuple[str, str, bool]]:
         for element in fixed.build_provider_fields():
             if element.key == CREDENTIAL_REFERENCE_KEY:
                 continue
-            expected.append((provider, element.key, element.mandatory))
+            mandatory = element.mandatory or bool(element.mandatoryConditionFields)
+            expected.append((provider, element.key, mandatory))
     return expected
 
 
@@ -185,22 +186,24 @@ def test_form_conditions_every_credential_field_on_provider_select() -> None:
     assert credential_reference["cardinality"] == "1"
     # The provider is chosen through PROVIDER_KEY, so no CredentialType filter.
     assert credential_reference["credential_reference_type"] is None
-    assert credential_reference["visibleConditionFields"] == []
+    # Shown for a credential provider, next to its legacy credential fields.
+    assert credential_reference["visibleConditionValues"] == {
+        PROVIDER_KEY: ["aws", "azure", "gcp"]
+    }
+    assert credential_reference["mandatoryConditionFields"] == []
     mandatory_count = 0
     for field_entry, (provider, _key, base_mandatory) in zip(
         fields[2:17], expected_credential, strict=True
     ):
-        assert field_entry["visibleConditionFields"] == [PROVIDER_KEY]
-        assert field_entry["visibleConditionValues"] == {PROVIDER_KEY: provider}
         assert field_entry["mandatory"] is False
+        assert field_entry["mandatoryGroups"] == []
+        assert field_entry["visibleConditionValues"] == {PROVIDER_KEY: provider}
         if base_mandatory:
             mandatory_count += 1
-            assert field_entry["mandatoryConditionFields"] == [PROVIDER_KEY]
             assert field_entry["mandatoryConditionValues"] == {PROVIDER_KEY: provider}
         else:
             assert field_entry["mandatoryConditionFields"] == []
-            assert field_entry["mandatoryConditionValues"] == {}
-    assert mandatory_count == 13
+    assert mandatory_count == 3
     for provider, select in zip(("aws", "azure", "gcp"), fields[17:20], strict=True):
         assert select["type"] == "select"
         assert select["mandatory"] is False
@@ -499,7 +502,7 @@ def test_failed_universal_run_preserves_error_unchanged() -> None:
 
     fixed = _contract("gcp/compute")
     fixed._client_factory = _ClientFactory(failed)
-    fixed_parsed = fixed.parse_input(dict(PROVIDER_FORMS["gcp"]))
+    fixed_parsed = fixed.parse_input(PROVIDER_FORMS["gcp"])
     fixed_outcome = fixed.execute(ProwlerConfig(), fixed_parsed)
 
     assert len(universal_factory.calls) == 1

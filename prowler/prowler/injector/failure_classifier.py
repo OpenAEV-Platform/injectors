@@ -4,6 +4,13 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Literal
 
+from pyoaev.credential import (
+    CredentialErrorCode,
+    CredentialResolutionError,
+    CredentialType,
+    credential_error_guidance,
+)
+
 from prowler._core.cli_engine import CliEngineError, ExecutionError, ParsingError
 from prowler._core.prowler_client import (
     OutputArtifactError,
@@ -11,11 +18,21 @@ from prowler._core.prowler_client import (
     OutputWorkspacePreparationError,
 )
 from prowler.contracts.base import ContractExecutionOutcome, ContractInputError
+from prowler.injector.authentication import (
+    AwsAccountMismatchError,
+    CredentialScopeMissingError,
+)
 from prowler.injector.failure_taxonomy import (
     _ALLOWED_CLI_FAILURE_KINDS,
     _ALLOWED_ISSUE_LOCATIONS,
     _ALLOWED_ISSUE_TYPES,
     _ARTIFACT_FAILURE_KIND,
+    _CREDENTIAL_CODE_BY_FAILURE_KIND,
+    _CREDENTIAL_FAILURE_KIND_BY_CODE,
+    _CREDENTIAL_GUIDANCE_BY_FAILURE_KIND,
+    _CREDENTIAL_REFERENCE_PATTERN,
+    _CREDENTIAL_REFERENCE_SENTINEL,
+    _CREDENTIAL_SUMMARY_BY_FAILURE_KIND,
     _GENERIC_INPUT_GUIDANCE,
     _GUIDANCE_BY_FAILURE_KIND,
     _ISSUE_FIELD_LABELS,
@@ -37,6 +54,7 @@ from prowler.injector.failure_taxonomy import (
     _SUMMARY_BY_FAILURE_KIND,
     _ArtifactFailure,
     _AssessmentFailure,
+    _CredentialFailure,
     _ExecutableEvidence,
     _FailurePresentation,
     _InputValidationFailure,
@@ -252,6 +270,12 @@ class FailureClassifier:
         configured_executable: object | None = None,
     ) -> _FailurePresentation:
         """Classify a raised failure without reading its text or representation."""
+        if isinstance(error, CredentialResolutionError):
+            return self._classify_credential_failure(stage, error)
+        if isinstance(error, AwsAccountMismatchError):
+            return self._account_mismatch_failure(stage, error)
+        if isinstance(error, CredentialScopeMissingError):
+            return self._scope_missing_failure(stage, error)
         if stage == "input_validation" and isinstance(error, ContractInputError):
             issues, omitted, truncated = self._safe_input_issues(error)
             return _InputValidationFailure(
@@ -303,6 +327,113 @@ class FailureClassifier:
             failure_summary=_SUMMARY_BY_FAILURE_KIND["unexpected_failure"],
             operator_guidance=_GUIDANCE_BY_FAILURE_KIND["unexpected_failure"],
             evidence=executable,
+        )
+
+    def _classify_credential_failure(
+        self, stage: str, error: CredentialResolutionError
+    ) -> _FailurePresentation:
+        """Classify a credential error by its closed code, at any stage.
+
+        An unknown code is reported as an access denial, like pyoaev does, so
+        that nothing about the credential leaks.
+        """
+        code = getattr(error.code, "value", None)
+        failure_kind = _CREDENTIAL_FAILURE_KIND_BY_CODE.get(
+            code if isinstance(code, str) else "", "credential_access_denied"
+        )
+        return self._credential_failure(
+            stage,
+            failure_kind,
+            reference=error.reference,
+            expected_type=error.expected_type,
+        )
+
+    @staticmethod
+    def _credential_failure(
+        stage: str,
+        failure_kind: str,
+        *,
+        reference: object = None,
+        expected_type: object = None,
+    ) -> _CredentialFailure:
+        """Render the fixed taxonomy messages with the reference id only."""
+        safe_reference = (
+            reference
+            if isinstance(reference, str)
+            and _CREDENTIAL_REFERENCE_PATTERN.fullmatch(reference)
+            else None
+        )
+        guidance = _CREDENTIAL_GUIDANCE_BY_FAILURE_KIND[failure_kind]
+        if failure_kind == "credential_incompatible" and isinstance(
+            expected_type, CredentialType
+        ):
+            guidance = credential_error_guidance(
+                CredentialErrorCode.CREDENTIAL_INCOMPATIBLE, expected_type
+            )
+        return _CredentialFailure(
+            stage=stage,
+            failure_kind=failure_kind,
+            failure_summary=_CREDENTIAL_SUMMARY_BY_FAILURE_KIND[failure_kind].format(
+                reference=safe_reference or _CREDENTIAL_REFERENCE_SENTINEL
+            ),
+            operator_guidance=guidance,
+            credential_error_code=_CREDENTIAL_CODE_BY_FAILURE_KIND[failure_kind],
+            credential_reference=safe_reference,
+        )
+
+    @staticmethod
+    def _account_mismatch_failure(
+        stage: str, error: AwsAccountMismatchError
+    ) -> _CredentialFailure:
+        """Render the account mismatch with the reference and account IDs only."""
+        reference = error.reference
+        safe_reference = (
+            reference
+            if isinstance(reference, str)
+            and _CREDENTIAL_REFERENCE_PATTERN.fullmatch(reference)
+            else None
+        )
+        kind = "credential_account_mismatch"
+        return _CredentialFailure(
+            stage=stage,
+            failure_kind=kind,
+            failure_summary=_CREDENTIAL_SUMMARY_BY_FAILURE_KIND[kind].format(
+                reference=safe_reference or _CREDENTIAL_REFERENCE_SENTINEL,
+                credential_account=_aws_account_or_unknown(error.credential_account),
+                expected_account=_aws_account_or_unknown(error.expected_account),
+            ),
+            operator_guidance=_CREDENTIAL_GUIDANCE_BY_FAILURE_KIND[kind],
+            credential_error_code=_CREDENTIAL_CODE_BY_FAILURE_KIND[kind],
+            credential_reference=safe_reference,
+        )
+
+    @staticmethod
+    def _scope_missing_failure(
+        stage: str, error: CredentialScopeMissingError
+    ) -> _CredentialFailure:
+        """Render the missing scope with the reference and field labels only."""
+        reference = error.reference
+        safe_reference = (
+            reference
+            if isinstance(reference, str)
+            and _CREDENTIAL_REFERENCE_PATTERN.fullmatch(reference)
+            else None
+        )
+        fields = " and ".join(
+            _ISSUE_FIELD_LABELS.get(field, _ISSUE_LOCATION_SENTINEL)
+            for field in error.fields
+        )
+        kind = "credential_scope_missing"
+        return _CredentialFailure(
+            stage=stage,
+            failure_kind=kind,
+            failure_summary=_CREDENTIAL_SUMMARY_BY_FAILURE_KIND[kind].format(
+                reference=safe_reference or _CREDENTIAL_REFERENCE_SENTINEL,
+                fields=fields or _ISSUE_LOCATION_SENTINEL,
+            ),
+            operator_guidance=_CREDENTIAL_GUIDANCE_BY_FAILURE_KIND[kind],
+            credential_error_code=_CREDENTIAL_CODE_BY_FAILURE_KIND[kind],
+            credential_reference=safe_reference,
         )
 
     def _classify_artifact_failure(
@@ -458,3 +589,10 @@ class FailureClassifier:
                 truncated = True
             issues.append({"location": location, "type": error_type})
         return issues, omitted, truncated
+
+
+def _aws_account_or_unknown(value: object) -> str:
+    """Keep only a 12-digit AWS account ID in a rendered message."""
+    if isinstance(value, str) and len(value) == 12 and value.isdigit():
+        return value
+    return "unknown"

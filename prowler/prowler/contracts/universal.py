@@ -5,19 +5,20 @@ from typing import ClassVar, Mapping, Sequence, cast, get_args
 
 from pyoaev.contracts.contract_config import ContractElement, ContractSelect
 from pyoaev.contracts.contract_utils import ContractCardinality
+from pyoaev.credential import CredentialAttachment
 from pyoaev.credential.utils import build_single_referenced_credential_element
 
 from prowler._core.prowler_client import ComplianceSelector, ServiceSelector
 from prowler.models.configs.config_loader import ProwlerConfig
 from prowler.models.findings import OcsfPreviewRecord, OpenAevFinding
 from prowler.models.provider_inputs import (
-    AwsProviderInput,
-    AzureProviderInput,
-    GcpProviderInput,
-    KubernetesProviderInput,
+    AWS_PROVIDER_INPUTS,
+    AZURE_PROVIDER_INPUTS,
+    GCP_PROVIDER_INPUTS,
+    KUBERNETES_PROVIDER_INPUTS,
     ProviderInput,
     ProviderInputError,
-    parse_provider_input,
+    validate_provider_input,
 )
 from prowler.services.output_trace import generate
 
@@ -26,8 +27,13 @@ from .base import (
     ClientFactoryPort,
     ContractExecutionOutcome,
 )
-from .provider_fields import _PROVIDER_FIELDS, ProviderName
-from .provider_fields import build_provider_fields as _build_provider_fields
+from .provider_fields import (
+    _PROVIDER_FIELDS,
+    CREDENTIAL_MANAGER_PROVIDERS,
+    PROVIDER_LABELS,
+    ProviderName,
+    build_provider_field,
+)
 from .registry import stable_contract_id
 from .selectable import SERVICE_SELECT_VALUES, STATIC_SELECT_LABELS
 from .selection import (
@@ -55,19 +61,18 @@ SERVICE_KEYS: Mapping[str, str] = {
     "gcp": "prowler_service_gcp",
 }
 COMPLIANCE_KEY = "prowler_compliance"
-_SELECT_KEYS = (PROVIDER_KEY, *SERVICE_KEYS.values(), COMPLIANCE_KEY)
+_SELECT_KEYS = (
+    PROVIDER_KEY,
+    *SERVICE_KEYS.values(),
+    COMPLIANCE_KEY,
+)
 NONE_SCOPE = "__none__"
 NONE_SCOPE_LABEL = "None (base scan)"
-PROVIDER_SELECT_VALUES = ("aws", "azure", "gcp", "kubernetes")
-
-# Human labels for the provider select and the two literals that
-# selectable.STATIC_SELECT_LABELS does not cover.
 PROVIDER_SELECT_LABELS: Mapping[str, str] = {
-    "aws": "AWS",
-    "azure": "Azure",
-    "gcp": "GCP",
-    "kubernetes": "Kubernetes",
+    str(provider): label for provider, label in PROVIDER_LABELS.items()
 }
+PROVIDER_SELECT_VALUES = tuple(PROVIDER_SELECT_LABELS)
+# Human labels for the two literals selectable.STATIC_SELECT_LABELS lacks.
 KUBERNETES_STATIC_SELECT_LABELS: Mapping[str, str] = {
     "cis_1.12_kubernetes": "CIS 1.12 (Kubernetes)",
     "iso27001_2022_kubernetes": "ISO 27001:2022 (Kubernetes)",
@@ -108,7 +113,7 @@ COMPLIANCE_SCOPE_BY_ROUTE: Mapping[str, ScopeOption] = {
 def _service_scope_label(option: "ScopeOption") -> str:
     """Build the provider-qualified label for one service scope option."""
     label = STATIC_SELECT_LABELS[option.literal]
-    return f"{label} ({PROVIDER_SELECT_LABELS[option.provider]})"
+    return f"{label} ({PROVIDER_LABELS[cast(ProviderName, option.provider)]})"
 
 
 SERVICE_SCOPE_CHOICES: Mapping[str, str] = {
@@ -158,14 +163,24 @@ class UniversalProwlerContract(SelectionScopedContract):
 
         pyoaev pins one immutable key on every credential-reference element, so
         the four provider field sets cannot each contribute one without
-        colliding. This form therefore exposes exactly one unconditioned
-        credential reference, built from the ``all`` meta-token so the platform
-        applies no provider-specific credential filter: the operator picks the
-        provider through ``prowler_provider`` instead.
+        colliding. This form therefore exposes exactly one credential
+        reference, built from the ``all`` meta-token so the platform applies no
+        provider-specific credential filter.
+
+        The picker is shown for the providers with a platform credential type,
+        next to their legacy credential fields, and is not required: an inject
+        without a credential is validated against the legacy fields.
         """
+        reference = build_single_referenced_credential_element(self.provider)
+        reference.visibleConditionFields = [PROVIDER_KEY]
+        reference.visibleConditionValues = {
+            PROVIDER_KEY: list(CREDENTIAL_MANAGER_PROVIDERS)
+        }
+        reference.mandatoryConditionFields = []
+        reference.mandatoryConditionValues = {}
         fields: list[ContractElement] = [
             self._build_provider_select(),
-            build_single_referenced_credential_element(self.provider),
+            reference,
         ]
         for provider_name in _CREDENTIAL_FIELD_KEYS:
             fields.extend(self._build_credential_group(provider_name))
@@ -194,23 +209,22 @@ class UniversalProwlerContract(SelectionScopedContract):
 
     @staticmethod
     def _build_credential_group(provider_name: ProviderName) -> list[ContractElement]:
-        """Build one provider's credentials conditioned on its provider select."""
-        fields = [
-            element
-            for element in _build_provider_fields(provider_name)
-            if element.key != CREDENTIAL_REFERENCE_KEY
+        """Build one provider's fields, shown for that provider.
+
+        The fields a credential provides are not marked required: a credential
+        reference replaces them, so a missing one is reported when the inject
+        is parsed without a reference. The other fields stay required for
+        their provider.
+        """
+        provider_condition: dict[str, str | list[str]] = {PROVIDER_KEY: provider_name}
+        return [
+            build_provider_field(
+                specification,
+                mandatory=specification.mandatory and not specification.from_credential,
+                condition=provider_condition,
+            )
+            for specification in _PROVIDER_FIELDS[provider_name]
         ]
-        for element in fields:
-            element.visibleConditionFields = [PROVIDER_KEY]
-            element.visibleConditionValues = {PROVIDER_KEY: provider_name}
-            if element.mandatory:
-                element.mandatoryConditionFields = [PROVIDER_KEY]
-                element.mandatoryConditionValues = {PROVIDER_KEY: provider_name}
-                element.mandatory = False
-            else:
-                element.mandatoryConditionFields = []
-                element.mandatoryConditionValues = {}
-        return fields
 
     @staticmethod
     def _build_service_scope_select(
@@ -253,13 +267,24 @@ class UniversalProwlerContract(SelectionScopedContract):
             mandatoryConditionValues={},
         )
 
-    def parse_input(self, raw_input: Mapping[str, object]) -> ProviderInput:
-        """Validate the closed selects before the strict provider model."""
+    def parse_input(
+        self,
+        raw_input: Mapping[str, object],
+        *,
+        credential_attachment: CredentialAttachment | None = None,
+    ) -> ProviderInput:
+        """Validate the closed selects before the strict provider model.
+
+        The attached credential picks the path. With one, only the selected
+        provider's reference model is validated: its credential fields are
+        ignored, like every other provider's. Without one, the strict legacy
+        model is validated.
+        """
         # Clear this thread's selection before any rejection path can run,
         # so no early return can expose a selection from an earlier parse.
         self._clear_selection("provider", "service_route", "compliance_route")
         forbid_provider_key(raw_input)
-        selected_provider = self._parse_provider_select(raw_input)
+        selected_provider = cast(ProviderName, self._parse_provider_select(raw_input))
         service_key = SERVICE_KEYS.get(selected_provider)
         service_route = self._parse_scope_select(
             raw_input,
@@ -274,7 +299,7 @@ class UniversalProwlerContract(SelectionScopedContract):
         )
         candidate = self._build_provider_candidate(raw_input, selected_provider)
         try:
-            parsed = parse_provider_input(candidate)
+            parsed = validate_provider_input(candidate, credential_attachment)
         except ProviderInputError as error:
             raise translate_provider_input_error(error) from None
         self._selection.provider = selected_provider
@@ -399,12 +424,12 @@ class UniversalProwlerContract(SelectionScopedContract):
     def _provider_model_matches(provider_name: str, provider: ProviderInput) -> bool:
         """Return True only when the model class matches the held provider name."""
         if provider_name == "aws":
-            return type(provider) is AwsProviderInput
+            return type(provider) in AWS_PROVIDER_INPUTS
         if provider_name == "azure":
-            return type(provider) is AzureProviderInput
+            return type(provider) in AZURE_PROVIDER_INPUTS
         if provider_name == "gcp":
-            return type(provider) is GcpProviderInput
-        return type(provider) is KubernetesProviderInput
+            return type(provider) in GCP_PROVIDER_INPUTS
+        return type(provider) in KUBERNETES_PROVIDER_INPUTS
 
     def _provider_findings(
         self, findings: Sequence[OpenAevFinding]

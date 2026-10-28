@@ -122,6 +122,7 @@ def test_serialized_form_has_one_closed_select_after_provider_fields(
     )
     content = json.loads(str(item["contract_content"]))
     fields = content["fields"]
+    # The scope select is the only select.
     select_fields = [f for f in fields if f["type"] == "select"]
     assert len(select_fields) == 1
     select = select_fields[0]

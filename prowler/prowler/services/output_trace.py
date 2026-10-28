@@ -167,17 +167,26 @@ def _raw_preview_renderables(
         ]
         usable_cloud = [part for part in cloud_parts if part != "-"]
         cloud = " / ".join(usable_cloud) if usable_cloud else provider_uid
+        # Text cells: the values are cloud data, never Rich markup. A resource UID
+        # such as "/subscriptions/<id>" in brackets would otherwise be read as a
+        # closing tag and fail the whole trace.
         table.add_row(
-            str(index),
-            _joined_preview_cell(
-                preview, "finding_title", "finding_uid", max_cell_length
+            Text(str(index)),
+            Text(
+                _joined_preview_cell(
+                    preview, "finding_title", "finding_uid", max_cell_length
+                )
             ),
-            _joined_preview_cell(preview, "status", "status_code", max_cell_length),
-            _format_cell(preview.get("severity", _MISSING), max_cell_length),
-            _joined_preview_cell(
-                preview, "resource_name", "resource_uid", max_cell_length
+            Text(
+                _joined_preview_cell(preview, "status", "status_code", max_cell_length)
             ),
-            _format_cell(cloud, max_cell_length),
+            Text(_format_cell(preview.get("severity", _MISSING), max_cell_length)),
+            Text(
+                _joined_preview_cell(
+                    preview, "resource_name", "resource_uid", max_cell_length
+                )
+            ),
+            Text(_format_cell(cloud, max_cell_length)),
         )
     omitted = max(0, raw_record_count - len(previews))
     return [
