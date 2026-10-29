@@ -561,6 +561,64 @@ class ProcessMessageCredentialReferenceTest(TestCase):
         self.assertEqual(env["AWS_DEFAULT_REGION"], "us-west-2")
         self.assertEqual(env["AWS_PROFILE"], "srt-target")
 
+    def test_instance_default_hands_the_host_identity_over(self):
+        payload = {
+            "type": "AWS_ASSUME_ROLE",
+            "value": {
+                "aws_role_arn": "arn:aws:iam::123456789012:role/r",
+                "aws_source_identity_type": "INSTANCE_DEFAULT",
+                "aws_default_region": "us-west-2",
+            },
+        }
+        host = {
+            "AWS_ACCESS_KEY_ID": "AKIA-HOST",
+            "AWS_SECRET_ACCESS_KEY": "host-secret",
+            "AWS_EC2_METADATA_SERVICE_ENDPOINT": "http://127.0.0.1:1338",
+            "AWS_PROFILE": "host",
+            "AWS_REGION": "eu-west-3",
+            "AWS_CONFIG_FILE": "host-config",
+        }
+        with patch.dict(os.environ, host):
+            injector = self._injector(payload)
+            injector.process_message(_data({}, AWS_TECH_CONTRACT, ATTACHMENTS))
+        env = self._detonate_env(injector)
+        self.assertEqual(env["AWS_ACCESS_KEY_ID"], "AKIA-HOST")
+        self.assertEqual(env["AWS_SECRET_ACCESS_KEY"], "host-secret")
+        self.assertEqual(
+            env["AWS_EC2_METADATA_SERVICE_ENDPOINT"], "http://127.0.0.1:1338"
+        )
+        # The profile, region and config file are the credential's, not the host's.
+        self.assertEqual(env["AWS_PROFILE"], "srt-target")
+        self.assertEqual(env["AWS_REGION"], "us-west-2")
+        self.assertNotEqual(env["AWS_CONFIG_FILE"], "host-config")
+
+    def test_instance_default_without_host_variables_adds_nothing(self):
+        payload = {
+            "type": "AWS_ASSUME_ROLE",
+            "value": {
+                "aws_role_arn": "arn:aws:iam::123456789012:role/r",
+                "aws_source_identity_type": "INSTANCE_DEFAULT",
+                "aws_default_region": "us-west-2",
+            },
+        }
+        with patch.dict(os.environ, clear=False):
+            for name in mod.AWS_INSTANCE_IDENTITY_VARIABLES:
+                os.environ.pop(name, None)
+            injector = self._injector(payload)
+            injector.process_message(_data({}, AWS_TECH_CONTRACT, ATTACHMENTS))
+        env = self._detonate_env(injector)
+        for name in mod.AWS_INSTANCE_IDENTITY_VARIABLES:
+            self.assertNotIn(name, env)
+
+    def test_other_aws_credentials_do_not_get_the_host_identity(self):
+        host = {"AWS_ACCESS_KEY_ID": "AKIA-HOST", "AWS_SESSION_TOKEN": "host-token"}
+        with patch.dict(os.environ, host):
+            injector = self._injector(AWS_ACCESS_KEY_PAYLOAD)
+            injector.process_message(_data({}, AWS_TECH_CONTRACT, ATTACHMENTS))
+        env = self._detonate_env(injector)
+        self.assertEqual(env["AWS_ACCESS_KEY_ID"], "AKIA-REF")
+        self.assertNotIn("AWS_SESSION_TOKEN", env)
+
     def test_resolved_subscription_wins_over_the_inject_fields(self):
         injector = self._injector(AZURE_SERVICE_PRINCIPAL_PAYLOAD)
         content = {
