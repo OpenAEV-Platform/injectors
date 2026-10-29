@@ -415,6 +415,70 @@ def test_account_of_the_credential_is_not_checked_against_the_form_pattern() -> 
     assert executed.effective_aws_account_id == "mock-account"
 
 
+@pytest.mark.parametrize(
+    "form",
+    (
+        {"aws_account_id": "ACCOUNT-CANARY"},
+        {"aws_account_id": ""},
+        {},
+        {"aws_account_id": "ACCOUNT-CANARY", "aws_endpoint_url": "not a url"},
+    ),
+)
+def test_invalid_form_values_are_ignored_when_the_credential_has_them(
+    form: dict[str, str],
+) -> None:
+    payload = {
+        "type": "AWS_ACCESS_KEY",
+        "value": {
+            **AWS_ACCESS_KEY["value"],
+            "aws_account_id": OTHER_ACCOUNT,
+            "aws_endpoint_url": "http://mock.example.test",
+        },
+    }
+
+    callbacks = _process(_helper(payload), form, attachments=ATTACHMENTS)
+
+    assert callbacks[-1]["execution_status"] == "SUCCESS"
+    (executed,) = _Contract.executed
+    assert executed.effective_aws_account_id == OTHER_ACCOUNT
+    assert executed.effective_aws_endpoint_url == "http://mock.example.test"
+
+
+@pytest.mark.parametrize(
+    ("form", "guidance"),
+    (
+        (
+            {"aws_account_id": "ACCOUNT-CANARY"},
+            "AWS account ID must contain exactly 12 ASCII digits.",
+        ),
+        ({"aws_account_id": ""}, "AWS account ID is required."),
+        ({}, "AWS account ID is required."),
+    ),
+)
+def test_invalid_form_account_in_use_is_reported_before_the_scan(
+    form: dict[str, str], guidance: str
+) -> None:
+    (terminal,) = _process(_helper(AWS_ACCESS_KEY), form, attachments=ATTACHMENTS)
+
+    assert terminal["execution_status"] == "ERROR"
+    assert _Contract.executed == []
+    assert guidance in terminal["execution_message"]
+    assert "ACCOUNT-CANARY" not in json.dumps(terminal, default=str)
+
+
+def test_invalid_form_endpoint_in_use_is_reported_before_the_scan() -> None:
+    (terminal,) = _process(
+        _helper(AWS_ACCESS_KEY),
+        {**AWS_FORM, "aws_endpoint_url": "https://user:pass@example.test"},
+        attachments=ATTACHMENTS,
+    )
+
+    assert terminal["execution_status"] == "ERROR"
+    assert _Contract.executed == []
+    assert "AWS endpoint URL has an invalid value." in terminal["execution_message"]
+    assert "user:pass" not in json.dumps(terminal, default=str)
+
+
 def test_form_account_is_used_when_the_credential_has_none() -> None:
     callbacks = _process(_helper(AWS_ACCESS_KEY), AWS_FORM, attachments=ATTACHMENTS)
 
