@@ -1,5 +1,6 @@
 """Strict, secret-safe provider inputs for future OpenAEV form contracts."""
 
+import re
 from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import Annotated, Any, Literal, NoReturn, Self
@@ -359,18 +360,15 @@ class AwsReferenceProviderInput(CredentialReferenceProviderInput):
 
     provider: Literal["aws"]
     # The account and the endpoint of the credential win over these form
-    # values, which stay as the fallback of a credential that has none.
-    aws_account_id: AwsAccountId
+    # values, which are only the fallback of a credential that has none. They
+    # are not checked when the form is parsed: a value the credential
+    # overrides is ignored, so ``form_fallback_issues`` checks the ones in use
+    # once the credential is resolved.
+    aws_account_id: str | None = None
     aws_endpoint_url: str | None = None
 
-    @field_validator("aws_endpoint_url", mode="before")
-    @classmethod
-    def validate_aws_endpoint_url(cls, value: object) -> object:
-        """Accept only absolute HTTP(S) endpoints without unsafe URL extras."""
-        return _validate_aws_endpoint_url(value)
-
     @property
-    def effective_aws_account_id(self) -> str:
+    def effective_aws_account_id(self) -> str | None:
         """Return the account of the credential, else the one of the form.
 
         The credential value is not checked against the form pattern: a
@@ -382,6 +380,26 @@ class AwsReferenceProviderInput(CredentialReferenceProviderInput):
     def effective_aws_endpoint_url(self) -> str | None:
         """Return the endpoint of the credential, else the one of the form."""
         return self.scope_value("aws_endpoint_url") or self.aws_endpoint_url
+
+    def form_fallback_issues(self) -> tuple[tuple[str, str], ...]:
+        """Return the ``(field, error type)`` of each invalid form value in use.
+
+        Only the form values the resolved credential does not override are
+        checked, with the rules of the legacy model: the account must be 12
+        digits, the endpoint a safe HTTP(S) URL.
+        """
+        issues: list[tuple[str, str]] = []
+        if self.scope_value("aws_account_id") is None:
+            if self.aws_account_id is None:
+                issues.append(("aws_account_id", "missing"))
+            elif not re.fullmatch(_AWS_ACCOUNT_ID_PATTERN, self.aws_account_id):
+                issues.append(("aws_account_id", "string_pattern_mismatch"))
+        if self.scope_value("aws_endpoint_url") is None and self.aws_endpoint_url:
+            try:
+                _validate_aws_endpoint_url(self.aws_endpoint_url)
+            except ValueError:
+                issues.append(("aws_endpoint_url", "value_error"))
+        return tuple(issues)
 
     def missing_scope_fields(self) -> tuple[str, ...]:
         """Return ``aws_region`` when the credential has no region."""

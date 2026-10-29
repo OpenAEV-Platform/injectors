@@ -31,6 +31,7 @@ from prowler._core.prowler_client import (
     ProwlerClientFactory,
     TemporaryCredentialLeaseFactory,
     TemporaryOutputWorkspaceFactory,
+    client,
 )
 from prowler._core.prowler_client.provider_adapter import (
     _AWS_INSTANCE_IDENTITY_VARIABLES,
@@ -717,6 +718,45 @@ def test_sovereign_values_never_appear_in_renderings_or_logs(
         assert "CANARY" not in rendering
     for lease in invocation.credential_leases:
         lease.cleanup()
+
+
+def test_system_environment_is_only_added_on_windows(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Python needs SYSTEMROOT and a UTF-8 mode to run Prowler on Windows."""
+    monkeypatch.setattr(client, "_WINDOWS_SYSTEM_VARIABLES", ("SYSTEMROOT",))
+    monkeypatch.setattr(client, "_WINDOWS_FIXED_VARIABLES", (("PYTHONUTF8", "1"),))
+    environment: tuple[tuple[str, Any], ...] = (("AWS_REGION", SecretStr("us-east-1")),)
+    monkeypatch.setenv("SYSTEMROOT", "C:/Windows")
+
+    assert (
+        client._with_system_environment(environment, platform_name="posix")
+        == environment
+    )
+    assert client._with_system_environment(environment, platform_name="nt") == (
+        *environment,
+        ("SYSTEMROOT", "C:/Windows"),
+        ("PYTHONUTF8", "1"),
+    )
+
+
+def test_system_environment_is_not_duplicated_nor_invented(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A value already provided wins, and an unset host variable adds nothing."""
+    monkeypatch.setattr(client, "_WINDOWS_SYSTEM_VARIABLES", ("SYSTEMROOT",))
+    monkeypatch.setattr(client, "_WINDOWS_FIXED_VARIABLES", (("PYTHONUTF8", "1"),))
+    provided: tuple[tuple[str, Any], ...] = (
+        ("SYSTEMROOT", "provided"),
+        ("PYTHONUTF8", "0"),
+    )
+    monkeypatch.setenv("SYSTEMROOT", "C:/Windows")
+    assert client._with_system_environment(provided, platform_name="nt") == provided
+
+    monkeypatch.delenv("SYSTEMROOT")
+    assert client._with_system_environment((), platform_name="nt") == (
+        ("PYTHONUTF8", "1"),
+    )
 
 
 @pytest.mark.parametrize("secret_type", tuple(PAYLOADS))

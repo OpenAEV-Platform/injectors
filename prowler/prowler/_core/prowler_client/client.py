@@ -1,6 +1,7 @@
 """Synchronous Prowler client over the safe CLI engine."""
 
 import logging
+import os
 from collections.abc import Sequence
 from dataclasses import replace
 from threading import Lock
@@ -11,6 +12,7 @@ from prowler._core.cli_engine import (
     OutputSpecification,
     ValidatedCommandRequest,
 )
+from prowler._core.cli_engine.contracts import EnvironmentValue
 from prowler.models.configs.config_loader import ProwlerConfig
 from prowler.models.provider_inputs import (
     AWS_PROVIDER_INPUTS,
@@ -73,6 +75,38 @@ _NARROWING_OPTIONS = frozenset(
 )
 _EMPTY_OCSF_ARTIFACT = b"[]"
 _LOGGER = logging.getLogger(__name__)
+# Prowler runs with an exact environment. On Windows, Python then needs two more
+# variables, none of them a credential. SYSTEMROOT is inherited from the host:
+# without it Winsock cannot initialize (WinError 10106 on the first ``import
+# asyncio``) and Prowler exits before running anything. PYTHONUTF8 is fixed:
+# with stdout piped, Python encodes with the ANSI code page, and the progress
+# bar of Prowler crashes (UnicodeEncodeError) once the checks are done.
+_WINDOWS_SYSTEM_VARIABLES = ("SYSTEMROOT",)
+_WINDOWS_FIXED_VARIABLES = (("PYTHONUTF8", "1"),)
+
+
+def _with_system_environment(
+    environment: Sequence[tuple[str, EnvironmentValue]],
+    *,
+    platform_name: str = os.name,
+) -> tuple[tuple[str, EnvironmentValue], ...]:
+    """Add the variables Prowler cannot run correctly without, on Windows only."""
+    if platform_name != "nt":
+        return tuple(environment)
+    provided = {name.upper() for name, _ in environment}
+    inherited = (
+        (name, os.environ[name])
+        for name in _WINDOWS_SYSTEM_VARIABLES
+        if name in os.environ
+    )
+    return (
+        *environment,
+        *(
+            (name, value)
+            for name, value in (*inherited, *_WINDOWS_FIXED_VARIABLES)
+            if name not in provided
+        ),
+    )
 
 
 def _safe_log(level: int, message: str, **metadata: object) -> None:
@@ -263,7 +297,7 @@ class ProwlerClient:
                     *_OUTPUT_ARGUMENTS_PREFIX,
                     *_OUTPUT_FORMAT_ARGUMENTS,
                 ),
-                environment=invocation.environment,
+                environment=_with_system_environment(invocation.environment),
                 working_directory=None,
                 input_bytes=b"",
                 output=OutputSpecification(parser="raw"),

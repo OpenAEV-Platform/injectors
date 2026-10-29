@@ -23,6 +23,7 @@ from prowler.contracts.base import (
     BaseProwlerContract,
     ContractExecutionOutcome,
     ContractInputError,
+    ContractInputIssue,
 )
 from prowler.injector.authentication import (
     AwsAccountMismatchError,
@@ -59,6 +60,7 @@ from prowler.injector.lifecycle_metadata import LifecycleMetadataBuilder
 from prowler.models import ConfigLoader
 from prowler.models.provider_inputs import (
     AWS_PROVIDER_INPUTS,
+    AwsReferenceProviderInput,
     CredentialReferenceProviderInput,
     KubernetesReferenceProviderInput,
     ProviderInput,
@@ -379,16 +381,25 @@ class ProwlerInjector:
             # The form fields are hidden with the credential manager: the
             # region, subscription, or project must be set on the credential.
             raise CredentialScopeMissingError(reference, missing)
-        if isinstance(resolved_secret, AwsAssumeRoleSecret) and isinstance(
-            resolved, AWS_PROVIDER_INPUTS
-        ):
-            # The role ARN names the account it lives in: a credential for
-            # another account is rejected before Prowler scans it. The account
-            # set on the credential wins over the one of the form.
-            account = aws_account_from_role_arn(resolved_secret.aws_role_arn)
-            expected = resolved.effective_aws_account_id
-            if account is not None and account != expected:
-                raise AwsAccountMismatchError(reference, expected, account)
+        if isinstance(resolved, AwsReferenceProviderInput):
+            # A form value the credential overrides is ignored: only the ones
+            # in use, the credential having no account or endpoint, are checked.
+            issues = resolved.form_fallback_issues()
+            if issues:
+                raise ContractInputError.from_validation(
+                    tuple(
+                        ContractInputIssue(("aws", field), error_type)
+                        for field, error_type in issues
+                    )
+                )
+            if isinstance(resolved_secret, AwsAssumeRoleSecret):
+                # The role ARN names the account it lives in: a credential for
+                # another account is rejected before Prowler scans it. The
+                # account set on the credential wins over the one of the form.
+                account = aws_account_from_role_arn(resolved_secret.aws_role_arn)
+                expected = resolved.effective_aws_account_id
+                if account is not None and expected and account != expected:
+                    raise AwsAccountMismatchError(reference, expected, account)
         return resolved
 
     def _report_authentication(
@@ -446,7 +457,7 @@ class ProwlerInjector:
             return
         account = authentication.aws_account_id
         expected = provider.effective_aws_account_id
-        if account is None or account == expected:
+        if account is None or expected is None or account == expected:
             return
         self._log(
             "warning",

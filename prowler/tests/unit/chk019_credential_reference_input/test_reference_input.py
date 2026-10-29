@@ -9,7 +9,10 @@ from typing import Any, ClassVar
 from unittest.mock import Mock
 
 import pytest
-from pyoaev.credential import CredentialAttachment  # type: ignore[import-untyped]
+from pyoaev.credential import (  # type: ignore[import-untyped]
+    AwsAccessKeySecret,
+    CredentialAttachment,
+)
 
 from prowler._core.cli_engine import (
     CommandResult,
@@ -62,8 +65,9 @@ LEGACY_SETTING_FORMS: dict[str, dict[str, str]] = {
 
 
 # Non-credential fields no credential provides: still required with a reference.
+# The AWS account and endpoint are not: the credential overrides them, and the
+# form values in use are only checked once it is resolved.
 REQUIRED_REFERENCE_FIELDS: dict[str, str] = {
-    "aws": "aws_account_id",
     "kubernetes": "kubernetes_context",
 }
 # Scope fields: with a credential reference, from the credential only.
@@ -344,32 +348,103 @@ def test_legacy_blank_aws_region_is_still_rejected() -> None:
     )
 
 
-def test_reference_rejects_an_invalid_aws_account_without_echoing_it() -> None:
-    """The AWS account pattern still applies on the reference path."""
-    with pytest.raises(ContractInputError) as raised:
-        _contract("aws").parse_input(
-            {"aws_account_id": "ACCOUNT-CANARY"},
-            credential_attachment=ATTACHMENT,
-        )
-    assert raised.value.issues == (
-        ContractInputIssue(("aws", "aws_account_id"), "string_pattern_mismatch"),
-    )
-    assert "ACCOUNT-CANARY" not in str(raised.value)
+@pytest.mark.parametrize(
+    "form",
+    (
+        {"aws_account_id": "ACCOUNT-CANARY"},
+        {"aws_endpoint_url": "https://user:pass@example.test"},
+        {"aws_account_id": "", "aws_endpoint_url": ""},
+        {},
+    ),
+)
+def test_reference_does_not_check_the_form_account_and_endpoint_when_parsing(
+    form: dict[str, str],
+) -> None:
+    """The credential may override them: they are only checked once resolved."""
+    parsed = _contract("aws").parse_input(form, credential_attachment=ATTACHMENT)
+
+    assert isinstance(parsed, AwsReferenceProviderInput)
 
 
-def test_reference_rejects_an_unsafe_aws_endpoint() -> None:
-    """The AWS endpoint override keeps its validator on the reference path."""
-    with pytest.raises(ContractInputError) as raised:
-        _contract("aws").parse_input(
-            {
-                **NON_CREDENTIAL_FORMS["aws"],
-                "aws_endpoint_url": "https://user:pass@example.test",
-            },
-            credential_attachment=ATTACHMENT,
+def test_form_account_and_endpoint_are_ignored_when_the_credential_has_them() -> None:
+    """The account and endpoint of the credential win, whatever the form holds."""
+    provider = AwsReferenceProviderInput(
+        provider="aws",
+        credential_attachment=ATTACHMENT,
+        aws_account_id="ACCOUNT-CANARY",
+        aws_endpoint_url="https://user:pass@example.test",
+    ).with_resolved_secret(
+        AwsAccessKeySecret(
+            aws_access_key_id="ACCESS-KEY-CANARY",
+            aws_secret_access_key="SECRET-KEY-CANARY",  # noqa: S106
+            aws_default_region="us-east-1",
+            aws_account_id="999999999999",
+            aws_endpoint_url="http://mock.example.test",
         )
-    assert raised.value.issues == (
-        ContractInputIssue(("aws", "aws_endpoint_url"), "value_error"),
     )
+
+    assert provider.form_fallback_issues() == ()
+    assert provider.effective_aws_account_id == "999999999999"
+    assert provider.effective_aws_endpoint_url == "http://mock.example.test"
+
+
+@pytest.mark.parametrize(
+    ("account", "error_type"),
+    (
+        (None, "missing"),
+        ("ACCOUNT-CANARY", "string_pattern_mismatch"),
+        ("12345678901", "string_pattern_mismatch"),
+        ("123456789012\n", "string_pattern_mismatch"),
+        (" ", "string_pattern_mismatch"),
+    ),
+)
+def test_form_account_in_use_is_checked_without_echoing_it(
+    account: str | None, error_type: str
+) -> None:
+    """A credential without account falls back on the form one, checked as before."""
+    provider = AwsReferenceProviderInput(
+        provider="aws", credential_attachment=ATTACHMENT, aws_account_id=account
+    ).with_resolved_secret(
+        AwsAccessKeySecret(
+            aws_access_key_id="ACCESS-KEY-CANARY",
+            aws_secret_access_key="SECRET-KEY-CANARY",  # noqa: S106
+        )
+    )
+
+    assert provider.form_fallback_issues() == (("aws_account_id", error_type),)
+
+
+def test_valid_form_account_is_the_fallback_of_a_credential_without_one() -> None:
+    """A credential without account keeps using the valid form account."""
+    provider = AwsReferenceProviderInput(
+        provider="aws",
+        credential_attachment=ATTACHMENT,
+        aws_account_id="123456789012",
+    ).with_resolved_secret(
+        AwsAccessKeySecret(
+            aws_access_key_id="ACCESS-KEY-CANARY",
+            aws_secret_access_key="SECRET-KEY-CANARY",  # noqa: S106
+        )
+    )
+
+    assert provider.form_fallback_issues() == ()
+    assert provider.effective_aws_account_id == "123456789012"
+
+
+def test_form_endpoint_in_use_is_checked_as_a_safe_url() -> None:
+    """The AWS endpoint override keeps its validator when it is the one in use."""
+    secret = AwsAccessKeySecret(
+        aws_access_key_id="ACCESS-KEY-CANARY",
+        aws_secret_access_key="SECRET-KEY-CANARY",  # noqa: S106
+        aws_account_id="999999999999",
+    )
+    provider = AwsReferenceProviderInput(
+        provider="aws",
+        credential_attachment=ATTACHMENT,
+        aws_endpoint_url="https://user:pass@example.test",
+    ).with_resolved_secret(secret)
+
+    assert provider.form_fallback_issues() == (("aws_endpoint_url", "value_error"),)
 
 
 def test_reference_normalizes_a_blank_aws_endpoint_to_none() -> None:
