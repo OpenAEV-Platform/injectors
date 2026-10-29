@@ -6,6 +6,8 @@ from importlib.resources import files
 from typing import Dict, List, Optional, Tuple
 
 from pyoaev.credential import (
+    AwsAssumeRoleSecret,
+    AwsSourceIdentityType,
     CredentialCleanupError,
     CredentialErrorCode,
     CredentialResolutionError,
@@ -59,6 +61,21 @@ AUTH_PLATFORM_LABELS = {
 # Stratus only builds a client for these platforms, without contacting them: a
 # passed check proves the credentials were loaded, not that they are valid.
 UNVERIFIED_AUTH_PLATFORMS = frozenset({"azure", "GCP"})
+
+# Stratus runs without the host cloud credentials. An AWS assume-role credential
+# whose source is the host's own identity (INSTANCE_DEFAULT) only works if the
+# variables that describe that identity are handed over: the ambient keys, and
+# the settings of the EC2 instance metadata service the profile falls back on.
+AWS_INSTANCE_IDENTITY_VARIABLES = (
+    "AWS_ACCESS_KEY_ID",
+    "AWS_SECRET_ACCESS_KEY",
+    "AWS_SESSION_TOKEN",
+    "AWS_EC2_METADATA_SERVICE_ENDPOINT",
+    "AWS_EC2_METADATA_SERVICE_ENDPOINT_MODE",
+    "AWS_EC2_METADATA_V1_DISABLED",
+    "AWS_METADATA_SERVICE_TIMEOUT",
+    "AWS_METADATA_SERVICE_NUM_ATTEMPTS",
+)
 
 LEGACY_CREDENTIAL_SOURCE = "the inject credential fields"
 
@@ -202,6 +219,25 @@ class OpenAEVStratus:
         return attachment.reference, credential
 
     @staticmethod
+    def _host_identity_env(credential: ResolvedSecret) -> Dict[str, str]:
+        """Host variables of a credential whose identity is the host's own.
+
+        Only the listed variables that are set are handed over; a value the
+        credential materializes itself always wins over the host one.
+        """
+        if not (
+            isinstance(credential, AwsAssumeRoleSecret)
+            and credential.aws_source_identity_type
+            == AwsSourceIdentityType.INSTANCE_DEFAULT
+        ):
+            return {}
+        return {
+            name: os.environ[name]
+            for name in AWS_INSTANCE_IDENTITY_VARIABLES
+            if name in os.environ
+        }
+
+    @staticmethod
     def _reference_default_env(
         platform: PlatformSpec, reference: str, credential: ResolvedSecret
     ) -> Dict[str, str]:
@@ -245,9 +281,14 @@ class OpenAEVStratus:
         try:
             # The legacy credential fields are not read at all, and the host
             # credentials are not inherited: the resolved credential is the only
-            # one Stratus can use.
+            # one Stratus can use, apart from the host identity it names as its
+            # source.
             with materialize(credential, reference=reference) as materialized:
-                env = {**default_env, **materialized.env}
+                env = {
+                    **self._host_identity_env(credential),
+                    **default_env,
+                    **materialized.env,
+                }
                 result = self.stratus.detonate(
                     technique_id, env=env, cleanup=True, isolate_host_credentials=True
                 )
