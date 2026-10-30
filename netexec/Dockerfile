@@ -14,6 +14,8 @@ COPY --from=injector_common ./ ./
 WORKDIR /
 RUN git clone https://github.com/OpenAEV-Platform/client-python
 
+RUN pip3 install -U pip certifi
+
 # poetry version available on Ubuntu 24.04
 RUN pip3 install poetry==2.3.2 \
     && poetry config installer.re-resolve false \
