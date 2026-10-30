@@ -1,5 +1,6 @@
 """Strict, secret-safe provider inputs for future OpenAEV form contracts."""
 
+import re
 from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import Annotated, Any, Literal, NoReturn, Self
@@ -229,6 +230,11 @@ class AwsProviderInput(ImmutableProviderInput):
         """Accept only absolute HTTP(S) endpoints without unsafe URL extras."""
         return _validate_aws_endpoint_url(value)
 
+    @property
+    def effective_aws_account_id(self) -> str:
+        """Return the account of the form, the only one of a legacy input."""
+        return self.aws_account_id
+
     def safe_log_metadata(self) -> dict[str, object]:
         """Return the log-safe metadata facts for this AWS input."""
         metadata = _aws_scope_log_metadata(
@@ -353,15 +359,47 @@ class AwsReferenceProviderInput(CredentialReferenceProviderInput):
     """AWS provider form input whose credential comes from a reference."""
 
     provider: Literal["aws"]
-    # No credential carries the account: it is always taken from the form.
-    aws_account_id: AwsAccountId
+    # The account and the endpoint of the credential win over these form
+    # values, which are only the fallback of a credential that has none. They
+    # are not checked when the form is parsed: a value the credential
+    # overrides is ignored, so ``form_fallback_issues`` checks the ones in use
+    # once the credential is resolved.
+    aws_account_id: str | None = None
     aws_endpoint_url: str | None = None
 
-    @field_validator("aws_endpoint_url", mode="before")
-    @classmethod
-    def validate_aws_endpoint_url(cls, value: object) -> object:
-        """Accept only absolute HTTP(S) endpoints without unsafe URL extras."""
-        return _validate_aws_endpoint_url(value)
+    @property
+    def effective_aws_account_id(self) -> str | None:
+        """Return the account of the credential, else the one of the form.
+
+        The credential value is not checked against the form pattern: a
+        sovereign or mocked cloud may use another account format.
+        """
+        return self.scope_value("aws_account_id") or self.aws_account_id
+
+    @property
+    def effective_aws_endpoint_url(self) -> str | None:
+        """Return the endpoint of the credential, else the one of the form."""
+        return self.scope_value("aws_endpoint_url") or self.aws_endpoint_url
+
+    def form_fallback_issues(self) -> tuple[tuple[str, str], ...]:
+        """Return the ``(field, error type)`` of each invalid form value in use.
+
+        Only the form values the resolved credential does not override are
+        checked, with the rules of the legacy model: the account must be 12
+        digits, the endpoint a safe HTTP(S) URL.
+        """
+        issues: list[tuple[str, str]] = []
+        if self.scope_value("aws_account_id") is None:
+            if self.aws_account_id is None:
+                issues.append(("aws_account_id", "missing"))
+            elif not re.fullmatch(_AWS_ACCOUNT_ID_PATTERN, self.aws_account_id):
+                issues.append(("aws_account_id", "string_pattern_mismatch"))
+        if self.scope_value("aws_endpoint_url") is None and self.aws_endpoint_url:
+            try:
+                _validate_aws_endpoint_url(self.aws_endpoint_url)
+            except ValueError:
+                issues.append(("aws_endpoint_url", "value_error"))
+        return tuple(issues)
 
     def missing_scope_fields(self) -> tuple[str, ...]:
         """Return ``aws_region`` when the credential has no region."""
@@ -370,9 +408,9 @@ class AwsReferenceProviderInput(CredentialReferenceProviderInput):
     def safe_log_metadata(self) -> dict[str, object]:
         """Return the log-safe metadata facts for this AWS input."""
         metadata = _aws_scope_log_metadata(
-            self.aws_account_id,
+            self.effective_aws_account_id,
             self.scope_value("aws_default_region"),
-            self.aws_endpoint_url,
+            self.effective_aws_endpoint_url,
         )
         metadata.update(self.reference_log_metadata())
         return metadata

@@ -349,7 +349,7 @@ class BaseProwlerContract(ABC):
         }
         if isinstance(provider, AWS_PROVIDER_INPUTS):
             info.update(
-                account=provider.aws_account_id,
+                account=provider.effective_aws_account_id,
                 region=_scope_value(provider, "aws_region", "aws_default_region"),
             )
         elif isinstance(provider, AZURE_PROVIDER_INPUTS):
