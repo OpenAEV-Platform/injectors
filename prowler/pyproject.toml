@@ -7,7 +7,7 @@ authors = [
     { name = "Filigran", email = "contact@filigran.io" },
 ]
 license = "Apache-2.0"
-requires-python = ">=3.11,<4.0"
+requires-python = ">=3.14,<4.0.0"
 dependencies = [
     "pyoaev (==3.261029.0); extra != 'dev'",
     "pydantic>=2.13.3,<2.14.0",
@@ -54,7 +54,7 @@ src_paths = [
 ]
 
 [tool.ruff]
-target-version = "py311"
+target-version = "py314"
 
 [tool.ruff.lint]
 select = [

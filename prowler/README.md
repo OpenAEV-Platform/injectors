@@ -6,7 +6,7 @@ Run Prowler cloud-security assessments from OpenAEV and return the results to th
 
 - An OpenAEV instance and valid connection configuration
 - Prowler 5.36.0, reachable at `PROWLER_EXECUTABLE_PATH` (default `/usr/local/bin/prowler`)
-- Python 3.11 or later when running from source
+- Python 3.14 or later when running from source
 
 The injector emits Prowler 5.36.0 CLI arguments. The Docker image bundles Prowler 5.36.0 in its own virtual environment, linked to `/usr/local/bin/prowler`: the Prowler package uses the same `prowler` import name as this injector and pins a different pydantic version, so the two cannot share an environment. When running from source, install Prowler the same way and point `PROWLER_EXECUTABLE_PATH` at its `prowler` executable.
 
