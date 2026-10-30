@@ -549,6 +549,41 @@ def test_azure_credential_authority_host_is_normalized(
     )
 
 
+@pytest.mark.parametrize(
+    "secret_type", ("AZURE_SERVICE_PRINCIPAL", "AZURE_MANAGED_IDENTITY")
+)
+@pytest.mark.parametrize(
+    "authority", ("http://mock.example.test", "http://mock.example.test/")
+)
+def test_azure_credential_authority_host_is_also_the_arm_endpoint(
+    tmp_path: Path, secret_type: str, authority: str
+) -> None:
+    provider = _sovereign_input(
+        AzureReferenceProviderInput,
+        AZURE_INPUT,
+        secret_type,
+        azure_authority_host_uri=authority,
+    )
+
+    environment = _environment(_adapter(tmp_path).adapt(provider))
+
+    assert environment["AZURE_ARM_ENDPOINT"] == "http://mock.example.test"
+
+
+@pytest.mark.parametrize(
+    "secret_type", ("AZURE_SERVICE_PRINCIPAL", "AZURE_MANAGED_IDENTITY")
+)
+def test_azure_arm_endpoint_is_absent_without_a_credential_authority_host(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, secret_type: str
+) -> None:
+    monkeypatch.setenv("AZURE_ARM_ENDPOINT", "http://host.example.test")
+    provider = _reference_input(AzureReferenceProviderInput, AZURE_INPUT, secret_type)
+
+    environment = _environment(_adapter(tmp_path).adapt(provider))
+
+    assert "AZURE_ARM_ENDPOINT" not in environment
+
+
 def test_azure_credential_authority_host_wins_over_the_host_variable(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
