@@ -67,6 +67,11 @@ _AZURE_MANAGED_IDENTITY_VARIABLES = (
     "AZURE_TENANT_ID",
 )
 
+# Prowler has no setting for the Azure Resource Manager host of a custom cloud.
+# A credential with its own authority host (a mocked cloud) serves the Resource
+# Manager API from that same host, so it is handed over under this variable.
+_AZURE_ARM_ENDPOINT_VARIABLE = "AZURE_ARM_ENDPOINT"
+
 
 class ProviderInvocationAdapter:
     """Build credential-safe provider arguments and exact environments."""
@@ -172,6 +177,18 @@ class ProviderInvocationAdapter:
                 and "AWS_ENDPOINT_URL" not in lease.credential.env
             ):
                 environment.append(("AWS_ENDPOINT_URL", provider.aws_endpoint_url))
+            if (
+                isinstance(
+                    resolved, AzureServicePrincipalSecret | AzureManagedIdentitySecret
+                )
+                and resolved.azure_authority_host_uri
+            ):
+                environment.append(
+                    (
+                        _AZURE_ARM_ENDPOINT_VARIABLE,
+                        SecretStr(resolved.azure_authority_host_uri.rstrip("/")),
+                    )
+                )
             environment.extend(
                 _host_environment(_ambient_identity_variables(resolved), environment)
             )
