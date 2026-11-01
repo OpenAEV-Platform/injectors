@@ -1,4 +1,5 @@
 import json
+import os
 import subprocess
 import threading
 import time
@@ -20,6 +21,7 @@ from nuclei.helpers.nuclei_command_builder import NucleiCommandBuilder
 from nuclei.helpers.nuclei_output_parser import NucleiOutputParser
 from nuclei.helpers.nuclei_process import NucleiProcess
 from nuclei.helpers.scan_coordination import TemplateAccessLock
+from nuclei.helpers.template_url import TemplateUrlError, materialize_template_url
 from nuclei.models.data import MessageData
 from nuclei.nuclei_contracts.external_contracts import ExternalContractsScheduler
 
@@ -40,6 +42,16 @@ SECURITY_PLATFORM_LOGO_PATH = "nuclei/img/nuclei.jpg"
 # Max characters of Nuclei's captured stderr kept in a log line, so a very
 # noisy scan cannot flood the injector logs.
 _STDERR_LOG_TAIL = 2000
+
+
+def _safe_remove(path: Optional[str]) -> None:
+    """Best-effort delete of a temporary template file; never raises."""
+    if not path:
+        return
+    try:
+        os.remove(path)
+    except OSError:
+        pass
 
 
 def _decode(raw: Optional[bytes]) -> str:
@@ -79,100 +91,147 @@ class OpenAEVNuclei:
         msg_data: MessageData,
     ) -> Dict:
         targets = msg_data.get_targets()
-        # Nuclei Args Builder
-        nuclei_builder = NucleiCommandBuilder(
-            nuclei_configs=self.config_loader.nuclei,
-            contract_id=msg_data.contract_id,
-            content=msg_data.inject_content,
-            targets=targets,
+
+        # template_url: the deployed Nuclei binary does not load remote templates
+        # itself (-tu / -remote-template-domain are rejected), so when an inject
+        # provides a template URL we download it to a temporary local file, run a
+        # validation pass on it, and feed it to Nuclei as a local -templates path.
+        # Lets an operator run a not-yet-merged template (e.g. one in review in a
+        # PR) with Nuclei's full matching logic. Cleaned up after the scan.
+        content = msg_data.inject_content
+        tmp_template_path: Optional[str] = None
+        template_url = (
+            content.get("template_url") if isinstance(content, dict) else None
         )
-        nuclei_args = nuclei_builder.build()
-
-        self.helper.injector_logger.info(
-            "Executing nuclei with: " + " ".join(nuclei_args)
-        )
-
-        callback_data = {
-            "execution_message": Targets.build_execution_message(
-                selector_key=msg_data.selector_key,
-                data=msg_data.raw_data,
-                command_args=nuclei_args,
-            ),
-            "execution_status": "INFO",
-            "execution_duration": int(time.time() - start),
-            "execution_action": "command_execution",
-        }
-
-        self.helper.api.inject.execution_callback(
-            inject_id=msg_data.inject_id,
-            data=callback_data,
-        )
-
-        # Per-target traces so each asset-backed endpoint's result view shows the
-        # scan reached it; the batched scan only sends a global callback otherwise.
-        send_per_target_traces(
-            self.helper,
-            msg_data.inject_id,
-            msg_data.target_results.ip_to_asset_id_map,
-            label="nuclei scan",
-            start=start,
-        )
-
-        input_data = ("\n".join(targets) + "\n").encode("utf-8")
-        scan_timeout = self.config_loader.nuclei.scan_timeout
-        try:
-            # Bound concurrency (one slot per running Nuclei subprocess) and take
-            # the reader side of the templates lock so a scan never overlaps the
-            # periodic refresh rewriting the templates directory.
-            with self._scan_slots, self._templates_lock.read():
-                result = NucleiProcess.nuclei_execute(
-                    nuclei_args, input_data, timeout=scan_timeout
+        if template_url:
+            try:
+                tmp_template_path = materialize_template_url(
+                    template_url,
+                    self.config_loader.nuclei.template_url_allowed_domains,
+                    self.config_loader.nuclei.template_url_max_bytes,
                 )
-        except subprocess.TimeoutExpired as exc:
-            # A hung scan must not block the consumer forever: Nuclei's own
-            # -timeout is per-request, so only this ceiling bounds the whole run.
-            # Surface the partial output and re-raise so process_message emits a
-            # terminal ERROR callback - otherwise the inject stays PENDING until
-            # the platform's stale-inject sweep marks it failed with no reason.
-            stderr_tail = _decode(exc.stderr)
-            self.helper.injector_logger.error(
-                f"Nuclei scan timed out after {scan_timeout}s for inject "
-                f"{msg_data.inject_id} and was terminated. Nuclei stderr tail: "
-                f"{stderr_tail[-_STDERR_LOG_TAIL:] or '<none>'}"
-            )
-            raise RuntimeError(
-                f"Nuclei scan timed out after {scan_timeout} seconds and was "
-                "terminated before completion. Reduce the scan scope (tags / "
-                "manual template path / fewer targets) or raise NUCLEI_SCAN_TIMEOUT."
-            ) from exc
-        except subprocess.CalledProcessError as exc:
-            # Non-zero exit: bubble up the stderr so the terminal error trace is
-            # actionable instead of a bare "returned non-zero exit status N".
-            stderr_tail = _decode(exc.stderr)
-            self.helper.injector_logger.error(
-                f"Nuclei exited with code {exc.returncode} for inject "
-                f"{msg_data.inject_id}. Nuclei stderr tail: "
-                f"{stderr_tail[-_STDERR_LOG_TAIL:] or '<none>'}"
-            )
-            raise RuntimeError(
-                f"Nuclei exited with code {exc.returncode}: "
-                f"{stderr_tail[-_STDERR_LOG_TAIL:] or 'no stderr output'}"
-            ) from exc
+            except TemplateUrlError as exc:
+                raise RuntimeError(str(exc)) from exc
+            # Hand the local file to the command builder as -templates <path>
+            # (copy so the original inject_content is left untouched).
+            content = {**content, "template_path": tmp_template_path}
 
-        # Nuclei writes its runtime progress and warnings to stderr; log it so a
-        # completed scan is no longer silent between "Executing nuclei with ..."
-        # and the results.
-        stderr_tail = _decode(result.stderr)
-        if stderr_tail:
+        # Everything after the download is wrapped so the temporary template file
+        # is always removed, on every success or failure path (validation,
+        # builder/callback, scan timeout/error, decode or parser failure).
+        try:
+            if tmp_template_path:
+                # Validate the fetched template before running it, under the scan
+                # concurrency semaphore so a burst of injects cannot spawn an
+                # unbounded number of validation subprocesses.
+                with self._scan_slots:
+                    try:
+                        NucleiProcess.nuclei_validate(tmp_template_path)
+                    except subprocess.CalledProcessError as exc:
+                        detail = (
+                            _decode(exc.stderr)
+                            or _decode(exc.stdout)
+                            or "invalid template"
+                        )
+                        raise RuntimeError(
+                            f"template_url failed Nuclei validation: "
+                            f"{detail[-_STDERR_LOG_TAIL:]}"
+                        ) from exc
+
+            # Nuclei Args Builder
+            nuclei_builder = NucleiCommandBuilder(
+                nuclei_configs=self.config_loader.nuclei,
+                contract_id=msg_data.contract_id,
+                content=content,
+                targets=targets,
+            )
+            nuclei_args = nuclei_builder.build()
+
             self.helper.injector_logger.info(
-                f"Nuclei finished for inject {msg_data.inject_id} in "
-                f"{int(time.time() - start)}s. Nuclei stderr tail: "
-                f"{stderr_tail[-_STDERR_LOG_TAIL:]}"
+                "Executing nuclei with: " + " ".join(nuclei_args)
             )
 
-        return self.parser.parse(
-            result.stdout.decode("utf-8"), msg_data.target_results.ip_to_asset_id_map
-        )
+            callback_data = {
+                "execution_message": Targets.build_execution_message(
+                    selector_key=msg_data.selector_key,
+                    data=msg_data.raw_data,
+                    command_args=nuclei_args,
+                ),
+                "execution_status": "INFO",
+                "execution_duration": int(time.time() - start),
+                "execution_action": "command_execution",
+            }
+
+            self.helper.api.inject.execution_callback(
+                inject_id=msg_data.inject_id,
+                data=callback_data,
+            )
+
+            # Per-target traces so each asset-backed endpoint's result view shows
+            # the scan reached it; the batched scan only sends a global callback.
+            send_per_target_traces(
+                self.helper,
+                msg_data.inject_id,
+                msg_data.target_results.ip_to_asset_id_map,
+                label="nuclei scan",
+                start=start,
+            )
+
+            input_data = ("\n".join(targets) + "\n").encode("utf-8")
+            scan_timeout = self.config_loader.nuclei.scan_timeout
+            try:
+                # Bound concurrency (one slot per running Nuclei subprocess) and
+                # take the reader side of the templates lock so a scan never
+                # overlaps the periodic refresh rewriting the templates directory.
+                with self._scan_slots, self._templates_lock.read():
+                    result = NucleiProcess.nuclei_execute(
+                        nuclei_args, input_data, timeout=scan_timeout
+                    )
+            except subprocess.TimeoutExpired as exc:
+                # A hung scan must not block the consumer forever: Nuclei's own
+                # -timeout is per-request, so only this ceiling bounds the run.
+                stderr_tail = _decode(exc.stderr)
+                self.helper.injector_logger.error(
+                    f"Nuclei scan timed out after {scan_timeout}s for inject "
+                    f"{msg_data.inject_id} and was terminated. Nuclei stderr "
+                    f"tail: {stderr_tail[-_STDERR_LOG_TAIL:] or '<none>'}"
+                )
+                raise RuntimeError(
+                    f"Nuclei scan timed out after {scan_timeout} seconds and was "
+                    "terminated before completion. Reduce the scan scope (tags / "
+                    "manual template path / fewer targets) or raise "
+                    "NUCLEI_SCAN_TIMEOUT."
+                ) from exc
+            except subprocess.CalledProcessError as exc:
+                # Non-zero exit: bubble up the stderr so the terminal error trace
+                # is actionable instead of a bare "non-zero exit status N".
+                stderr_tail = _decode(exc.stderr)
+                self.helper.injector_logger.error(
+                    f"Nuclei exited with code {exc.returncode} for inject "
+                    f"{msg_data.inject_id}. Nuclei stderr tail: "
+                    f"{stderr_tail[-_STDERR_LOG_TAIL:] or '<none>'}"
+                )
+                raise RuntimeError(
+                    f"Nuclei exited with code {exc.returncode}: "
+                    f"{stderr_tail[-_STDERR_LOG_TAIL:] or 'no stderr output'}"
+                ) from exc
+
+            # Nuclei writes runtime progress/warnings to stderr; log it so a
+            # completed scan is not silent between the command and the results.
+            stderr_tail = _decode(result.stderr)
+            if stderr_tail:
+                self.helper.injector_logger.info(
+                    f"Nuclei finished for inject {msg_data.inject_id} in "
+                    f"{int(time.time() - start)}s. Nuclei stderr tail: "
+                    f"{stderr_tail[-_STDERR_LOG_TAIL:]}"
+                )
+
+            return self.parser.parse(
+                result.stdout.decode("utf-8"),
+                msg_data.target_results.ip_to_asset_id_map,
+            )
+        finally:
+            _safe_remove(tmp_template_path)
 
     def _report_pre_execution_failure(
         self, data: Dict, start: float, err: Exception

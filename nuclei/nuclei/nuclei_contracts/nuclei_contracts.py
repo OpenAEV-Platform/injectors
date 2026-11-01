@@ -231,6 +231,13 @@ class NucleiContracts:
                     ]
                     + [
                         ContractText(
+                            key="template_url",
+                            label="Template URL (fetched to a local file)",
+                            mandatory=False,
+                        )
+                    ]
+                    + [
+                        ContractText(
                             key="options",
                             label="Options",
                             mandatory=False,

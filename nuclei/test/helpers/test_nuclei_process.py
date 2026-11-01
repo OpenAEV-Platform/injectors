@@ -36,3 +36,17 @@ def test_nuclei_execute_passes_timeout(m_run):
         check=True,
         timeout=540,
     )
+
+
+@mock.patch("nuclei.helpers.nuclei_process.subprocess.run")
+def test_nuclei_validate_checks_template(m_run):
+    # A template fetched from a URL is validated before it is run; a non-zero
+    # exit (check=True) surfaces as a failure the caller turns into an error.
+    NucleiProcess.nuclei_validate("/tmp/tpl.yaml", timeout=60)
+
+    m_run.assert_called_once_with(
+        ["nuclei", "-validate", "-disable-update-check", "-t", "/tmp/tpl.yaml"],
+        capture_output=True,
+        check=True,
+        timeout=60,
+    )

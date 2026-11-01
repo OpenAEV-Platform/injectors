@@ -1,0 +1,69 @@
+"""Executable complete-scope and service-specific AWS contracts."""
+
+from typing import ClassVar, get_args
+
+from prowler._core.prowler_client import AwsServiceSelector
+from prowler.models.configs.config_loader import ProwlerConfig
+from prowler.models.provider_inputs import AWS_PROVIDER_INPUTS, ProviderInput
+
+from .base import BaseProwlerContract, ContractExecutionOutcome, RouteFamily
+from .compliance import FixedServiceContract
+
+
+class AwsBaseContract(BaseProwlerContract):
+    """Run the complete AWS provider scope and retain only mapped AWS findings."""
+
+    contract_id: ClassVar[str] = "a0464aa7-9451-54ea-bc00-3e89019a315a"
+    external_id: ClassVar[str] = "prowler:aws"
+    route_name: ClassVar[str] = "aws"
+    provider = "aws"
+    family: ClassVar[RouteFamily] = "base"
+    label = "Prowler AWS"
+    check_filters = ()
+
+    def execute(
+        self, config: ProwlerConfig, provider: ProviderInput
+    ) -> ContractExecutionOutcome:
+        """Map one complete-scope result, preserving ordered AWS findings only."""
+        return self._execute_scoped(config, provider)
+
+
+class AwsServiceContract(FixedServiceContract):
+    """Execute one route-owned AWS service selector through the CHK.004 seam."""
+
+    provider = "aws"
+    service_selector: ClassVar[AwsServiceSelector]
+    service_selectors = get_args(AwsServiceSelector)
+    provider_input_types = AWS_PROVIDER_INPUTS
+    provider_label = "AWS"
+    provider_article = "an"
+
+
+class AwsIamContract(AwsServiceContract):
+    """Run only Prowler AWS IAM checks."""
+
+    contract_id = "056a2645-d7a4-5043-a54b-5f1df35f5aa0"
+    external_id = "prowler:aws/iam"
+    route_name = "aws/iam"
+    label = "Prowler AWS IAM"
+    service_selector = "iam"
+
+
+class AwsS3Contract(AwsServiceContract):
+    """Run only Prowler AWS S3 checks."""
+
+    contract_id = "f6b85401-358f-5d31-96ad-c64a44466228"
+    external_id = "prowler:aws/s3"
+    route_name = "aws/s3"
+    label = "Prowler AWS S3"
+    service_selector = "s3"
+
+
+class AwsEc2Contract(AwsServiceContract):
+    """Run only Prowler AWS EC2 checks."""
+
+    contract_id = "302268dc-8792-5383-b32a-d2fe2e74b2e9"
+    external_id = "prowler:aws/ec2"
+    route_name = "aws/ec2"
+    label = "Prowler AWS EC2"
+    service_selector = "ec2"

@@ -24,6 +24,7 @@ later validate.
   - [Usage](#usage)
   - [Inject contracts](#inject-contracts)
   - [Supported platforms](#supported-platforms)
+  - [Credential reference](#credential-reference)
   - [Target selection](#target-selection)
   - [Behavior](#behavior)
   - [Debugging](#debugging)
@@ -163,6 +164,58 @@ failure path). Credentials are never persisted in `config.yml` / `.env` and neve
 | Kubernetes            | Kubeconfig (YAML, materialized to a temp file for the run)                                    |
 | Amazon EKS            | AWS access key ID, secret access key, optional session token, region                         |
 
+## Credential reference
+
+Instead of typing secrets into the inject, a contract can use a credential stored on the platform. Every contract of a
+platform with a credential type starts with a **Credentials** select: **Credential manager** (the default) or
+**<platform> - manual credentials**. The inject form shows either the credential picker or the credential fields,
+never both: it can only react to a select, not to the picker itself.
+
+- **Credential manager**: the credential picker is shown and required, the credential fields are hidden. The injector
+  resolves the credential just in time, after acknowledging the job and before reporting its result, through the
+  platform resolution endpoint, presenting the authorisation code received with the job. The injector token therefore
+  needs the `RESOLVE_INJECT_SECRET` capability. Inject credential fields are ignored, even if filled, and the host
+  credential variables of the injector (`AWS_*`, `AZURE_*`, `ARM_*`, `GOOGLE_*`, `GCLOUD_*`, `CLOUDSDK_*`,
+  `KUBECONFIG`) are not passed to Stratus either. The region, project and subscription come from the credential only:
+  without a region, the Stratus default `us-east-1` applies; without a required subscription or project, the execution
+  ends in `ERROR` asking to set it on the credential. Without a selected credential, the execution ends in `ERROR`.
+- **Manual credentials**: the credential fields are shown and required, and the inject runs from them as before. A
+  credential picked before switching to manual credentials is ignored and never resolved.
+- **Kubernetes**: no credential type applies, so there is no select and the kubeconfig is required.
+
+| Platform              | Accepted credential types                                                   |
+|-----------------------|-----------------------------------------------------------------------------|
+| AWS, Amazon EKS       | AWS access key, AWS assume role                                             |
+| Azure, Entra ID       | Azure service principal, Azure managed identity                             |
+| Google Cloud Platform | GCP service account, GCP OAuth2                                             |
+| Kubernetes            | None: a kubeconfig is required, a credential reference ends in an error     |
+
+The resolved secret only lives for the detonation: it is exposed to Stratus through environment variables and, when the
+SDK reads it from disk (AWS assume role profile, GCP key), files in a private temporary directory removed afterwards,
+including on the failure path. It is never written to the inject, logged, or reported to the platform.
+
+A credential problem never blocks saving the inject: it ends the execution in `ERROR`, with one of these codes and its
+message in the execution trace:
+
+| Code                       | Reported when                                                                       |
+|----------------------------|-------------------------------------------------------------------------------------|
+| `CREDENTIAL_NOT_FOUND`     | The credential no longer exists at execution time                                   |
+| `CREDENTIAL_INACTIVE`      | The credential exists but is inactive                                               |
+| `CREDENTIAL_ACCESS_DENIED` | The execution is not entitled to use the credential                                 |
+| `CREDENTIAL_INCOMPATIBLE`  | The credential type does not match the platform of the contract (see table above), or its Azure cloud cannot be targeted (e.g. the retired `AzureGermanCloud`) |
+| `CREDENTIAL_RESOLUTION_UNAVAILABLE` | The platform could not be reached, or failed, while resolving the credential |
+
+### Authentication trace
+
+Stratus checks its authentication against the target platform before warming up the technique, and prints nothing
+when the check passes. The injector reads that check from the Stratus output and, when it passed, logs it and adds an
+`INFO` prerequisite check trace naming the platform and the credential source (the credential reference id and type, or
+the inject credential fields) - never a secret value. A failed check ends the execution in `ERROR` with
+`Authentication against <platform> failed: <reason>`.
+
+For Azure and Google Cloud, the Stratus check only loads the credentials without contacting the cloud, so the trace says
+so: the credentials are only confirmed by the detonation itself.
+
 ## Target selection
 
 This injector does not target OpenAEV assets. The "target" of every inject is the cloud account reached through the
@@ -186,7 +239,8 @@ flowchart LR
 ```
 
 On each job the injector acknowledges reception, resolves the platform and technique from the contract id (or from the
-inject content for a custom contract), builds the Stratus process environment from the per-inject credentials, and
+inject content for a custom contract), builds the Stratus process environment from the referenced credential (see
+[Credential reference](#credential-reference)) or else from the per-inject credential fields, and
 detonates the technique with `--cleanup` (a 15-minute timeout covers the Terraform warm-up). It then reports
 `SUCCESS` / `ERROR` to the platform; the detection and prevention expectations are scored by the relevant runtime
 detection collectors. Materialized secret files are always removed afterwards, including on the failure path.
@@ -202,6 +256,9 @@ Common issues:
   otherwise the stored inject references a contract this injector version does not know.
 - Authentication or permission errors in the detonation output: verify the platform credentials and that the identity is
   entitled to provision and detonate the technique's prerequisites.
+- `CREDENTIAL_*` errors: the credential reference of the inject could not be used, see
+  [Credential reference](#credential-reference). `CREDENTIAL_ACCESS_DENIED` on every inject usually means the injector
+  token lacks the `RESOLVE_INJECT_SECRET` capability.
 - A run that times out after 15 minutes returns a timeout error - typically a slow or blocked Terraform warm-up.
 
 ## Additional information
