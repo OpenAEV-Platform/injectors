@@ -126,3 +126,14 @@ def test_extract_open_ports_skips_multi_port_ranges():
     executor = _executor()
     ports = executor._extract_open_ports("FromPort: 8000 ToPort: 8010")
     assert ports == []
+
+
+def test_extract_open_ports_mixed_rules_keep_only_single_ports():
+    """Single port, genuine range and allow-all rule in one output."""
+    executor = _executor()
+    ports = executor._extract_open_ports(
+        "FromPort: 22 ToPort: 22\n"
+        "FromPort: 8000 ToPort: 8010\n"
+        "FromPort: 0 ToPort: 65535\n"
+    )
+    assert ports == [22]

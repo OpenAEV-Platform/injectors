@@ -136,6 +136,9 @@ class ShodanFindingsParser:
             for cve_id, severity in self._iter_cves(element.get("vulns")):
                 if not host:
                     continue
+                # Deliberately one CVE finding per (cve_id, host), not per port:
+                # a CVE finding states that the host is exposed to the CVE, and
+                # the CVE output carries no port. Do not add the port to this key.
                 key = (cve_id, host)
                 if key in cve_seen:
                     continue
