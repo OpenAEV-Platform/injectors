@@ -110,6 +110,32 @@ def test_parse_vulns_as_list_yields_unknown_severity():
     ]
 
 
+def test_parse_same_cve_on_two_ports_yields_one_cve_per_host():
+    """A CVE seen on several ports of one host is one CVE finding (deliberate)."""
+    matches = [
+        {
+            "ip_str": "5.6.7.8",
+            "hostnames": [],
+            "port": 443,
+            "vulns": {"CVE-2023-44487": {"cvss": 7.5}},
+        },
+        {
+            "ip_str": "5.6.7.8",
+            "hostnames": [],
+            "port": 8443,
+            "vulns": {"CVE-2023-44487": {"cvss": 7.5}},
+        },
+    ]
+
+    outputs = ShodanFindingsParser().parse(_normalize_input_data([]), _results(matches))
+
+    assert outputs["cve"] == [
+        {"id": "CVE-2023-44487", "host": "5.6.7.8", "severity": "7.5"}
+    ]
+    # Both ports are still reported through PortsScan.
+    assert [p["port"] for p in outputs["ports_scan"]] == [443, 8443]
+
+
 def test_parse_deduplicates_and_skips_errors_and_non_ipv4():
     results = {
         "targets": ["a", "b"],
