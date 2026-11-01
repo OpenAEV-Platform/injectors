@@ -11,7 +11,6 @@ jobs:
     working_directory: ~/repo
     steps:
       - checkout
-      - run: sudo apt-get update -qq && sudo apt install curl gettext-base
       - run:
           name: install dependencies
           command: pip install black isort --user
@@ -74,7 +73,7 @@ jobs:
             PYOAEV_REF="main"
 
             echo "Running tests for injector: << parameters.injector_name >>"
-            poetry install
+            poetry install --extras dev
             poetry run pip install --force-reinstall git+https://github.com/OpenAEV-Platform/client-python.git@${PYOAEV_REF}
             poetry run python -m unittest
 
@@ -104,10 +103,8 @@ jobs:
             echo "IS_LATEST=$IS_LATEST" >> $BASH_ENV
       - setup_remote_docker
       - run:
-          name: Install environment
+          name: Prepare images directory
           command: |
-            sudo apt-get update -qq
-            sudo apt install curl gettext-base
             mkdir -p ~/openaev/images
       - run:
           working_directory: ~/openaev
@@ -217,7 +214,6 @@ jobs:
     docker:
       - image: cimg/base:current-24.04
     steps:
-      - run: sudo apt-get update -qq && sudo apt install curl gettext-base
       - slack/notify:
           event: pass
           template: basic_success_1
@@ -225,7 +221,6 @@ jobs:
     docker:
       - image: cimg/base:current-24.04
     steps:
-      - run: sudo apt-get update -qq && sudo apt install curl gettext-base
       - slack/notify:
           event: pass
           template: basic_success_1
@@ -244,14 +239,14 @@ workflows:
       - test:
           matrix:
             parameters:
-              injector_name: ["ai-redteam", "http-query", "netexec", "nmap", "nuclei", "bloodhound"]
+              injector_name: ["ai-redteam", "censys", "email-google-workspace", "http-query", "netexec", "nmap", "nuclei", "slack", "stratus"]
           filters:
             tags:
               only: /[0-9]+(\.[0-9]+)+(\.[0-9]+)*/
       - build_docker_images:
           matrix:
             parameters:
-              injector_name: [ "ai-redteam", "aws", "http-query", "netexec", "nmap", "nuclei", "shodan", "teams", "bloodhound" ]
+              injector_name: [ "ai-redteam", "aws", "censys", "email-google-workspace", "email-smtp", "http-query", "netexec", "nmap", "nuclei", "prowler", "shodan", "slack", "stratus", "teams" ]
           requires:
             - ensure_formatting
             - linter
@@ -262,7 +257,7 @@ workflows:
       - publish_images:
           matrix:
             parameters:
-              injector_name: [ "ai-redteam", "aws", "http-query", "netexec", "nmap", "nuclei", "shodan", "teams", "bloodhound" ]
+              injector_name: [ "ai-redteam", "aws", "censys", "email-google-workspace", "email-smtp", "http-query", "netexec", "nmap", "nuclei", "prowler", "shodan", "slack", "stratus", "teams" ]
           requires:
             - build_docker_images
           filters:
