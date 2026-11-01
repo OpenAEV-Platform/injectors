@@ -61,7 +61,16 @@ class NucleiOutputParser:
         if not grouped_findings and not others:
             message_parts.append("Good News: Nothing Found !")
 
+        outputs = {"cve": grouped_findings, "others": others}
+        # The raw stdout, routed independently of the structured cve/others
+        # extraction above: it never shows up as a visible Finding
+        # (isFindingCompatible=False on the contract side), but stays usable as
+        # a chaining/event filter. Additive — "others" keeps behaving exactly
+        # as it does today.
+        if stdout.strip():
+            outputs["action_output"] = stdout.strip()
+
         return {
             "message": "Nuclei completed: " + " ".join(message_parts),
-            "outputs": {"cve": grouped_findings, "others": others},
+            "outputs": outputs,
         }

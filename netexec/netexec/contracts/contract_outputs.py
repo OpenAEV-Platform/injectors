@@ -5,17 +5,18 @@ from pyoaev.contracts.contract_config import ContractOutputElement, ContractOutp
 
 from netexec.contracts.output_registry import (
     ACCOUNT_PW_NOT_REQUIRED,
+    ACTION_OUTPUT,
     ADMIN_USERNAME,
     ASREPROASTABLE,
     COMPUTER,
     CREDENTIALS,
     DELEGATION,
+    FILE,
     GROUP,
     KERBEROASTABLE,
     PASSWORD_POLICY,
     SHARE,
     SID,
-    TEXT,
     USERNAME,
     VULNERABILITY,
 )
@@ -24,11 +25,14 @@ from netexec.contracts.output_registry import (
 # One ContractOutputElement per output type
 # ---------------------------------------------------------------------------
 
-_TEXT_OUTPUT = ContractOutputElement(
-    type=ContractOutputType.Text,
-    field="text",
-    isMultiple=True,
-    isFindingCompatible=True,
+# The raw stdout, stored as a single non-finding-compatible entry: it never
+# shows up as a visible Finding, but stays usable as a chaining/event filter
+# (e.g. matching a substring in the command output).
+_ACTION_OUTPUT_OUTPUT = ContractOutputElement(
+    type=ContractOutputType.ActionOutput,
+    field="action_output",
+    isMultiple=False,
+    isFindingCompatible=False,
     labels=["netexec"],
 )
 
@@ -51,6 +55,14 @@ _USERNAME_OUTPUT = ContractOutputElement(
 _SHARE_OUTPUT = ContractOutputElement(
     type=ContractOutputType.Share,
     field="shares",
+    isMultiple=True,
+    isFindingCompatible=True,
+    labels=["netexec"],
+)
+
+_FILE_OUTPUT = ContractOutputElement(
+    type=ContractOutputType.File,
+    field="files",
     isMultiple=True,
     isFindingCompatible=True,
     labels=["netexec"],
@@ -145,10 +157,11 @@ _EXPECTATION_SIGNATURE_OUTPUT = ContractOutputElement(
 )
 
 _TYPE_TO_ELEMENT = {
-    TEXT: _TEXT_OUTPUT,
+    ACTION_OUTPUT: _ACTION_OUTPUT_OUTPUT,
     CREDENTIALS: _CREDENTIALS_OUTPUT,
     USERNAME: _USERNAME_OUTPUT,
     SHARE: _SHARE_OUTPUT,
+    FILE: _FILE_OUTPUT,
     ADMIN_USERNAME: _ADMIN_USERNAME_OUTPUT,
     GROUP: _GROUP_OUTPUT,
     COMPUTER: _COMPUTER_OUTPUT,

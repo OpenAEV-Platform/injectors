@@ -15,3 +15,8 @@ class InjectorConfigOverride(ConfigLoaderCollector):
         default="http-query/img/icon-http.png",
         description="Path to the icon file",
     )
+    author: str | None = Field(
+        default=None,
+        description="Optional author override for this injector's contracts. "
+        "When absent, the platform attributes them to the injector's name.",
+    )

@@ -75,22 +75,28 @@ The injector is configured either through environment variables (recommended, re
 
 ### Nuclei injector environment variables
 
-These tune how Nuclei runs. Each maps to a Nuclei command-line flag (shown in the description). `exclude_type` and
+These tune how Nuclei runs. Most map to a Nuclei command-line flag (shown in the description). `exclude_type` and
 `exclude_severity` accept comma-separated values.
 
-| Parameter                      | config.yml                              | Docker environment variable             | Default   | Mandatory | Description                                                                                                    |
-|--------------------------------|-----------------------------------------|-----------------------------------------|-----------|-----------|----------------------------------------------------------------------------------------------------------------|
-| Scan strategy                  | `nuclei.scan_strategy`                  | `NUCLEI_SCAN_STRATEGY`                  | host-spray| No        | Strategy used while scanning. One of `auto`, `host-spray`, `template-spray` (`-scan-strategy`).                |
-| Templates parallelism          | `nuclei.templates_parallelism`          | `NUCLEI_TEMPLATES_PARALLELISM`          | 5         | No        | Maximum number of templates executed in parallel (`-concurrency`).                                             |
-| Hosts parallelism per template | `nuclei.hosts_parallelism_per_template` | `NUCLEI_HOSTS_PARALLELISM_PER_TEMPLATE` | 5         | No        | Maximum number of hosts analyzed in parallel per template (`-bulk-size`).                                      |
-| Max requests per second        | `nuclei.max_requests_per_second`        | `NUCLEI_MAX_REQUESTS_PER_SECOND`        | 50        | No        | Maximum number of requests sent per second (`-rate-limit`).                                                    |
-| Timeout                        | `nuclei.timeout`                        | `NUCLEI_TIMEOUT`                        | 10        | No        | Time to wait in seconds before timeout (`-timeout`).                                                           |
-| Retries                        | `nuclei.retries`                        | `NUCLEI_RETRIES`                        | 1         | No        | Number of times to retry a failed request (`-retries`).                                                        |
-| Max host error                 | `nuclei.max_host_error`                 | `NUCLEI_MAX_HOST_ERROR`                 | 30        | No        | Max errors for a host before skipping it from the scan (`-max-host-error`).                                    |
-| Response size read             | `nuclei.response_size_read`             | `NUCLEI_RESPONSE_SIZE_READ`             | 1048576   | No        | Max response size to read, in bytes (`-response-size-read`).                                                   |
-| Response size save             | `nuclei.response_size_save`             | `NUCLEI_RESPONSE_SIZE_SAVE`             | 1048576   | No        | Max response size to save, in bytes (`-response-size-save`).                                                   |
-| Exclude type                   | `nuclei.exclude_type`                   | `NUCLEI_EXCLUDE_TYPE`                   | headless  | No        | Protocol types to exclude: `dns`, `file`, `http`, `headless`, `tcp`, `workflow`, `ssl`, `websocket`, `whois`, `code`, `javascript` (`-exclude-type`). |
-| Exclude severity               | `nuclei.exclude_severity`               | `NUCLEI_EXCLUDE_SEVERITY`               | /         | No        | Severities to exclude: `info`, `low`, `medium`, `high`, `critical`, `unknown` (`-exclude-severity`).           |
+| Parameter                      | config.yml                              | Docker environment variable             | Default    | Mandatory | Description                                                                                                    |
+|--------------------------------|-----------------------------------------|-----------------------------------------|------------|-----------|----------------------------------------------------------------------------------------------------------------|
+| Scan strategy                  | `nuclei.scan_strategy`                  | `NUCLEI_SCAN_STRATEGY`                  | host-spray | No        | Strategy used while scanning. One of `auto`, `host-spray`, `template-spray` (`-scan-strategy`).                |
+| Scan timeout                   | `nuclei.scan_timeout`                   | `NUCLEI_SCAN_TIMEOUT`                   | 540        | No        | Hard ceiling in seconds for a whole scan. When exceeded, the scan is terminated and the inject is reported as a timeout error instead of hanging forever. Not a Nuclei flag (`-timeout` is per-request). Keep it below the platform's inject execution threshold (default 10 min). |
+| Template update timeout        | `nuclei.template_update_timeout`        | `NUCLEI_TEMPLATE_UPDATE_TIMEOUT`        | 300        | No        | Hard ceiling in seconds for a template refresh (`nuclei -update-templates`), applied at startup and on each periodic refresh. The refresh holds the writer side of the templates lock, so a hung update would otherwise block every scan (and startup) forever; when it fires, the refresh is terminated and degrades to best-effort (the templates already on disk are used). Not a Nuclei flag. |
+| Max concurrent scans           | `nuclei.max_concurrent_scans`           | `NUCLEI_MAX_CONCURRENT_SCANS`           | 5          | No        | Maximum number of scans running at the same time. The injector runs one Nuclei subprocess per inject; extra injects wait for a slot so a burst cannot exhaust CPU/memory/sockets. Not a Nuclei flag. |
+| Disable interactsh             | `nuclei.disable_interactsh`             | `NUCLEI_DISABLE_INTERACTSH`             | false      | No        | Disable out-of-band (OOB) interaction polling. In networks that cannot reach the public interactsh servers, OOB templates stall for the whole poll window; enabling this skips them and avoids the stall (`-no-interactsh`). |
+| Templates parallelism          | `nuclei.templates_parallelism`          | `NUCLEI_TEMPLATES_PARALLELISM`          | 2          | No        | Maximum number of templates executed in parallel (`-concurrency`).                                             |
+| Hosts parallelism per template | `nuclei.hosts_parallelism_per_template` | `NUCLEI_HOSTS_PARALLELISM_PER_TEMPLATE` | 2          | No        | Maximum number of hosts analyzed in parallel per template (`-bulk-size`).                                      |
+| Max requests per second        | `nuclei.max_requests_per_second`        | `NUCLEI_MAX_REQUESTS_PER_SECOND`        | 25         | No        | Maximum number of requests sent per second (`-rate-limit`).                                                    |
+| Timeout                        | `nuclei.timeout`                        | `NUCLEI_TIMEOUT`                        | 10         | No        | Time to wait in seconds before timeout (`-timeout`).                                                           |
+| Retries                        | `nuclei.retries`                        | `NUCLEI_RETRIES`                        | 1          | No        | Number of times to retry a failed request (`-retries`).                                                        |
+| Max host error                 | `nuclei.max_host_error`                 | `NUCLEI_MAX_HOST_ERROR`                 | 30         | No        | Max errors for a host before skipping it from the scan (`-max-host-error`).                                    |
+| Response size read             | `nuclei.response_size_read`             | `NUCLEI_RESPONSE_SIZE_READ`             | 1048576    | No        | Max response size to read, in bytes (`-response-size-read`).                                                   |
+| Response size save             | `nuclei.response_size_save`             | `NUCLEI_RESPONSE_SIZE_SAVE`             | 1048576    | No        | Max response size to save, in bytes (`-response-size-save`).                                                   |
+| Exclude type                   | `nuclei.exclude_type`                   | `NUCLEI_EXCLUDE_TYPE`                   | headless   | No        | Protocol types to exclude: `dns`, `file`, `http`, `headless`, `tcp`, `workflow`, `ssl`, `websocket`, `whois`, `code`, `javascript` (`-exclude-type`). |
+| Exclude severity               | `nuclei.exclude_severity`               | `NUCLEI_EXCLUDE_SEVERITY`               | /          | No        | Severities to exclude: `info`, `low`, `medium`, `high`, `critical`, `unknown` (`-exclude-severity`).           |
+| Template URL allowed domains   | `nuclei.template_url_allowed_domains`   | `NUCLEI_TEMPLATE_URL_ALLOWED_DOMAINS`   | raw.githubusercontent.com | No | Comma-separated allowlist of domains a `template_url` inject field may be fetched from. A URL whose host is not listed is rejected before any download. Not a Nuclei flag. |
+| Template URL max bytes         | `nuclei.template_url_max_bytes`         | `NUCLEI_TEMPLATE_URL_MAX_BYTES`         | 2000000    | No        | Maximum size in bytes of a template fetched via a `template_url` inject field; a larger download is rejected. Not a Nuclei flag. |
 
 ## Deployment
 
@@ -127,6 +133,29 @@ poetry run python -m nuclei.openaev_nuclei
 > For local development against a checkout of [client-python](https://github.com/OpenAEV-Platform/client-python)
 > (cloned next to this repository), use `poetry install --extras dev`.
 
+## Templates and scan reliability
+
+Nuclei needs its templates present and complete on disk to scan. The injector manages them so scans do not race the
+template files:
+
+- **Bundled at build time.** The Docker image runs `nuclei -update-templates` during the build, so a fresh container
+  can scan immediately instead of downloading templates on first use.
+- **Refreshed before listening.** At startup the injector refreshes templates once (best-effort) before it starts
+  consuming injects, closing the cold-start window where a scan could read a half-written template tree.
+- **Refreshed periodically under a lock.** The background refresh rewrites the templates directory while holding the
+  writer side of a readers-writer lock; scans hold the reader side, so a scan never overlaps a refresh mid-write. The
+  refresh (at startup and periodically) is bounded by `template_update_timeout`, so a hung `nuclei -update-templates`
+  cannot hold the writer lock and block every scan (or startup) forever - it is terminated and the templates already on
+  disk are used.
+- **No in-scan updates.** Scans run with `-disable-update-check`, so a scan never triggers its own template/engine
+  update mid-run.
+
+Together with `scan_timeout` (a hard ceiling that turns a hung scan into a reported timeout) and
+`max_concurrent_scans` (a bound on how many scans run at once), this removes the "same asset scans fine sometimes and
+times out other times" behaviour caused by templates being downloaded or rewritten underneath a running scan. In
+locked-down networks that cannot reach the public interactsh servers, also set `disable_interactsh` so out-of-band
+templates do not stall for the whole poll window.
+
 ## Usage
 
 Once started, the injector registers its contracts with OpenAEV and waits for jobs. Add a Nuclei inject to a scenario or
@@ -154,9 +183,19 @@ The static contracts select Nuclei templates by tag:
 > path passed to Nuclei (not a special "all templates" keyword); scope the scan down with the manual template path
 > field below whenever possible.
 
-Every contract also exposes two optional free-text fields:
+Every static contract also exposes three optional free-text fields (the per-CVE
+contracts kept in sync with the catalog expose only `template` and `options`):
 
-- `Manual template path (-t)` (`template`): run a specific template or template directory (`-templates <path>`).
+- `Manual template path (-t)` (`template`): run a specific template or template directory already present in the
+  injector's local template store (`-templates <path>`).
+- `Template URL (fetched to a local file)` (`template_url`): run a template that is **not** in the local store yet —
+  for example one still in review in a pull request, or kept in an internal repository. The injector downloads the
+  template from the URL to a temporary local file, validates it with `nuclei -validate`, runs it as a normal local
+  `-templates <path>`, and deletes the file afterwards. The deployed Nuclei binary does not fetch remote templates
+  itself (its `-tu` / `-remote-template-domain` flags are not used); the injector performs the fetch so the domain can
+  be restricted. The URL's host must be in `NUCLEI_TEMPLATE_URL_ALLOWED_DOMAINS` (default `raw.githubusercontent.com`)
+  and the download must stay under `NUCLEI_TEMPLATE_URL_MAX_BYTES` (default 2 MB). Combine it with the
+  `Nuclei - TEMPLATES Scan` contract to run only that template (other contracts also add their tag filter).
 - `Options` (`options`): extra raw Nuclei flags, appended to the command line.
 
 In addition to the static contracts, a background scheduler maintains one contract per CVE. On each tick (every
@@ -183,9 +222,9 @@ Targets are resolved through the shared selection logic of `injector_common`:
 | Target property   | Asset field used                                   |
 |-------------------|----------------------------------------------------|
 | Automatic         | Hostname for agentless assets, else first valid IP |
-| Seen IP           | `endpoint_seen_ip`                                 |
-| Local IP (first)  | First valid entry in `endpoint_ips`                |
-| Hostname          | `endpoint_hostname`                                |
+| Seen IP           | `asset_seen_ip`                                    |
+| Local IP (first)  | First valid entry in `asset_ips`                   |
+| Hostname          | `asset_hostname`                                   |
 
 For manual targets, provide hostnames or IP addresses as comma-separated values. Invalid, loopback, unspecified and
 link-local addresses are filtered out.

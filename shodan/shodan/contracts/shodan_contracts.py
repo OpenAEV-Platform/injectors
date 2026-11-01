@@ -203,20 +203,22 @@ class ShodanContracts:
 
     @staticmethod
     def _build_expectations():
+        expectation_items = [
+            Expectation(
+                expectation_type=ExpectationType.vulnerability,
+                expectation_name="Not vulnerable",
+                expectation_description="",
+                expectation_score=100,
+                expectation_expectation_group=False,
+                expectation_is_predefined=True,
+            )
+        ]
         return ContractExpectations(
             key=InjectorKey.EXPECTATIONS_KEY,
             label="Expectations",
             mandatory=False,
             cardinality=ContractCardinality.Multiple,
-            predefinedExpectations=[
-                Expectation(
-                    expectation_type=ExpectationType.vulnerability,
-                    expectation_name="Not vulnerable",
-                    expectation_description="",
-                    expectation_score=100,
-                    expectation_expectation_group=False,
-                )
-            ],
+            availableExpectations=expectation_items,
         )
 
     def _base_fields(self, selector_default_value: str) -> list[ContractElement]:

@@ -15,6 +15,11 @@ class InjectorConfigOverride(ConfigLoaderCollector):
         default="shodan/img/icon-shodan.png",
         description="Path to the icon file",
     )
+    author: str | None = Field(
+        default=None,
+        description="Optional author override for this injector's contracts. "
+        "When absent, the platform attributes them to the injector's name.",
+    )
 
     def to_daemon_config(self) -> Configuration:
         return Configuration(

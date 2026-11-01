@@ -1,0 +1,14 @@
+openaev:
+  url: 'http://localhost:3001'
+  token: 'ChangeMe'
+
+injector:
+  id: 'ChangeMe'   # unique UUIDv4
+  name: 'Slack'
+  log_level: 'info'
+
+slack:
+  # Slack bot token (xoxb-...) with the chat:write scope - see the README.
+  bot_token: 'ChangeMe'
+#  base_url: 'https://slack.com/api'
+#  request_timeout_seconds: 30

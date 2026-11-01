@@ -9,6 +9,8 @@ from pyoaev.contracts.contract_config import (
     ContractText,
     Expectation,
     ExpectationType,
+    PrimitiveType,
+    SecurityPlatformType,
 )
 from pyoaev.contracts.contract_utils import ContractCardinality
 
@@ -20,11 +22,15 @@ from injector_common.constants import (
 from injector_common.targets import TargetProperty, target_property_choices_dict
 from netexec.contracts.protocol_config import PROTOCOL_CONFIGS
 
-# Credential field definitions keyed by their field name.
+# Credential field definitions keyed by their field name. `argumentType` is
+# omitted for `domain` (reuses a primitive currently modeled for network/scope
+# typing, not yet confirmed to fit an AD NetBIOS domain — see the typing spec's
+# "review" bucket) and `key_file` (a path on the injector's own host, not a
+# discovered artifact — no primitive fits).
 _CREDENTIAL_DEFS = {
-    "username": {"label": "Username"},
-    "password": {"label": "Password"},
-    "hash": {"label": "NTLM hash"},
+    "username": {"label": "Username", "argumentType": PrimitiveType.Username},
+    "password": {"label": "Password", "argumentType": PrimitiveType.Password},
+    "hash": {"label": "NTLM hash", "argumentType": PrimitiveType.Hash},
     "domain": {"label": "Domain"},
     "key_file": {"label": "SSH private key file path"},
 }
@@ -36,7 +42,14 @@ def build_credential_fields(protocol: str) -> list[ContractElement]:
     fields: list[ContractElement] = []
     for cred_key in config["credentials"]:
         defn = _CREDENTIAL_DEFS[cred_key]
-        fields.append(ContractText(key=cred_key, label=defn["label"], mandatory=False))
+        fields.append(
+            ContractText(
+                key=cred_key,
+                label=defn["label"],
+                mandatory=False,
+                argumentType=defn.get("argumentType"),
+            )
+        )
     return fields
 
 
@@ -48,6 +61,7 @@ def build_port_field(protocol: str) -> ContractText:
         key="port",
         label=f"Port (default: {default})",
         mandatory=False,
+        argumentType=PrimitiveType.Port,
     )
 
 
@@ -105,34 +119,47 @@ def build_core_fields() -> list[ContractElement]:
         visibleConditionFields=[target_selector.key],
         visibleConditionValues={target_selector.key: "manual"},
     )
+    expectation_items = [
+        Expectation(
+            expectation_type=ExpectationType.detection,
+            expectation_name="Detection",
+            expectation_description="",
+            expectation_score=100,
+            expectation_expectation_group=False,
+            expectation_is_predefined=True,
+            expectation_expected_security_platform_types=[
+                SecurityPlatformType.EDR,
+                SecurityPlatformType.XDR,
+                SecurityPlatformType.SIEM,
+            ],
+        ),
+        Expectation(
+            expectation_type=ExpectationType.prevention,
+            expectation_name="Prevention",
+            expectation_description="",
+            expectation_score=100,
+            expectation_expectation_group=False,
+            expectation_is_predefined=True,
+            expectation_expected_security_platform_types=[
+                SecurityPlatformType.EDR,
+                SecurityPlatformType.XDR,
+            ],
+        ),
+        Expectation(
+            expectation_type=ExpectationType.vulnerability,
+            expectation_name="Not vulnerable",
+            expectation_description="",
+            expectation_score=100,
+            expectation_expectation_group=False,
+            expectation_is_predefined=True,
+        ),
+    ]
     expectations = ContractExpectations(
         key="expectations",
         label="Expectations",
         mandatory=False,
         cardinality=ContractCardinality.Multiple,
-        predefinedExpectations=[
-            Expectation(
-                expectation_type=ExpectationType.detection,
-                expectation_name="Detection",
-                expectation_description="",
-                expectation_score=100,
-                expectation_expectation_group=False,
-            ),
-            Expectation(
-                expectation_type=ExpectationType.prevention,
-                expectation_name="Prevention",
-                expectation_description="",
-                expectation_score=100,
-                expectation_expectation_group=False,
-            ),
-            Expectation(
-                expectation_type=ExpectationType.vulnerability,
-                expectation_name="Not vulnerable",
-                expectation_description="",
-                expectation_score=100,
-                expectation_expectation_group=False,
-            ),
-        ],
+        availableExpectations=expectation_items,
     )
 
     return [

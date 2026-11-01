@@ -3,7 +3,18 @@ openaev:
   token: 'ChangeMe'
 
 injector:
-  id: 'changeme'
-  name: 'Teams'
+  id: 'ChangeMe'   # unique UUIDv4
+  name: 'Microsoft Teams'
   log_level: 'info'
 
+teams:
+  # Microsoft Entra ID (Azure AD) app registration - see the README for the setup.
+  tenant_id: 'ChangeMe'
+  client_id: 'ChangeMe'
+  client_secret: 'ChangeMe'
+  # Long-lived refresh token minted by the one-time admin consent (see the README).
+  refresh_token: 'ChangeMe'
+#  authority_base_url: 'https://login.microsoftonline.com'
+#  graph_base_url: 'https://graph.microsoft.com/v1.0'
+#  scope: 'offline_access ChannelMessage.Send ChatMessage.Send'
+#  request_timeout_seconds: 30

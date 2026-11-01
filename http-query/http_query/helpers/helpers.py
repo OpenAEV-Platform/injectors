@@ -38,4 +38,8 @@ class HTTPHelpers:
             "status": "SUCCESS",
             "message": response.text
             or f"No response body (HTTP {response.status_code})",
+            # The raw response body, kept separate from 'message' (which falls
+            # back to a synthetic string when the body is empty) so callers can
+            # tell a real body apart from that placeholder.
+            "body": response.text,
         }

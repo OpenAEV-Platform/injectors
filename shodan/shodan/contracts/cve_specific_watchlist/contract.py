@@ -7,6 +7,7 @@ from pyoaev.contracts.contract_config import (
     ContractElement,
     ContractOutputElement,
     ContractText,
+    PrimitiveType,
     SupportedLanguage,
 )
 
@@ -165,6 +166,8 @@ class CVESpecificWatchlist:
                 key="vulnerability",
                 label="Vulnerability",
                 mandatory=True,
+                # Holds a CVE id despite the generic label.
+                argumentType=PrimitiveType.CVE,
                 **cls._build_conditions(
                     source_selector=source_selector_key,
                     target_selector=all_targets_selector,
@@ -223,4 +226,5 @@ class CVESpecificWatchlist:
             fields=contract_with_specific_fields,
             outputs=contract_with_specific_outputs,
             manual=False,
+            contract_attack_patterns_external_ids=["T1596.005"],
         )

@@ -15,6 +15,7 @@ from pyoaev.contracts.contract_config import (
     ContractText,
     Expectation,
     ExpectationType,
+    SecurityPlatformType,
     SupportedLanguage,
     prepare_contracts,
 )
@@ -100,27 +101,40 @@ class NmapContracts:
             visibleConditionFields=[target_selector.key],
             visibleConditionValues={target_selector.key: "manual"},
         )
+
+        expectation_items = [
+            Expectation(
+                expectation_type=ExpectationType.detection,
+                expectation_name="Detection",
+                expectation_description="",
+                expectation_score=100,
+                expectation_expectation_group=False,
+                expectation_is_predefined=True,
+                expectation_expected_security_platform_types=[
+                    SecurityPlatformType.NDR,
+                    SecurityPlatformType.SIEM,
+                    SecurityPlatformType.XDR,
+                ],
+            ),
+            Expectation(
+                expectation_type=ExpectationType.prevention,
+                expectation_name="Prevention",
+                expectation_description="",
+                expectation_score=100,
+                expectation_expectation_group=False,
+                expectation_is_predefined=True,
+                expectation_expected_security_platform_types=[
+                    SecurityPlatformType.NDR,
+                    SecurityPlatformType.XDR,
+                ],
+            ),
+        ]
         expectations = ContractExpectations(
             key="expectations",
             label="Expectations",
             mandatory=False,
             cardinality=ContractCardinality.Multiple,
-            predefinedExpectations=[
-                Expectation(
-                    expectation_type=ExpectationType.detection,
-                    expectation_name="Detection",
-                    expectation_description="",
-                    expectation_score=100,
-                    expectation_expectation_group=False,
-                ),
-                Expectation(
-                    expectation_type=ExpectationType.prevention,
-                    expectation_name="Prevention",
-                    expectation_description="",
-                    expectation_score=100,
-                    expectation_expectation_group=False,
-                ),
-            ],
+            availableExpectations=expectation_items,
         )
 
         # -- OUTPUTS --
@@ -135,6 +149,17 @@ class NmapContracts:
             type=ContractOutputType.Port,
             field="ports",
             isMultiple=True,
+            isFindingCompatible=False,
+            labels=["scan"],
+        )
+        # The raw nmap XML report, stored as a single non-finding-compatible entry:
+        # it never shows up as a visible Finding, but stays usable as a
+        # chaining/event filter, independent of the structured PortsScan/Port
+        # extraction above.
+        output_action_output = ContractOutputElement(
+            type=ContractOutputType.ActionOutput,
+            field="action_output",
+            isMultiple=False,
             isFindingCompatible=False,
             labels=["scan"],
         )
@@ -162,7 +187,14 @@ class NmapContracts:
         )
         nmap_contract_outputs: List[ContractOutputElement] = (
             ContractBuilder()
-            .add_outputs([output_ports_scans, output_port, expectation_signatures])
+            .add_outputs(
+                [
+                    output_ports_scans,
+                    output_port,
+                    output_action_output,
+                    expectation_signatures,
+                ]
+            )
             .build_outputs()
         )
         syn_scan_contract = Contract(
@@ -176,6 +208,7 @@ class NmapContracts:
             outputs=nmap_contract_outputs,
             manual=False,
             domains=[SecurityDomains.NETWORK.value],
+            contract_attack_patterns_external_ids=["T1046"],
         )
         tcp_scan_contract = Contract(
             contract_id=TCP_CONNECT_SCAN_CONTRACT,
@@ -188,6 +221,7 @@ class NmapContracts:
             outputs=nmap_contract_outputs,
             manual=False,
             domains=[SecurityDomains.NETWORK.value],
+            contract_attack_patterns_external_ids=["T1046"],
         )
         fin_scan_contract = Contract(
             contract_id=FIN_SCAN_CONTRACT,
@@ -200,6 +234,7 @@ class NmapContracts:
             outputs=nmap_contract_outputs,
             manual=False,
             domains=[SecurityDomains.NETWORK.value],
+            contract_attack_patterns_external_ids=["T1046"],
         )
         return prepare_contracts(
             [syn_scan_contract, tcp_scan_contract, fin_scan_contract]

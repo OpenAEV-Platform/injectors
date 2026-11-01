@@ -29,6 +29,24 @@ class Engine:
         raise NotImplementedError
 
 
+def build_vulnerability(value: str, reason: str, target=None) -> dict:
+    """Build a `vulnerability` finding entry in the shape the platform's Vulnerability output
+    processor expects: ``name`` and ``status`` are required (the backend rejects and drops any
+    item missing them), ``details`` carries the human-readable reason, and ``asset_id`` links the
+    finding to the targeted AI asset so it surfaces on that asset's detail page. ``asset_id`` is
+    omitted for manual (non-asset) targets.
+    """
+    item = {
+        "name": value,
+        "status": "VULNERABLE",
+        "details": reason,
+    }
+    asset_id = getattr(target, "asset_id", None) if target is not None else None
+    if asset_id:
+        item["asset_id"] = asset_id
+    return item
+
+
 _LEET = str.maketrans({"a": "4", "e": "3", "i": "1", "o": "0", "s": "5", "t": "7"})
 
 

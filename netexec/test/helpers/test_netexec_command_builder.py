@@ -204,3 +204,28 @@ class NetExecCommandBuilderTest(TestCase):
     def test_extract_module_unknown_safe_key_raises(self):
         with self.assertRaises(ValueError):
             extract_data_module({}, "smb", "nonexistent_module_xyz")
+
+    def test_extract_module_spider_plus_forces_output_folder(self):
+        content = {"username": "admin", "password": "pass"}
+        data = extract_data_module(content, "smb", "spider_plus")
+        self.assertIn("spider_output_dir", data)
+        self.assertTrue(data["spider_output_dir"].startswith("/tmp/nxc_spider_plus_"))
+        # The controlled folder is passed to netexec as a module option.
+        o_idx = data["extra_args"].index("-o")
+        opts_after = data["extra_args"][o_idx + 1 :]
+        self.assertIn(f"OUTPUT_FOLDER={data['spider_output_dir']}", opts_after)
+
+    def test_extract_module_spider_plus_overrides_user_output_folder(self):
+        content = {
+            "username": "admin",
+            "password": "pass",
+            "mo_spider_plus_OUTPUT_FOLDER": "/home/attacker/loot",
+        }
+        data = extract_data_module(content, "smb", "spider_plus")
+        o_idx = data["extra_args"].index("-o")
+        opts_after = data["extra_args"][o_idx + 1 :]
+        folders = [o for o in opts_after if o.startswith("OUTPUT_FOLDER=")]
+        # Exactly one OUTPUT_FOLDER, and it is the controlled temp dir, never the
+        # user-supplied one (which we could not read back reliably).
+        self.assertEqual(folders, [f"OUTPUT_FOLDER={data['spider_output_dir']}"])
+        self.assertNotIn("OUTPUT_FOLDER=/home/attacker/loot", opts_after)

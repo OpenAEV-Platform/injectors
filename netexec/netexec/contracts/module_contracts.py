@@ -10,6 +10,7 @@ from pyoaev.contracts.contract_config import (
 )
 from pyoaev.security_domain.types import SecurityDomains
 
+from netexec.contracts.attack_pattern_registry import get_module_attack_patterns
 from netexec.contracts.base_fields import build_protocol_base_fields
 from netexec.contracts.contract_outputs import build_outputs_for_types
 from netexec.contracts.output_registry import get_module_output_types
@@ -71,6 +72,7 @@ def _build_module_contract(
         outputs=build_outputs_for_types(get_module_output_types(safe_name)),
         manual=False,
         domains=[SecurityDomains.ENDPOINT.value, SecurityDomains.NETWORK.value],
+        contract_attack_patterns_external_ids=get_module_attack_patterns(safe_name),
     )
 
 

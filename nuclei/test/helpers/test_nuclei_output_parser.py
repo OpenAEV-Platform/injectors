@@ -97,3 +97,38 @@ class NucleiOutputParserTest(TestCase):
             "Another result line",
         ]
         assert "2 Vulnerabilities" in result["message"]
+
+    # ----------------------------------------------------------------
+    # action_output: raw stdout, additive alongside cve/others (which keep
+    # behaving exactly as they do today), independent of whether any line
+    # parsed as a CVE match.
+    # ----------------------------------------------------------------
+
+    def test_action_output_present_alongside_others(self):
+        stdout = "Some plain text vuln result\nAnother result line"
+        result = parser.parse(stdout, {})
+        self.assertEqual(result["outputs"]["action_output"], stdout)
+        # "others" is untouched by the addition.
+        self.assertEqual(
+            result["outputs"]["others"],
+            ["Some plain text vuln result", "Another result line"],
+        )
+
+    def test_action_output_present_alongside_cve(self):
+        stdout = json.dumps(
+            {
+                "matcher-status": True,
+                "info": {
+                    "classification": {"cve-id": ["CVE-2021-1234"]},
+                    "severity": "high",
+                },
+                "host": "https://example.com",
+            }
+        )
+        result = parser.parse(stdout, {})
+        self.assertEqual(result["outputs"]["action_output"], stdout)
+        self.assertEqual(len(result["outputs"]["cve"]), 1)
+
+    def test_action_output_absent_for_blank_stdout(self):
+        result = parser.parse("   \n  ", {})
+        self.assertNotIn("action_output", result["outputs"])

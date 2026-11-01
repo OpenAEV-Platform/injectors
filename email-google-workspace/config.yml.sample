@@ -1,0 +1,17 @@
+openaev:
+  url: 'http://localhost:3001'
+  token: 'ChangeMe'
+  # only required for multi-tenancy (Enterprise Edition), keep commented otherwise
+  # tenant_id: 'ChangeMe'
+
+injector:
+  id: 'ChangeMe'   # unique UUIDv4
+  name: 'Email (Google Workspace)'
+  log_level: 'error'
+
+gws:
+  # Full service account key JSON with domain-wide delegation for gmail.send - see the README.
+  # In YAML, paste the JSON as a single-quoted string (or use the env var instead).
+  service_account_json: 'ChangeMe'
+  # gmail_base_url: 'https://gmail.googleapis.com/gmail/v1'
+  # request_timeout_seconds: 30

@@ -247,4 +247,5 @@ class CriticalPortsAndExposedAdminInterface:
             fields=contract_with_specific_fields,
             outputs=contract_with_specific_outputs,
             manual=False,
+            contract_attack_patterns_external_ids=["T1596.005"],
         )

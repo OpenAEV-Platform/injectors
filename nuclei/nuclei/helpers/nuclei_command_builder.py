@@ -39,6 +39,7 @@ class NucleiCommandBuilder:
         self.args = []
         build = (
             self._with_nuclei()
+            ._with_engine_flags()
             ._with_configs()
             ._with_tags()
             ._with_templates()
@@ -52,6 +53,21 @@ class NucleiCommandBuilder:
 
     def _with_nuclei(self):
         self.args += ["nuclei"]
+        return self
+
+    def _with_engine_flags(self):
+        # Never let a scan touch Nuclei's own update machinery mid-run: templates
+        # are bundled at build time and refreshed out of band under a lock, so an
+        # in-scan update check only adds variable latency and, when it hits the
+        # network at a bad moment, an apparent hang.
+        # Nuclei Flags: -duc, -disable-update-check
+        self.args += ["-disable-update-check"]
+        # interactsh / OOB polling stalls scans for the whole poll window in
+        # networks that cannot reach the public interactsh servers. Off by
+        # default so OOB-based templates keep working where OOB is reachable.
+        # Nuclei Flags: -ni, -no-interactsh
+        if self.nuclei_configs.disable_interactsh:
+            self.args += ["-no-interactsh"]
         return self
 
     def _with_tags(self):

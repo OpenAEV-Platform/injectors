@@ -10,7 +10,7 @@ import tempfile
 
 import yaml
 from ai_redteam.contracts import constants as c
-from ai_redteam.engines.base import Engine, EngineResult
+from ai_redteam.engines.base import Engine, EngineResult, build_vulnerability
 
 
 def _provider_config(target):
@@ -143,10 +143,11 @@ class PromptfooEngine(Engine):
             }
             if vulnerable:
                 outputs["vulnerability"] = [
-                    {
-                        "value": f"Promptfoo red-team found {failures} failing assertion(s)",
-                        "reason": "Assertion failed",
-                    }
+                    build_vulnerability(
+                        f"Promptfoo red-team found {failures} failing assertion(s)",
+                        "Assertion failed",
+                        target,
+                    )
                 ]
             message = (
                 f"[{'VULNERABLE' if vulnerable else 'DEFENDED'}] Promptfoo red-team: "

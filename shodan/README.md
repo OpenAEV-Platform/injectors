@@ -170,9 +170,9 @@ Targets can come from OpenAEV assets or from manual input, selected per inject:
 | Target property   | Asset field used                            |
 |-------------------|---------------------------------------------|
 | Automatic         | Hostnames and IPs collected from the assets |
-| Seen IP           | `endpoint_seen_ip`                          |
-| Local IP (first)  | First entry in `endpoint_ips`               |
-| Hostname          | `endpoint_hostname`                         |
+| Seen IP           | `asset_seen_ip`                             |
+| Local IP (first)  | First entry in `asset_ips`                  |
+| Hostname          | `asset_hostname`                            |
 
 The resolved hostnames or IP addresses are not scanned directly; they are used as the value of the Shodan filter for the
 chosen contract (hostname-based contracts use the hostnames, IP Enumeration uses the IP addresses). Asset groups are

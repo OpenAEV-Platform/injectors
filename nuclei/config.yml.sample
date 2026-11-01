@@ -1,7 +1,8 @@
 openaev:
   url: "ChangeMe"
   token: "ChangeMe"
-  tenant_id: "ChangeMe"
+  # only required for multi-tenancy (Enterprise Edition), keep commented otherwise
+  # tenant_id: "ChangeMe"
 
 injector:
   id: "nuclei--ChangeMe"
@@ -10,13 +11,19 @@ injector:
 
 nuclei:
   scan_strategy: "host-spray" # Available values: auto / host-spray / template-spray
-  templates_parallelism: 5 # (concurrency)
-  hosts_parallelism_per_template: 5 # (bulk_size)
-  max_requests_per_second: 50 # (rate_limit)
+  templates_parallelism: 2 # (concurrency)
+  hosts_parallelism_per_template: 2 # (bulk_size)
+  max_requests_per_second: 25 # (rate_limit)
   timeout: 10
+  scan_timeout: 540 # hard ceiling (seconds) for a whole scan; keep below the platform inject execution threshold (default 10 min)
+  template_update_timeout: 300 # hard ceiling (seconds) for a template refresh; a hung update cannot block scans or startup, it degrades to best-effort
+  max_concurrent_scans: 5 # max number of scans running at the same time; extra injects wait for a slot
+  disable_interactsh: false # set to true in locked-down networks that cannot reach the public interactsh (OOB) servers
   retries: 1
   max_host_error: 30
   response_size_read: 1048576  # in bytes
   response_size_save: 1048576  # in bytes
   exclude_type: "headless" # Available values: dns, file, http, headless, tcp, workflow, ssl, websocket, whois, code, javascript
 #  exclude_severity: "ChangeMe" # Available values: info, low, medium, high, critical, unknown
+  template_url_allowed_domains: "raw.githubusercontent.com" # allowlist of domains a `template_url` inject field may be fetched from (comma-separated)
+  template_url_max_bytes: 2000000 # maximum size in bytes of a template fetched via a `template_url` inject field

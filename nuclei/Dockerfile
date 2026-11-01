@@ -1,6 +1,6 @@
 FROM python:3.13-alpine AS builder
 
-RUN apk update && apk upgrade && apk add git
+RUN apk --no-cache upgrade && apk --no-cache add git
 
 WORKDIR /opt/injector_common
 COPY --from=injector_common ./ ./
@@ -19,6 +19,8 @@ WORKDIR ${installdir}
 RUN poetry install
 
 FROM python:3.13-alpine AS runner
+
+RUN apk --no-cache upgrade
 
 WORKDIR /opt/injector_common
 COPY --from=injector_common ./ ./
@@ -44,5 +46,13 @@ ARG NUCLEI_VERSION=3.8.0
 ARG NUCLEI_URL=https://github.com/projectdiscovery/nuclei/releases/download/v${NUCLEI_VERSION}/nuclei_${NUCLEI_VERSION}_linux_amd64.zip
 ADD ${NUCLEI_URL} /tmp
 RUN unzip /tmp/nuclei_${NUCLEI_VERSION}_linux_amd64.zip -d /usr/local/bin/
+
+# Bundle the nuclei templates into the image at build time. Without this the
+# container starts with NO templates on an ephemeral filesystem and re-downloads
+# them on every restart, and a scan consumed during that first download reads a
+# half-written template tree (intermittent empty/errored/hung scans). With the
+# templates baked in, a fresh container can scan immediately; the injector still
+# refreshes them synchronously at startup and periodically afterwards.
+RUN nuclei -update-templates
 
 CMD ["python3", "-m", "nuclei.openaev_nuclei"]

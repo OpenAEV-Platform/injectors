@@ -10,16 +10,31 @@ The following repository is used to store the OpenAEV injectors for the platform
 
 This repository is used to host injectors that are supported by the core development team of OpenAEV. Nevertheless, the community is also developing a lot of injectors, third-parties modules directly linked to OpenAEV. You can find the list of all available injectors and plugins in the [OpenAEV ecosystem dedicated space](https://filigran.notion.site/OpenAEV-Ecosystem-30d8eb73d7d04611843e758ddef8941b).
 
+## Development
+This step installs all injectors within the repository inside a single poetry environment. If you do not wish
+to work with all injectors at once, it is possible to install each injector within its own poetry environment. Refer
+to each injector's individual README for instructions.
+
+In this repository, you need to have `python >= 3.11` and `poetry >= 2.1`. Install the development environment with:
+> [!IMPORTANT]
+> This repository uses "mutually exclusive extra markers" to manage the source of the pyoaev dependency. Make sure to
+> follow the steps to set up poetry correctly to handle this case:
+> https://python-poetry.org/docs/dependency-specification/#exclusive-extras
+
+```shell
+poetry install --extras dev
+```
+
 ### Creating a new injector
 
 #### Project setup
-Assuming a new collector by the name of `new_injector`, create a skeleton directory with:
+Assuming a new injector by the name of `new_injector`, create a skeleton directory with:
 ```shell
 poetry new new_injector
 ```
 
 #### `pyoaev` dependency
-We wish to retain the possibility to develop simultaneously on `pyoaev` and collectors. We rely on PEP 508 environment
+We wish to retain the possibility to develop simultaneously on `pyoaev` and injectors. We rely on PEP 508 environment
 markers to alternatively install a local path `pyoaev` dependency or a released version from PyPI; specifically the `extra`
 marker.
 
@@ -32,7 +47,7 @@ vim new_injector/pyproject.toml
 Here's the expression for the pyoaev dependency, including the `extra` definition:
 ```toml
 dependencies = [
-    "pyoaev (==2.1.8); extra != 'dev'",
+    "pyoaev (==<latest pyoaev release on PyPI>); extra != 'dev'",
 ]
 [project.optional-dependencies]
 dev = [
@@ -59,10 +74,17 @@ Here's an example layout:
 │   ├── scripts
 │   └── test
 └── injectors          <= this repo root dir
+    ├── ai-redteam
     ├── aws
+    ├── censys
     ├── http-query
+    ├── injector_common
+    ├── netexec
     ├── nmap
-    └── nuclei
+    ├── nuclei
+    ├── shodan
+    ├── stratus
+    └── teams
 ```
 
 
@@ -72,7 +94,7 @@ If you want to help use improve or develop new injector, please check out the **
 
 ## License
 
-**Unless specified otherwise**, injectors are released under the [Apache 2.0](https://github.com/OpenAEV-Platform/injectors/blob/master/LICENSE). If an injector is released by its author under a different license, the subfolder corresponding to it will contain a *LICENSE* file.
+**Unless specified otherwise**, injectors are released under the [Apache 2.0](https://github.com/OpenAEV-Platform/injectors/blob/main/LICENSE). If an injector is released by its author under a different license, the subfolder corresponding to it will contain a *LICENSE* file.
 
 ## About
 

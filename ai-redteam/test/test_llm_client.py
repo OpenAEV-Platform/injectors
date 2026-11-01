@@ -111,6 +111,54 @@ class SendPromptTest(TestCase):
         result = llm_client.send_prompt(target, "hi", "m", timeout=5)
         self.assertEqual(result.text, "fb")
 
+    @patch("ai_redteam.targets.llm_client.requests.post")
+    def test_xtm_one_posts_platform_chat_message(self, post):
+        post.return_value = _response(
+            {"content": "agent reply", "conversation_id": "c1"}
+        )
+        target = _target(
+            "XTM_ONE",
+            "https://xtm-one.example.test",
+            configuration={"xtm_one_slug": "ctem-assistant"},
+        )
+        result = llm_client.send_prompt(target, "attack", "marker-9", timeout=5)
+        self.assertEqual(result.text, "agent reply")
+        self.assertEqual(
+            post.call_args.args[0],
+            "https://xtm-one.example.test/api/v1/platform/chat/messages",
+        )
+        sent_body = post.call_args.kwargs["json"]
+        self.assertEqual(sent_body["agent_slug"], "ctem-assistant")
+        self.assertEqual(sent_body["content"], "attack")
+        self.assertFalse(sent_body["stream"])
+        self.assertEqual(
+            post.call_args.kwargs["headers"]["Authorization"], "Bearer secret-key"
+        )
+
+    @patch("ai_redteam.targets.llm_client.requests.post")
+    def test_xtm_one_derives_slug_from_model_and_strips_v1(self, post):
+        post.return_value = _response({"content": "ok"})
+        target = _target("XTM_ONE", "https://xtm-one.example.test/v1")
+        target.model = "agent:triage"
+        llm_client.send_prompt(target, "hi", "m", timeout=5)
+        self.assertEqual(
+            post.call_args.args[0],
+            "https://xtm-one.example.test/api/v1/platform/chat/messages",
+        )
+        self.assertEqual(post.call_args.kwargs["json"]["agent_slug"], "triage")
+
+    def test_xtm_one_without_endpoint_raises(self):
+        target = _target("XTM_ONE", endpoint=None)
+        with self.assertRaises(ValueError):
+            llm_client.send_prompt(target, "hi", "m", timeout=5)
+
+    def test_xtm_one_without_slug_raises(self):
+        # Neither a configured slug nor a model to derive one from.
+        target = _target("XTM_ONE", "https://xtm-one.example.test")
+        target.model = "   "
+        with self.assertRaises(ValueError):
+            llm_client.send_prompt(target, "hi", "m", timeout=5)
+
 
 class SafeJsonTest(TestCase):
     def test_returns_raw_on_invalid_json(self):
@@ -118,3 +166,33 @@ class SafeJsonTest(TestCase):
         resp.json.side_effect = ValueError("not json")
         resp.text = "plain body"
         self.assertEqual(llm_client._safe_json(resp), {"_raw": "plain body"})
+
+
+class RedactBodyTest(TestCase):
+    def test_redacts_sensitive_top_level_keys(self):
+        body = {"input": "prompt", "api_key": "sk-secret", "token": "fcp-secret"}
+        redacted = llm_client._redact_body(body)
+        self.assertEqual(redacted["input"], "prompt")
+        self.assertEqual(redacted["api_key"], "***redacted***")
+        self.assertEqual(redacted["token"], "***redacted***")
+        # the original body must not be mutated
+        self.assertEqual(body["api_key"], "sk-secret")
+
+    def test_leaves_non_dict_untouched(self):
+        self.assertEqual(llm_client._redact_body("raw"), "raw")
+
+    @patch("ai_redteam.targets.llm_client.requests.post")
+    def test_custom_http_body_secret_is_redacted_in_logs(self, post):
+        resp = _response({"output": "ok"})
+        resp.elapsed.total_seconds.return_value = 0.01
+        post.return_value = resp
+        logger = MagicMock()
+        target = _target(
+            "CUSTOM_HTTP",
+            "https://agent.example.com",
+            configuration={"body_template": {"api_key": "sk-should-not-leak"}},
+        )
+        llm_client.send_prompt(target, "hi", "m", timeout=5, logger=logger)
+        logged = " ".join(str(call.args[0]) for call in logger.info.call_args_list)
+        self.assertIn("***redacted***", logged)
+        self.assertNotIn("sk-should-not-leak", logged)

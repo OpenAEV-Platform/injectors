@@ -8,7 +8,7 @@ multi-turn attack) using the multi-provider LLM client, so the technique always 
 
 from ai_redteam import detectors
 from ai_redteam.contracts import constants as c
-from ai_redteam.engines.base import Engine, EngineResult
+from ai_redteam.engines.base import Engine, EngineResult, build_vulnerability
 from ai_redteam.targets import llm_client
 
 ESCALATION_TEMPLATES = [
@@ -24,6 +24,7 @@ class PyritEngine(Engine):
         self.timeout = timeout
 
     def run(self, content, target, marker, ctx) -> EngineResult:
+        logger = (ctx or {}).get("logger")
         objective = (content.get(c.KEY_PYRIT_OBJECTIVE) or "").replace(
             "{marker}", marker
         )
@@ -37,9 +38,13 @@ class PyritEngine(Engine):
 
         # Built-in escalation fallback (always available). A real PyRIT integration can be wired
         # behind a feature flag; the fallback keeps the technique functional out of the box.
-        return self._escalation_loop(objective, strategy, max_turns, target, marker)
+        return self._escalation_loop(
+            objective, strategy, max_turns, target, marker, logger
+        )
 
-    def _escalation_loop(self, objective, strategy, max_turns, target, marker):
+    def _escalation_loop(
+        self, objective, strategy, max_turns, target, marker, logger=None
+    ):
         transcript = []
         success = False
         reason = "Target resisted across all turns"
@@ -52,13 +57,37 @@ class PyritEngine(Engine):
             )
             try:
                 response = llm_client.send_prompt(
-                    target, prompt, marker, timeout=self.timeout
+                    target, prompt, marker, timeout=self.timeout, logger=logger
                 )
             except Exception as exc:  # noqa: BLE001
                 return EngineResult(
                     success=False,
                     status="ERROR",
                     message=f"Error during PyRIT escalation turn {turn + 1}: {exc}",
+                )
+            # A non-2xx means the turn never reached the model (auth/endpoint/
+            # upstream failure): report an execution error instead of silently
+            # counting it as a resisted turn.
+            status_code = response.status_code
+            if status_code is not None and not (200 <= status_code < 300):
+                return EngineResult(
+                    success=False,
+                    status="ERROR",
+                    message=(
+                        f"AI target returned HTTP {status_code} on PyRIT "
+                        f"escalation turn {turn + 1} and could not be tested.\n"
+                        f"Response (truncated):\n{(response.text or '')[:1500]}"
+                    ),
+                    # Mirror the native engine's ERROR outputs so multi-target
+                    # aggregation keeps the marker and can surface the HTTP status
+                    # of the failing target in the summary.
+                    outputs={
+                        "response": (response.text or "")[:4000],
+                        "marker": marker,
+                        "target_endpoint": target.endpoint or "",
+                        "http_status": status_code,
+                        "attack_succeeded": False,
+                    },
                 )
             last_response = response.text
             transcript.append(
@@ -80,10 +109,9 @@ class PyritEngine(Engine):
         }
         if success:
             outputs["vulnerability"] = [
-                {
-                    "value": f"Multi-turn ({strategy}) jailbreak succeeded",
-                    "reason": reason,
-                }
+                build_vulnerability(
+                    f"Multi-turn ({strategy}) jailbreak succeeded", reason, target
+                )
             ]
         message = (
             f"[{'VULNERABLE' if success else 'DEFENDED'}] PyRIT {strategy} campaign ({turns} turns): "

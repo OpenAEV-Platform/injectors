@@ -12,6 +12,7 @@ from pyoaev.contracts.contract_config import (
     ContractText,
     Expectation,
     ExpectationType,
+    SecurityPlatformType,
     SupportedLanguage,
     prepare_contracts,
 )
@@ -92,34 +93,49 @@ class NucleiContracts:
             visibleConditionFields=[target_selector.key],
             visibleConditionValues={target_selector.key: "manual"},
         )
+
+        expectation_items = [
+            Expectation(
+                expectation_type=ExpectationType.detection,
+                expectation_name="Detection",
+                expectation_description="",
+                expectation_score=100,
+                expectation_expectation_group=False,
+                expectation_is_predefined=True,
+                expectation_expected_security_platform_types=[
+                    SecurityPlatformType.XDR,
+                    SecurityPlatformType.SIEM,
+                    SecurityPlatformType.NDR,
+                ],
+            ),
+            Expectation(
+                expectation_type=ExpectationType.prevention,
+                expectation_name="Prevention",
+                expectation_description="",
+                expectation_score=100,
+                expectation_expectation_group=False,
+                expectation_is_predefined=True,
+                expectation_expected_security_platform_types=[
+                    SecurityPlatformType.XDR,
+                    SecurityPlatformType.NDR,
+                ],
+            ),
+            Expectation(
+                expectation_type=ExpectationType.vulnerability,
+                expectation_name="Not vulnerable",
+                expectation_description="",
+                expectation_score=100,
+                expectation_expectation_group=False,
+                expectation_is_predefined=True,
+            ),
+        ]
         expectations = ContractExpectations(
             key="expectations",
             label="Expectations",
             mandatory=False,
             cardinality=ContractCardinality.Multiple,
-            predefinedExpectations=[
-                Expectation(
-                    expectation_type=ExpectationType.detection,
-                    expectation_name="Detection",
-                    expectation_description="",
-                    expectation_score=100,
-                    expectation_expectation_group=False,
-                ),
-                Expectation(
-                    expectation_type=ExpectationType.prevention,
-                    expectation_name="Prevention",
-                    expectation_description="",
-                    expectation_score=100,
-                    expectation_expectation_group=False,
-                ),
-                Expectation(
-                    expectation_type=ExpectationType.vulnerability,
-                    expectation_name="Not vulnerable",
-                    expectation_description="",
-                    expectation_score=100,
-                    expectation_expectation_group=False,
-                ),
-            ],
+            availableExpectations=expectation_items,
+            predefinedExpectations=expectation_items,
         )
 
         return [
@@ -154,7 +170,22 @@ class NucleiContracts:
             isFindingCompatible=True,
             labels=["nuclei"],
         )
-        return [output_expectation_signatures, output_vulns, output_others]
+        # The raw stdout, additive alongside "others" (which keeps behaving
+        # exactly as it does today, unlike netexec's dead catch-all): never a
+        # visible Finding, but stays usable as a chaining/event filter.
+        output_action_output = ContractOutputElement(
+            type=ContractOutputType.ActionOutput,
+            field="action_output",
+            isMultiple=False,
+            isFindingCompatible=False,
+            labels=["nuclei"],
+        )
+        return [
+            output_expectation_signatures,
+            output_vulns,
+            output_others,
+            output_action_output,
+        ]
 
     @staticmethod
     def build_contract(
@@ -179,6 +210,7 @@ class NucleiContracts:
             outputs=ContractBuilder().add_outputs(contract_outputs).build_outputs(),
             manual=False,
             domains=domains,
+            contract_attack_patterns_external_ids=["T1595.002"],
         )
 
     @staticmethod
@@ -194,6 +226,13 @@ class NucleiContracts:
                         ContractText(
                             key="template",
                             label="Manual template path (-t)",
+                            mandatory=False,
+                        )
+                    ]
+                    + [
+                        ContractText(
+                            key="template_url",
+                            label="Template URL (fetched to a local file)",
                             mandatory=False,
                         )
                     ]

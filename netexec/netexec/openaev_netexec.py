@@ -1,5 +1,6 @@
 import json
 import os
+import shutil
 import time
 from importlib.resources import files
 
@@ -15,6 +16,7 @@ from injector_common.constants import TARGET_PROPERTY_SELECTOR_KEY, TARGET_SELEC
 from injector_common.data_helpers import DataHelpers
 from injector_common.dump_config import intercept_dump_argument
 from injector_common.targets import TargetProperty, Targets
+from injector_common.traces import send_per_target_traces
 from netexec.configuration.config_loader import ConfigLoader
 from netexec.contracts import parse_contract_id
 from netexec.helpers.netexec_command_builder import (
@@ -26,6 +28,7 @@ from netexec.helpers.netexec_command_builder import (
 )
 from netexec.helpers.netexec_output_parser import NetExecOutputParser
 from netexec.helpers.netexec_process import execute_netexec
+from netexec.helpers.spider_plus_parser import parse_spider_output_dir
 
 _SENSITIVE_KEYS = {"password", "hash", "key_file", "username", "domain"}
 
@@ -159,7 +162,21 @@ class OpenAEVNetExecInjector:
             data=callback_data,
         )
 
+        # Per-target traces so each asset-backed endpoint's result view shows the
+        # run reached it; the batched run only sends a global callback otherwise.
+        send_per_target_traces(
+            self.helper,
+            inject_id,
+            target_results.ip_to_asset_id_map,
+            label="NetExec",
+            start=start,
+        )
+
         output_file = parsed_data.get("output_file") if parsed_data else None
+        spider_output_dir = (
+            parsed_data.get("spider_output_dir") if parsed_data else None
+        )
+        spider_files: list[dict] = []
         execution_details, execution_signatures = self._pre_execution_compile(targets)
         try:
             stdout, stderr, returncode = execute_netexec(cmd)
@@ -177,6 +194,13 @@ class OpenAEVNetExecInjector:
                     self.helper.injector_logger.error(
                         f"Unable to execute NetExec due to missing file: {err}"
                     )
+
+            # spider_plus writes its file list to a JSON metadata folder, not
+            # stdout. Read it into `file` findings before the folder is cleaned.
+            if spider_output_dir:
+                spider_files = parse_spider_output_dir(
+                    spider_output_dir, target_results.ip_to_asset_id_map
+                )
         except Exception as err:
             self.helper.injector_logger.error(f"Unable to execute NetExec: {err}")
         finally:
@@ -185,6 +209,8 @@ class OpenAEVNetExecInjector:
                     os.remove(output_file)
                 except OSError:
                     pass
+            if spider_output_dir:
+                shutil.rmtree(spider_output_dir, ignore_errors=True)
 
         parse_result = self.parser.parse(
             stdout,
@@ -192,6 +218,12 @@ class OpenAEVNetExecInjector:
             family=contract_family,
             identifier=contract_identifier,
         )
+
+        # File findings come from the spider_plus JSON metadata, not stdout, so
+        # merge them into the structured outputs after the stdout parse.
+        if spider_files:
+            parse_result["outputs"]["files"] = spider_files
+            parse_result["message"] += f", {len(spider_files)} files"
         return {
             "success": returncode == 0,
             "stdout": stdout,

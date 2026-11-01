@@ -11,7 +11,7 @@ import subprocess
 import tempfile
 
 from ai_redteam.contracts import constants as c
-from ai_redteam.engines.base import Engine, EngineResult
+from ai_redteam.engines.base import Engine, EngineResult, build_vulnerability
 
 
 def _model_type_and_env(target):
@@ -104,10 +104,9 @@ class GarakEngine(Engine):
             }
             if vulnerable:
                 outputs["vulnerability"] = [
-                    {
-                        "value": f"Garak probe failed: {p}",
-                        "reason": "Detector triggered",
-                    }
+                    build_vulnerability(
+                        f"Garak probe failed: {p}", "Detector triggered", target
+                    )
                     for p in failed_probes[:50]
                 ]
             message = (

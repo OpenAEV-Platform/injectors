@@ -1,0 +1,16 @@
+openaev:
+  url: 'http://localhost:3001'
+  token: 'ChangeMe'
+  # only required for multi-tenancy (Enterprise Edition), keep commented otherwise
+  # tenant_id: 'ChangeMe'
+
+injector:
+  id: 'ChangeMe'
+  name: 'Censys'
+  log_level: 'error'
+
+censys:
+  api_id: 'ChangeMe'
+  api_secret: 'ChangeMe'
+  # per_page: 50
+  # max_pages: 10

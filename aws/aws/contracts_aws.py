@@ -13,6 +13,8 @@ from pyoaev.contracts.contract_config import (
     ContractText,
     Expectation,
     ExpectationType,
+    PrimitiveType,
+    SecurityPlatformType,
     SupportedLanguage,
     prepare_contracts,
 )
@@ -136,21 +138,26 @@ class AWSContracts:
             },
         )
 
-        # Common expectations
+        expectation_items = [
+            Expectation(
+                expectation_type=ExpectationType.detection,
+                expectation_name="Detection",
+                expectation_description="",
+                expectation_score=100,
+                expectation_expectation_group=False,
+                expectation_is_predefined=True,
+                expectation_expected_security_platform_types=[
+                    SecurityPlatformType.SIEM,
+                    SecurityPlatformType.XDR,
+                ],
+            )
+        ]
         expectations = ContractExpectations(
             key="expectations",
             label="Expectations",
             mandatory=False,
             cardinality=ContractCardinality.Multiple,
-            predefinedExpectations=[
-                Expectation(
-                    expectation_type=ExpectationType.detection,
-                    expectation_name="Detection",
-                    expectation_description="",
-                    expectation_score=100,
-                    expectation_expectation_group=False,
-                )
-            ],
+            availableExpectations=expectation_items,
         )
 
         # Output types for different modules
@@ -421,7 +428,8 @@ class AWSContracts:
             en: str,
             fr: str,
             outputs: List[ContractOutputElement],
-            fields: List[ContractElement] = None,
+            fields: List[ContractElement] | None = None,
+            attack_patterns: List[str] | None = None,
         ) -> Contract:
             return Contract(
                 contract_id=contract_id,
@@ -434,6 +442,7 @@ class AWSContracts:
                 outputs=(ContractBuilder().add_outputs(outputs).build_outputs()),
                 manual=False,
                 domains=[SecurityDomains.CLOUD.value],
+                contract_attack_patterns_external_ids=attack_patterns or [],
             )
 
         # IAM Enumeration contracts
@@ -442,6 +451,7 @@ class AWSContracts:
             "AWS - IAM Enumerate Permissions",
             "AWS - Énumération des permissions IAM",
             [output_iam_permissions],
+            attack_patterns=["T1069.003"],
         )
 
         iam_enum_users_contract = make_contract(
@@ -454,6 +464,7 @@ class AWSContracts:
                 output_iam_policies,
                 output_iam_groups,
             ],
+            attack_patterns=["T1087.004"],
         )
 
         iam_enum_roles_contract = make_contract(
@@ -461,6 +472,7 @@ class AWSContracts:
             "AWS - IAM Enumerate Roles",
             "AWS - Énumération des rôles IAM",
             [output_iam_roles],
+            attack_patterns=["T1069.003"],
         )
 
         # IAM Privilege Escalation Scan
@@ -469,6 +481,7 @@ class AWSContracts:
             "AWS - IAM Privilege Escalation Scan",
             "AWS - Scan d'escalade de privilèges IAM",
             [output_iam_privesc_paths],
+            attack_patterns=["T1069.003"],
         )
 
         # IAM Get Account Password Policy
@@ -477,6 +490,7 @@ class AWSContracts:
             "AWS - IAM Get Account Password Policy",
             "AWS - Obtenir la politique de mot de passe IAM",
             [output_iam_password_policy],
+            attack_patterns=["T1201"],
         )
 
         # IAM Create User (Attack)
@@ -484,6 +498,7 @@ class AWSContracts:
             key="username",
             label="Username to create",
             mandatory=True,
+            argumentType=PrimitiveType.Username,
         )
 
         iam_create_user_fields = (
@@ -508,6 +523,7 @@ class AWSContracts:
             "AWS - Créer un utilisateur IAM (Attaque)",
             [],  # No outputs - this is an attack action
             fields=iam_create_user_fields,
+            attack_patterns=["T1136.003"],
         )
 
         # EC2 Enumeration contracts
@@ -516,6 +532,7 @@ class AWSContracts:
             "AWS - EC2 Enumerate Instances",
             "AWS - Énumération des instances EC2",
             [output_ec2_instances, output_ec2_security_groups],
+            attack_patterns=["T1580"],
         )
 
         ec2_enum_security_groups_contract = make_contract(
@@ -523,6 +540,7 @@ class AWSContracts:
             "AWS - EC2 Enumerate Security Groups",
             "AWS - Énumération des groupes de sécurité EC2",
             [output_ec2_security_groups],
+            attack_patterns=["T1580"],
         )
 
         # S3 contracts
@@ -532,6 +550,7 @@ class AWSContracts:
             "AWS - S3 List Buckets",
             "AWS - Lister les buckets S3",
             [output_s3_buckets],
+            attack_patterns=["T1619"],
         )
 
         # S3 Download specific bucket
@@ -562,6 +581,7 @@ class AWSContracts:
             "AWS - Télécharger le bucket S3",
             [output_json],
             fields=s3_download_fields,
+            attack_patterns=["T1530"],
         )
 
         # Lambda Enumeration
@@ -570,6 +590,7 @@ class AWSContracts:
             "AWS - Lambda Enumerate Functions",
             "AWS - Énumération des fonctions Lambda",
             [output_lambda_functions],
+            attack_patterns=["T1526"],
         )
 
         # CloudTrail Enumeration
@@ -578,6 +599,7 @@ class AWSContracts:
             "AWS - CloudTrail Enumerate Trails",
             "AWS - Énumération CloudTrail",
             [output_cloudtrail_events],
+            attack_patterns=["T1580"],
         )
 
         # VPC Enumeration
@@ -586,6 +608,7 @@ class AWSContracts:
             "AWS - VPC Enumerate Networks",
             "AWS - Énumération des VPC",
             [output_vpc_networks],
+            attack_patterns=["T1580"],
         )
 
         # RDS Enumeration
@@ -594,6 +617,7 @@ class AWSContracts:
             "AWS - RDS Enumerate Databases",
             "AWS - Énumération des bases RDS",
             [output_rds_databases],
+            attack_patterns=["T1526"],
         )
 
         # Secrets Manager Enumeration
@@ -602,6 +626,7 @@ class AWSContracts:
             "AWS - Secrets Manager Enumerate",
             "AWS - Énumération Secrets Manager",
             [output_secrets],
+            attack_patterns=["T1526"],
         )
 
         # SSM Parameters Enumeration
@@ -610,6 +635,7 @@ class AWSContracts:
             "AWS - SSM Enumerate Parameters",
             "AWS - Énumération des paramètres SSM",
             [output_ssm_parameters],
+            attack_patterns=["T1526"],
         )
 
         # Organizations Enumeration
@@ -618,6 +644,7 @@ class AWSContracts:
             "AWS - Organizations Enumerate",
             "AWS - Énumération des organisations",
             [output_organizations],
+            attack_patterns=["T1526"],
         )
 
         # EBS Snapshots Enumeration
@@ -626,6 +653,7 @@ class AWSContracts:
             "AWS - EBS Enumerate Snapshots",
             "AWS - Énumération des snapshots EBS",
             [output_ebs_snapshots],
+            attack_patterns=["T1580"],
         )
 
         # DynamoDB Enumeration
@@ -634,6 +662,7 @@ class AWSContracts:
             "AWS - DynamoDB Enumerate Tables",
             "AWS - Énumération des tables DynamoDB",
             [output_dynamodb_tables],
+            attack_patterns=["T1526"],
         )
 
         # ECR Enumeration
@@ -642,6 +671,7 @@ class AWSContracts:
             "AWS - ECR Enumerate Repositories",
             "AWS - Énumération des dépôts ECR",
             [output_ecr_repositories],
+            attack_patterns=["T1526"],
         )
 
         # ECS Enumeration
@@ -650,6 +680,7 @@ class AWSContracts:
             "AWS - ECS Enumerate Clusters",
             "AWS - Énumération des clusters ECS",
             [output_ecs_clusters],
+            attack_patterns=["T1526"],
         )
 
         # EKS Enumeration
@@ -658,6 +689,7 @@ class AWSContracts:
             "AWS - EKS Enumerate Clusters",
             "AWS - Énumération des clusters EKS",
             [output_eks_clusters],
+            attack_patterns=["T1526"],
         )
 
         # GuardDuty Enumeration
@@ -666,6 +698,7 @@ class AWSContracts:
             "AWS - GuardDuty List Findings",
             "AWS - Liste des découvertes GuardDuty",
             [output_guardduty_findings],
+            attack_patterns=["T1518.001"],
         )
 
         # Cognito Enumeration
@@ -674,6 +707,7 @@ class AWSContracts:
             "AWS - Cognito Enumerate User Pools",
             "AWS - Énumération des pools Cognito",
             [output_cognito_pools],
+            attack_patterns=["T1526"],
         )
 
         # Glue Enumeration
@@ -682,6 +716,7 @@ class AWSContracts:
             "AWS - Glue Enumerate Databases",
             "AWS - Énumération des bases Glue",
             [output_glue_databases],
+            attack_patterns=["T1526"],
         )
 
         # Route53 Enumeration
@@ -690,6 +725,7 @@ class AWSContracts:
             "AWS - Route53 Enumerate Zones",
             "AWS - Énumération des zones Route53",
             [output_route53_zones],
+            attack_patterns=["T1526"],
         )
 
         # SNS Enumeration
@@ -698,6 +734,7 @@ class AWSContracts:
             "AWS - SNS Enumerate Topics",
             "AWS - Énumération des topics SNS",
             [output_sns_topics],
+            attack_patterns=["T1526"],
         )
 
         return prepare_contracts(

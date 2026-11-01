@@ -108,7 +108,24 @@ class OpenAEVHttp:
         # Execute inject
         try:
             execution_result = self.http_execution(data)
-            execution_outputs = {"url": execution_result["url"]}
+            # http_execution returns an error dict without "url" for
+            # unsupported contracts; fall back to the requested URI so the
+            # real error message is reported instead of a KeyError.
+            url = execution_result.get("url")
+            if url is None:
+                url = data["injection"]["inject_content"].get("uri", "")
+            execution_outputs = {"url": url}
+            # The raw response body, stored as a single non-finding-compatible
+            # entry (isFindingCompatible=False on the contract side): it never
+            # shows up as a visible Finding, but stays usable as a
+            # chaining/event filter. Routed verbatim so the output reflects the
+            # actual response content; .strip() is only the non-blank gate
+            # (same gate netexec uses for its action_output), so a bodyless
+            # response (e.g. HTTP 204) emits nothing - there is nothing to
+            # route.
+            body = execution_result.get("body", "")
+            if body.strip():
+                execution_outputs["action_output"] = body
             callback_data = {
                 "execution_message": execution_result["message"],
                 "execution_output_structured": json.dumps(execution_outputs),
@@ -120,6 +137,12 @@ class OpenAEVHttp:
                 inject_id=inject_id, data=callback_data
             )
         except Exception as e:
+            # Decision: no action_output on this path. Unlike netexec (whose
+            # tool stdout exists even on failure), a request that raised
+            # (timeout, DNS failure, connection refused) has no response
+            # object at all - there is no real body to route, only an error
+            # message, which would misrepresent action_output as response
+            # content.
             callback_data = {
                 "execution_message": str(e),
                 "execution_status": "ERROR",

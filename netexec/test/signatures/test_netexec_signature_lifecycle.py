@@ -8,6 +8,7 @@ pyoaev is mocked by test/conftest.py — SignatureManager and build_network_conf
 are both MagicMocks in this context, which lets us assert on their call signatures.
 """
 
+from types import SimpleNamespace
 from unittest import TestCase
 from unittest.mock import MagicMock, patch
 
@@ -202,6 +203,46 @@ class SignatureLifecycleTest(TestCase):
         self.mock_sm.build_execution_signatures.assert_called_once_with(
             config=["cfg-1", "cfg-2"]
         )
+
+    # -- Scenario: Each asset-backed target gets its own execution trace --
+
+    def test_process_message_emits_per_target_traces_for_asset_targets(self):
+        """
+        Given an inject targeting two asset-backed endpoints
+        When process_message runs the batched NetExec command
+        Then a target-scoped execution trace is emitted per asset id, so each
+        endpoint's result view shows the run reached it.
+        """
+        injector = self._make_injector()
+        data, _ = _build_data(["10.0.0.1", "10.0.0.2"])
+        extraction = SimpleNamespace(
+            targets=["10.0.0.1", "10.0.0.2"],
+            ip_to_asset_id_map={"10.0.0.1": "asset-1", "10.0.0.2": "asset-2"},
+        )
+
+        with patch(
+            "netexec.openaev_netexec.build_network_configs",
+            return_value=["cfg-1", "cfg-2"],
+        ), patch(
+            "netexec.openaev_netexec.Targets.extract_targets",
+            return_value=extraction,
+        ), patch(
+            "netexec.openaev_netexec.Targets.extract_target_meta",
+            return_value=[],
+        ):
+            self._run_process_message(injector, data, returncode=0)
+
+        calls = injector.helper.api.inject.execution_callback.call_args_list
+        target_calls = [
+            c for c in calls if c.kwargs["data"].get("execution_context_identifiers")
+        ]
+        self.assertEqual(len(target_calls), 2)
+        identifiers = sorted(
+            c.kwargs["data"]["execution_context_identifiers"][0] for c in target_calls
+        )
+        self.assertEqual(identifiers, ["asset-1", "asset-2"])
+        for c in target_calls:
+            self.assertEqual(c.kwargs["data"]["execution_action"], "command_execution")
 
 
 class NetexecSignatureTypesTest(TestCase):

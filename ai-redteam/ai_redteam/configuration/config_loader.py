@@ -21,6 +21,9 @@ class ConfigLoader(SettingsLoader):
                 "injector_name": {"data": self.injector.name},
                 "injector_type": {"data": c.INJECTOR_TYPE},
                 "injector_contracts": {"data": build_contracts()},
+                # Optional author override; None lets the platform attribute
+                # the contracts to the injector's name.
+                "injector_author": {"data": self.injector.author},
                 "injector_log_level": {"data": self.injector.log_level},
                 "injector_icon_filepath": {"data": self.injector.icon_filepath},
                 "injector_request_timeout_seconds": {

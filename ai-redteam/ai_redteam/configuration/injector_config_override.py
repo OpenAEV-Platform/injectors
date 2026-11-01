@@ -19,3 +19,8 @@ class InjectorConfigOverride(ConfigLoaderCollector):
         default=120,
         description="HTTP timeout (seconds) for a single request to an AI target.",
     )
+    author: str | None = Field(
+        default=None,
+        description="Optional author override for this injector's contracts. "
+        "When absent, the platform attributes them to the injector's name.",
+    )
