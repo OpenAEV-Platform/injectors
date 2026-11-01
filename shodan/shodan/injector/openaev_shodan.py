@@ -24,7 +24,7 @@ from shodan.models import (
     ContractType,
     NormalizeInputData,
 )
-from shodan.services import ShodanClientAPI, Utils
+from shodan.services import ShodanClientAPI, ShodanFindingsParser, Utils
 
 LOG_PREFIX = "[SHODAN_INJECTOR]"
 
@@ -38,6 +38,7 @@ class ShodanInjector:
         self.helper = helper
         self.shodan_client_api = ShodanClientAPI(self.config, self.helper)
         self.utils = Utils()
+        self.findings_parser = ShodanFindingsParser()
 
     def _prepare_output_message(
         self, normalize_input_data: NormalizeInputData, results, user_info: dict
@@ -442,9 +443,16 @@ class ShodanInjector:
         )
 
         # Preparation and creation of auto_create_assets
-        output_structured = ""
+        output_structured = {}
         if normalize_input_data.inject_content.auto_create_assets:
-            output_structured = self._prepare_output_structured(shodan_results)
+            output_structured.update(self._prepare_output_structured(shodan_results))
+
+        # Parse Shodan matches into finding-compatible structured outputs
+        # (IPv4 / PortsScan / CVE). Emitted for every execution, independently
+        # of auto_create_assets, so downstream chaining can trigger off them.
+        output_structured.update(
+            self.findings_parser.parse(normalize_input_data, shodan_results)
+        )
 
         # Preparation and creation of output_message
         output_message = self._prepare_output_message(
