@@ -127,7 +127,7 @@ An injector may expose **one or more contracts**, depending on the inject types 
 
 | Requirement                                                                       | Recommended Version | Purpose                                                                                         |
 |-----------------------------------------------------------------------------------|---------------------|-------------------------------------------------------------------------------------------------|
-| Python                                                                            | `>=3.11,<4.0`       | Primary runtime environment for all injectors                                                   |
+| Python                                                                            | `>=3.14,<4.0`       | Primary runtime environment for all injectors                                                   |
 | Pyoaev (`client-python`)                                                          | `2.260521.0`        | OpenAEV Python SDK used for injector contracts, runtime integration, and platform communication |
 | [Docker](https://docs.docker.com/engine/install/)                                 | `>=24`              | Containerized injector execution and deployment                                                 |
 | [Docker Compose](https://docs.docker.com/compose/install/)                        | `v2+`               | Local development stack orchestration and multi-service management                              |
@@ -137,7 +137,7 @@ An injector may expose **one or more contracts**, depending on the inject types 
 ### Knowledge Requirements
 
 To contribute an injector, you should be comfortable with:
-- Proficiency in **Python programming (3.11+)**
+- Proficiency in **Python programming (3.14+)**
 - **Pydantic** v2 models and **Pydantic Settings**
 - **Git branching** and the **Pull Request** workflow
 - **Docker** and **Docker Compose** fundamentals
@@ -396,7 +396,7 @@ tests/shodan_contracts/domain_discovery/
 Every injector must include a functional `Dockerfile` and `docker-compose.yml`. 
 
 Key requirements:
-- Use a `python:3.x-alpine` base image with a Python version >=3.11 and <3.14
+- Use a `python:3.x-alpine` base image with a Python version >=3.14
 - Minimize layer count and image size
 - Include health checks where applicable
 - Follow security best practices (non-root user, minimal packages)

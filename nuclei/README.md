@@ -46,7 +46,7 @@ the RabbitMQ host/port advertised by the platform.
 
 - A running OpenAEV platform, reachable from the injector (along with its RabbitMQ broker)
 - For a manual (non-Docker) deployment:
-  - Python >= 3.11 and [Poetry](https://python-poetry.org/) >= 2.1
+  - Python >= 3.14 and [Poetry](https://python-poetry.org/) >= 2.1
   - The `nuclei` binary available on the `PATH` (the Docker image bundles Nuclei `v3.8.0`)
   - Outbound network access to `raw.githubusercontent.com` and `github.com` so the injector can update the Nuclei
     templates and sync the per-CVE contracts

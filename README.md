@@ -15,7 +15,7 @@ This step installs all injectors within the repository inside a single poetry en
 to work with all injectors at once, it is possible to install each injector within its own poetry environment. Refer
 to each injector's individual README for instructions.
 
-In this repository, you need to have `python >= 3.11` and `poetry >= 2.1`. Install the development environment with:
+In this repository, you need to have `python >= 3.14` and `poetry >= 2.1`. Install the development environment with:
 > [!IMPORTANT]
 > This repository uses "mutually exclusive extra markers" to manage the source of the pyoaev dependency. Make sure to
 > follow the steps to set up poetry correctly to handle this case:

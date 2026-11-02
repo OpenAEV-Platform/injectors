@@ -1,4 +1,4 @@
-FROM python:3.13-alpine AS builder
+FROM python:3.14-alpine AS builder
 
 ENV PIP_VERSION=25.0.1
 
@@ -24,7 +24,7 @@ WORKDIR ${installdir}
 RUN poetry install && \
     python3 -m pip install --no-cache-dir pip==${PIP_VERSION}
 
-FROM python:3.13-alpine AS runner
+FROM python:3.14-alpine AS runner
 
 ENV PIP_VERSION=25.0.1
 ENV STRATUS_VERSION=2.24.0
@@ -38,7 +38,7 @@ COPY --from=injector_common ./ ./
 ARG installdir=/opt/injector
 WORKDIR ${installdir}
 COPY --from=builder ${installdir} ${installdir}
-COPY --from=builder /usr/local/lib/python3.13/site-packages /usr/local/lib/python3.13/site-packages
+COPY --from=builder /usr/local/lib/python3.14/site-packages /usr/local/lib/python3.14/site-packages
 
 ARG PYOAEV_GIT_BRANCH_OVERRIDE
 

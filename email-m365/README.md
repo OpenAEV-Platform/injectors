@@ -60,7 +60,7 @@ For each job the injector acquires an app-only access token with MSAL (client-cr
 - A Microsoft 365 tenant and an Entra ID (Azure AD) app registration with the `Mail.Send` application permission
   (admin-consented) - see [Microsoft 365 app setup](#microsoft-365-app-setup).
 - Outbound HTTPS access from the injector to `login.microsoftonline.com` and `graph.microsoft.com`.
-- For a manual (non-Docker) deployment: Python >= 3.11 and [Poetry](https://python-poetry.org/) >= 2.1.
+- For a manual (non-Docker) deployment: Python >= 3.14 and [Poetry](https://python-poetry.org/) >= 2.1.
 
 ## Microsoft 365 app setup
 

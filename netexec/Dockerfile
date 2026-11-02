@@ -1,4 +1,4 @@
-FROM python:3.13-alpine AS builder
+FROM python:3.14-alpine AS builder
 
 RUN apk --no-cache upgrade && apk --no-cache add \
     git \
@@ -24,7 +24,7 @@ ADD . ${installdir}
 WORKDIR ${installdir}
 RUN poetry install
 
-FROM python:3.13-alpine AS runner
+FROM python:3.14-alpine AS runner
 
 # brotli-libs: the system Brotli that Pillow's FreeType loads (see the netexec install).
 RUN apk --no-cache upgrade && apk --no-cache add \
@@ -43,7 +43,7 @@ COPY --from=injector_common ./ ./
 ARG installdir=/opt/injector
 WORKDIR ${installdir}
 COPY --from=builder ${installdir} ${installdir}
-COPY --from=builder /usr/local/lib/python3.13/site-packages /usr/local/lib/python3.13/site-packages
+COPY --from=builder /usr/local/lib/python3.14/site-packages /usr/local/lib/python3.14/site-packages
 
 # Declare the build argument
 ARG PYOAEV_GIT_BRANCH_OVERRIDE
