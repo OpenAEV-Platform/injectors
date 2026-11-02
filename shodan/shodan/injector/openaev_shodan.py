@@ -5,7 +5,6 @@ from urllib.parse import urlparse
 
 from pyoaev.helpers import OpenAEVInjectorHelper
 
-from injector_common.pagination import Pagination
 from shodan.contracts import (
     CloudProviderAssetDiscovery,
     CriticalPortsAndExposedAdminInterface,
@@ -191,19 +190,8 @@ class ShodanInjector:
 
     def _resolve_assets(self, data: dict, selector_key: str) -> list[dict]:
 
-        if selector_key == "assets":
+        if selector_key == "assets" or selector_key == "asset-groups":
             return data.get("assets", [])
-
-        if selector_key == "asset-groups":
-            asset_groups = data.get("assetGroups", [])
-            asset_group_ids = [
-                asset_group.get("asset_group_id") for asset_group in asset_groups
-            ]
-
-            return Pagination.fetch_all_targets(
-                helper=self.helper,
-                asset_group_ids=asset_group_ids,
-            )
 
         return []
 
