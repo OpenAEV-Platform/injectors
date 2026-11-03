@@ -529,7 +529,7 @@ def test_aws_credential_without_endpoint_sets_no_endpoint(tmp_path: Path) -> Non
     "secret_type", ("AZURE_SERVICE_PRINCIPAL", "AZURE_MANAGED_IDENTITY")
 )
 @pytest.mark.parametrize(
-    "authority", ("http://mock.example.test", "http://mock.example.test/")
+    "authority", ("https://mock.example.test", "https://mock.example.test/")
 )
 def test_azure_credential_authority_host_is_normalized(
     tmp_path: Path, secret_type: str, authority: str
@@ -543,17 +543,17 @@ def test_azure_credential_authority_host_is_normalized(
 
     environment = _environment(_adapter(tmp_path).adapt(provider))
 
-    assert environment["AZURE_AUTHORITY_HOST"] == "http://mock.example.test/"
-    assert environment["AZURE_POD_IDENTITY_AUTHORITY_HOST"] == (
-        "http://mock.example.test/"
-    )
+    assert environment["AZURE_AUTHORITY_HOST"] == "https://mock.example.test/"
+    # azure-identity reads this one as the managed identity (IMDS) endpoint,
+    # never as the Entra authority.
+    assert "AZURE_POD_IDENTITY_AUTHORITY_HOST" not in environment
 
 
 @pytest.mark.parametrize(
     "secret_type", ("AZURE_SERVICE_PRINCIPAL", "AZURE_MANAGED_IDENTITY")
 )
 @pytest.mark.parametrize(
-    "authority", ("http://mock.example.test", "http://mock.example.test/")
+    "authority", ("https://mock.example.test", "https://mock.example.test/")
 )
 def test_azure_credential_authority_host_is_also_the_arm_endpoint(
     tmp_path: Path, secret_type: str, authority: str
@@ -567,7 +567,7 @@ def test_azure_credential_authority_host_is_also_the_arm_endpoint(
 
     environment = _environment(_adapter(tmp_path).adapt(provider))
 
-    assert environment["AZURE_ARM_ENDPOINT"] == "http://mock.example.test"
+    assert environment["AZURE_ARM_ENDPOINT"] == "https://mock.example.test"
 
 
 @pytest.mark.parametrize(
@@ -584,7 +584,7 @@ def test_azure_arm_endpoint_is_absent_without_a_credential_authority_host(
     assert "AZURE_ARM_ENDPOINT" not in environment
 
 
-def test_azure_credential_authority_host_wins_over_the_host_variable(
+def test_azure_credential_authority_host_keeps_the_host_imds_endpoint(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     monkeypatch.setenv("AZURE_POD_IDENTITY_AUTHORITY_HOST", "http://host.example.test/")
@@ -592,7 +592,7 @@ def test_azure_credential_authority_host_wins_over_the_host_variable(
         AzureReferenceProviderInput,
         AZURE_INPUT,
         "AZURE_MANAGED_IDENTITY",
-        azure_authority_host_uri="http://mock.example.test/",
+        azure_authority_host_uri="https://mock.example.test/",
     )
 
     invocation = _adapter(tmp_path).adapt(provider)
@@ -600,8 +600,9 @@ def test_azure_credential_authority_host_wins_over_the_host_variable(
     names = [name for name, _value in invocation.environment]
     assert names.count("AZURE_POD_IDENTITY_AUTHORITY_HOST") == 1
     environment = _environment(invocation)
+    assert environment["AZURE_AUTHORITY_HOST"] == "https://mock.example.test/"
     assert environment["AZURE_POD_IDENTITY_AUTHORITY_HOST"] == (
-        "http://mock.example.test/"
+        "http://host.example.test/"
     )
 
 
@@ -678,6 +679,9 @@ def test_gcp_oauth2_sovereign_values_reach_the_environment(tmp_path: Path) -> No
     )
     assert environment["GOOGLE_IAM_CUSTOM_ENDPOINT"] == "http://mock.example.test/iam"
     assert environment["GOOGLE_OAUTH_ACCESS_TOKEN"] == "OAUTH-ACCESS-TOKEN-CANARY"
+    # Prowler only reads the token, and then the project, from these ones.
+    assert environment["CLOUDSDK_AUTH_ACCESS_TOKEN"] == "OAUTH-ACCESS-TOKEN-CANARY"
+    assert environment["GOOGLE_CLOUD_PROJECT"] == environment["GOOGLE_PROJECT"]
     assert "GOOGLE_RESOURCE_MANAGER_CUSTOM_ENDPOINT" not in environment
     for lease in invocation.credential_leases:
         lease.cleanup()
@@ -721,7 +725,7 @@ def test_gcp_service_account_resource_manager_uri_reaches_the_environment(
             AZURE_INPUT,
             "AZURE_SERVICE_PRINCIPAL",
             {
-                "azure_authority_host_uri": "http://mock.example.test/",
+                "azure_authority_host_uri": "https://mock.example.test/",
                 "azure_requests_certificate": base64.b64encode(CA_CERTIFICATE).decode(),
             },
         ),

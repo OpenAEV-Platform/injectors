@@ -801,7 +801,7 @@ class ProcessMessageCredentialReferenceTest(TestCase):
             },
         }
         for payload in (AZURE_SERVICE_PRINCIPAL_PAYLOAD, managed_identity):
-            for uri in ("http://mock:8080", "http://mock:8080/"):
+            for uri in ("https://mock:8080", "https://mock:8080/"):
                 with self.subTest(secret_type=payload["type"], uri=uri):
                     injector = self._injector(
                         _with_values(payload, azure_authority_host_uri=uri)
@@ -813,10 +813,9 @@ class ProcessMessageCredentialReferenceTest(TestCase):
                         self._callback(injector)["execution_status"], "SUCCESS"
                     )
                     env = self._detonate_env(injector)
-                    self.assertEqual(env["AZURE_AUTHORITY_HOST"], "http://mock:8080/")
-                    self.assertEqual(
-                        env["AZURE_POD_IDENTITY_AUTHORITY_HOST"], "http://mock:8080/"
-                    )
+                    self.assertEqual(env["AZURE_AUTHORITY_HOST"], "https://mock:8080/")
+                    # The managed identity (IMDS) endpoint is never the authority.
+                    self.assertNotIn("AZURE_POD_IDENTITY_AUTHORITY_HOST", env)
                     self.assertNotIn("REQUESTS_CA_BUNDLE", env)
                     self.assertNotIn("SSL_CERT_FILE", env)
 
@@ -830,6 +829,72 @@ class ProcessMessageCredentialReferenceTest(TestCase):
             env["AZURE_AUTHORITY_HOST"], "https://login.microsoftonline.com/"
         )
         self.assertNotIn("AZURE_POD_IDENTITY_AUTHORITY_HOST", env)
+
+    def test_azure_managed_identity_hands_the_host_identity_over(self):
+        payload = {
+            "type": "AZURE_MANAGED_IDENTITY",
+            "value": {
+                "azure_environment": "AzureCloud",
+                "azure_subscription_id": "ref-subscription",
+                "azure_authority_host_uri": "https://mock:8080/",
+            },
+        }
+        host = {
+            "AZURE_POD_IDENTITY_AUTHORITY_HOST": "http://localhost:4577",
+            "IDENTITY_ENDPOINT": "http://localhost:4578/token",
+            "AZURE_TENANT_ID": "host-tenant",
+            "AZURE_CLIENT_ID": "host-client",
+            "AZURE_AUTHORITY_HOST": "https://host-authority/",
+        }
+        with patch.dict(os.environ, host):
+            injector = self._injector(payload)
+            injector.process_message(
+                _data(AZURE_CONTENT, AZURE_CUSTOM_CONTRACT, ATTACHMENTS)
+            )
+        env = self._detonate_env(injector)
+        # The IMDS endpoint is the host's, never the credential authority.
+        self.assertEqual(
+            env["AZURE_POD_IDENTITY_AUTHORITY_HOST"], "http://localhost:4577"
+        )
+        self.assertEqual(env["IDENTITY_ENDPOINT"], "http://localhost:4578/token")
+        self.assertEqual(env["AZURE_TENANT_ID"], "host-tenant")
+        # A host client id would turn the system-assigned identity into a
+        # user-assigned one; the authority is the credential's.
+        self.assertNotIn("AZURE_CLIENT_ID", env)
+        self.assertEqual(env["AZURE_AUTHORITY_HOST"], "https://mock:8080/")
+
+    def test_azure_managed_identity_without_host_variables_adds_nothing(self):
+        payload = {
+            "type": "AZURE_MANAGED_IDENTITY",
+            "value": {
+                "azure_environment": "AzureCloud",
+                "azure_subscription_id": "ref-subscription",
+            },
+        }
+        with patch.dict(os.environ, clear=False):
+            for name in mod.AZURE_MANAGED_IDENTITY_VARIABLES:
+                os.environ.pop(name, None)
+            injector = self._injector(payload)
+            injector.process_message(
+                _data(AZURE_CONTENT, AZURE_CUSTOM_CONTRACT, ATTACHMENTS)
+            )
+        env = self._detonate_env(injector)
+        for name in mod.AZURE_MANAGED_IDENTITY_VARIABLES:
+            self.assertNotIn(name, env)
+
+    def test_azure_service_principal_does_not_get_the_host_identity(self):
+        host = {
+            "AZURE_POD_IDENTITY_AUTHORITY_HOST": "http://localhost:4577",
+            "AZURE_TENANT_ID": "host-tenant",
+        }
+        with patch.dict(os.environ, host):
+            injector = self._injector(AZURE_SERVICE_PRINCIPAL_PAYLOAD)
+            injector.process_message(
+                _data(AZURE_CONTENT, AZURE_CUSTOM_CONTRACT, ATTACHMENTS)
+            )
+        env = self._detonate_env(injector)
+        self.assertNotIn("AZURE_POD_IDENTITY_AUTHORITY_HOST", env)
+        self.assertEqual(env["AZURE_TENANT_ID"], "ref-tenant")
 
     def test_azure_certificate_is_trusted_by_python_and_go_then_removed(self):
         seen = {}
