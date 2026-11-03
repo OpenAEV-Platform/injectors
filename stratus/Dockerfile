@@ -8,9 +8,9 @@ COPY --from=injector_common ./ ./
 WORKDIR /
 RUN git clone https://github.com/OpenAEV-Platform/client-python
 
-RUN python3 -m pip install -U pip certifi
+RUN python3 -m pip install --no-cache-dir -U pip certifi
 
-RUN python3 -m pip install poetry==2.3.2 \
+RUN python3 -m pip install --no-cache-dir poetry==2.3.2 \
     && poetry config installer.re-resolve false \
     && poetry config virtualenvs.create false
 
@@ -51,9 +51,9 @@ RUN apk --no-cache upgrade && \
 RUN if [ -n "${PYOAEV_GIT_BRANCH_OVERRIDE}" ] ; then \
         echo "Forcing specific version of client-python" && \
         apk add --no-cache git && \
-        pip install pip3-autoremove && \
+        pip install --no-cache-dir pip3-autoremove && \
         pip-autoremove pyoaev -y && \
-        pip install "git+https://github.com/OpenAEV-Platform/client-python@${PYOAEV_GIT_BRANCH_OVERRIDE}" ; \
+        pip install --no-cache-dir "git+https://github.com/OpenAEV-Platform/client-python@${PYOAEV_GIT_BRANCH_OVERRIDE}" ; \
     fi
 
 CMD ["python3", "-m", "stratus.openaev_stratus"]
