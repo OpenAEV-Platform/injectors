@@ -23,6 +23,7 @@ RUN poetry install
 FROM python:3.13-alpine AS runner
 
 RUN apk --no-cache upgrade && apk --no-cache add nmap
+RUN pip install --no-cache-dir -U pip certifi
 
 WORKDIR /opt/injector_common
 COPY --from=injector_common ./ ./

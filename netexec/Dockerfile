@@ -38,6 +38,7 @@ RUN apk --no-cache upgrade && apk --no-cache add \
     openssl-dev \
     cargo \
     git
+RUN pip install --no-cache-dir -U pip certifi
 
 WORKDIR /opt/injector_common
 COPY --from=injector_common ./ ./

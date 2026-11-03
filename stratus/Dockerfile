@@ -28,6 +28,7 @@ ENV STRATUS_VERSION=2.24.0
 ENV STRATUS_SHA256=bcc307e72427e785431a89c025388141201fa82d64d2337de20d6a602b0576a0
 
 RUN apk --no-cache upgrade
+RUN pip install --no-cache-dir -U pip certifi
 
 WORKDIR /opt/injector_common
 COPY --from=injector_common ./ ./
