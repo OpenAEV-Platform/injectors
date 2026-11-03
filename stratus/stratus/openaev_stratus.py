@@ -8,6 +8,7 @@ from typing import Dict, List, Optional, Tuple
 from pyoaev.credential import (
     AwsAssumeRoleSecret,
     AwsSourceIdentityType,
+    AzureManagedIdentitySecret,
     CredentialCleanupError,
     CredentialErrorCode,
     CredentialResolutionError,
@@ -75,6 +76,24 @@ AWS_INSTANCE_IDENTITY_VARIABLES = (
     "AWS_EC2_METADATA_V1_DISABLED",
     "AWS_METADATA_SERVICE_TIMEOUT",
     "AWS_METADATA_SERVICE_NUM_ATTEMPTS",
+)
+
+# Same for an Azure managed identity, which is the host's own identity: the
+# endpoints and secrets the Azure platform defines for it. App Service,
+# Container Apps and Functions (IDENTITY_*), Service Fabric, Arc (IMDS_ENDPOINT),
+# Azure ML and Cloud Shell (MSI_*), pod identity, and workload identity.
+# AZURE_CLIENT_ID is left out on purpose: it would turn the system-assigned
+# identity of the credential into a user-assigned one.
+AZURE_MANAGED_IDENTITY_VARIABLES = (
+    "IDENTITY_ENDPOINT",
+    "IDENTITY_HEADER",
+    "IDENTITY_SERVER_THUMBPRINT",
+    "IMDS_ENDPOINT",
+    "MSI_ENDPOINT",
+    "MSI_SECRET",
+    "AZURE_POD_IDENTITY_AUTHORITY_HOST",
+    "AZURE_FEDERATED_TOKEN_FILE",
+    "AZURE_TENANT_ID",
 )
 
 LEGACY_CREDENTIAL_SOURCE = "the inject credential fields"
@@ -225,17 +244,17 @@ class OpenAEVStratus:
         Only the listed variables that are set are handed over; a value the
         credential materializes itself always wins over the host one.
         """
-        if not (
+        if (
             isinstance(credential, AwsAssumeRoleSecret)
             and credential.aws_source_identity_type
             == AwsSourceIdentityType.INSTANCE_DEFAULT
         ):
+            names = AWS_INSTANCE_IDENTITY_VARIABLES
+        elif isinstance(credential, AzureManagedIdentitySecret):
+            names = AZURE_MANAGED_IDENTITY_VARIABLES
+        else:
             return {}
-        return {
-            name: os.environ[name]
-            for name in AWS_INSTANCE_IDENTITY_VARIABLES
-            if name in os.environ
-        }
+        return {name: os.environ[name] for name in names if name in os.environ}
 
     @staticmethod
     def _reference_default_env(
