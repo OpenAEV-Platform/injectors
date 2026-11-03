@@ -77,7 +77,13 @@ class Targets:
             ASSETS_KEY_RABBITMQ
         ]:
             for asset in data[ASSETS_KEY_RABBITMQ]:
-                target_pair = Targets._get_target(asset, selector_property)
+                try:
+                    target_pair = Targets._get_target(asset, selector_property)
+                except Exception as e:
+                    helper.injector_logger.error(
+                        f"Error processing asset_id={asset.get('asset_id')}: {e}"
+                    )
+                    continue
                 if target_pair is None:
                     continue
                 asset_group = None
