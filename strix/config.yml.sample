@@ -1,0 +1,22 @@
+openaev:
+  url: "ChangeMe"
+  token: "ChangeMe"
+  # only required for multi-tenancy (Enterprise Edition), keep commented otherwise
+  # tenant_id: "ChangeMe"
+
+injector:
+  id: "strix--ChangeMe"
+  name: "Strix"
+  log_level: "error"
+
+strix:
+  llm_model: "openai/gpt-4.1"   # LiteLLM identifier; e.g. anthropic/claude-sonnet-4 or ollama/<model>
+  llm_api_key: "ChangeMe"       # leave empty for a local provider that needs no key
+  # llm_api_base: "http://host.docker.internal:11434"  # OpenAI-compatible endpoint (local model)
+  # perplexity_api_key: "ChangeMe"                     # enables Strix search
+  scan_mode: "deep"             # quick / standard / deep
+  max_turns: 60
+  # max_budget_usd: 10          # recommended in deep mode
+  scan_timeout: 540             # hard ceiling (s) for a whole assessment; keep below the platform inject execution threshold (default 10 min)
+  max_concurrent_scans: 2       # Strix is heavy; extra injects wait for a slot
+  # docker_host: "unix:///var/run/docker.sock"
