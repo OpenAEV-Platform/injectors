@@ -14,8 +14,10 @@ COPY --from=injector_common ./ ./
 WORKDIR /
 RUN git clone https://github.com/OpenAEV-Platform/client-python
 
+RUN pip3 install --no-cache-dir -U pip certifi
+
 # poetry version available on Ubuntu 24.04
-RUN pip3 install poetry==2.3.2 \
+RUN pip3 install --no-cache-dir poetry==2.3.2 \
     && poetry config installer.re-resolve false \
     && poetry config virtualenvs.create false
 
@@ -36,6 +38,7 @@ RUN apk --no-cache upgrade && apk --no-cache add \
     openssl-dev \
     cargo \
     git
+RUN pip install --no-cache-dir -U pip certifi
 
 WORKDIR /opt/injector_common
 COPY --from=injector_common ./ ./
@@ -50,9 +53,9 @@ ARG PYOAEV_GIT_BRANCH_OVERRIDE
 
 RUN if [[ ${PYOAEV_GIT_BRANCH_OVERRIDE} ]] ; then \
         echo "Forcing specific version of client-python" && \
-        pip install pip3-autoremove && \
+        pip install --no-cache-dir pip3-autoremove && \
         pip-autoremove pyoaev -y && \
-        pip install git+https://github.com/OpenAEV-Platform/client-python@${PYOAEV_GIT_BRANCH_OVERRIDE} ; \
+        pip install --no-cache-dir git+https://github.com/OpenAEV-Platform/client-python@${PYOAEV_GIT_BRANCH_OVERRIDE} ; \
     fi
 
 # Install netexec. The Pillow wheels bundle Brotli 1.2.0 (CVE-2026-111497) for

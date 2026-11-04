@@ -8,8 +8,10 @@ COPY --from=injector_common ./ ./
 WORKDIR /
 RUN git clone https://github.com/OpenAEV-Platform/client-python
 
+RUN pip install --no-cache-dir -U pip certifi
+
 # poetry version available on Ubuntu 24.04
-RUN pip3 install poetry==2.3.2 \
+RUN pip3 install --no-cache-dir poetry==2.3.2 \
     && poetry config installer.re-resolve false \
     && poetry config virtualenvs.create false
 
@@ -21,6 +23,7 @@ RUN poetry install
 FROM python:3.13-alpine AS runner
 
 RUN apk --no-cache upgrade
+RUN pip install --no-cache-dir -U pip certifi
 
 WORKDIR /opt/injector_common
 COPY --from=injector_common ./ ./
@@ -36,9 +39,9 @@ ARG PYOAEV_GIT_BRANCH_OVERRIDE
 RUN if [ -n "${PYOAEV_GIT_BRANCH_OVERRIDE}" ] ; then \
         echo "Forcing specific version of client-python" && \
         apk add --no-cache git && \
-        pip install pip3-autoremove && \
+        pip install --no-cache-dir pip3-autoremove && \
         pip-autoremove pyoaev -y && \
-        pip install git+https://github.com/OpenAEV-Platform/client-python@${PYOAEV_GIT_BRANCH_OVERRIDE} ; \
+        pip install --no-cache-dir git+https://github.com/OpenAEV-Platform/client-python@${PYOAEV_GIT_BRANCH_OVERRIDE} ; \
     fi
 
 CMD ["python3", "-m", "email_gws_injector.openaev_email_gws"]
