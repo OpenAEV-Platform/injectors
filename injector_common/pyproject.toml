@@ -5,7 +5,7 @@ requires-python = ">=3.11,<4.0"
 
 [tool.poetry.dependencies]
 python = "^3.11"
-pyoaev = "3.261023.0"
+pyoaev = "3.261104.0"
 
 [tool.poetry.group.dev.dependencies]
 black = "^26.3.0"
