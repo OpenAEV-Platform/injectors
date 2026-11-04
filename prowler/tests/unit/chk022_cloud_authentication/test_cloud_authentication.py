@@ -338,6 +338,155 @@ def test_assume_role_of_the_inject_account_runs() -> None:
     assert len(_Contract.executed) == 1
 
 
+def _with_account(payload: dict[str, Any], account: str) -> dict[str, Any]:
+    """Copy of a resolved AWS secret that carries its own account."""
+    return {
+        "type": payload["type"],
+        "value": {**payload["value"], "aws_account_id": account},
+    }
+
+
+def test_account_of_the_credential_wins_over_the_form_account() -> None:
+    callbacks = _process(
+        _helper(_with_account(_assume_role(OTHER_ACCOUNT), OTHER_ACCOUNT)),
+        AWS_FORM,
+        attachments=ATTACHMENTS,
+    )
+
+    assert callbacks[-1]["execution_status"] == "SUCCESS"
+    (executed,) = _Contract.executed
+    assert executed.aws_account_id == ACCOUNT
+    assert executed.effective_aws_account_id == OTHER_ACCOUNT
+    assert _Contract().safe_request_info(executed)["account"] == OTHER_ACCOUNT
+    assert executed.safe_log_metadata()["aws_account_id"] == OTHER_ACCOUNT
+
+
+def test_assume_role_is_checked_against_the_account_of_the_credential() -> None:
+    # The role belongs to the account of the form, not to the one of the
+    # credential: the credential account is the expected one.
+    (terminal,) = _process(
+        _helper(_with_account(_assume_role(ACCOUNT), OTHER_ACCOUNT)),
+        AWS_FORM,
+        attachments=ATTACHMENTS,
+    )
+
+    assert terminal["execution_status"] == "ERROR"
+    assert _Contract.executed == []
+    assert "CREDENTIAL_ACCOUNT_MISMATCH" in terminal["execution_message"]
+    assert OTHER_ACCOUNT in terminal["execution_message"]
+
+
+def test_authenticated_account_is_compared_with_the_credential_account() -> None:
+    helper = _helper(_with_account(AWS_ACCESS_KEY, OTHER_ACCOUNT))
+
+    callbacks = _process(
+        helper, AWS_FORM, attachments=ATTACHMENTS, stdout=_aws_box(OTHER_ACCOUNT)
+    )
+
+    # The form account differs, but only the credential one is expected.
+    assert [payload["execution_status"] for payload in callbacks] == [
+        "INFO",
+        "SUCCESS",
+    ]
+
+
+def test_other_authenticated_account_warns_with_the_credential_account() -> None:
+    helper = _helper(_with_account(AWS_ACCESS_KEY, OTHER_ACCOUNT))
+
+    _auth, warning, _terminal = _process(
+        helper, AWS_FORM, attachments=ATTACHMENTS, stdout=_aws_box(ACCOUNT)
+    )
+
+    assert warning["execution_status"] == "WARNING"
+    assert f"not the AWS account {OTHER_ACCOUNT} set on this inject" in (
+        warning["execution_message"]
+    )
+
+
+def test_account_of_the_credential_is_not_checked_against_the_form_pattern() -> None:
+    callbacks = _process(
+        _helper(_with_account(AWS_ACCESS_KEY, "mock-account")),
+        AWS_FORM,
+        attachments=ATTACHMENTS,
+    )
+
+    assert callbacks[-1]["execution_status"] == "SUCCESS"
+    (executed,) = _Contract.executed
+    assert executed.effective_aws_account_id == "mock-account"
+
+
+@pytest.mark.parametrize(
+    "form",
+    (
+        {"aws_account_id": "ACCOUNT-CANARY"},
+        {"aws_account_id": ""},
+        {},
+        {"aws_account_id": "ACCOUNT-CANARY", "aws_endpoint_url": "not a url"},
+    ),
+)
+def test_invalid_form_values_are_ignored_when_the_credential_has_them(
+    form: dict[str, str],
+) -> None:
+    payload = {
+        "type": "AWS_ACCESS_KEY",
+        "value": {
+            **AWS_ACCESS_KEY["value"],
+            "aws_account_id": OTHER_ACCOUNT,
+            "aws_endpoint_url": "http://mock.example.test",
+        },
+    }
+
+    callbacks = _process(_helper(payload), form, attachments=ATTACHMENTS)
+
+    assert callbacks[-1]["execution_status"] == "SUCCESS"
+    (executed,) = _Contract.executed
+    assert executed.effective_aws_account_id == OTHER_ACCOUNT
+    assert executed.effective_aws_endpoint_url == "http://mock.example.test"
+
+
+@pytest.mark.parametrize(
+    ("form", "guidance"),
+    (
+        (
+            {"aws_account_id": "ACCOUNT-CANARY"},
+            "AWS account ID must contain exactly 12 ASCII digits.",
+        ),
+        ({"aws_account_id": ""}, "AWS account ID is required."),
+        ({}, "AWS account ID is required."),
+    ),
+)
+def test_invalid_form_account_in_use_is_reported_before_the_scan(
+    form: dict[str, str], guidance: str
+) -> None:
+    (terminal,) = _process(_helper(AWS_ACCESS_KEY), form, attachments=ATTACHMENTS)
+
+    assert terminal["execution_status"] == "ERROR"
+    assert _Contract.executed == []
+    assert guidance in terminal["execution_message"]
+    assert "ACCOUNT-CANARY" not in json.dumps(terminal, default=str)
+
+
+def test_invalid_form_endpoint_in_use_is_reported_before_the_scan() -> None:
+    (terminal,) = _process(
+        _helper(AWS_ACCESS_KEY),
+        {**AWS_FORM, "aws_endpoint_url": "https://user:pass@example.test"},
+        attachments=ATTACHMENTS,
+    )
+
+    assert terminal["execution_status"] == "ERROR"
+    assert _Contract.executed == []
+    assert "AWS endpoint URL has an invalid value." in terminal["execution_message"]
+    assert "user:pass" not in json.dumps(terminal, default=str)
+
+
+def test_form_account_is_used_when_the_credential_has_none() -> None:
+    callbacks = _process(_helper(AWS_ACCESS_KEY), AWS_FORM, attachments=ATTACHMENTS)
+
+    assert callbacks[-1]["execution_status"] == "SUCCESS"
+    (executed,) = _Contract.executed
+    assert executed.effective_aws_account_id == ACCOUNT
+
+
 def test_region_comes_from_the_credential() -> None:
     callbacks = _process(_helper(AWS_ACCESS_KEY), AWS_FORM, attachments=ATTACHMENTS)
 
