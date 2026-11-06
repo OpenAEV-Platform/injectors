@@ -585,4 +585,3 @@ class TestSendSignatures:
         assert isinstance(targets_meta[0], TargetMeta)
         assert targets_meta[0].agent_id is None
         assert targets_meta[0].asset_id is None
-        assert targets_meta[0].asset_group_id is None

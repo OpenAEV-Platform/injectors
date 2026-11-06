@@ -2,7 +2,6 @@ from unittest import TestCase
 from unittest.mock import MagicMock
 
 from injector_common.constants import (
-    ASSET_GROUPS_KEY,
     ASSETS_KEY_RABBITMQ,
     TARGET_PROPERTY_SELECTOR_KEY,
     TARGET_SELECTOR_KEY,
@@ -194,37 +193,22 @@ class CommonTargetsTest(TestCase):
 
     # ---------- extract_target_meta ----------
 
-    # ---------- message carrying asset_groups ----------
-
-    def _asset_groups_message(self, assets):
-        return {
+    def test_given_message_with_asset_groups_should_read_group_members_from_message(
+        self,
+    ):
+        # Arrange: one member with an agent and one member without a usable target
+        data = {
             "injection": {
                 "inject_content": {
                     TARGET_SELECTOR_KEY: "asset-groups",
                     TARGET_PROPERTY_SELECTOR_KEY: "automatic",
                 }
             },
-            ASSETS_KEY_RABBITMQ: assets,
+            ASSETS_KEY_RABBITMQ: [
+                {**self.asset_local_ip, "asset_agents": [{"agent_id": "ag2"}]},
+                self.empty_asset_ips,
+            ],
         }
-
-    @staticmethod
-    def _asset_group(asset_group_id):
-        return {"asset_group_id": asset_group_id, "asset_group_name": asset_group_id}
-
-    def test_given_message_with_asset_groups_should_read_group_members_from_message(
-        self,
-    ):
-        # Arrange: one member of both groups and one member without a usable target
-        in_both_groups = {
-            **self.asset_local_ip,
-            "asset_agents": [{"agent_id": "ag2"}],
-            ASSET_GROUPS_KEY: [self._asset_group("grp-2"), self._asset_group("grp-1")],
-        }
-        no_target = {
-            **self.empty_asset_ips,
-            ASSET_GROUPS_KEY: [self._asset_group("grp-1")],
-        }
-        data = self._asset_groups_message([in_both_groups, no_target])
 
         # Act
         result = Targets.extract_targets(
@@ -234,12 +218,11 @@ class CommonTargetsTest(TestCase):
             "asset-groups", "automatic", data, self.mock_helper
         )
 
-        # Assert: the member is scanned once, with a single TargetMeta carrying the first
-        # group listed in its asset_groups
+        # Assert: the member is scanned once, with a single TargetMeta
         self.assertEqual(result.targets, ["10.0.0.2"])
         self.assertEqual(
-            [(meta.asset_id, meta.asset_group_id, meta.agent_id) for meta in metas],
-            [("a2", "grp-2", "ag2")],
+            [(meta.asset_id, meta.agent_id) for meta in metas],
+            [("a2", "ag2")],
         )
 
     def test_given_message_with_asset_groups_should_align_meta_with_targets_in_assets_mode(
@@ -254,8 +237,8 @@ class CommonTargetsTest(TestCase):
                 }
             },
             ASSETS_KEY_RABBITMQ: [
-                {**self.empty_asset_ips, "asset_agents": [], ASSET_GROUPS_KEY: []},
-                {**self.asset_local_ip, "asset_agents": [], ASSET_GROUPS_KEY: []},
+                {**self.empty_asset_ips, "asset_agents": []},
+                {**self.asset_local_ip, "asset_agents": []},
             ],
         }
 
@@ -268,25 +251,4 @@ class CommonTargetsTest(TestCase):
         # Assert: the asset without a local IP is skipped in both lists
         self.assertEqual(result.targets, ["10.0.0.2"])
         self.assertEqual([meta.asset_id for meta in metas], ["a2"])
-        self.assertIsNone(metas[0].asset_group_id)
-
-    def test_given_message_without_asset_groups_should_target_asset_without_group(
-        self,
-    ):
-        # Arrange: an asset listing no asset_groups
-        data = self._asset_groups_message([{**self.asset_local_ip, "asset_agents": []}])
-
-        # Act
-        result = Targets.extract_targets(
-            "asset-groups", "automatic", data, self.mock_helper
-        )
-        metas = Targets.extract_target_meta(
-            "asset-groups", "automatic", data, self.mock_helper
-        )
-
-        # Assert: it is still targeted, with a single TargetMeta carrying no group
-        self.assertEqual(result.targets, ["10.0.0.2"])
-        self.assertEqual(
-            [(meta.asset_id, meta.asset_group_id) for meta in metas],
-            [("a2", None)],
-        )
+        self.assertIsNone(metas[0].agent_id)

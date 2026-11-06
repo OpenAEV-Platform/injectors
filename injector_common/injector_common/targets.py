@@ -6,7 +6,7 @@ from typing import Dict, List, Optional, Tuple
 from pyoaev.helpers import OpenAEVInjectorHelper
 
 from injector_common.constants import (
-    ASSET_GROUPS_KEY,
+    ASSET_GROUPS_KEY_RABBITMQ,
     ASSETS_KEY_RABBITMQ,
     TARGETS_KEY,
 )
@@ -22,7 +22,6 @@ class TargetExtractionResult:
 class TargetMeta:
     agent_id: str | None = None
     asset_id: str | None = None
-    asset_group_id: str | None = None
 
 
 class TargetProperty(Enum):
@@ -39,12 +38,8 @@ target_property_choices_dict = {
 
 class Targets:
     @staticmethod
-    def _build_target_meta(asset: Dict, asset_group: Optional[Dict]) -> TargetMeta:
-        meta = {
-            "asset_group_id": (
-                asset_group.get("asset_group_id") if asset_group else None
-            )
-        }
+    def _build_target_meta(asset: Dict) -> TargetMeta:
+        meta = {}
         if asset_id := asset.get("asset_id"):
             meta["asset_id"] = asset_id
         if asset_agents := asset.get("asset_agents"):
@@ -64,12 +59,11 @@ class Targets:
         data: dict,
         helper: OpenAEVInjectorHelper,
     ) -> list[TargetMeta]:
-        """Return 1+ TargetMeta providing the matching between 1+ asset ID, 0+ asset group ID and 0+ agent ID.
+        """Return 1+ TargetMeta providing the matching between 1+ asset ID and 0+ agent ID.
 
         Built from the same assets as extract_targets, an asset without a target value for the
         selector property being skipped as it is there, so that both lists pair by position with
-        the execution signatures. An asset gets a single TargetMeta: in asset-groups mode, it
-        carries the first asset group listed in its asset_groups, if any.
+        the execution signatures. An asset gets a single TargetMeta.
         """
         targets: list[TargetMeta] = []
 
@@ -86,10 +80,7 @@ class Targets:
                     continue
                 if target_pair is None:
                     continue
-                asset_group = None
-                if selector_key == "asset-groups":
-                    asset_group = next(iter(asset.get(ASSET_GROUPS_KEY) or []), None)
-                targets.append(Targets._build_target_meta(asset, asset_group))
+                targets.append(Targets._build_target_meta(asset))
             return targets
 
         if selector_key == "manual":
@@ -256,14 +247,11 @@ class Targets:
         - For others ('assets', 'manual', etc.): returns the command arguments joined as a string.
         """
         if selector_key == "asset-groups":
-            asset_group_names = list(
-                dict.fromkeys(
-                    g["asset_group_name"]
-                    for asset in data.get(ASSETS_KEY_RABBITMQ) or []
-                    for g in asset.get(ASSET_GROUPS_KEY) or []
-                    if g.get("asset_group_name")
-                )
-            )
+            asset_group_names = [
+                g["asset_group_name"]
+                for g in data[ASSET_GROUPS_KEY_RABBITMQ]
+                if g["asset_group_name"]
+            ]
             group_str = ", ".join(asset_group_names)
             command_str = " ".join(command_args)
             return f"The inject was executed in {group_str} with command {command_str}"
