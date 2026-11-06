@@ -188,13 +188,6 @@ class ShodanInjector:
         )
         return {"found_assets": aggregate_assets}
 
-    def _resolve_assets(self, data: dict, selector_key: str) -> list[dict]:
-
-        if selector_key == "assets" or selector_key == "asset-groups":
-            return data.get("assets", [])
-
-        return []
-
     def _deduplicate(self, key: str, values: list[str]):
 
         if not values:
@@ -388,8 +381,8 @@ class ShodanInjector:
             )
             return normalize_input_data
 
-        # Resolve Assets (assets / asset-groups)
-        assets = self._resolve_assets(data, selector_key)
+        # Resolve Assets from assets
+        assets = data.get("assets", [])
 
         # Build targets from assets based on the selector_property
         targets = self._build_targets_from_assets(
