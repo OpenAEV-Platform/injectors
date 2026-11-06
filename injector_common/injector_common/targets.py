@@ -6,11 +6,10 @@ from typing import Dict, List, Optional, Tuple
 from pyoaev.helpers import OpenAEVInjectorHelper
 
 from injector_common.constants import (
-    ASSET_GROUPS_KEY_RABBITMQ,
+    ASSET_GROUPS_KEY,
     ASSETS_KEY_RABBITMQ,
     TARGETS_KEY,
 )
-from injector_common.pagination import Pagination
 
 
 @dataclass
@@ -40,63 +39,57 @@ target_property_choices_dict = {
 
 class Targets:
     @staticmethod
+    def _build_target_meta(asset: Dict, asset_group: Optional[Dict]) -> TargetMeta:
+        meta = {
+            "asset_group_id": (
+                asset_group.get("asset_group_id") if asset_group else None
+            )
+        }
+        if asset_id := asset.get("asset_id"):
+            meta["asset_id"] = asset_id
+        if asset_agents := asset.get("asset_agents"):
+            agents_id = list(
+                set(
+                    agent["agent_id"] for agent in asset_agents if agent.get("agent_id")
+                )
+            )
+            if agents_id:
+                meta["agent_id"] = agents_id[0]
+        return TargetMeta(**meta)
+
+    @staticmethod
     def extract_target_meta(
         selector_key: str,
         selector_property: str,
         data: dict,
         helper: OpenAEVInjectorHelper,
     ) -> list[TargetMeta]:
-        """Return 1+ TargetMeta providing the matching between 1+ asset ID, 0+ asset group ID and 0+ agent ID"""
+        """Return 1+ TargetMeta providing the matching between 1+ asset ID, 0+ asset group ID and 0+ agent ID.
+
+        Built from the same assets as extract_targets, an asset without a target value for the
+        selector property being skipped as it is there, so that both lists pair by position with
+        the execution signatures. An asset gets a single TargetMeta: in asset-groups mode, it
+        carries the first asset group listed in its asset_groups, if any.
+        """
         targets: list[TargetMeta] = []
 
-        if selector_key == "asset-groups" and data[ASSET_GROUPS_KEY_RABBITMQ]:
-            helper.injector_logger.info(
-                "Fetching all endpoint targets from asset groups with pagination"
-            )
-            asset_group_ids = [
-                g["asset_group_id"] for g in data[ASSET_GROUPS_KEY_RABBITMQ]
-            ]
-            for asset_group_id in asset_group_ids:
-                assets = Pagination.fetch_all_targets(helper, [asset_group_id])
-                helper.injector_logger.info(
-                    f"Fetched {len(assets)} assets from groups."
-                )
-                for asset in assets:
-                    meta = {
-                        "asset_group_id": asset_group_id,
-                    }
-                    if asset_id := asset.get("asset_id"):
-                        meta["asset_id"] = asset_id
-                    if asset_agents := asset.get("asset_agents"):
-                        agents_id = list(
-                            set(
-                                agent["agent_id"]
-                                for agent in asset_agents
-                                if agent.get("agent_id")
-                            )
-                        )
-                        if agents_id:
-                            meta["agent_id"] = agents_id[0]
-                    targets.append(TargetMeta(**meta))
-            return targets
-
-        if selector_key == "assets" and data[ASSETS_KEY_RABBITMQ]:
-            assets = data[ASSETS_KEY_RABBITMQ]
-            for asset in assets:
-                meta = {}
-                if asset_id := asset.get("asset_id"):
-                    meta["asset_id"] = asset_id
-                if asset_agents := asset.get("asset_agents"):
-                    agents_id = list(
-                        set(
-                            agent["agent_id"]
-                            for agent in asset_agents
-                            if agent.get("agent_id")
-                        )
+        if (selector_key == "asset-groups" or selector_key == "assets") and data[
+            ASSETS_KEY_RABBITMQ
+        ]:
+            for asset in data[ASSETS_KEY_RABBITMQ]:
+                try:
+                    target_pair = Targets._get_target(asset, selector_property)
+                except Exception as e:
+                    helper.injector_logger.error(
+                        f"Error processing asset_id={asset.get('asset_id')}: {e}"
                     )
-                    if agents_id:
-                        meta["agent_id"] = agents_id[0]
-                targets.append(TargetMeta(**meta))
+                    continue
+                if target_pair is None:
+                    continue
+                asset_group = None
+                if selector_key == "asset-groups":
+                    asset_group = next(iter(asset.get(ASSET_GROUPS_KEY) or []), None)
+                targets.append(Targets._build_target_meta(asset, asset_group))
             return targets
 
         if selector_key == "manual":
@@ -119,22 +112,11 @@ class Targets:
         ip_to_asset_id_map: Dict[str, str] = {}
         content = data["injection"]["inject_content"]
 
-        if selector_key == "asset-groups" and data[ASSET_GROUPS_KEY_RABBITMQ]:
-            helper.injector_logger.info(
-                "Fetching all endpoint targets from asset groups with pagination"
-            )
-            asset_group_ids = [
-                g["asset_group_id"] for g in data[ASSET_GROUPS_KEY_RABBITMQ]
-            ]
-            assets = Pagination.fetch_all_targets(helper, asset_group_ids)
-            helper.injector_logger.info(f"Fetched {len(assets)} assets from groups.")
-            Targets.process_targets(
-                assets, selector_property, helper, targets, ip_to_asset_id_map
-            )
-
-        elif selector_key == "assets" and data[ASSETS_KEY_RABBITMQ]:
+        if (selector_key == "asset-groups" or selector_key == "assets") and data[
+            ASSETS_KEY_RABBITMQ
+        ]:
             assets = data[ASSETS_KEY_RABBITMQ]
-            Targets.process_targets(
+            Targets._process_targets(
                 assets, selector_property, helper, targets, ip_to_asset_id_map
             )
 
@@ -153,7 +135,7 @@ class Targets:
         )
 
     @staticmethod
-    def process_targets(
+    def _process_targets(
         assets: List[Dict],
         selector: str,
         helper: "OpenAEVInjectorHelper",
@@ -164,7 +146,7 @@ class Targets:
         # Process all assets
         for asset in assets:
             try:
-                target_pair = Targets.get_target(asset, selector)
+                target_pair = Targets._get_target(asset, selector)
                 if target_pair:
                     target, asset_id = target_pair
                     targets.append(target)
@@ -181,18 +163,18 @@ class Targets:
                 )
 
     @staticmethod
-    def get_target(asset: Dict, selector: str) -> Optional[Tuple[str, str]]:
+    def _get_target(asset: Dict, selector: str) -> Optional[Tuple[str, str]]:
         """Return (target_value, asset_id) or None if not available."""
         asset_id = asset.get("asset_id")
 
         if selector == "automatic":
-            result = Targets.extract_property_target_value(asset)
+            result = Targets._extract_property_target_value(asset)
             if result:
                 return result
 
         elif selector == "seen_ip":
             seen_ip = asset.get("asset_seen_ip")
-            if Targets.is_valid_ip(seen_ip):
+            if Targets._is_valid_ip(seen_ip):
                 return seen_ip, asset_id
             else:
                 return None
@@ -201,7 +183,7 @@ class Targets:
             asset_ips = asset.get("asset_ips") or []
             # Validate each IP
             for ip in asset_ips:
-                if Targets.is_valid_ip(ip):
+                if Targets._is_valid_ip(ip):
                     return ip, asset_id
             # No valid IPs found
             return None
@@ -215,7 +197,7 @@ class Targets:
         return None
 
     @staticmethod
-    def is_valid_ip(ip: Optional[str]) -> bool:
+    def _is_valid_ip(ip: Optional[str]) -> bool:
         """Filter out loopback, unspecified ip.
 
         Accepts an optional value because callers pass raw payload fields
@@ -232,7 +214,7 @@ class Targets:
             return False
 
     @staticmethod
-    def extract_property_target_value(asset: Dict) -> Optional[Tuple[str, str]]:
+    def _extract_property_target_value(asset: Dict) -> Optional[Tuple[str, str]]:
         """
         Extract target value from asset based on conditions:
         - Agentless + hostname => hostname
@@ -254,12 +236,12 @@ class Targets:
 
         # Case 2: the address the platform saw this endpoint at
         seen_ip = asset.get("asset_seen_ip")
-        if Targets.is_valid_ip(seen_ip):
+        if Targets._is_valid_ip(seen_ip):
             return seen_ip, asset_id
 
         # Case 3: no usable seen IP => fall back to the local ones
         for ip in asset_ips:
-            if Targets.is_valid_ip(ip):
+            if Targets._is_valid_ip(ip):
                 return ip, asset_id
 
         return None
@@ -274,11 +256,14 @@ class Targets:
         - For others ('assets', 'manual', etc.): returns the command arguments joined as a string.
         """
         if selector_key == "asset-groups":
-            asset_group_names = [
-                g["asset_group_name"]
-                for g in data[ASSET_GROUPS_KEY_RABBITMQ]
-                if g["asset_group_name"]
-            ]
+            asset_group_names = list(
+                dict.fromkeys(
+                    g["asset_group_name"]
+                    for asset in data.get(ASSETS_KEY_RABBITMQ) or []
+                    for g in asset.get(ASSET_GROUPS_KEY) or []
+                    if g.get("asset_group_name")
+                )
+            )
             group_str = ", ".join(asset_group_names)
             command_str = " ".join(command_args)
             return f"The inject was executed in {group_str} with command {command_str}"
