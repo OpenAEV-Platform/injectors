@@ -128,8 +128,12 @@ class OpenAEVInjectorHelper:
         When omitted, ``_create_default_api_client(config)`` builds it, which the
         SDK cannot do on its own: inject one, or override the hook.
 
-    Started with ``--dev --help`` (or ``-h``), the helper prints the injector dev
-    options and exits with code 0, before reaching the platform.
+    Started with ``--dev``, the helper runs without the platform: it never builds the
+    API client, registers against a local stand-in, starts no heartbeat, and ``listen``
+    hands the ``--inject`` message (as the platform publishes it) to the callback once,
+    writes the calls the injector makes, then exits (0 completed, 1 failed or never
+    completed, 2 refused before running). With ``--help`` (or ``-h``), it prints the
+    injector dev options and exits with code 0, before reaching the platform.
     """
 
     def __init__(
@@ -140,7 +144,10 @@ class OpenAEVInjectorHelper:
     ) -> None:
         self._dev_options = _dev.options()
         _dev.exit_on_help(self._dev_options)
-        self.api = api_client or self._create_default_api_client(config)
+        if self._dev_options.enabled:
+            self.api = _dev.api_client(config, self._dev_options)
+        else:
+            self.api = api_client or self._create_default_api_client(config)
         self.config = _registration.injector_config(config)
 
         self.logger_class = logger(*_registration.logger_settings(config))
@@ -152,8 +159,9 @@ class OpenAEVInjectorHelper:
         )
         self.connect_run_and_terminate = False
         self.scheduler = _registration.scheduler()
+        self.ping = None
         # Start ping thread
-        if not self.connect_run_and_terminate:
+        if not self.connect_run_and_terminate and not self._dev_options.enabled:
             self.ping = PingAlive(
                 self.api, self.config, self.injector_logger, "injector"
             )
@@ -161,6 +169,16 @@ class OpenAEVInjectorHelper:
         self.listen_queue = None
 
     def listen(self, message_callback: Callable[[Dict], None]) -> None:
+        if self._dev_options.enabled:
+            raise SystemExit(
+                _dev.run(
+                    self.api,
+                    self.config,
+                    message_callback,
+                    self.injector_logger,
+                    self._dev_options,
+                )
+            )
         self.listen_queue = ListenQueue(
             self.config, self.injector_config, self.injector_logger, message_callback
         )

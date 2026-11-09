@@ -1,6 +1,6 @@
 """Injector runtime ports: the behaviour the public runtime expects from the core."""
 
-from typing import Protocol, runtime_checkable
+from typing import Any, Callable, Protocol, runtime_checkable
 
 from injectors_sdk.seam.runtime.models import InjectorDevOptions
 
@@ -21,3 +21,22 @@ class InjectorDevRuntimePort(Protocol):
 
     def exit_on_help(self, options: InjectorDevOptions) -> None:
         """Print the dev help and exit with code 0 when ``options`` ask for it."""
+
+    def api_client(self, config: Any, options: InjectorDevOptions) -> Any:
+        """A stand-in of the platform client: it offers the managers an injector
+        calls, writes each call to the dev sink, and raises ``NeedsPlatformError`` for
+        any call only the platform can answer. Secrets from the configuration and the
+        environment are redacted from what it writes."""
+
+    def run(
+        self,
+        api: Any,
+        injector_config: dict[str, Any],
+        callback: Callable[[dict[str, Any]], None],
+        logger: Any,
+        options: InjectorDevOptions,
+    ) -> int:
+        """Run ``callback`` on the ``--inject`` message, as the platform publishes it,
+        completed and checked like the platform does, then wait for the inject's
+        ``complete`` callback. Return the exit code: 0 completed, 1 failed or not
+        completed within ``options.timeout``, 2 refused before running."""

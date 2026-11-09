@@ -16,6 +16,21 @@ version of its seam.
 - `helpers`: started with `--dev --help` (or `-h`), `OpenAEVInjectorHelper` prints the
   injector dev options and exits with code 0, before building the API client or
   reaching the platform. Without `--dev`, `-h` stays the injector's own.
+- `runtime`: run an injector without the platform. Started with `--dev`,
+  `OpenAEVInjectorHelper` never builds the API client, registers against a local
+  stand-in and starts no heartbeat; `listen` reads `--inject` (a file, or `-` for
+  stdin) as the platform publishes it, completes a lean message the way the platform
+  fills it (the injector's own contract under both id paths, an inject id and title,
+  the content defaults under the content given), checks it the way the platform
+  checks it (`xtm_oaev_sdk.ContractValidator`, the targets the message carries counted
+  as set), hands it to the callback once, and writes every call to the dev sink, one
+  JSON list (`--out`, or stdout). The run ends on the inject's `complete` callback, or
+  after `--timeout` seconds (600 by default) without one. Exit codes: 0 completed, 1
+  failed (a status of the platform's failure family) or never completed, 2 refused
+  before running. A document download, a target search or any manager the stand-in
+  does not offer raises `xtm_oaev_sdk.NeedsPlatformError` naming it. Secrets from the
+  configuration and the environment are redacted. `InjectorDevOptions` gains
+  `timeout`; the port gains `api_client` and `run`. Seam `runtime` `1.0.0`.
 
 ## [0.1.0] - Unreleased
 
