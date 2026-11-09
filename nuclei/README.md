@@ -131,7 +131,7 @@ poetry run python -m nuclei.openaev_nuclei
 ```
 
 > For local development against a checkout of [client-python](https://github.com/OpenAEV-Platform/client-python)
-> (cloned next to this repository), use `poetry install --extras dev`.
+> (cloned next to this repository), use `poetry install --with dev,test`.
 
 ## Templates and scan reliability
 
