@@ -15,12 +15,14 @@ from injectors_sdk._core.helpers import (
     MqSsl,
     QueueConsumer,
 )
+from injectors_sdk._core.runtime import InjectorDevRuntime
 from injectors_sdk.seam.helpers import (
     ConfigLookupPort,
     InjectorRegistrationPort,
     MqSslPort,
     QueueConsumerPort,
 )
+from injectors_sdk.seam.runtime import InjectorDevRuntimePort
 from xtm_oaev_sdk import BaseClient, Configuration, PingAlive, logger
 
 __all__ = [
@@ -34,6 +36,7 @@ _config: ConfigLookupPort = ConfigLookup()
 _registration: InjectorRegistrationPort = InjectorRegistration()
 _mq_ssl: MqSslPort = MqSsl()
 _consumer: QueueConsumerPort = QueueConsumer(_mq_ssl)
+_dev: InjectorDevRuntimePort = InjectorDevRuntime()
 
 
 def create_mq_ssl_context(config) -> ssl.SSLContext:
@@ -124,6 +127,9 @@ class OpenAEVInjectorHelper:
     :param api_client: an API client conforming to ``xtm_oaev_sdk.BaseClient``.
         When omitted, ``_create_default_api_client(config)`` builds it, which the
         SDK cannot do on its own: inject one, or override the hook.
+
+    Started with ``--dev --help`` (or ``-h``), the helper prints the injector dev
+    options and exits with code 0, before reaching the platform.
     """
 
     def __init__(
@@ -132,6 +138,8 @@ class OpenAEVInjectorHelper:
         icon,
         api_client: BaseClient | None = None,
     ) -> None:
+        self._dev_options = _dev.options()
+        _dev.exit_on_help(self._dev_options)
         self.api = api_client or self._create_default_api_client(config)
         self.config = _registration.injector_config(config)
 

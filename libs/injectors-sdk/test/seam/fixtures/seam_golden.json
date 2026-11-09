@@ -22,5 +22,17 @@
   "injectors_sdk.seam.helpers.ports.QueueListenerProtocol": {
     "kind": "class",
     "sha256": "e1bdd8883520ea4ffe69cdbadcd45089834a85c44e302beecce1033e32945d23"
+  },
+  "injectors_sdk.seam.runtime.SEAM_VERSION": {
+    "kind": "assignment",
+    "sha256": "c26dc544bb2976ca7c5a7465be69719edcc7893657a494ef17b0285e7e2a37db"
+  },
+  "injectors_sdk.seam.runtime.models.InjectorDevOptions": {
+    "kind": "class",
+    "sha256": "621e0a7d3cf2d95aabde7edfac6719ebedff0db77537db6bbb70a6ba4a6fd8f6"
+  },
+  "injectors_sdk.seam.runtime.ports.InjectorDevRuntimePort": {
+    "kind": "class",
+    "sha256": "f2dd3956b6a6a4624eb8a9c7f0f1fcda5a31a175cfff82c2135e6dcceec71592"
   }
 }

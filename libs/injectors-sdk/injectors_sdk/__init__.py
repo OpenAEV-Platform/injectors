@@ -4,8 +4,11 @@ Built on the shared ``xtm-oaev-sdk``; never depends on the pyoaev client.
 
 Architecture:
     _core/helpers/   Configuration lookup, registration, queue consumption, MQ SSL
+    _core/runtime/   Dev runtime: running an injector without the platform
     seam/helpers/    Injector runtime ports (closed, versioned)
+    seam/runtime/    Dev runtime contracts and ports (closed, versioned)
     public/helpers   Injector helper adapters
+    public/runtime   Dev runtime adapters
     public/          User-facing re-exports
 
 Port/adapter layering: ``seam`` holds the contracts and imports nothing from
