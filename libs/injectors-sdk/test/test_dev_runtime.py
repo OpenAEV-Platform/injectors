@@ -409,6 +409,16 @@ def _then_written_text_excludes(run: Run, secret: str) -> None:
     assert secret not in run.written
 
 
+def _then_registration_is_written(run: Run) -> None:
+    """Then the registration is written, with the injector contracts"""
+    assert [(r["method"], r["path"]) for r in run.requests] == [
+        ("POST", "/api/injectors")
+    ]
+    body = run.requests[0]["body"]
+    assert body["injector_id"] == "4f1d-injector"
+    assert body["injector_contracts"] == [CONTRACT]
+
+
 def test_dev_mode_never_reaches_the_platform(tmp_path: Path) -> None:
     """It runs without building the platform client or starting the heartbeat.
 
@@ -586,6 +596,26 @@ def test_dev_mode_writes_signatures_as_the_callback_carrying_them(
     run = _when_running_in_dev_mode(tmp_path, injector, "--inject", path)
     _then_requests_are(run, ("POST", CALLBACK), ("POST", RECEPTION), ("POST", CALLBACK))
     _then_signatures_are_sent_as_a_callback(run)
+
+
+def test_dev_mode_writes_the_registration_when_dumping_contracts(
+    tmp_path: Path,
+) -> None:
+    """It writes the registration the platform would receive, and runs nothing.
+
+    Scenario: Dev mode writes the registration when dumping contracts
+      Given an injector configured with one TCP connect scan contract
+      And an injector that acknowledges the inject, then completes it with status "SUCCESS"
+      When the injector starts with "--dev --dump-contracts --out run.json"
+      Then the registration is written, with the injector contracts
+      And the injector never runs
+      And the injector exits with code 0
+    """
+    injector = _given_completing_injector()
+    run = _when_running_in_dev_mode(tmp_path, injector, "--dump-contracts")
+    _then_registration_is_written(run)
+    _then_injector_never_runs(run)
+    _then_exits_with(run, 0)
 
 
 # ---- Constraints identified ----
