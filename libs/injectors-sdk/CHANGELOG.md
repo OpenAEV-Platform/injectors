@@ -20,7 +20,8 @@ version of its seam.
   `OpenAEVInjectorHelper` never builds the API client, registers against a local
   stand-in and starts no heartbeat; `listen` reads `--inject` (a file, or `-` for
   stdin) as the platform publishes it, completes a lean message the way the platform
-  fills it (the injector's own contract under both id paths, an inject id and title,
+  fills it (the injector's own contract under both id paths, an inject id derived
+  from the message, so the same message writes the same calls at every run, a title,
   the content defaults under the content given), checks it the way the platform
   checks it (`xtm_oaev_sdk.ContractValidator`, the targets the message carries counted
   as set), hands it to the callback once, and writes every call to the dev sink, one

@@ -3,7 +3,9 @@
 A lean message holds only the platform keys someone edits (the contract id, the
 content, the targets). The rest is what the platform fills from data dev mode already
 holds: the contract (``injector_contract_content`` and ``convertedContent``, from the
-injector's own), the inject id and title, and the content defaults.
+injector's own), the inject id and title, and the content defaults. The inject id is
+derived from the message, so the same message gets the same id at every run, and a
+recorded run and its replay write the same calls.
 
 The content defaults follow the platform's inject form (``InjectForm.tsx``), which is
 where injects are written: every content field (not a target, team, article,
@@ -105,7 +107,9 @@ def complete_message(
     message keeps every value it carries."""
     message = copy.deepcopy(document)
     injection = message["injection"]
-    injection.setdefault("inject_id", str(uuid.uuid4()))
+    if "inject_id" not in injection:
+        given = json.dumps(document, sort_keys=True, separators=(",", ":"))
+        injection["inject_id"] = str(uuid.uuid5(uuid.NAMESPACE_URL, f"dev:{given}"))
     injection.setdefault("inject_title", label_of(contract))
     injection.setdefault("inject_documents", [])
     reference = injection["inject_injector_contract"]
