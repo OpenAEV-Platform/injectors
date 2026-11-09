@@ -47,7 +47,7 @@ the RabbitMQ host/port advertised by the platform.
 - A running OpenAEV platform, reachable from the injector (along with its RabbitMQ broker)
 - For a manual (non-Docker) deployment:
   - Python >= 3.11 and [Poetry](https://python-poetry.org/) >= 2.1
-  - The `nuclei` binary available on the `PATH` (the Docker image bundles Nuclei `v3.8.0`)
+  - The `nuclei` binary available on the `PATH` (the Docker image bundles Nuclei `v3.11.1`)
   - Outbound network access to `raw.githubusercontent.com` and `github.com` so the injector can update the Nuclei
     templates and sync the per-CVE contracts
 
@@ -122,7 +122,7 @@ docker compose up -d
 
 ### Manual Deployment
 
-Make sure the `nuclei` binary is installed and on your `PATH` (the Docker image bundles `v3.8.0`), create a `config.yml`
+Make sure the `nuclei` binary is installed and on your `PATH` (the Docker image bundles `v3.11.1`), create a `config.yml`
 from `config.yml.sample`, then install and run the injector:
 
 ```shell
