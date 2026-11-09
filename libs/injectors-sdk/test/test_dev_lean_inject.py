@@ -197,6 +197,27 @@ def test_a_lean_message_gets_an_inject_id(tmp_path: Path) -> None:
     _then_inject_has_an_id_used_by_its_calls(run)
 
 
+def test_the_same_lean_message_gets_the_same_inject_id_at_every_run(
+    tmp_path: Path,
+) -> None:
+    """It derives the inject id from the message, so two runs of it write the same calls.
+
+    Scenario: The same lean message gets the same inject id at every run
+      Given an injector configured with one TCP connect scan contract
+      And a lean inject message naming the scan contract by id, saved to a file
+      When the injector starts twice with "--dev --inject inject.json --out run.json"
+      Then both runs write exactly the same calls
+      And a lean message with another content gets another inject id
+    """
+    path = _given_lean_message(tmp_path)
+    first = _when_running(tmp_path, path)
+    second = _when_running(tmp_path, path)
+    other = _when_running(tmp_path, _given_lean_message(tmp_path, mode="full"))
+    assert first.requests == second.requests
+    assert _injection(first)["inject_id"] == _injection(second)["inject_id"]
+    assert _injection(other)["inject_id"] != _injection(first)["inject_id"]
+
+
 def test_a_lean_message_gets_the_contract_defaults(tmp_path: Path) -> None:
     """It completes the content with the contract defaults it leaves out.
 
