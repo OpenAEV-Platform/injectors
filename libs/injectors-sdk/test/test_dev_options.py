@@ -13,6 +13,7 @@ import pytest
 
 INJECTOR_OPTIONS = (
     "--inject",
+    "--timeout",
     "--emit",
     "--dump-contracts",
     "--list-contracts",
@@ -216,7 +217,7 @@ def test_injector_dev_help_lists_the_common_and_injector_options() -> None:
       Given the injectors SDK exposes the injector dev help
       When the injector dev help is read
       Then the help section "common options" lists exactly --dev, -h, --out, --record and --replay
-      And the help section "injector options" lists exactly --inject, --emit, --dump-contracts, --list-contracts and --new-inject
+      And the help section "injector options" lists exactly --inject, --timeout, --emit, --dump-contracts, --list-contracts and --new-inject
       And the help has no "collector options" section
     """
     helper = _given_injector_dev_help()
@@ -224,3 +225,29 @@ def test_injector_dev_help_lists_the_common_and_injector_options() -> None:
     _then_help_groups(text, "common options", *COMMON_OPTIONS)
     _then_help_groups(text, "injector options", *INJECTOR_OPTIONS)
     _then_help_has_no_section(text, "collector options")
+
+
+@pytest.mark.parametrize(
+    ("argv", "timeout"),
+    [(["--dev"], 600.0), (["--dev", "--timeout", "2.5"], 2.5)],
+    ids=["default", "given"],
+)
+def test_the_wait_for_the_inject_to_complete_is_bounded(
+    argv: list[str], timeout: float
+) -> None:
+    """It bounds the wait for the complete callback, 600 seconds unless given.
+
+    Scenario Outline: The wait for the inject to complete is bounded
+      Given the injectors SDK exposes the injector dev options
+      And an injector command line with "<argv>"
+      When the injector dev options are read
+      Then the options wait <timeout> seconds for the inject to complete
+
+      Examples:
+        | argv                    | timeout |
+        | --dev                   | 600     |
+        | --dev --timeout 2.5     | 2.5     |
+    """
+    reader = _given_injector_dev_options_reader()
+    options = _when_reading_dev_options(reader, argv)
+    _then_options_are(options, timeout=timeout)
