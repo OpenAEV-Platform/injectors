@@ -9,6 +9,7 @@ or after ``--timeout`` seconds without one.
 
 import json
 import sys
+from datetime import datetime, timezone
 from types import SimpleNamespace
 from typing import Any, Callable
 
@@ -23,6 +24,7 @@ from xtm_oaev_sdk import (
 
 from .client import DevPlatformClient
 from .contracts import contract_lines, field_guide, find_contracts, new_inject_message
+from .emit import pending_expectations, posted_signatures
 from .message import complete_message, contract_fields, label_of
 from .options import injector_help, injector_options
 
@@ -130,7 +132,9 @@ class InjectorDevRuntime:
         configuration = config.get_config_obj() if config is not None else None
         if configuration is not None:
             secrets += configuration.secret_values()
-        return DevPlatformClient(dev_sink(options.out, secrets, KEPT_KEYS))
+        # Emitting pending expectations: stdout is theirs, the calls go to stderr.
+        to_stderr = "expectations" in options.emit
+        return DevPlatformClient(dev_sink(options.out, secrets, KEPT_KEYS, to_stderr))
 
     def run(
         self,
@@ -244,12 +248,17 @@ class InjectorDevRuntime:
         inject_id = message.injection.inject_id
         logger.info(f"Dev mode: running inject {inject_id} from {options.inject}")
         callback(document)
-        if not sink.wait_for(
-            lambda calls: bool(_completes(calls, inject_id)), options.timeout
-        ):
+        code = self._wait_for_complete(sink, inject_id, options.timeout)
+        if "expectations" in options.emit:
+            self._emit_expectations(sink, message, inject_id)
+        return code
+
+    @staticmethod
+    def _wait_for_complete(sink: Any, inject_id: str, timeout: float) -> int:
+        if not sink.wait_for(lambda calls: bool(_completes(calls, inject_id)), timeout):
             sink.note(
                 f"no complete callback for inject {inject_id} within"
-                f" {options.timeout:g} seconds"
+                f" {timeout:g} seconds"
             )
             return 1
         failed = any(
@@ -257,3 +266,20 @@ class InjectorDevRuntime:
             for body in _completes(sink.calls, inject_id)
         )
         return 1 if failed else 0
+
+    @staticmethod
+    def _emit_expectations(
+        sink: Any, message: ExecutableInject, inject_id: str
+    ) -> None:
+        """Write on stdout the pending expectations collectors would then get, the
+        JSON list a collector reads with ``--expectations``; notes go to stderr."""
+        pending, notes = pending_expectations(
+            inject_id,
+            message.injection.inject_content,
+            posted_signatures(sink.calls, inject_id),
+            datetime.now(timezone.utc),
+        )
+        for note in notes:
+            sink.note(note)
+        sys.stdout.write(json.dumps(sink.redact(pending), indent=2) + "\n")
+        sys.stdout.flush()

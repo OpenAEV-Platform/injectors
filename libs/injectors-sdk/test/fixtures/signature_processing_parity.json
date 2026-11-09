@@ -29,7 +29,7 @@
         {
           "type": "DETECTION",
           "agent": "agent-1",
-          "asset": null,
+          "asset": "asset-1",
           "asset_group": null,
           "signatures": [
             [

@@ -39,6 +39,16 @@ version of its seam.
   fill on stderr; a name matching no contract or several is refused (exit code 2) with
   the candidates. `--dump-contracts` writes the registration (`POST /api/injectors`,
   contracts included) to the dev sink. Each exits with code 0.
+- `runtime`: `--emit expectations` makes a dev run also write, on stdout, the pending
+  expectations the platform would then serve to collectors: the JSON list a collector
+  reads with `--expectations`, so an injector pipes into a collector. The signatures
+  are read from the execution callbacks the injector posted, the way the platform's
+  `SignatureOutputProcessor` reads them (target: agent, else asset, else asset group;
+  DETECTION and PREVENTION only, those the inject content declares; fallback keys;
+  scalar values with text, a type and value pair kept once), checked against the
+  cases of the platform's `SignatureOutputProcessorTest`. Without `--out`, the calls go
+  to stderr, so stdout carries the pending expectations alone; what the platform would
+  have dropped is noted on stderr.
 
 ## [0.1.0] - Unreleased
 
