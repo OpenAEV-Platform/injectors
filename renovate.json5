@@ -1,0 +1,80 @@
+{
+    $schema: 'https://docs.renovatebot.com/renovate-schema.json',
+    extends: [
+        'config:recommended',
+        'docker:enableMajor',
+        ':semanticCommits',
+    ],
+    labels: [
+        'dependencies',
+        'filigran team',
+    ],
+    minimumReleaseAge: '3 days',
+    prHourlyLimit: 100,
+    prConcurrentLimit: 60,
+    branchConcurrentLimit: 60,
+    timezone: 'Europe/Paris',
+    schedule: [
+        '* 0-4,22-23 * * 1-5',
+        '* * * * 0,6',
+    ],
+    updateNotScheduled: false,
+    rebaseWhen: 'conflicted',
+    vulnerabilityAlerts: {
+        // as we don't rely on Renovate to be informed of dependency security advisories,
+        // vulnerabilityAlerts is disabled since it can cause problems by skipping minimumReleaseAge, schedule and others constraints
+        enabled: false,
+    },
+    customManagers: [
+        {
+            customType: 'regex',
+            description: 'Tools installed by the Dockerfiles, marked with a "# renovate:" comment above their version',
+            managerFilePatterns: ['/(^|/)Dockerfile$/'],
+            matchStrings: ['# renovate: datasource=(?<datasource>\S+) depName=(?<depName>\S+)\s+(?:ARG|ENV) \w+_VERSION=(?<currentValue>\S+)'],
+            extractVersionTemplate: '^v?(?<version>.+)$',
+        },
+    ],
+    packageRules: [
+        {
+            description: 'pyoaev is bumped by the release',
+            matchPackageNames: [
+                'pyoaev',
+            ],
+            enabled: false,
+        },
+        {
+            description: 'Stratus also pins the archive checksum',
+            matchDepNames: [
+                'DataDog/stratus-red-team',
+            ],
+            prBodyNotes: [
+                'Update `STRATUS_SHA256` in `stratus/Dockerfile` from the release `checksums.txt`: the image build fails until then.',
+            ],
+        },
+        {
+            description: 'Majors are proposed on the Dependency Dashboard, not as a standing PR',
+            matchUpdateTypes: [
+                'major',
+            ],
+            dependencyDashboardApproval: true,
+        },
+        {
+            groupName: 'ci tooling (non-major)',
+            groupSlug: 'ci-tooling-non-major',
+            description: 'Batch non-major GitHub Actions updates once a week on Sunday',
+            schedule: [
+                '* * * * 0',
+            ],
+            matchManagers: [
+                'github-actions',
+            ],
+            matchUpdateTypes: [
+                'minor',
+                'patch',
+                'pin',
+                'digest',
+            ],
+            rebaseWhen: 'auto',
+        },
+    ],
+}
