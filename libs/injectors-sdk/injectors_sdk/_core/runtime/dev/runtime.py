@@ -16,8 +16,10 @@ from typing import Any, Callable
 from injectors_sdk.seam.runtime import InjectorDevOptions
 from pydantic import ValidationError
 from xtm_oaev_sdk import (
+    CallTape,
     ContractValidator,
     ExecutableInject,
+    OpenAEVError,
     dev_sink,
     environment_secret_values,
 )
@@ -112,6 +114,28 @@ def _completes(calls: list[dict[str, Any]], inject_id: str) -> list[dict[str, An
     ]
 
 
+def _start_tape(
+    sink: Any, options: InjectorDevOptions, secrets: list[str], daemon: Any
+) -> CallTape | None:
+    """The tape recording or replaying the run's outside calls, if one is asked for;
+    exits with code 2 when both are, or when the replay tape cannot be read."""
+    if options.record and options.replay:
+        raise SystemExit(sink.refuse("--record and --replay cannot be given together"))
+    if not (options.record or options.replay):
+        return None
+    mode = "record" if options.record else "replay"
+    tape = CallTape(
+        options.record or options.replay,
+        mode,
+        secrets=secrets,
+        daemon=str(daemon) if daemon else None,
+    )
+    try:
+        return tape.start()
+    except OpenAEVError as error:
+        raise SystemExit(sink.refuse(str(error))) from error
+
+
 class InjectorDevRuntime:
     """Implements ``InjectorDevRuntimePort``."""
 
@@ -134,9 +158,25 @@ class InjectorDevRuntime:
             secrets += configuration.secret_values()
         # Emitting pending expectations: stdout is theirs, the calls go to stderr.
         to_stderr = "expectations" in options.emit
-        return DevPlatformClient(dev_sink(options.out, secrets, KEPT_KEYS, to_stderr))
+        sink = dev_sink(options.out, secrets, KEPT_KEYS, to_stderr)
+        name = config.get_conf("injector_name") if config is not None else None
+        return DevPlatformClient(sink, _start_tape(sink, options, secrets, name))
 
     def run(
+        self,
+        api: Any,
+        injector_config: dict[str, Any],
+        callback: Callable[[dict[str, Any]], None],
+        logger: Any,
+        options: InjectorDevOptions,
+    ) -> int:
+        try:
+            return self._dispatch(api, injector_config, callback, logger, options)
+        finally:
+            if api.tape is not None:
+                api.tape.stop()
+
+    def _dispatch(
         self,
         api: Any,
         injector_config: dict[str, Any],

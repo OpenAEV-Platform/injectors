@@ -49,6 +49,12 @@ version of its seam.
   cases of the platform's `SignatureOutputProcessorTest`. Without `--out`, the calls go
   to stderr, so stdout carries the pending expectations alone; what the platform would
   have dropped is noted on stderr.
+- `runtime`: `--record PATH` writes every outside call the injector makes during a dev
+  run (its product's API over HTTP, its commands through `subprocess.run`) and the
+  answers to a tape (`xtm_oaev_sdk.CallTape`, one readable JSON document whose header
+  names the injector); `--replay PATH` answers them from it, offline, any other outbound
+  connection failing. Secrets from the configuration and the environment stay off the
+  tape. Both at once, or a tape that cannot be replayed, are refused (exit code 2).
 
 ## [0.1.0] - Unreleased
 

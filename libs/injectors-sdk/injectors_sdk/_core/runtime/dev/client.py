@@ -79,8 +79,10 @@ class DevPlatformClient:
     Any other manager raises ``NeedsPlatformError`` naming it.
     """
 
-    def __init__(self, sink: DevSinkPort) -> None:
+    def __init__(self, sink: DevSinkPort, tape: Any = None) -> None:
         self.sink = sink
+        #: The call tape recording or replaying the run's outside calls, if any.
+        self.tape = tape
         self.injector = _InjectorManager()
         self.inject = _InjectManager(sink)
         self.signature = _SignatureManager(sink)
