@@ -19,6 +19,7 @@ import uuid
 from typing import Any
 
 __all__ = [
+    "NOT_DYNAMIC_KEYS",
     "complete_message",
     "contract_content",
     "contract_fields",
@@ -26,7 +27,8 @@ __all__ = [
     "new_inject_content",
 ]
 
-_NOT_DYNAMIC = frozenset({"teams", "articles", "challenges", "attachments"})
+#: Content keys the inject form never prefills: they hold platform objects.
+NOT_DYNAMIC_KEYS = frozenset({"teams", "articles", "challenges", "attachments"})
 #: Field types that travel next to the content (``isInjectContentType`` of the form).
 _NOT_CONTENT_TYPES = frozenset(
     {
@@ -83,7 +85,11 @@ def new_inject_content(contract: dict[str, Any]) -> dict[str, Any]:
     content: dict[str, Any] = {}
     for field in contract_fields(contract):
         key = field.get("key")
-        if not key or key in _NOT_DYNAMIC or field.get("type") in _NOT_CONTENT_TYPES:
+        if (
+            not key
+            or key in NOT_DYNAMIC_KEYS
+            or field.get("type") in _NOT_CONTENT_TYPES
+        ):
             continue
         value = _default(field)
         if value is not None:

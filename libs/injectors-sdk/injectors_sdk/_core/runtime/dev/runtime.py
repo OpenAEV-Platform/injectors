@@ -22,7 +22,8 @@ from xtm_oaev_sdk import (
 )
 
 from .client import DevPlatformClient
-from .message import complete_message, contract_fields
+from .contracts import contract_lines, field_guide, find_contracts, new_inject_message
+from .message import complete_message, contract_fields, label_of
 from .options import injector_help, injector_options
 
 __all__ = ["InjectorDevRuntime"]
@@ -140,10 +141,52 @@ class InjectorDevRuntime:
         options: InjectorDevOptions,
     ) -> int:
         sink = api.sink
+        contracts = _contracts(injector_config)
+        # The contract helpers write to stdout and stderr themselves: no call is made.
+        if options.list_contracts:
+            return self._list_contracts(contracts)
+        if options.new_inject:
+            return self._new_inject(sink, contracts, options.new_inject)
         try:
+            if options.dump_contracts:
+                sink.record("POST", "/api/injectors", injector_config)
+                return 0
             return self._run(sink, injector_config, callback, logger, options)
         finally:
             sink.close()
+
+    @staticmethod
+    def _list_contracts(contracts: list[dict[str, Any]]) -> int:
+        sys.stdout.write("".join(line + "\n" for line in contract_lines(contracts)))
+        sys.stdout.flush()
+        return 0
+
+    @staticmethod
+    def _new_inject(sink: Any, contracts: list[dict[str, Any]], name: str) -> int:
+        found = find_contracts(contracts, name)
+        if len(found) != 1:
+            why = "matches no contract" if not found else "matches several contracts"
+            listed = "\n".join(contract_lines(found or contracts))
+            return sink.refuse(f"--new-inject {name!r} {why}:\n{listed}")
+        contract = found[0]
+        message, notes = new_inject_message(contract)
+        content = message["injection"]["inject_content"]
+        guide = [f"dev: {label_of(contract)} ({contract.get('contract_id')})"]
+        guide += field_guide(contract, content)
+        guide += [f"dev: {note}" for note in notes]
+        violations = ContractValidator().validate(_elements(contract), content)
+        if violations:
+            guide.append(
+                "dev: still to fill for a run: "
+                + "; ".join(v.message for v in violations)
+            )
+        else:
+            guide.append("dev: ready to run as is")
+        sys.stderr.write("".join(line + "\n" for line in guide))
+        sys.stderr.flush()
+        sys.stdout.write(json.dumps(message, indent=2) + "\n")
+        sys.stdout.flush()
+        return 0
 
     def _run(
         self,

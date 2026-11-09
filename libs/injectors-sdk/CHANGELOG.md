@@ -31,6 +31,14 @@ version of its seam.
   does not offer raises `xtm_oaev_sdk.NeedsPlatformError` naming it. Secrets from the
   configuration and the environment are redacted. `InjectorDevOptions` gains
   `timeout`; the port gains `api_client` and `run`. Seam `runtime` `1.0.0`.
+- `runtime`: the contract helpers of dev mode. `--list-contracts` lists the contracts
+  the injector serves (id, label, target types); `--new-inject CONTRACT` (an id, or a
+  piece of a label, whatever the case) writes on stdout a lean inject message to edit,
+  prefilled the way the platform's inject form fills a new inject, its target type
+  switched to one dev mode can run, with a guide to each field and what is still to
+  fill on stderr; a name matching no contract or several is refused (exit code 2) with
+  the candidates. `--dump-contracts` writes the registration (`POST /api/injectors`,
+  contracts included) to the dev sink. Each exits with code 0.
 
 ## [0.1.0] - Unreleased
 
