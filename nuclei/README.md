@@ -198,6 +198,8 @@ contracts kept in sync with the catalog expose only `template` and `options`):
   `Nuclei - TEMPLATES Scan` contract to run only that template (other contracts also add their tag filter).
 - `Options` (`options`): extra raw Nuclei flags, appended to the command line.
 
+**Note**: since nuclei 3.11.0, custom templates that use the `javascript:` protocol must be digitally signed. Please refer to nuclei 3.11.0 release note for more details [https://github.com/projectdiscovery/nuclei/releases/tag/v3.11.0](https://github.com/projectdiscovery/nuclei/releases/tag/v3.11.0)
+
 In addition to the static contracts, a background scheduler maintains one contract per CVE. On each tick (every
 `86400` seconds / 24h by default) it runs `nuclei -update-templates`, fetches the official Nuclei CVE catalog
 (`cves.json` from the `projectdiscovery/nuclei-templates` repository), and creates, updates or deletes the matching
