@@ -47,7 +47,7 @@ the RabbitMQ host/port advertised by the platform.
 - A running OpenAEV platform, reachable from the injector (along with its RabbitMQ broker)
 - For a manual (non-Docker) deployment:
   - Python >= 3.11 and [Poetry](https://python-poetry.org/) >= 2.1
-  - The `nuclei` binary available on the `PATH` (the Docker image bundles Nuclei `v3.8.0`)
+  - The `nuclei` binary available on the `PATH` (the Docker image bundles Nuclei `v3.11.1`)
   - Outbound network access to `raw.githubusercontent.com` and `github.com` so the injector can update the Nuclei
     templates and sync the per-CVE contracts
 
@@ -122,7 +122,7 @@ docker compose up -d
 
 ### Manual Deployment
 
-Make sure the `nuclei` binary is installed and on your `PATH` (the Docker image bundles `v3.8.0`), create a `config.yml`
+Make sure the `nuclei` binary is installed and on your `PATH` (the Docker image bundles `v3.11.1`), create a `config.yml`
 from `config.yml.sample`, then install and run the injector:
 
 ```shell
@@ -197,6 +197,8 @@ contracts kept in sync with the catalog expose only `template` and `options`):
   and the download must stay under `NUCLEI_TEMPLATE_URL_MAX_BYTES` (default 2 MB). Combine it with the
   `Nuclei - TEMPLATES Scan` contract to run only that template (other contracts also add their tag filter).
 - `Options` (`options`): extra raw Nuclei flags, appended to the command line.
+
+**Note**: since nuclei 3.11.0, custom templates that use the `javascript:` protocol must be digitally signed. Please refer to nuclei 3.11.0 release note for more details [https://github.com/projectdiscovery/nuclei/releases/tag/v3.11.0](https://github.com/projectdiscovery/nuclei/releases/tag/v3.11.0)
 
 In addition to the static contracts, a background scheduler maintains one contract per CVE. On each tick (every
 `86400` seconds / 24h by default) it runs `nuclei -update-templates`, fetches the official Nuclei CVE catalog

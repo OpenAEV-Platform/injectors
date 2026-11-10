@@ -45,7 +45,7 @@ RUN if [[ ${PYOAEV_GIT_BRANCH_OVERRIDE} ]] ; then \
     fi
 
 # renovate: datasource=github-releases depName=projectdiscovery/nuclei
-ARG NUCLEI_VERSION=3.8.0
+ARG NUCLEI_VERSION=3.11.1
 ARG NUCLEI_URL=https://github.com/projectdiscovery/nuclei/releases/download/v${NUCLEI_VERSION}/nuclei_${NUCLEI_VERSION}_linux_amd64.zip
 ADD ${NUCLEI_URL} /tmp
 RUN unzip /tmp/nuclei_${NUCLEI_VERSION}_linux_amd64.zip -d /usr/local/bin/
