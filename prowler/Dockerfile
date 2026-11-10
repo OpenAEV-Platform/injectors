@@ -42,6 +42,7 @@ RUN if [[ ${PYOAEV_GIT_BRANCH_OVERRIDE} ]] ; then \
 # virtual environment: the Prowler wheel ships a top-level `prowler` package
 # (same import name as this injector) and pins pydantic==2.12.5, so it cannot
 # share the injector's environment. lz4 and zstd have no musl wheels.
+# renovate: datasource=pypi depName=prowler
 ARG PROWLER_VERSION=5.36.0
 RUN apk --no-cache add \
     gcc \

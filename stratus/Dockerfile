@@ -22,6 +22,7 @@ RUN poetry install && \
 
 FROM python:3.13-alpine AS runner
 
+# renovate: datasource=github-releases depName=DataDog/stratus-red-team
 ENV STRATUS_VERSION=2.24.0
 # SHA256 of stratus-red-team_Linux_x86_64.tar.gz for STRATUS_VERSION, taken
 # from the release checksums.txt. Bump both together when upgrading Stratus.

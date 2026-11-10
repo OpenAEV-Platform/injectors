@@ -44,7 +44,7 @@ RUN if [[ ${PYOAEV_GIT_BRANCH_OVERRIDE} ]] ; then \
         pip install --no-cache-dir git+https://github.com/OpenAEV-Platform/client-python@${PYOAEV_GIT_BRANCH_OVERRIDE} ; \
     fi
 
-# get nuclei from above
+# renovate: datasource=github-releases depName=projectdiscovery/nuclei
 ARG NUCLEI_VERSION=3.8.0
 ARG NUCLEI_URL=https://github.com/projectdiscovery/nuclei/releases/download/v${NUCLEI_VERSION}/nuclei_${NUCLEI_VERSION}_linux_amd64.zip
 ADD ${NUCLEI_URL} /tmp
