@@ -1,4 +1,4 @@
-FROM python:3.13-slim AS builder
+FROM python:3.15-slim AS builder
 
 RUN pip3 install --no-cache-dir -U pip certifi
 RUN pip3 install --no-cache-dir poetry==2.3.2
@@ -8,7 +8,7 @@ ARG installdir=/injector
 ADD . ${installdir}
 RUN cd ${installdir} && poetry build
 
-FROM python:3.13-slim AS runner
+FROM python:3.15-slim AS runner
 
 ARG installdir=/injector
 
