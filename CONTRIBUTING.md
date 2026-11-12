@@ -443,7 +443,7 @@ Example (`manifest-metadata.json`):
   "max_confidence_level": 80,
   "support_version": "",
   "subscription_link": "",
-  "source_code": "",
+  "source_code": "https://github.com/OpenAEV-Platform/injectors/tree/main/my-injector",
   "manager_supported": true,
   "container_version": "rolling",
   "container_image": "openaev/injector-my-injector",
