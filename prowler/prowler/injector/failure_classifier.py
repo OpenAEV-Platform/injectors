@@ -276,7 +276,11 @@ class FailureClassifier:
             return self._account_mismatch_failure(stage, error)
         if isinstance(error, CredentialScopeMissingError):
             return self._scope_missing_failure(stage, error)
-        if stage == "input_validation" and isinstance(error, ContractInputError):
+        # The form values a resolved credential does not override are only
+        # checked once it is resolved.
+        if stage in {"input_validation", "credential_resolution"} and isinstance(
+            error, ContractInputError
+        ):
             issues, omitted, truncated = self._safe_input_issues(error)
             return _InputValidationFailure(
                 stage=stage,

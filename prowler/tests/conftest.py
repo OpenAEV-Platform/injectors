@@ -4,7 +4,19 @@ from collections.abc import Iterator
 
 import pytest
 
+from prowler._core.prowler_client import client
 from prowler.contracts import DEFAULT_PROWLER_CONTRACTS
+
+
+@pytest.fixture(autouse=True)
+def _no_host_system_environment(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Keep the Windows host variables out of the exact environment assertions.
+
+    The client adds ``SYSTEMROOT`` on Windows only, so that Prowler can start;
+    the tests assert the exact environment handed over, on every platform.
+    """
+    monkeypatch.setattr(client, "_WINDOWS_SYSTEM_VARIABLES", ())
+    monkeypatch.setattr(client, "_WINDOWS_FIXED_VARIABLES", ())
 
 
 @pytest.fixture(autouse=True)
