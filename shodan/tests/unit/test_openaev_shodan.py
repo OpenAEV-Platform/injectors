@@ -18,6 +18,67 @@ class TestShodanInjector(unittest.TestCase):
 
         m_api.assert_called_once_with(config, helper)
 
+    def test_shodaninjector_normalize_input_data_case_asset_groups(self, m_api):
+        config = MagicMock()
+        helper = MagicMock()
+
+        injector = module.ShodanInjector(config=config, helper=helper)
+
+        inject_content = {
+            "expectations": [],
+            "target_selector": "asset-groups",
+            "target_property_selector": "automatic",
+            "auto_create_assets": False,
+            "hostname": "",
+            "organization": "",
+        }
+        # The asset group holds more assets than the ones in the message: the
+        # platform only sends the assets the user launching the inject has clearance on.
+        asset_zero = {
+            "asset_id": "asset-zero-id",
+            "asset_hostname": "asset.hostname.local",
+            "asset_ips": ["1.2.3.4"],
+            "asset_seen_ip": "1.2.3.4",
+            "asset_groups": [{"asset_group_id": "group-id"}],
+        }
+        asset_one = {
+            "asset_id": "asset-one-id",
+            "asset_hostname": "endpoint.hostname.local",
+            "asset_ips": ["5.6.7.8"],
+            "asset_seen_ip": "5.6.7.8",
+            "asset_groups": [{"asset_group_id": "group-id"}],
+        }
+        data = {
+            "injection": {
+                "inject_injector_contract": {
+                    "convertedContent": {
+                        "contract_id": module.ShodanContractId.CVE_ENUMERATION.value
+                    }
+                },
+                "inject_content": inject_content,
+            },
+            "assetGroups": [
+                {"asset_group_id": "group-id", "asset_group_name": "Group"}
+            ],
+            "assets": [asset_zero, asset_one],
+        }
+
+        normalize_input_data = injector._normalize_input_data(
+            data, inject_content, "asset-groups", "automatic"
+        )
+
+        targets = normalize_input_data.targets
+        self.assertEqual(targets.selector_key, "asset-groups")
+        self.assertEqual(targets.asset_ids, ["asset-zero-id", "asset-one-id"])
+        self.assertEqual(
+            targets.hostnames, ["asset.hostname.local", "endpoint.hostname.local"]
+        )
+        self.assertEqual(targets.ips, ["1.2.3.4", "5.6.7.8"])
+        self.assertEqual(targets.seen_ips, ["1.2.3.4", "5.6.7.8"])
+        # The assets of the groups are never fetched from the API, which would
+        # bypass the clearance filtering done by the platform.
+        helper.api.endpoint.searchTargets.assert_not_called()
+
     def test_shodaninjector_build_targets_from_assets_case_automatic(self, m_api):
         config = MagicMock()
         helper = MagicMock()
