@@ -756,9 +756,9 @@ class ProcessMessageCredentialReferenceTest(TestCase):
         injector.process_message(_data({}, GCP_TECH_CONTRACT, ATTACHMENTS))
         self.assertEqual(self._callback(injector)["execution_status"], "SUCCESS")
         env = self._detonate_env(injector)
-        self.assertEqual(env["GOOGLE_OAUTH2_TOKEN_URI_OVERRIDE"], "http://mock/token")
-        self.assertEqual(env["GOOGLE_IAM_CUSTOM_ENDPOINT"], "http://mock/iam")
         self.assertEqual(env["GOOGLE_OAUTH_ACCESS_TOKEN"], "ref-oauth-token")
+        self.assertNotIn("GOOGLE_IAM_CUSTOM_ENDPOINT", env)
+        self.assertNotIn("GOOGLE_OAUTH2_TOKEN_URI_OVERRIDE", env)
         self.assertNotIn("GOOGLE_RESOURCE_MANAGER_CUSTOM_ENDPOINT", env)
         self._assert_no_secret_reported(injector)
 

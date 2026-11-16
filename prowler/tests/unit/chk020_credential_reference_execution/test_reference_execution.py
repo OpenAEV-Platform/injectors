@@ -674,15 +674,13 @@ def test_gcp_oauth2_sovereign_values_reach_the_environment(tmp_path: Path) -> No
     invocation = _adapter(tmp_path).adapt(provider)
 
     environment = _environment(invocation)
-    assert environment["GOOGLE_OAUTH2_TOKEN_URI_OVERRIDE"] == (
-        "http://mock.example.test/token"
-    )
-    assert environment["GOOGLE_IAM_CUSTOM_ENDPOINT"] == "http://mock.example.test/iam"
     assert environment["GOOGLE_OAUTH_ACCESS_TOKEN"] == "OAUTH-ACCESS-TOKEN-CANARY"
     # Prowler only reads the token, and then the project, from these ones.
     assert environment["CLOUDSDK_AUTH_ACCESS_TOKEN"] == "OAUTH-ACCESS-TOKEN-CANARY"
     assert environment["GOOGLE_CLOUD_PROJECT"] == environment["GOOGLE_PROJECT"]
     assert "GOOGLE_RESOURCE_MANAGER_CUSTOM_ENDPOINT" not in environment
+    assert "GOOGLE_OAUTH2_TOKEN_URI_OVERRIDE" not in environment
+    assert "GOOGLE_IAM_CUSTOM_ENDPOINT" not in environment
     for lease in invocation.credential_leases:
         lease.cleanup()
 
