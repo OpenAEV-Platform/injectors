@@ -11,13 +11,18 @@ The contract exposes a "Type of targets" selector (`target_selector`) with three
 For backward compatibility, when no selector is present we keep the legacy behaviour: use the
 `ai_target` reference if one is set, otherwise fall back to the inline definition.
 
-The credential always comes from the AI target. The platform never returns it on reads: when
-`ai_target_token_set` is true, the injector asks for it with the inject's one-time code. It is
-optional: targets that require no authentication simply carry no token. The injector never reads
-credentials from its own environment or configuration.
+The credential always comes from the AI target: its `ai_target_credential` is an API token
+credential the injector resolves with the inject's one-time code. It is optional: targets that
+require no authentication simply carry none. The injector never reads credentials from its own
+environment or configuration.
 """
 
 from ai_redteam.contracts import constants as c
+from pyoaev.credential import CredentialType
+from pyoaev.credential.attachment import (
+    CredentialAttachment,
+    resolve_credential_attachment,
+)
 
 
 class TargetConfig:
@@ -53,20 +58,27 @@ class TargetConfig:
 
 
 def _token_fetcher(data: dict, api):
-    """Fetch an AI target token with the inject's one-time code (platform keeps it write-only)."""
+    """Resolve an AI target's API token credential with the inject's one-time code."""
     data = data or {}
     inject_id = (data.get("injection") or {}).get("inject_id")
     code = (data.get("attachments") or {}).get("authorisation_code")
-    return lambda asset_id: api.inject.resolve_ai_target_token(
-        inject_id, asset_id, code
-    )
+
+    def fetch(credential_id: str) -> str:
+        return resolve_credential_attachment(
+            api,
+            inject_id,
+            CredentialAttachment(credential_id, code),
+            CredentialType.API,
+        ).api_token
+
+    return fetch
 
 
 def _from_ai_target_asset(asset: dict, fetch_token=None) -> TargetConfig:
     # An older platform still sends the token on reads.
     token = asset.get("ai_target_token")
-    if not token and asset.get("ai_target_token_set") and fetch_token:
-        token = fetch_token(asset.get("asset_id"))
+    if not token and asset.get("ai_target_credential") and fetch_token:
+        token = fetch_token(asset.get("ai_target_credential"))
     return TargetConfig(
         provider=asset.get("ai_target_provider"),
         endpoint=asset.get("ai_target_endpoint"),
