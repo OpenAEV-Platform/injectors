@@ -108,12 +108,6 @@ def _target_fields():
         mandatory=False,
         **manual_condition,
     )
-    token = ContractText(
-        key=c.KEY_TOKEN,
-        label="API token (optional)",
-        mandatory=False,
-        **manual_condition,
-    )
     system_prompt = ContractTextArea(
         key=c.KEY_SYSTEM_PROMPT,
         label="System prompt (optional)",
@@ -127,7 +121,6 @@ def _target_fields():
         provider,
         endpoint,
         model,
-        token,
         system_prompt,
     ]
 

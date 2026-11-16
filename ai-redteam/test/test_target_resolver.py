@@ -66,7 +66,7 @@ class ResolveTargetTest(TestCase):
         self.assertEqual(target.token, "asset-token")
         self.assertEqual(target.api_key, "asset-token")
 
-    def test_inline_manual_token(self):
+    def test_inline_manual_token_is_ignored(self):
         content = {
             "target_selector": "manual",
             "target_provider": "XTM_ONE",
@@ -74,8 +74,7 @@ class ResolveTargetTest(TestCase):
             "target_token": "fcp-inline",
         }
         target = target_resolver.resolve_target(content, api=MagicMock())
-        self.assertEqual(target.token, "fcp-inline")
-        self.assertEqual(target.api_key, "fcp-inline")
+        self.assertIsNone(target.token)
 
     def test_inline_system_prompt_overrides_asset(self):
         api = MagicMock()
