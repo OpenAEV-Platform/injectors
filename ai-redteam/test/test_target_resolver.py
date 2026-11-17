@@ -1,8 +1,10 @@
 from unittest import TestCase
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 from ai_redteam.targets import target_resolver
 from ai_redteam.targets.target_resolver import TargetConfig
+from pyoaev.credential import CredentialType
+from pyoaev.credential.attachment import CredentialAttachment
 
 
 class TargetConfigTest(TestCase):
@@ -140,6 +142,37 @@ class ResolveTargetsTest(TestCase):
         targets = target_resolver.resolve_targets(content, data={}, api=api)
         self.assertEqual(len(targets), 1)
         self.assertEqual(targets[0].name, "Local Llama")
+
+    @patch.object(target_resolver, "resolve_credential_attachment")
+    def test_ai_target_credential_is_resolved_with_the_inject_code(self, resolve):
+        resolve.return_value.api_token = "sk-from-credential"
+        api = MagicMock()
+        api.http_get.return_value = {
+            "ai_target_provider": "OPENAI_COMPATIBLE",
+            "ai_target_credential": "cred-123",
+        }
+        content = {"target_selector": "ai_target", "ai_target": "asset-123"}
+        data = {
+            "injection": {"inject_id": "inject-1"},
+            "attachments": {"authorisation_code": "code-1"},
+        }
+        targets = target_resolver.resolve_targets(content, data=data, api=api)
+        resolve.assert_called_once_with(
+            api,
+            "inject-1",
+            CredentialAttachment("cred-123", "code-1"),
+            CredentialType.API,
+        )
+        self.assertEqual(targets[0].api_key, "sk-from-credential")
+
+    @patch.object(target_resolver, "resolve_credential_attachment")
+    def test_ai_target_without_credential_has_no_token(self, resolve):
+        api = MagicMock()
+        api.http_get.return_value = {"ai_target_provider": "OLLAMA"}
+        content = {"target_selector": "ai_target", "ai_target": "asset-123"}
+        targets = target_resolver.resolve_targets(content, data={}, api=api)
+        resolve.assert_not_called()
+        self.assertIsNone(targets[0].api_key)
 
     def test_asset_groups_fetches_all_members_paginated(self):
         api = MagicMock()
