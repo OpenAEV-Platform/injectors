@@ -58,7 +58,6 @@ class TargetConfig:
 
 
 def _token_fetcher(data: dict, api):
-    """Resolve an AI target's API token credential with the inject's one-time code."""
     data = data or {}
     inject_id = (data.get("injection") or {}).get("inject_id")
     code = (data.get("attachments") or {}).get("authorisation_code")
