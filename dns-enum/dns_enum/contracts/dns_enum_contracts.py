@@ -1,26 +1,5 @@
 from typing import List
 
-from pyoaev.contracts import ContractBuilder
-from pyoaev.contracts.contract_config import (
-    Contract,
-    ContractCardinality,
-    ContractCheckbox,
-    ContractConfig,
-    ContractElement,
-    ContractExpectations,
-    ContractOutputElement,
-    ContractOutputType,
-    ContractSelect,
-    ContractText,
-    ContractTextArea,
-    Expectation,
-    ExpectationType,
-    SecurityPlatformType,
-    SupportedLanguage,
-    prepare_contracts,
-)
-from pyoaev.security_domain.types import SecurityDomains
-
 from dns_enum.contracts.dns_enum_constants import (
     ACTION_OUTPUT_FIELD,
     ASSET_GROUP_ID_KEY,
@@ -46,6 +25,26 @@ from dns_enum.contracts.dns_enum_constants import (
     TYPE,
     WORDLIST_KEY,
 )
+from pyoaev.contracts import ContractBuilder
+from pyoaev.contracts.contract_config import (
+    Contract,
+    ContractCardinality,
+    ContractCheckbox,
+    ContractConfig,
+    ContractElement,
+    ContractExpectations,
+    ContractOutputElement,
+    ContractOutputType,
+    ContractSelect,
+    ContractText,
+    ContractTextArea,
+    Expectation,
+    ExpectationType,
+    SecurityPlatformType,
+    SupportedLanguage,
+    prepare_contracts,
+)
+from pyoaev.security_domain.types import SecurityDomains
 
 
 class DnsEnumContracts:

@@ -1,9 +1,8 @@
-from pydantic import Field
-from pyoaev.configuration import ConfigLoaderOAEV, Configuration, SettingsLoader
-
 from dns_enum.configuration.injector_config_override import InjectorConfigOverride
 from dns_enum.contracts.dns_enum_constants import TYPE
 from dns_enum.contracts.dns_enum_contracts import DnsEnumContracts
+from pydantic import Field
+from pyoaev.configuration import ConfigLoaderOAEV, Configuration, SettingsLoader
 
 
 class ConfigLoader(SettingsLoader):

@@ -5,7 +5,12 @@ import tempfile
 import time
 from typing import Dict, List
 
-from injector_common.dump_config import intercept_dump_argument
+from dns_enum.configuration.config_loader import ConfigLoader
+from dns_enum.contracts.dns_enum_constants import HOSTNAMES_FIELD
+from dns_enum.helpers.dns_enum_command_builder import DnsEnumCommandBuilder
+from dns_enum.helpers.dns_enum_output_parser import DnsEnumOutputParser
+from dns_enum.helpers.endpoint_importer import EndpointImporter
+from dns_enum.models.data import MessageData
 from pyoaev.helpers import OpenAEVConfigHelper, OpenAEVInjectorHelper
 from pyoaev.signatures import SignatureManager
 from pyoaev.signatures.models import (
@@ -14,12 +19,7 @@ from pyoaev.signatures.models import (
     build_network_configs,
 )
 
-from dns_enum.configuration.config_loader import ConfigLoader
-from dns_enum.contracts.dns_enum_constants import HOSTNAMES_FIELD
-from dns_enum.helpers.dns_enum_command_builder import DnsEnumCommandBuilder
-from dns_enum.helpers.dns_enum_output_parser import DnsEnumOutputParser
-from dns_enum.helpers.endpoint_importer import EndpointImporter
-from dns_enum.models.data import MessageData
+from injector_common.dump_config import intercept_dump_argument
 
 
 def _write_lines(directory: str, name: str, lines: List[str]) -> str:
