@@ -16,7 +16,7 @@ dependencies = [
     "requests~=2.33",
     "limiter==0.5.0",
     "tenacity~=9.1.2",
-    "rich~=14.2.0",
+    "rich~=14.3.4",
 ]
 
 [project.urls]
