@@ -1,0 +1,18 @@
+{
+  "title": "BloodHound AD",
+  "slug": "openaev_bloodhound",
+  "description": "This injector runs the BloodHound.py Active Directory collector and surfaces users, computers and privilege-escalation attack paths (Kerberoastable, AS-REP roastable) as findings.",
+  "short_description": "Map Active Directory attack paths with BloodHound",
+  "use_cases": ["Technical"],
+  "verified": false,
+  "last_verified_date": "",
+  "playbook_supported": false,
+  "max_confidence_level": 80,
+  "support_version": "",
+  "subscription_link": "https://github.com/dirkjanm/BloodHound.py",
+  "source_code": "",
+  "manager_supported": true,
+  "container_version": "rolling",
+  "container_image": "openaev/injector-bloodhound",
+  "container_type": "INJECTOR"
+}
