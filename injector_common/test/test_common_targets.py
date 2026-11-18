@@ -294,7 +294,9 @@ class CommonTargetsTest(TestCase):
             "asset web-01: hostname worker-01.example.com (automatic, agentless)",
         )
         seen = Targets._resolve_target(self.asset_seen_and_local_ip, "automatic")
-        self.assertEqual(seen.describe(), "asset a4: seen IP 74.234.220.121 (automatic)")
+        self.assertEqual(
+            seen.describe(), "asset a4: seen IP 74.234.220.121 (automatic)"
+        )
 
     def test_extract_targets_keeps_resolutions_and_message_shows_them(self):
         data = {

@@ -11,7 +11,6 @@ from injector_common.constants import (
     TARGETS_KEY,
 )
 
-
 # Human-readable name of each asset field a target value can come from.
 TARGET_VALUE_LABELS = {
     "hostname": "hostname",
