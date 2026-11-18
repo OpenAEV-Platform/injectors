@@ -10,6 +10,13 @@ from injectors_sdk.public.helpers import (
     create_mq_ssl_context,
 )
 
+# --- Runtime ---
+from injectors_sdk.public.runtime import (
+    InjectorDevOptions,
+    injector_dev_help,
+    injector_dev_options,
+)
+
 __all__ = [
     "__version__",
     # Helpers
@@ -17,4 +24,8 @@ __all__ = [
     "OpenAEVConfigHelper",
     "OpenAEVInjectorHelper",
     "create_mq_ssl_context",
+    # Runtime
+    "InjectorDevOptions",
+    "injector_dev_help",
+    "injector_dev_options",
 ]

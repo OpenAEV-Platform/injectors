@@ -1,0 +1,504 @@
+{
+  "description": "How the platform turns the signatures an injector posts into the signatures of its pending expectations, one case per test of the platform's SignatureOutputProcessorTest: the expectation_signatures an injector posts, and the expectations that end up signed, with their target and signatures. The inject declares a DETECTION and a PREVENTION expectation.",
+  "platform_source": "openaev-api/src/test/java/io/openaev/output_processor/SignatureOutputProcessorTest.java (openaev-platform, main)",
+  "cases": [
+    {
+      "source": "SignatureOutputProcessorTest.shouldResolveAgentTargetByInjectAndAgent",
+      "expectation_signatures": {
+        "targets": [
+          {
+            "signature_target": {
+              "agent_id": "agent-1",
+              "asset_id": "asset-1"
+            },
+            "signature_values": [
+              {
+                "expectation_type": "DETECTION",
+                "values": [
+                  {
+                    "signature_type": "target_ipv4_address",
+                    "signature_value": "10.0.0.5"
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "signed": [
+        {
+          "type": "DETECTION",
+          "agent": "agent-1",
+          "asset": "asset-1",
+          "asset_group": null,
+          "signatures": [
+            [
+              "target_ipv4_address",
+              "10.0.0.5"
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "source": "SignatureOutputProcessorTest.shouldResolveAssetTargetByInjectAndAsset",
+      "expectation_signatures": {
+        "targets": [
+          {
+            "signature_target": {
+              "asset_id": "asset-1"
+            },
+            "signature_values": [
+              {
+                "expectation_type": "PREVENTION",
+                "values": [
+                  {
+                    "signature_type": "target_ipv4_address",
+                    "signature_value": "10.0.0.5"
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "signed": [
+        {
+          "type": "PREVENTION",
+          "agent": null,
+          "asset": "asset-1",
+          "asset_group": null,
+          "signatures": [
+            [
+              "target_ipv4_address",
+              "10.0.0.5"
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "source": "SignatureOutputProcessorTest.given_targetsNotArray_should_returnEarly",
+      "expectation_signatures": {
+        "targets": {
+          "signature_target": {
+            "asset_id": "asset-1"
+          }
+        }
+      },
+      "signed": []
+    },
+    {
+      "source": "SignatureOutputProcessorTest.given_signatureValuesNotArray_should_skipTarget",
+      "expectation_signatures": {
+        "targets": [
+          {
+            "signature_target": {
+              "asset_id": "asset-1"
+            },
+            "signature_values": {
+              "expectation_type": "DETECTION"
+            }
+          },
+          {
+            "signature_target": {
+              "asset_id": "asset-2"
+            },
+            "signature_values": [
+              {
+                "expectation_type": "DETECTION",
+                "values": [
+                  {
+                    "signature_type": "target_ipv4_address",
+                    "signature_value": "10.0.0.5"
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "signed": [
+        {
+          "type": "DETECTION",
+          "agent": null,
+          "asset": "asset-2",
+          "asset_group": null,
+          "signatures": [
+            [
+              "target_ipv4_address",
+              "10.0.0.5"
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "source": "SignatureOutputProcessorTest.given_expectationTypeNull_should_skip",
+      "expectation_signatures": {
+        "targets": [
+          {
+            "signature_target": {
+              "asset_id": "asset-1"
+            },
+            "signature_values": [
+              {
+                "values": [
+                  {
+                    "signature_type": "target_ipv4_address",
+                    "signature_value": "10.0.0.5"
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "signed": []
+    },
+    {
+      "source": "SignatureOutputProcessorTest.given_expectationTypeManual_should_skip",
+      "expectation_signatures": {
+        "targets": [
+          {
+            "signature_target": {
+              "asset_id": "asset-1"
+            },
+            "signature_values": [
+              {
+                "expectation_type": "MANUAL",
+                "values": [
+                  {
+                    "signature_type": "target_ipv4_address",
+                    "signature_value": "10.0.0.5"
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "signed": []
+    },
+    {
+      "source": "SignatureOutputProcessorTest.given_expectationTypeUnknownString_should_skip",
+      "expectation_signatures": {
+        "targets": [
+          {
+            "signature_target": {
+              "asset_id": "asset-1"
+            },
+            "signature_values": [
+              {
+                "expectation_type": "NOT_A_TYPE",
+                "values": [
+                  {
+                    "signature_type": "target_ipv4_address",
+                    "signature_value": "10.0.0.5"
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "signed": []
+    },
+    {
+      "source": "SignatureOutputProcessorTest.given_valuesNotArray_should_skipProcessing",
+      "expectation_signatures": {
+        "targets": [
+          {
+            "signature_target": {
+              "asset_id": "asset-1"
+            },
+            "signature_values": [
+              {
+                "expectation_type": "DETECTION",
+                "values": {
+                  "signature_type": "target_ipv4_address",
+                  "signature_value": "10.0.0.5"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "signed": []
+    },
+    {
+      "source": "SignatureOutputProcessorTest.given_valuesArrayEmpty_should_skipProcessing",
+      "expectation_signatures": {
+        "targets": [
+          {
+            "signature_target": {
+              "asset_id": "asset-1"
+            },
+            "signature_values": [
+              {
+                "expectation_type": "DETECTION",
+                "values": []
+              }
+            ]
+          }
+        ]
+      },
+      "signed": []
+    },
+    {
+      "source": "SignatureOutputProcessorTest.given_signatureWithEmptyType_should_skipProcessing",
+      "expectation_signatures": {
+        "targets": [
+          {
+            "signature_target": {
+              "asset_id": "asset-1"
+            },
+            "signature_values": [
+              {
+                "expectation_type": "DETECTION",
+                "values": [
+                  {
+                    "signature_type": "",
+                    "signature_value": "10.0.0.5"
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "signed": []
+    },
+    {
+      "source": "SignatureOutputProcessorTest.given_signatureWithEmptyValue_should_skipProcessing",
+      "expectation_signatures": {
+        "targets": [
+          {
+            "signature_target": {
+              "asset_id": "asset-1"
+            },
+            "signature_values": [
+              {
+                "expectation_type": "DETECTION",
+                "values": [
+                  {
+                    "signature_type": "target_ipv4_address",
+                    "signature_value": ""
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "signed": []
+    },
+    {
+      "source": "SignatureOutputProcessorTest.given_signatureWithFallbackTypeValueKeys_should_processSignature",
+      "expectation_signatures": {
+        "targets": [
+          {
+            "signature_target": {
+              "asset_id": "asset-1"
+            },
+            "signature_values": [
+              {
+                "expectation_type": "DETECTION",
+                "values": [
+                  {
+                    "type": "target_ipv4_address",
+                    "value": "10.0.0.5"
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "signed": [
+        {
+          "type": "DETECTION",
+          "agent": null,
+          "asset": "asset-1",
+          "asset_group": null,
+          "signatures": [
+            [
+              "target_ipv4_address",
+              "10.0.0.5"
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "source": "SignatureOutputProcessorTest.given_assetGroupId_should_resolveViaAssetGroup",
+      "expectation_signatures": {
+        "targets": [
+          {
+            "signature_target": {
+              "asset_group_id": "group-1"
+            },
+            "signature_values": [
+              {
+                "expectation_type": "DETECTION",
+                "values": [
+                  {
+                    "signature_type": "target_ipv4_address",
+                    "signature_value": "10.0.0.5"
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "signed": [
+        {
+          "type": "DETECTION",
+          "agent": null,
+          "asset": null,
+          "asset_group": "group-1",
+          "signatures": [
+            [
+              "target_ipv4_address",
+              "10.0.0.5"
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "source": "SignatureOutputProcessorTest.given_assetGroupFallbackKey_should_resolveViaAssetGroup",
+      "expectation_signatures": {
+        "targets": [
+          {
+            "signature_target": {
+              "asset_group": "group-1"
+            },
+            "signature_values": [
+              {
+                "expectation_type": "DETECTION",
+                "values": [
+                  {
+                    "signature_type": "target_ipv4_address",
+                    "signature_value": "10.0.0.5"
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "signed": [
+        {
+          "type": "DETECTION",
+          "agent": null,
+          "asset": null,
+          "asset_group": "group-1",
+          "signatures": [
+            [
+              "target_ipv4_address",
+              "10.0.0.5"
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "source": "SignatureOutputProcessorTest.given_agentFallbackKey_should_resolveAgentExpectations",
+      "expectation_signatures": {
+        "targets": [
+          {
+            "signature_target": {
+              "agent": "agent-1"
+            },
+            "signature_values": [
+              {
+                "expectation_type": "DETECTION",
+                "values": [
+                  {
+                    "signature_type": "target_ipv4_address",
+                    "signature_value": "10.0.0.5"
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "signed": [
+        {
+          "type": "DETECTION",
+          "agent": "agent-1",
+          "asset": null,
+          "asset_group": null,
+          "signatures": [
+            [
+              "target_ipv4_address",
+              "10.0.0.5"
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "source": "SignatureOutputProcessorTest.given_assetFallbackKey_should_resolveAssetExpectations",
+      "expectation_signatures": {
+        "targets": [
+          {
+            "signature_target": {
+              "asset": "asset-1"
+            },
+            "signature_values": [
+              {
+                "expectation_type": "DETECTION",
+                "values": [
+                  {
+                    "signature_type": "target_ipv4_address",
+                    "signature_value": "10.0.0.5"
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "signed": [
+        {
+          "type": "DETECTION",
+          "agent": null,
+          "asset": "asset-1",
+          "asset_group": null,
+          "signatures": [
+            [
+              "target_ipv4_address",
+              "10.0.0.5"
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "source": "SignatureOutputProcessorTest.given_missingSignatureTarget_should_skip",
+      "expectation_signatures": {
+        "targets": [
+          {
+            "signature_target": {},
+            "signature_values": [
+              {
+                "expectation_type": "DETECTION",
+                "values": [
+                  {
+                    "signature_type": "target_ipv4_address",
+                    "signature_value": "10.0.0.5"
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "signed": []
+    }
+  ]
+}

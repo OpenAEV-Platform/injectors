@@ -2,6 +2,8 @@
 
 - **``helpers``** — the ports of the injector runtime: configuration access,
   registration, inject queue consumption and its SSL context.
+- **``runtime``** — the dev runtime: the dev options of an injector and running it
+  without the platform.
 
 A seam is **closed**: it imports only the standard library, third-party
 libraries (including the ``xtm_oaev_sdk`` public package) and sibling seam
