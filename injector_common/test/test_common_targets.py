@@ -7,7 +7,11 @@ from injector_common.constants import (
     TARGET_SELECTOR_KEY,
     TARGETS_KEY,
 )
-from injector_common.targets import Targets
+from injector_common.targets import (
+    TargetExtractionResult,
+    TargetResolution,
+    Targets,
+)
 
 
 class CommonTargetsTest(TestCase):
@@ -252,3 +256,104 @@ class CommonTargetsTest(TestCase):
         self.assertEqual(result.targets, ["10.0.0.2"])
         self.assertEqual([meta.asset_id for meta in metas], ["a2"])
         self.assertIsNone(metas[0].agent_id)
+
+    # ---------- automatic resolution, visible per asset ----------
+
+    def test_automatic_order_records_the_field_used(self):
+        agentless = {
+            "asset_id": "a1",
+            "asset_name": "web-01",
+            "asset_hostname": "worker-01.example.com",
+            "asset_seen_ip": "203.0.113.9",
+            "asset_agents": [],
+        }
+        cases = [
+            (agentless, "worker-01.example.com", "hostname"),
+            (self.asset_seen_and_local_ip, "74.234.220.121", "seen_ip"),
+            (self.asset_loopback_seen_ip, "10.0.0.5", "local_ip"),
+        ]
+        for asset, value, field_used in cases:
+            resolution = Targets._resolve_target(asset, "automatic")
+            self.assertEqual(resolution.target, value)
+            self.assertEqual(resolution.value_property, field_used)
+            self.assertEqual(resolution.selector, "automatic")
+        self.assertIsNone(Targets._resolve_target(self.empty_asset_ips, "automatic"))
+
+    def test_resolution_describe(self):
+        agentless = Targets._resolve_target(
+            {
+                "asset_id": "a1",
+                "asset_name": "web-01",
+                "asset_hostname": "worker-01.example.com",
+                "asset_agents": [],
+            },
+            "automatic",
+        )
+        self.assertEqual(
+            agentless.describe(),
+            "asset web-01: hostname worker-01.example.com (automatic, agentless)",
+        )
+        seen = Targets._resolve_target(self.asset_seen_and_local_ip, "automatic")
+        self.assertEqual(seen.describe(), "asset a4: seen IP 74.234.220.121 (automatic)")
+
+    def test_extract_targets_keeps_resolutions_and_message_shows_them(self):
+        data = {
+            "injection": {"inject_content": {}},
+            ASSETS_KEY_RABBITMQ: [self.asset_hostname, self.asset_seen_and_local_ip],
+        }
+        result = Targets.extract_targets("assets", "automatic", data, self.mock_helper)
+        self.assertEqual(
+            [(r.target, r.value_property) for r in result.resolutions],
+            [("host.local", "hostname"), ("74.234.220.121", "seen_ip")],
+        )
+        message = Targets.build_execution_message(
+            "assets", data, ["nmap", "-sS"], target_results=result
+        )
+        self.assertEqual(
+            message,
+            "nmap -sS\nResolved targets:\n"
+            "- asset a1: hostname host.local (automatic, agentless)\n"
+            "- asset a4: seen IP 74.234.220.121 (automatic)",
+        )
+
+    def test_message_unchanged_for_explicit_properties(self):
+        data = {
+            "injection": {"inject_content": {}},
+            ASSETS_KEY_RABBITMQ: [self.asset_local_ip],
+        }
+        result = Targets.extract_targets("assets", "local_ip", data, self.mock_helper)
+        self.assertEqual(
+            Targets.build_execution_message(
+                "assets", data, ["nmap"], target_results=result
+            ),
+            "nmap",
+        )
+
+    def test_missed_targets_by_value(self):
+        result = TargetExtractionResult(
+            targets=["Missing.Invalid", "10.0.0.2", "10.0.0.3"],
+            ip_to_asset_id_map={},
+            resolutions=[
+                TargetResolution("Missing.Invalid", "a1", "web-01"),
+                TargetResolution("10.0.0.2", "a2"),
+                TargetResolution("10.0.0.3", "a3"),
+            ],
+        )
+        missed = Targets.missed_targets(result, ["10.0.0.2"], ["missing.invalid"])
+        self.assertEqual(
+            [m.describe() for m in missed],
+            [
+                "Missing.Invalid (asset web-01): not scanned, hostname did not resolve",
+                "10.0.0.3 (asset a3): not scanned, no result returned by the scan",
+            ],
+        )
+
+    def test_missed_targets_for_manual_targets(self):
+        result = TargetExtractionResult(
+            targets=["a.invalid", "10.0.0.1"], ip_to_asset_id_map={}
+        )
+        missed = Targets.missed_targets(result, ["10.0.0.1"])
+        self.assertEqual(
+            [m.describe() for m in missed],
+            ["a.invalid: not scanned, hostname did not resolve"],
+        )

@@ -1,7 +1,26 @@
 from unittest import TestCase
 
-from injector_common.targets import TargetExtractionResult
+from injector_common.targets import TargetExtractionResult, TargetResolution
 from nmap.helpers.nmap_output_parser import NmapOutputParser
+
+
+def _host(addr: str, port: int, hostname: str = "") -> str:
+    names = (
+        f'<hostnames><hostname name="{hostname}" type="user"/></hostnames>'
+        if hostname
+        else "<hostnames/>"
+    )
+    return (
+        f'<host><status state="up"/><address addr="{addr}" addrtype="ipv4"/>{names}'
+        f'<ports><port protocol="tcp" portid="{port}"><state state="open"/>'
+        f'<service name="svc{port}"/></port></ports></host>'
+    )
+
+
+def _report(*hosts: str) -> bytes:
+    return (
+        '<?xml version="1.0"?><nmaprun scanner="nmap">' + "".join(hosts) + "</nmaprun>"
+    ).encode()
 
 
 class NmapOutputParserTest(TestCase):
@@ -109,6 +128,109 @@ class NmapOutputParserTest(TestCase):
                 "manual",
                 TargetExtractionResult(ip_to_asset_id_map={}, targets=[]),
             )
+
+    # ----------------------------------------------------------------
+    # Attribution by address/hostname, never by position
+    # ----------------------------------------------------------------
+
+    def test_unresolved_first_target_does_not_shift_attribution(self):
+        """Three targets, the first an unresolvable hostname: nmap emits two hosts.
+        Each host's ports go to its own asset and the first target is reported."""
+        results = TargetExtractionResult(
+            targets=["does-not-exist.invalid", "10.0.0.2", "10.0.0.3"],
+            ip_to_asset_id_map={
+                "does-not-exist.invalid": "a1",
+                "10.0.0.2": "a2",
+                "10.0.0.3": "a3",
+            },
+            resolutions=[
+                TargetResolution(
+                    "does-not-exist.invalid", "a1", "web-01", "hostname", "automatic"
+                ),
+                TargetResolution("10.0.0.2", "a2", None, "seen_ip", "automatic"),
+                TargetResolution("10.0.0.3", "a3", None, "seen_ip", "automatic"),
+            ],
+        )
+        stderr = b'Failed to resolve "does-not-exist.invalid".\n'
+        result = NmapOutputParser.xmlparse(
+            _report(_host("10.0.0.2", 22), _host("10.0.0.3", 80)),
+            "asset-groups",
+            results,
+            stderr=stderr,
+        )
+
+        by_port = {s["port"]: s for s in result["outputs"]["scan_results"]}
+        self.assertEqual(by_port[22]["asset_id"], "a2")
+        self.assertEqual(by_port[80]["asset_id"], "a3")
+        self.assertEqual(len(result["missed"]), 1)
+        self.assertEqual(
+            result["missed"][0].describe(),
+            "does-not-exist.invalid (asset web-01): not scanned, "
+            "hostname did not resolve",
+        )
+        self.assertIn("1 target(s) not scanned", result["message"])
+        self.assertIn("does-not-exist.invalid (asset web-01)", result["message"])
+
+    def test_hostname_target_matched_by_xml_hostname(self):
+        """A target given as a hostname is matched by the host's hostname entry."""
+        results = TargetExtractionResult(
+            targets=["10.0.0.9", "scanme.nmap.org"],
+            ip_to_asset_id_map={"10.0.0.9": "a9", "scanme.nmap.org": "a1"},
+        )
+        result = NmapOutputParser.xmlparse(self.result_single_host, "assets", results)
+
+        asset_ids = {s["asset_id"] for s in result["outputs"]["scan_results"]}
+        self.assertEqual(asset_ids, {"a1"})
+        # 10.0.0.9 produced no host: an IP target missed is reported, not attributed.
+        self.assertEqual([m.resolution.target for m in result["missed"]], ["10.0.0.9"])
+        self.assertEqual(result["missed"][0].reason, "no result returned by the scan")
+
+    def test_duplicate_target_values_do_not_shift_attribution(self):
+        """Two assets resolving to one value collapse in the map; the hosts after
+        them must still be attributed to their own asset."""
+        results = TargetExtractionResult(
+            targets=["10.0.0.1", "10.0.0.1", "10.0.0.2"],
+            ip_to_asset_id_map={"10.0.0.1": "a1b", "10.0.0.2": "a2"},
+            resolutions=[
+                TargetResolution("10.0.0.1", "a1"),
+                TargetResolution("10.0.0.1", "a1b"),
+                TargetResolution("10.0.0.2", "a2"),
+            ],
+        )
+        result = NmapOutputParser.xmlparse(
+            _report(_host("10.0.0.1", 22), _host("10.0.0.2", 443)),
+            "assets",
+            results,
+        )
+
+        port_443 = [s for s in result["outputs"]["scan_results"] if s["port"] == 443]
+        self.assertEqual([s["asset_id"] for s in port_443], ["a2"])
+        port_22 = sorted(
+            s["asset_id"] for s in result["outputs"]["scan_results"] if s["port"] == 22
+        )
+        self.assertEqual(port_22, ["a1", "a1b"])
+        self.assertEqual(result["missed"], [])
+        self.assertTrue(result["message"].startswith("Targets successfully scanned"))
+
+    def test_host_matching_no_target_keeps_asset_id_none(self):
+        results = TargetExtractionResult(
+            targets=["10.0.0.1"], ip_to_asset_id_map={"10.0.0.1": "a1"}
+        )
+        result = NmapOutputParser.xmlparse(
+            _report(_host("10.0.0.1", 22), _host("10.9.9.9", 80)), "assets", results
+        )
+        by_port = {s["port"]: s for s in result["outputs"]["scan_results"]}
+        self.assertEqual(by_port[22]["asset_id"], "a1")
+        self.assertIsNone(by_port[80]["asset_id"])
+
+    def test_unresolved_targets_read_from_stderr(self):
+        self.assertEqual(
+            NmapOutputParser.unresolved_targets(
+                b'Failed to resolve "a.invalid".\nFailed to resolve "b.invalid".\n'
+            ),
+            ["a.invalid", "b.invalid"],
+        )
+        self.assertEqual(NmapOutputParser.unresolved_targets(None), [])
 
     def test_truncated_xml_raises(self):
         """Genuinely malformed/truncated XML: lxml itself rejects it before

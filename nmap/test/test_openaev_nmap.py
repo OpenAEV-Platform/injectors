@@ -51,6 +51,7 @@ class TestOpenAEVNmap(unittest.TestCase):
             selector_key=message_data.selector_key,
             data=message_data.raw_data,
             command_args=m_build_args.return_value,
+            target_results=message_data.target_results,
         )
         m_helper.return_value.api.inject.execution_callback.assert_called_with(
             inject_id=message_data.inject_id,
@@ -68,8 +69,57 @@ class TestOpenAEVNmap(unittest.TestCase):
             m_subprocess_run.return_value.stdout,
             message_data.selector_key,
             message_data.target_results,
+            stderr=m_subprocess_run.return_value.stderr,
         )
         self.assertEqual(nmap_output, m_xmlparse.return_value)
+
+    @patch.object(module.NmapOutputParser, "xmlparse")
+    @patch.object(module.subprocess, "run")
+    @patch.object(module.Targets, "build_execution_message")
+    @patch.object(module.NmapCommandBuilder, "build_args")
+    def test_openaev_nmap_execution_reports_missed_targets_as_warning(
+        self,
+        m_build_args,
+        m_build_execution_message,
+        m_subprocess_run,
+        m_xmlparse,
+        m_configloader,
+        m_helper,
+        m_msgdata,
+        _,
+    ):
+        from injector_common.targets import MissedTarget, TargetResolution
+
+        m_helper.return_value.api = MagicMock()
+        m_helper.return_value.injector_logger = MagicMock()
+        injector = module.OpenAEVNmap()
+
+        message_data = MagicMock()
+        message_data.inject_id = "inject-id"
+        message_data.target_results.ip_to_asset_id_map = {}
+        miss = MissedTarget(
+            TargetResolution(
+                target="does-not-exist.invalid", asset_id="a1", asset_name="web-01"
+            ),
+            "hostname did not resolve",
+        )
+        m_xmlparse.return_value = {"message": "m", "outputs": {}, "missed": [miss]}
+
+        injector.nmap_execution(1, message_data)
+
+        calls = m_helper.return_value.api.inject.execution_callback.call_args_list
+        warnings = [
+            c for c in calls if c.kwargs["data"]["execution_status"] == "WARNING"
+        ]
+        self.assertEqual(len(warnings), 1)
+        data = warnings[0].kwargs["data"]
+        self.assertEqual(
+            data["execution_message"],
+            "does-not-exist.invalid (asset web-01): not scanned, "
+            "hostname did not resolve",
+        )
+        self.assertEqual(data["execution_context_identifiers"], ["a1"])
+        self.assertEqual(data["execution_action"], "command_execution")
 
     @patch.object(module.NmapOutputParser, "xmlparse")
     @patch.object(module.subprocess, "run")
