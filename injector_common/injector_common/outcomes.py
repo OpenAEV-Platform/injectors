@@ -224,4 +224,3 @@ def send_scan_progress_trace(
         helper.injector_logger.error(
             f"Failed to send the progress trace for inject {inject_id}: {exc}"
         )
-
