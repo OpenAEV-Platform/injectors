@@ -2,7 +2,13 @@ import threading
 import unittest
 from unittest.mock import ANY, MagicMock, patch
 
+from pyoaev.exceptions import OpenAEVUpdateError
+
 import nmap.openaev_nmap as module
+
+
+def _not_found():
+    return OpenAEVUpdateError("Inject not found", 404, b"")
 
 
 @patch.object(module, "intercept_dump_argument")
@@ -468,6 +474,119 @@ class TestOpenAEVNmap(unittest.TestCase):
         injector.helper.api.inject.execution_callback.assert_not_called()
         m_signaturemanager.return_value.send_signatures.assert_not_called()
         injector.helper.injector_logger.error.assert_called()
+
+    @patch.object(module, "ExecutionDetails")
+    @patch.object(module, "SignatureManager")
+    @patch.object(module, "build_network_configs")
+    @patch.object(module.subprocess, "run")
+    @patch.object(module.Targets, "build_execution_message")
+    @patch.object(module.NmapCommandBuilder, "build_args")
+    def test_openaev_nmap_inject_deleted_before_scan_aborts(
+        self,
+        m_build_args,
+        m_build_execution_message,
+        m_subprocess_run,
+        m_build_network_configs,
+        m_signaturemanager,
+        m_executiondetails,
+        m_configloader,
+        m_helper,
+        m_msgdata,
+        _,
+    ):
+        # The inject is deleted after the command_execution callback: the first
+        # per-target trace answers 404. nmap must not run, the remaining targets
+        # get no trace, one abort line is logged and nothing escapes.
+        m_helper.return_value.injector_logger = MagicMock()
+        m_helper.return_value.api = MagicMock()
+        injector = module.OpenAEVNmap()
+
+        message_data = MagicMock()
+        message_data.inject_id = "inject-id"
+        message_data.target_results.ip_to_asset_id_map = {
+            "10.0.0.1": "asset-1",
+            "10.0.0.2": "asset-2",
+            "10.0.0.3": "asset-3",
+        }
+        m_msgdata.return_value = message_data
+        injector.helper.api.inject.execution_callback.side_effect = [
+            None,  # global command_execution trace
+            _not_found(),  # first per-target trace
+        ]
+
+        injector.process_message({"injection": {"inject_id": "inject-id"}})
+
+        m_subprocess_run.assert_not_called()
+        self.assertEqual(injector.helper.api.inject.execution_callback.call_count, 2)
+        m_signaturemanager.return_value.send_signatures.assert_not_called()
+        injector.helper.injector_logger.warning.assert_called_once_with(
+            "inject inject-id deleted, aborting"
+        )
+        injector.helper.injector_logger.error.assert_not_called()
+
+    @patch.object(module.OpenAEVNmap, "nmap_execution")
+    @patch.object(module, "ExecutionDetails")
+    @patch.object(module, "SignatureManager")
+    @patch.object(module, "build_network_configs")
+    def test_openaev_nmap_inject_deleted_on_final_callback_aborts(
+        self,
+        m_build_network_configs,
+        m_signaturemanager,
+        m_executiondetails,
+        m_nmap_execution,
+        m_configloader,
+        m_helper,
+        m_msgdata,
+        _,
+    ):
+        m_helper.return_value.injector_logger = MagicMock()
+        m_helper.return_value.api = MagicMock()
+        injector = module.OpenAEVNmap()
+
+        message_data = MagicMock()
+        message_data.inject_id = "inject-id"
+        m_msgdata.return_value = message_data
+        m_nmap_execution.return_value = {"message": "done", "outputs": {}}
+        injector.helper.api.inject.execution_callback.side_effect = _not_found()
+
+        injector.process_message({"injection": {"inject_id": "inject-id"}})
+
+        m_signaturemanager.return_value.send_signatures.assert_not_called()
+        injector.helper.injector_logger.warning.assert_called_once_with(
+            "inject inject-id deleted, aborting"
+        )
+
+    @patch.object(module.OpenAEVNmap, "nmap_execution")
+    @patch.object(module, "ExecutionDetails")
+    @patch.object(module, "SignatureManager")
+    @patch.object(module, "build_network_configs")
+    def test_openaev_nmap_non_404_on_final_callback_still_raises(
+        self,
+        m_build_network_configs,
+        m_signaturemanager,
+        m_executiondetails,
+        m_nmap_execution,
+        m_configloader,
+        m_helper,
+        m_msgdata,
+        _,
+    ):
+        # Any other platform error keeps today's behaviour.
+        m_helper.return_value.injector_logger = MagicMock()
+        m_helper.return_value.api = MagicMock()
+        injector = module.OpenAEVNmap()
+
+        message_data = MagicMock()
+        message_data.inject_id = "inject-id"
+        m_msgdata.return_value = message_data
+        m_nmap_execution.return_value = {"message": "done", "outputs": {}}
+        injector.helper.api.inject.execution_callback.side_effect = OpenAEVUpdateError(
+            "boom", 500, b""
+        )
+
+        with self.assertRaises(OpenAEVUpdateError):
+            injector.process_message({"injection": {"inject_id": "inject-id"}})
+        injector.helper.injector_logger.warning.assert_not_called()
 
     def test_openaev_nmap_start(self, m_configloader, m_helper, m_msgdata, _):
         m_helper.return_value.api = MagicMock()

@@ -11,6 +11,7 @@ from pyoaev.signatures.models import (
 )
 
 from injector_common.dump_config import intercept_dump_argument
+from injector_common.inject_gone import abort_on_inject_gone, is_inject_gone
 from injector_common.targets import Targets
 from injector_common.traces import send_per_target_traces
 from nmap.configuration.config_loader import ConfigLoader
@@ -107,6 +108,12 @@ class OpenAEVNmap:
         )
 
     def process_message(self, data: dict) -> None:
+        # A 404 on any callback means the inject was deleted on the platform:
+        # stop with one log line, never a traceback in the per-message thread.
+        with abort_on_inject_gone(self.helper.injector_logger, data):
+            self._process_message(data)
+
+    def _process_message(self, data: dict) -> None:
         start = time.time()
 
         # unpacking the message, resolving targets and building the pre-execution
@@ -145,6 +152,9 @@ class OpenAEVNmap:
                 "exit_code": int(err.returncode),
             }
         except Exception as err:
+            if is_inject_gone(err):
+                # Deleted before the scan: nmap never ran, nothing to report.
+                raise
             execution_message = str(err)
             tool_error_info = {
                 "exit_code": 1,
