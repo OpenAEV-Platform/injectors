@@ -2,7 +2,6 @@ from lxml import objectify
 
 from injector_common.targets import TargetExtractionResult
 
-
 SERVICE_PROBED = "probed"
 SERVICE_GUESSED = "guessed"
 

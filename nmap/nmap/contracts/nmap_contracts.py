@@ -244,7 +244,7 @@ class NmapContracts:
             config=contract_config,
             label={
                 SupportedLanguage.en: "Nmap - SYN Scan with service/version detection",
-                SupportedLanguage.fr: "Nmap - SYN Scan avec détection des services et versions",
+                SupportedLanguage.fr: "Nmap - SYN Scan avec détection de version",
             },
             fields=nmap_contract_fields,
             outputs=nmap_contract_outputs,
