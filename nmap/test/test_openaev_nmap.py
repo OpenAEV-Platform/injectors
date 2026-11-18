@@ -63,13 +63,14 @@ class TestOpenAEVNmap(unittest.TestCase):
             },
         )
         m_subprocess_run.assert_called_once_with(
-            m_build_args.return_value, check=True, capture_output=True
+            m_build_args.return_value, check=False, capture_output=True
         )
         m_xmlparse.assert_called_once_with(
             m_subprocess_run.return_value.stdout,
             message_data.selector_key,
             message_data.target_results,
             stderr=m_subprocess_run.return_value.stderr,
+            exit_code=m_subprocess_run.return_value.returncode,
         )
         self.assertEqual(nmap_output, m_xmlparse.return_value)
 
@@ -88,7 +89,8 @@ class TestOpenAEVNmap(unittest.TestCase):
         m_msgdata,
         _,
     ):
-        from injector_common.targets import MissedTarget, TargetResolution
+        from injector_common.outcomes import NOT_SCANNED, TargetOutcome
+        from injector_common.targets import TargetResolution
 
         m_helper.return_value.api = MagicMock()
         m_helper.return_value.injector_logger = MagicMock()
@@ -97,13 +99,14 @@ class TestOpenAEVNmap(unittest.TestCase):
         message_data = MagicMock()
         message_data.inject_id = "inject-id"
         message_data.target_results.ip_to_asset_id_map = {}
-        miss = MissedTarget(
+        miss = TargetOutcome(
             TargetResolution(
                 target="does-not-exist.invalid", asset_id="a1", asset_name="web-01"
             ),
-            "hostname did not resolve",
+            NOT_SCANNED,
+            reason="hostname did not resolve",
         )
-        m_xmlparse.return_value = {"message": "m", "outputs": {}, "missed": [miss]}
+        m_xmlparse.return_value = {"message": "m", "outputs": {}, "outcomes": [miss]}
 
         injector.nmap_execution(1, message_data)
 
@@ -140,29 +143,131 @@ class TestOpenAEVNmap(unittest.TestCase):
         m_helper.return_value.injector_logger = MagicMock()
         injector = module.OpenAEVNmap()
 
+        from injector_common.outcomes import HOST_DOWN, HOST_UP, TargetOutcome
+        from injector_common.targets import TargetResolution
+
         message_data = MagicMock()
         message_data.inject_id = "inject-id"
+        message_data.get_targets.return_value = ["10.0.0.1", "10.0.0.2", "10.0.0.3"]
         # Two asset-backed targets and one manual target (no asset id): only the
-        # asset-backed ones must get a target-scoped trace.
-        message_data.target_results.ip_to_asset_id_map = {
-            "10.0.0.1": "asset-1",
-            "10.0.0.2": "asset-2",
+        # asset-backed ones get a target-scoped outcome trace, after the scan.
+        m_xmlparse.return_value = {
+            "message": "m",
+            "outputs": {},
+            "outcomes": [
+                TargetOutcome(TargetResolution("10.0.0.1", "asset-1"), HOST_UP, 2),
+                TargetOutcome(TargetResolution("10.0.0.2", "asset-2"), HOST_DOWN),
+                TargetOutcome(TargetResolution("10.0.0.3"), HOST_UP, 1),
+            ],
         }
 
         injector.nmap_execution(1, message_data)
 
         calls = m_helper.return_value.api.inject.execution_callback.call_args_list
+        # The progress trace states the target count and the platform threshold.
+        progress = calls[1].kwargs["data"]
+        self.assertEqual(progress["execution_status"], "INFO")
+        self.assertIn("3 target(s)", progress["execution_message"])
+        self.assertIn(
+            "inject.execution.threshold.minutes", progress["execution_message"]
+        )
         target_calls = [
             c for c in calls if c.kwargs["data"].get("execution_context_identifiers")
         ]
-        self.assertEqual(len(target_calls), 2)
-        identifiers = sorted(
-            c.kwargs["data"]["execution_context_identifiers"][0] for c in target_calls
+        self.assertEqual(
+            [
+                (
+                    c.kwargs["data"]["execution_context_identifiers"],
+                    c.kwargs["data"]["execution_status"],
+                    c.kwargs["data"]["execution_message"],
+                )
+                for c in target_calls
+            ],
+            [
+                (
+                    ["asset-1"],
+                    "EXECUTED",
+                    "10.0.0.1 (asset asset-1): host up, 2 open ports",
+                ),
+                (
+                    ["asset-2"],
+                    "WARNING",
+                    "10.0.0.2 (asset asset-2): host down or no response",
+                ),
+            ],
         )
-        self.assertEqual(identifiers, ["asset-1", "asset-2"])
         for c in target_calls:
             self.assertEqual(c.kwargs["data"]["execution_action"], "command_execution")
-            self.assertEqual(c.kwargs["data"]["execution_status"], "INFO")
+
+    @patch.object(module.subprocess, "run")
+    @patch.object(module.Targets, "build_execution_message")
+    @patch.object(module.NmapCommandBuilder, "build_args")
+    def test_openaev_nmap_execution_nonzero_exit_with_report_keeps_results(
+        self,
+        m_build_args,
+        m_build_execution_message,
+        m_subprocess_run,
+        m_configloader,
+        m_helper,
+        m_msgdata,
+        _,
+    ):
+        """(c) nmap exits non-zero with a parseable report: the results are kept,
+        the status is WARNING and the message carries the exit code."""
+        from injector_common.targets import TargetExtractionResult
+
+        m_helper.return_value.api = MagicMock()
+        m_helper.return_value.injector_logger = MagicMock()
+        injector = module.OpenAEVNmap()
+        message_data = MagicMock()
+        message_data.selector_key = "assets"
+        message_data.target_results = TargetExtractionResult(
+            targets=["10.0.0.1"], ip_to_asset_id_map={"10.0.0.1": "a1"}
+        )
+        m_subprocess_run.return_value = MagicMock(
+            returncode=1,
+            stdout=(
+                b'<?xml version="1.0"?><nmaprun><host><status state="up" '
+                b'reason="user-set"/><address addr="10.0.0.1" addrtype="ipv4"/>'
+                b'<ports><port protocol="tcp" portid="22"><state state="open"/>'
+                b'<service name="ssh"/></port></ports></host></nmaprun>'
+            ),
+            stderr=b"some interruption",
+        )
+
+        result = injector.nmap_execution(1, message_data)
+
+        self.assertEqual(result["status"], "WARNING")
+        self.assertEqual(result["outputs"]["ports"], [22])
+        self.assertIn("nmap exited with code 1", result["message"])
+
+    @patch.object(module.subprocess, "run")
+    @patch.object(module.Targets, "build_execution_message")
+    @patch.object(module.NmapCommandBuilder, "build_args")
+    def test_openaev_nmap_execution_nonzero_exit_without_report_raises(
+        self,
+        m_build_args,
+        m_build_execution_message,
+        m_subprocess_run,
+        m_configloader,
+        m_helper,
+        m_msgdata,
+        _,
+    ):
+        """(d) nmap exits non-zero with no report: CalledProcessError with stderr,
+        which process_message turns into a global ERROR."""
+        m_helper.return_value.api = MagicMock()
+        m_helper.return_value.injector_logger = MagicMock()
+        injector = module.OpenAEVNmap()
+        message_data = MagicMock()
+        m_subprocess_run.return_value = MagicMock(
+            returncode=255, stdout=b"", stderr=b"QUITTING!"
+        )
+
+        with self.assertRaises(module.subprocess.CalledProcessError) as ctx:
+            injector.nmap_execution(1, message_data)
+        self.assertEqual(ctx.exception.returncode, 255)
+        self.assertEqual(ctx.exception.stderr, b"QUITTING!")
 
     @patch.object(module.OpenAEVNmap, "nmap_execution")
     @patch.object(module, "ExecutionDetails")
