@@ -350,6 +350,115 @@ class CommonTargetsTest(TestCase):
             ],
         )
 
+    # ---------- skipped assets ----------
+
+    def _extract(self, assets, selector):
+        data = {
+            "injection": {"inject_content": {}},
+            ASSETS_KEY_RABBITMQ: assets,
+        }
+        return Targets.extract_targets("asset-groups", selector, data, self.mock_helper)
+
+    def test_skipped_assets_are_recorded_with_their_reason(self):
+        assets = [
+            {"asset_id": "a1", "asset_name": "web-01", "asset_seen_ip": "10.0.0.1"},
+            {"asset_id": "a2", "asset_name": "web-02", "asset_seen_ip": None},
+            {"asset_id": "a3", "asset_name": "web-03", "asset_seen_ip": "127.0.0.1"},
+        ]
+        result = self._extract(assets, "seen_ip")
+
+        self.assertEqual(result.targets, ["10.0.0.1"])
+        self.assertEqual(
+            [s.describe() for s in result.skipped],
+            [
+                "web-02: not scanned, no seen IP (target property seen_ip)",
+                "web-03: not scanned, seen IP 127.0.0.1 is loopback "
+                "(target property seen_ip)",
+            ],
+        )
+        self.assertEqual([s.asset_id for s in result.skipped], ["a2", "a3"])
+        self.assertEqual(result.skipped_summary(), "2 of 3 assets skipped")
+        self.assertFalse(result.all_assets_skipped)
+        # The logger line stays.
+        self.assertEqual(self.mock_helper.injector_logger.warning.call_count, 2)
+
+    def test_every_asset_skipped(self):
+        assets = [
+            {"asset_id": "a1", "asset_seen_ip": "0.0.0.0"},
+            {"asset_id": "a2", "asset_seen_ip": "169.254.1.1"},
+            {"asset_id": "a3", "asset_seen_ip": "not-an-ip"},
+        ]
+        result = self._extract(assets, "seen_ip")
+
+        self.assertEqual(result.targets, [])
+        self.assertTrue(result.all_assets_skipped)
+        self.assertEqual(
+            [s.reason for s in result.skipped],
+            [
+                "seen IP 0.0.0.0 is unspecified",
+                "seen IP 169.254.1.1 is link-local",
+                "seen IP not-an-ip is not a valid IP address",
+            ],
+        )
+        self.assertEqual(result.skipped_summary(), "3 of 3 assets skipped")
+        # Labelled by id when the asset has no name.
+        self.assertTrue(result.skipped[0].describe().startswith("a1: not scanned"))
+
+    def test_no_asset_skipped_keeps_result_unchanged(self):
+        assets = [
+            {"asset_id": "a1", "asset_seen_ip": "10.0.0.1"},
+            {"asset_id": "a2", "asset_seen_ip": "10.0.0.2"},
+        ]
+        result = self._extract(assets, "seen_ip")
+
+        self.assertEqual(result.skipped, [])
+        self.assertEqual(result.skipped_summary(), "")
+        self.assertEqual(result.describe_skipped(), "")
+        message = Targets.build_execution_message(
+            "assets", {}, ["nmap", "10.0.0.1"], result
+        )
+        self.assertEqual(message, "nmap 10.0.0.1")
+
+    def test_skip_reasons_by_property(self):
+        self.assertEqual(
+            Targets.skip_reason({"asset_ips": []}, "local_ip"), "no local IP"
+        )
+        self.assertEqual(
+            Targets.skip_reason({"asset_ips": ["127.0.0.1", "fe80::1"]}, "local_ip"),
+            "no valid local IP (127.0.0.1 is loopback, fe80::1 is link-local)",
+        )
+        self.assertEqual(Targets.skip_reason({}, "hostname"), "no hostname")
+        self.assertEqual(
+            Targets.skip_reason(
+                {"asset_agents": [{"agent_id": "x"}], "asset_seen_ip": "127.0.0.1"},
+                "automatic",
+            ),
+            "no usable value: seen IP 127.0.0.1 is loopback; no local IP",
+        )
+        self.assertEqual(
+            Targets.skip_reason({"asset_agents": []}, "automatic"),
+            "no usable value: agentless with no hostname; no seen IP; no local IP",
+        )
+
+    def test_skipped_assets_in_execution_message(self):
+        assets = [
+            {"asset_id": "a1", "asset_seen_ip": "10.0.0.1"},
+            {"asset_id": "a2", "asset_name": "db-02"},
+        ]
+        result = self._extract(assets, "seen_ip")
+        message = Targets.build_execution_message(
+            "assets", {}, ["nmap", "10.0.0.1"], result
+        )
+        self.assertEqual(
+            message,
+            "nmap 10.0.0.1\n1 of 2 assets skipped\n"
+            "- db-02: not scanned, no seen IP (target property seen_ip)",
+        )
+
+    def test_skipped_of_tolerates_results_without_skipped(self):
+        self.assertEqual(Targets.skipped_of(MagicMock()), [])
+        self.assertEqual(Targets.skipped_of(None), [])
+
     def test_missed_targets_for_manual_targets(self):
         result = TargetExtractionResult(
             targets=["a.invalid", "10.0.0.1"], ip_to_asset_id_map={}
