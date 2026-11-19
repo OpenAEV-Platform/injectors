@@ -2,10 +2,6 @@ import json
 import subprocess
 import time
 
-from nmap.configuration.config_loader import ConfigLoader
-from nmap.helpers.nmap_command_builder import NmapCommandBuilder
-from nmap.helpers.nmap_output_parser import NmapOutputParser
-from nmap.models.data import MessageData
 from pyoaev.helpers import OpenAEVConfigHelper, OpenAEVInjectorHelper
 from pyoaev.signatures import SignatureManager
 from pyoaev.signatures.models import (
@@ -23,6 +19,10 @@ from injector_common.outcomes import (
     send_target_outcome_traces,
 )
 from injector_common.targets import Targets
+from nmap.configuration.config_loader import ConfigLoader
+from nmap.helpers.nmap_command_builder import NmapCommandBuilder
+from nmap.helpers.nmap_output_parser import NmapOutputParser
+from nmap.models.data import MessageData
 
 
 class OpenAEVNmap:
