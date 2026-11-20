@@ -6,18 +6,23 @@ The contract exposes a "Type of targets" selector (`target_selector`) with three
   2. ``asset-groups`` - run the technique against every `AiTarget` asset that belongs to the
      selected asset group(s). The groups are carried on the injector message (`assetGroups`).
   3. ``manual`` - provide the connection inline on the inject (provider / endpoint / model /
-     token / system prompt).
+     system prompt), for targets that require no authentication.
 
 For backward compatibility, when no selector is present we keep the legacy behaviour: use the
 `ai_target` reference if one is set, otherwise fall back to the inline definition.
 
-The credential always comes from the AI target configuration (`ai_target_token`, or the inline
-`target_token` in manual mode). It is optional: targets that require no authentication (e.g. a
-local model deployment) simply carry no token. The injector never reads credentials from its own
+The credential always comes from the AI target: its `ai_target_credential` is an API token
+credential the injector resolves with the inject's one-time code. It is optional: targets that
+require no authentication simply carry none. The injector never reads credentials from its own
 environment or configuration.
 """
 
 from ai_redteam.contracts import constants as c
+from pyoaev.credential import CredentialType
+from pyoaev.credential.attachment import (
+    CredentialAttachment,
+    resolve_credential_attachment,
+)
 
 
 class TargetConfig:
@@ -52,7 +57,27 @@ class TargetConfig:
         self.asset_id = asset_id
 
 
-def _from_ai_target_asset(asset: dict) -> TargetConfig:
+def _token_fetcher(data: dict, api):
+    data = data or {}
+    inject_id = (data.get("injection") or {}).get("inject_id")
+    code = (data.get("attachments") or {}).get("authorisation_code")
+
+    def fetch(credential_id: str) -> str:
+        return resolve_credential_attachment(
+            api,
+            inject_id,
+            CredentialAttachment(credential_id, code),
+            CredentialType.API,
+        ).api_token
+
+    return fetch
+
+
+def _from_ai_target_asset(asset: dict, fetch_token=None) -> TargetConfig:
+    # An older platform still sends the token on reads.
+    token = asset.get("ai_target_token")
+    if not token and asset.get("ai_target_credential") and fetch_token:
+        token = fetch_token(asset.get("ai_target_credential"))
     return TargetConfig(
         provider=asset.get("ai_target_provider"),
         endpoint=asset.get("ai_target_endpoint"),
@@ -62,7 +87,7 @@ def _from_ai_target_asset(asset: dict) -> TargetConfig:
         configuration=asset.get("ai_target_configuration") or {},
         name=asset.get("asset_name"),
         asset_id=asset.get("asset_id"),
-        token=asset.get("ai_target_token"),
+        token=token,
     )
 
 
@@ -72,7 +97,6 @@ def _from_inline(content: dict) -> TargetConfig:
         endpoint=content.get(c.KEY_ENDPOINT),
         model=content.get(c.KEY_MODEL),
         system_prompt=content.get(c.KEY_SYSTEM_PROMPT),
-        token=content.get(c.KEY_TOKEN),
     )
 
 
@@ -116,7 +140,9 @@ def _collect_ai_target_ids_in_group(group_id: str, api, logger=None) -> list:
     return ids
 
 
-def _fetch_ai_targets_in_groups(group_ids: list, api, logger=None) -> list:
+def _fetch_ai_targets_in_groups(
+    group_ids: list, api, logger=None, fetch_token=None
+) -> list:
     """Resolve every AI target asset (static OR dynamic member) of the given group(s).
 
     The group-members endpoint only carries a summary of each asset (no connection
@@ -134,26 +160,28 @@ def _fetch_ai_targets_in_groups(group_ids: list, api, logger=None) -> list:
     for asset_id in ordered_ids:
         try:
             asset = api.http_get(f"/ai_targets/{asset_id}")
-            targets.append(_from_ai_target_asset(asset))
+            targets.append(_from_ai_target_asset(asset, fetch_token))
         except Exception as exc:  # noqa: BLE001
             if logger:
                 logger.warning(f"Could not fetch AI target {asset_id}: {exc}")
     return targets
 
 
-def _resolve_single(content: dict, api, logger=None) -> TargetConfig:
+def _resolve_single(content: dict, api, logger=None, fetch_token=None) -> TargetConfig:
     ai_target_id = content.get(c.KEY_TARGET_REF)
     if ai_target_id:
         try:
             asset = api.http_get(f"/ai_targets/{ai_target_id}")
-            target = _from_ai_target_asset(asset)
+        except Exception as exc:  # noqa: BLE001 - fall back to inline definition
+            if logger:
+                logger.warning(f"Could not fetch AI target {ai_target_id}: {exc}")
+        else:
+            # A refused token fails the target instead of falling back to the inline definition.
+            target = _from_ai_target_asset(asset, fetch_token)
             # Inline fields may still override the system prompt for a given inject
             if content.get(c.KEY_SYSTEM_PROMPT):
                 target.system_prompt = content.get(c.KEY_SYSTEM_PROMPT)
             return target
-        except Exception as exc:  # noqa: BLE001 - fall back to inline definition
-            if logger:
-                logger.warning(f"Could not fetch AI target {ai_target_id}: {exc}")
     return _from_inline(content)
 
 
@@ -168,12 +196,13 @@ def resolve_target(content: dict, api, logger=None) -> TargetConfig:
 def resolve_targets(content: dict, data: dict, api, logger=None) -> list:
     """Resolve every target for the inject as a list of TargetConfig (>= 1 in the happy path)."""
     selector = content.get(c.KEY_TARGET_SELECTOR)
+    fetch_token = _token_fetcher(data, api)
 
     if selector == c.TARGET_SELECTOR_ASSET_GROUPS:
         group_ids = _asset_group_ids(data)
         if not group_ids:
             raise ValueError("No asset group selected for this AI red-team inject")
-        targets = _fetch_ai_targets_in_groups(group_ids, api, logger)
+        targets = _fetch_ai_targets_in_groups(group_ids, api, logger, fetch_token)
         if not targets:
             raise ValueError(
                 "The selected asset group(s) contain no AI target assets to test"
@@ -183,4 +212,4 @@ def resolve_targets(content: dict, data: dict, api, logger=None) -> list:
     if selector == c.TARGET_SELECTOR_MANUAL:
         return [_from_inline(content)]
 
-    return [_resolve_single(content, api, logger)]
+    return [_resolve_single(content, api, logger, fetch_token)]
