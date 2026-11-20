@@ -22,7 +22,14 @@ RUN poetry install
 
 FROM python:3.13-alpine AS runner
 
-RUN apk --no-cache upgrade && apk --no-cache add nmap
+# -sV starts the NSE engine: on Alpine nse_main.lua and nselib ship in
+# nmap-nselibs and the scripts in nmap-scripts, not in nmap itself.
+RUN apk --no-cache upgrade && apk --no-cache add nmap nmap-nselibs nmap-scripts
+# Smoke test: service detection must start and report the host, else the
+# image build fails (the -sV contract would exit 1 at run time).
+RUN nmap -Pn -sT -sV --version-light -p 1 -oX - 127.0.0.1 > /tmp/nmap-smoke.xml \
+    && grep -q '<host ' /tmp/nmap-smoke.xml \
+    && rm -f /tmp/nmap-smoke.xml
 RUN pip install --no-cache-dir -U pip certifi
 
 WORKDIR /opt/injector_common
