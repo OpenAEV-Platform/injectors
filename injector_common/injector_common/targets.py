@@ -79,12 +79,67 @@ class MissedTarget:
 
 
 @dataclass
+class SkippedAsset:
+    """An asset of the inject that got no target value, so it was never scanned.
+
+    ``reason`` says why in the user's terms: no value for the selected property, or an
+    invalid one (the field and the value are named, e.g. 'seen IP 127.0.0.1 is
+    loopback'). ``selector`` is the target property requested on the inject.
+    """
+
+    asset_id: Optional[str]
+    asset_name: Optional[str]
+    selector: Optional[str]
+    reason: str
+
+    def asset_label(self) -> str:
+        return self.asset_name or self.asset_id or "unknown asset"
+
+    def describe(self) -> str:
+        """E.g. 'web-02: not scanned, seen IP 127.0.0.1 is loopback (target property
+        seen_ip)'."""
+        return (
+            f"{self.asset_label()}: not scanned, {self.reason} "
+            f"(target property {self.selector})"
+        )
+
+
+@dataclass
 class TargetExtractionResult:
     targets: List[str]
     ip_to_asset_id_map: Dict[str, str]
     # One entry per resolved asset, duplicates included (the map above collapses two
     # assets resolving to the same value into one key).
     resolutions: List[TargetResolution] = field(default_factory=list)
+    # One entry per asset that got no target value, with the reason.
+    skipped: List[SkippedAsset] = field(default_factory=list)
+
+    @property
+    def asset_count(self) -> int:
+        """Assets of the inject: the resolved ones and the skipped ones."""
+        return len(self.resolutions) + len(self.skipped)
+
+    @property
+    def all_assets_skipped(self) -> bool:
+        return bool(self.skipped) and not self.targets
+
+    def skipped_summary(self) -> str:
+        """'N of M assets skipped', or '' when no asset was skipped."""
+        if not self.skipped:
+            return ""
+        noun = "asset" if self.asset_count == 1 else "assets"
+        return f"{len(self.skipped)} of {self.asset_count} {noun} skipped"
+
+    def describe_skipped(self, limit: int = 50) -> str:
+        """The summary line then one line per skipped asset (at most ``limit``), or ''
+        when no asset was skipped."""
+        if not self.skipped:
+            return ""
+        lines = [self.skipped_summary()]
+        lines += [f"- {s.describe()}" for s in self.skipped[:limit]]
+        if len(self.skipped) > limit:
+            lines.append(f"- and {len(self.skipped) - limit} more")
+        return "\n".join(lines)
 
 
 @dataclass
@@ -171,6 +226,7 @@ class Targets:
         targets: List[str] = []
         ip_to_asset_id_map: Dict[str, str] = {}
         resolutions: List[TargetResolution] = []
+        skipped: List[SkippedAsset] = []
         content = data["injection"]["inject_content"]
 
         if (selector_key == "asset-groups" or selector_key == "assets") and data[
@@ -184,6 +240,7 @@ class Targets:
                 targets,
                 ip_to_asset_id_map,
                 resolutions,
+                skipped,
             )
 
         elif selector_key == "manual":
@@ -200,6 +257,7 @@ class Targets:
             targets=targets,
             ip_to_asset_id_map=ip_to_asset_id_map,
             resolutions=resolutions,
+            skipped=skipped,
         )
 
     @staticmethod
@@ -210,8 +268,25 @@ class Targets:
         targets: List[str],
         ip_to_asset_id_map: Dict[str, str],
         resolutions: Optional[List[TargetResolution]] = None,
+        skipped: Optional[List[SkippedAsset]] = None,
     ) -> None:
-        """Extract property based on TARGET_PROPERTY."""
+        """Extract property based on TARGET_PROPERTY.
+
+        An asset that gets no target value is recorded in ``skipped`` with the reason,
+        so the injector can report it on the inject instead of dropping it silently.
+        """
+
+        def skip(asset: Dict, reason: str) -> None:
+            if skipped is not None:
+                skipped.append(
+                    SkippedAsset(
+                        asset_id=asset.get("asset_id"),
+                        asset_name=asset.get("asset_name"),
+                        selector=selector,
+                        reason=reason,
+                    )
+                )
+
         # Process all assets
         for asset in assets:
             try:
@@ -229,11 +304,63 @@ class Targets:
                         f"No valid target found for asset_id={asset.get('asset_id')} "
                         f"(hostname={asset.get('asset_hostname')}, ips={asset.get('asset_ips')})"
                     )
+                    skip(asset, Targets.skip_reason(asset, selector))
 
             except Exception as e:
                 helper.injector_logger.error(
                     f"Error processing asset_id={asset.get('asset_id')}: {e}"
                 )
+                skip(asset, f"error while reading the asset: {e}")
+
+    @staticmethod
+    def _ip_defect(ip: Optional[str]) -> Optional[str]:
+        """Why an IP value is not usable ('loopback', 'unspecified', 'link-local',
+        'not a valid IP address'), or None when it is usable. Mirrors _is_valid_ip."""
+        try:
+            ip_obj = ipaddress.ip_address(ip)
+        except (ValueError, TypeError):
+            return "not a valid IP address"
+        if ip_obj.is_loopback:
+            return "loopback"
+        if ip_obj.is_unspecified:
+            return "unspecified"
+        if ip_obj.is_link_local:
+            return "link-local"
+        return None
+
+    @staticmethod
+    def _seen_ip_reason(asset: Dict) -> str:
+        seen_ip = asset.get("asset_seen_ip")
+        if not seen_ip:
+            return "no seen IP"
+        return f"seen IP {seen_ip} is {Targets._ip_defect(seen_ip)}"
+
+    @staticmethod
+    def _local_ip_reason(asset: Dict) -> str:
+        ips = [ip for ip in (asset.get("asset_ips") or []) if ip]
+        if not ips:
+            return "no local IP"
+        detail = ", ".join(f"{ip} is {Targets._ip_defect(ip)}" for ip in ips)
+        return f"no valid local IP ({detail})"
+
+    @staticmethod
+    def skip_reason(asset: Dict, selector: str) -> str:
+        """Why ``_resolve_target`` found no target value for this asset, in the user's
+        terms. Reads the same fields in the same order; never chooses a value."""
+        if selector == "seen_ip":
+            return Targets._seen_ip_reason(asset)
+        if selector == "local_ip":
+            return Targets._local_ip_reason(asset)
+        if selector == "hostname":
+            return "no hostname"
+        if selector == "automatic":
+            parts = []
+            if not asset.get("asset_agents"):
+                parts.append("agentless with no hostname")
+            parts.append(Targets._seen_ip_reason(asset))
+            parts.append(Targets._local_ip_reason(asset))
+            return "no usable value: " + "; ".join(parts)
+        return f"unknown target property {selector}"
 
     @staticmethod
     def _get_target(asset: Dict, selector: str) -> Optional[Tuple[str, str]]:
@@ -399,6 +526,13 @@ class Targets:
         return missed
 
     @staticmethod
+    def skipped_of(target_results: object) -> List[SkippedAsset]:
+        """The skipped assets of an extraction result, [] for anything else (a result
+        built by hand without them, or a test double)."""
+        skipped = getattr(target_results, "skipped", None)
+        return list(skipped) if isinstance(skipped, list) else []
+
+    @staticmethod
     def _is_ip(value: Optional[str]) -> bool:
         try:
             ipaddress.ip_address(value)
@@ -434,7 +568,10 @@ class Targets:
             )
         else:
             message = " ".join(command_args)
-        return message + Targets.describe_resolutions(target_results)
+        message += Targets.describe_resolutions(target_results)
+        if target_results is not None and Targets.skipped_of(target_results):
+            message += "\n" + target_results.describe_skipped()
+        return message
 
     @staticmethod
     def describe_resolutions(

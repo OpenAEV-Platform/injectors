@@ -39,6 +39,9 @@ class MessageData:
                 "No target identified for the property "
                 + self._selector_property_label()
             )
+            # Every asset was skipped: say how many and why, one line per asset.
+            if Targets.skipped_of(self.target_results):
+                message += ": " + self.target_results.describe_skipped()
             raise ValueError(message)
 
         return targets
