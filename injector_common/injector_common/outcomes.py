@@ -15,12 +15,8 @@ from typing import Iterable, Optional
 
 from pyoaev.helpers import OpenAEVInjectorHelper
 
-from injector_common.targets import (
-    NO_RESULT_REASON,
-    MissedTarget,
-    SkippedAsset,
-    TargetResolution,
-)
+from injector_common.inject_gone import InjectGoneError, is_inject_gone
+from injector_common.targets import NO_RESULT_REASON, MissedTarget, TargetResolution
 
 # Execution trace statuses understood by the platform (ExecutionTraceStatus).
 # WARNING counts as a successful execution; INFO is not counted.
@@ -188,46 +184,15 @@ def send_target_outcome_traces(
             helper.api.inject.execution_callback(inject_id=inject_id, data=data)
             sent += 1
         except Exception as exc:  # noqa: BLE001
+            # A 404 means the inject was deleted: stop at the first one.
+            if is_inject_gone(exc):
+                raise InjectGoneError(inject_id, exc) from exc
             logger.error(
                 f"Failed to send the target outcome trace for inject {inject_id} "
                 f"(target '{outcome.resolution.target}'): {exc}"
             )
     if sent:
         logger.info(f"Sent {sent} target outcome trace(s) for inject {inject_id}")
-
-
-def send_skipped_asset_traces(
-    helper: OpenAEVInjectorHelper,
-    inject_id: str,
-    skipped: Optional[Iterable[SkippedAsset]],
-    start: float,
-) -> int:
-    """One ``WARNING`` ``command_execution`` trace per asset that got no target value
-    (so it was never scanned), on that asset, with the reason and the target property:
-    '<asset>: not scanned, <reason> (target property <selector>)'. Returns the number of
-    traces sent. The injector logger line written at extraction stays."""
-    logger = helper.injector_logger
-    sent = 0
-    for asset in skipped or []:
-        data = {
-            "execution_message": _cap(asset.describe()),
-            "execution_status": WARNING,
-            "execution_duration": int(time.time() - start),
-            "execution_action": "command_execution",
-        }
-        if asset.asset_id:
-            data["execution_context_identifiers"] = [asset.asset_id]
-        try:
-            helper.api.inject.execution_callback(inject_id=inject_id, data=data)
-            sent += 1
-        except Exception as exc:  # noqa: BLE001
-            logger.error(
-                f"Failed to send the skipped asset trace for inject {inject_id} "
-                f"(asset '{asset.asset_label()}'): {exc}"
-            )
-    if sent:
-        logger.info(f"Sent {sent} skipped asset trace(s) for inject {inject_id}")
-    return sent
 
 
 def send_scan_progress_trace(
@@ -260,6 +225,9 @@ def send_scan_progress_trace(
             },
         )
     except Exception as exc:  # noqa: BLE001
+        # A 404 means the inject was deleted: the caller aborts before the run.
+        if is_inject_gone(exc):
+            raise InjectGoneError(inject_id, exc) from exc
         helper.injector_logger.error(
             f"Failed to send the progress trace for inject {inject_id}: {exc}"
         )
