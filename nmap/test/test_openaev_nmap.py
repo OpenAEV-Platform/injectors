@@ -2,7 +2,13 @@ import threading
 import unittest
 from unittest.mock import ANY, MagicMock, patch
 
+from pyoaev.exceptions import OpenAEVUpdateError
+
 import nmap.openaev_nmap as module
+
+
+def _not_found():
+    return OpenAEVUpdateError("Inject not found", 404, b"")
 
 
 @patch.object(module, "intercept_dump_argument")
@@ -63,14 +69,13 @@ class TestOpenAEVNmap(unittest.TestCase):
             },
         )
         m_subprocess_run.assert_called_once_with(
-            m_build_args.return_value, check=False, capture_output=True
+            m_build_args.return_value, check=True, capture_output=True
         )
         m_xmlparse.assert_called_once_with(
             m_subprocess_run.return_value.stdout,
             message_data.selector_key,
             message_data.target_results,
             stderr=m_subprocess_run.return_value.stderr,
-            exit_code=m_subprocess_run.return_value.returncode,
         )
         self.assertEqual(nmap_output, m_xmlparse.return_value)
 
@@ -89,8 +94,7 @@ class TestOpenAEVNmap(unittest.TestCase):
         m_msgdata,
         _,
     ):
-        from injector_common.outcomes import NOT_SCANNED, TargetOutcome
-        from injector_common.targets import TargetResolution
+        from injector_common.targets import MissedTarget, TargetResolution
 
         m_helper.return_value.api = MagicMock()
         m_helper.return_value.injector_logger = MagicMock()
@@ -99,14 +103,13 @@ class TestOpenAEVNmap(unittest.TestCase):
         message_data = MagicMock()
         message_data.inject_id = "inject-id"
         message_data.target_results.ip_to_asset_id_map = {}
-        miss = TargetOutcome(
+        miss = MissedTarget(
             TargetResolution(
                 target="does-not-exist.invalid", asset_id="a1", asset_name="web-01"
             ),
-            NOT_SCANNED,
-            reason="hostname did not resolve",
+            "hostname did not resolve",
         )
-        m_xmlparse.return_value = {"message": "m", "outputs": {}, "outcomes": [miss]}
+        m_xmlparse.return_value = {"message": "m", "outputs": {}, "missed": [miss]}
 
         injector.nmap_execution(1, message_data)
 
@@ -143,131 +146,29 @@ class TestOpenAEVNmap(unittest.TestCase):
         m_helper.return_value.injector_logger = MagicMock()
         injector = module.OpenAEVNmap()
 
-        from injector_common.outcomes import HOST_DOWN, HOST_UP, TargetOutcome
-        from injector_common.targets import TargetResolution
-
         message_data = MagicMock()
         message_data.inject_id = "inject-id"
-        message_data.get_targets.return_value = ["10.0.0.1", "10.0.0.2", "10.0.0.3"]
         # Two asset-backed targets and one manual target (no asset id): only the
-        # asset-backed ones get a target-scoped outcome trace, after the scan.
-        m_xmlparse.return_value = {
-            "message": "m",
-            "outputs": {},
-            "outcomes": [
-                TargetOutcome(TargetResolution("10.0.0.1", "asset-1"), HOST_UP, 2),
-                TargetOutcome(TargetResolution("10.0.0.2", "asset-2"), HOST_DOWN),
-                TargetOutcome(TargetResolution("10.0.0.3"), HOST_UP, 1),
-            ],
+        # asset-backed ones must get a target-scoped trace.
+        message_data.target_results.ip_to_asset_id_map = {
+            "10.0.0.1": "asset-1",
+            "10.0.0.2": "asset-2",
         }
 
         injector.nmap_execution(1, message_data)
 
         calls = m_helper.return_value.api.inject.execution_callback.call_args_list
-        # The progress trace states the target count and the platform threshold.
-        progress = calls[1].kwargs["data"]
-        self.assertEqual(progress["execution_status"], "INFO")
-        self.assertIn("3 target(s)", progress["execution_message"])
-        self.assertIn(
-            "inject.execution.threshold.minutes", progress["execution_message"]
-        )
         target_calls = [
             c for c in calls if c.kwargs["data"].get("execution_context_identifiers")
         ]
-        self.assertEqual(
-            [
-                (
-                    c.kwargs["data"]["execution_context_identifiers"],
-                    c.kwargs["data"]["execution_status"],
-                    c.kwargs["data"]["execution_message"],
-                )
-                for c in target_calls
-            ],
-            [
-                (
-                    ["asset-1"],
-                    "EXECUTED",
-                    "10.0.0.1 (asset asset-1): host up, 2 open ports",
-                ),
-                (
-                    ["asset-2"],
-                    "WARNING",
-                    "10.0.0.2 (asset asset-2): host down or no response",
-                ),
-            ],
+        self.assertEqual(len(target_calls), 2)
+        identifiers = sorted(
+            c.kwargs["data"]["execution_context_identifiers"][0] for c in target_calls
         )
+        self.assertEqual(identifiers, ["asset-1", "asset-2"])
         for c in target_calls:
             self.assertEqual(c.kwargs["data"]["execution_action"], "command_execution")
-
-    @patch.object(module.subprocess, "run")
-    @patch.object(module.Targets, "build_execution_message")
-    @patch.object(module.NmapCommandBuilder, "build_args")
-    def test_openaev_nmap_execution_nonzero_exit_with_report_keeps_results(
-        self,
-        m_build_args,
-        m_build_execution_message,
-        m_subprocess_run,
-        m_configloader,
-        m_helper,
-        m_msgdata,
-        _,
-    ):
-        """(c) nmap exits non-zero with a parseable report: the results are kept,
-        the status is WARNING and the message carries the exit code."""
-        from injector_common.targets import TargetExtractionResult
-
-        m_helper.return_value.api = MagicMock()
-        m_helper.return_value.injector_logger = MagicMock()
-        injector = module.OpenAEVNmap()
-        message_data = MagicMock()
-        message_data.selector_key = "assets"
-        message_data.target_results = TargetExtractionResult(
-            targets=["10.0.0.1"], ip_to_asset_id_map={"10.0.0.1": "a1"}
-        )
-        m_subprocess_run.return_value = MagicMock(
-            returncode=1,
-            stdout=(
-                b'<?xml version="1.0"?><nmaprun><host><status state="up" '
-                b'reason="user-set"/><address addr="10.0.0.1" addrtype="ipv4"/>'
-                b'<ports><port protocol="tcp" portid="22"><state state="open"/>'
-                b'<service name="ssh"/></port></ports></host></nmaprun>'
-            ),
-            stderr=b"some interruption",
-        )
-
-        result = injector.nmap_execution(1, message_data)
-
-        self.assertEqual(result["status"], "WARNING")
-        self.assertEqual(result["outputs"]["ports"], [22])
-        self.assertIn("nmap exited with code 1", result["message"])
-
-    @patch.object(module.subprocess, "run")
-    @patch.object(module.Targets, "build_execution_message")
-    @patch.object(module.NmapCommandBuilder, "build_args")
-    def test_openaev_nmap_execution_nonzero_exit_without_report_raises(
-        self,
-        m_build_args,
-        m_build_execution_message,
-        m_subprocess_run,
-        m_configloader,
-        m_helper,
-        m_msgdata,
-        _,
-    ):
-        """(d) nmap exits non-zero with no report: CalledProcessError with stderr,
-        which process_message turns into a global ERROR."""
-        m_helper.return_value.api = MagicMock()
-        m_helper.return_value.injector_logger = MagicMock()
-        injector = module.OpenAEVNmap()
-        message_data = MagicMock()
-        m_subprocess_run.return_value = MagicMock(
-            returncode=255, stdout=b"", stderr=b"QUITTING!"
-        )
-
-        with self.assertRaises(module.subprocess.CalledProcessError) as ctx:
-            injector.nmap_execution(1, message_data)
-        self.assertEqual(ctx.exception.returncode, 255)
-        self.assertEqual(ctx.exception.stderr, b"QUITTING!")
+            self.assertEqual(c.kwargs["data"]["execution_status"], "INFO")
 
     @patch.object(module.OpenAEVNmap, "nmap_execution")
     @patch.object(module, "ExecutionDetails")
@@ -623,6 +524,119 @@ class TestOpenAEVNmap(unittest.TestCase):
         injector.helper.api.inject.execution_callback.assert_not_called()
         m_signaturemanager.return_value.send_signatures.assert_not_called()
         injector.helper.injector_logger.error.assert_called()
+
+    @patch.object(module, "ExecutionDetails")
+    @patch.object(module, "SignatureManager")
+    @patch.object(module, "build_network_configs")
+    @patch.object(module.subprocess, "run")
+    @patch.object(module.Targets, "build_execution_message")
+    @patch.object(module.NmapCommandBuilder, "build_args")
+    def test_openaev_nmap_inject_deleted_before_scan_aborts(
+        self,
+        m_build_args,
+        m_build_execution_message,
+        m_subprocess_run,
+        m_build_network_configs,
+        m_signaturemanager,
+        m_executiondetails,
+        m_configloader,
+        m_helper,
+        m_msgdata,
+        _,
+    ):
+        # The inject is deleted after the command_execution callback: the first
+        # per-target trace answers 404. nmap must not run, the remaining targets
+        # get no trace, one abort line is logged and nothing escapes.
+        m_helper.return_value.injector_logger = MagicMock()
+        m_helper.return_value.api = MagicMock()
+        injector = module.OpenAEVNmap()
+
+        message_data = MagicMock()
+        message_data.inject_id = "inject-id"
+        message_data.target_results.ip_to_asset_id_map = {
+            "10.0.0.1": "asset-1",
+            "10.0.0.2": "asset-2",
+            "10.0.0.3": "asset-3",
+        }
+        m_msgdata.return_value = message_data
+        injector.helper.api.inject.execution_callback.side_effect = [
+            None,  # global command_execution trace
+            _not_found(),  # first per-target trace
+        ]
+
+        injector.process_message({"injection": {"inject_id": "inject-id"}})
+
+        m_subprocess_run.assert_not_called()
+        self.assertEqual(injector.helper.api.inject.execution_callback.call_count, 2)
+        m_signaturemanager.return_value.send_signatures.assert_not_called()
+        injector.helper.injector_logger.warning.assert_called_once_with(
+            "inject inject-id deleted, aborting"
+        )
+        injector.helper.injector_logger.error.assert_not_called()
+
+    @patch.object(module.OpenAEVNmap, "nmap_execution")
+    @patch.object(module, "ExecutionDetails")
+    @patch.object(module, "SignatureManager")
+    @patch.object(module, "build_network_configs")
+    def test_openaev_nmap_inject_deleted_on_final_callback_aborts(
+        self,
+        m_build_network_configs,
+        m_signaturemanager,
+        m_executiondetails,
+        m_nmap_execution,
+        m_configloader,
+        m_helper,
+        m_msgdata,
+        _,
+    ):
+        m_helper.return_value.injector_logger = MagicMock()
+        m_helper.return_value.api = MagicMock()
+        injector = module.OpenAEVNmap()
+
+        message_data = MagicMock()
+        message_data.inject_id = "inject-id"
+        m_msgdata.return_value = message_data
+        m_nmap_execution.return_value = {"message": "done", "outputs": {}}
+        injector.helper.api.inject.execution_callback.side_effect = _not_found()
+
+        injector.process_message({"injection": {"inject_id": "inject-id"}})
+
+        m_signaturemanager.return_value.send_signatures.assert_not_called()
+        injector.helper.injector_logger.warning.assert_called_once_with(
+            "inject inject-id deleted, aborting"
+        )
+
+    @patch.object(module.OpenAEVNmap, "nmap_execution")
+    @patch.object(module, "ExecutionDetails")
+    @patch.object(module, "SignatureManager")
+    @patch.object(module, "build_network_configs")
+    def test_openaev_nmap_non_404_on_final_callback_still_raises(
+        self,
+        m_build_network_configs,
+        m_signaturemanager,
+        m_executiondetails,
+        m_nmap_execution,
+        m_configloader,
+        m_helper,
+        m_msgdata,
+        _,
+    ):
+        # Any other platform error keeps today's behaviour.
+        m_helper.return_value.injector_logger = MagicMock()
+        m_helper.return_value.api = MagicMock()
+        injector = module.OpenAEVNmap()
+
+        message_data = MagicMock()
+        message_data.inject_id = "inject-id"
+        m_msgdata.return_value = message_data
+        m_nmap_execution.return_value = {"message": "done", "outputs": {}}
+        injector.helper.api.inject.execution_callback.side_effect = OpenAEVUpdateError(
+            "boom", 500, b""
+        )
+
+        with self.assertRaises(OpenAEVUpdateError):
+            injector.process_message({"injection": {"inject_id": "inject-id"}})
+        injector.helper.injector_logger.warning.assert_not_called()
 
     def test_openaev_nmap_start(self, m_configloader, m_helper, m_msgdata, _):
         m_helper.return_value.api = MagicMock()

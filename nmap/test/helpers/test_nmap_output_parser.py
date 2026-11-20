@@ -47,7 +47,8 @@ class NmapOutputParserTest(TestCase):
         self.assertEqual(scan["asset_id"], "asset-123")
         self.assertEqual(scan["host"], "45.33.32.156")
         self.assertEqual(scan["port"], 22)
-        self.assertEqual(scan["service"], "ssh")
+        self.assertEqual(scan["service"], "ssh, guessed from port")
+        self.assertEqual(scan["service_confidence"], "guessed")
 
     def test_parse_target_asset_groups(self):
         """Ensure target_selector='asset-groups' also uses asset_list."""
@@ -65,7 +66,7 @@ class NmapOutputParserTest(TestCase):
         self.assertEqual(scan["asset_id"], "group-asset-555")
         self.assertEqual(scan["host"], "45.33.32.156")
         self.assertEqual(scan["port"], 22)
-        self.assertEqual(scan["service"], "ssh")
+        self.assertEqual(scan["service"], "ssh, guessed from port")
 
     def test_parse_target_manual(self):
         """Ensure target_selector='manual' sets asset_id=None."""
@@ -92,6 +93,76 @@ class NmapOutputParserTest(TestCase):
 
         self.assertIsNone(scan["asset_id"])
         self.assertIsNone(scan["host"])
+
+    # ----------------------------------------------------------------
+    # service labels: guessed from nmap's port table vs probed by -sV
+    # ----------------------------------------------------------------
+
+    @staticmethod
+    def _single_port_report(service_element: str) -> bytes:
+        return (
+            '<?xml version="1.0" encoding="UTF-8"?><nmaprun scanner="nmap">'
+            '<host><status state="up"/><address addr="10.0.0.5" addrtype="ipv4"/>'
+            '<ports><port protocol="tcp" portid="9100">'
+            '<state state="open" reason="syn-ack"/>'
+            f"{service_element}</port></ports></host></nmaprun>"
+        ).encode()
+
+    def _scan_of(self, service_element: str) -> dict:
+        result = NmapOutputParser.xmlparse(
+            self._single_port_report(service_element),
+            "manual",
+            TargetExtractionResult(ip_to_asset_id_map={}, targets=["10.0.0.5"]),
+        )
+        return result["outputs"]["scan_results"][0]
+
+    def test_service_from_port_table_is_marked_guessed(self):
+        """Without -sV nmap names 9100/tcp 'jetdirect' from its port table: the
+        finding must say the label is a guess, not a detected printer."""
+        scan = self._scan_of('<service name="jetdirect" method="table" conf="3"/>')
+
+        self.assertEqual(scan["port"], 9100)
+        self.assertEqual(scan["service"], "jetdirect, guessed from port")
+        self.assertEqual(scan["service_confidence"], "guessed")
+        self.assertNotIn("service_product", scan)
+
+    def test_probed_service_carries_product_and_version(self):
+        scan = self._scan_of(
+            '<service name="http" product="Prometheus node_exporter" version="1.x" '
+            'method="probed" conf="10"/>'
+        )
+
+        self.assertEqual(scan["service"], "http, Prometheus node_exporter 1.x")
+        self.assertEqual(scan["service_confidence"], "probed")
+        self.assertEqual(scan["service_product"], "Prometheus node_exporter")
+        self.assertEqual(scan["service_version"], "1.x")
+
+    def test_probed_service_with_extrainfo(self):
+        scan = self._scan_of(
+            '<service name="ssh" product="OpenSSH" version="9.6p1" '
+            'extrainfo="protocol 2.0" method="probed" conf="10"/>'
+        )
+
+        self.assertEqual(scan["service"], "ssh, OpenSSH 9.6p1, protocol 2.0")
+        self.assertEqual(scan["service_extrainfo"], "protocol 2.0")
+
+    def test_probed_service_without_product_keeps_its_name(self):
+        scan = self._scan_of('<service name="http" method="probed" conf="10"/>')
+
+        self.assertEqual(scan["service"], "http")
+        self.assertEqual(scan["service_confidence"], "probed")
+
+    def test_port_without_service_element(self):
+        scan = self._scan_of("")
+
+        self.assertEqual(scan["service"], "missing name")
+        self.assertEqual(scan["service_confidence"], "guessed")
+
+    def test_scan_results_keep_the_chaining_keys(self):
+        scan = self._scan_of('<service name="jetdirect" method="table" conf="3"/>')
+
+        for key in ("asset_id", "host", "port", "service"):
+            self.assertIn(key, scan)
 
     # ----------------------------------------------------------------
     # action_output: raw XML report, always routed on a successful parse,
@@ -168,12 +239,7 @@ class NmapOutputParserTest(TestCase):
             "does-not-exist.invalid (asset web-01): not scanned, "
             "hostname did not resolve",
         )
-        self.assertTrue(
-            result["message"].startswith(
-                "2/3 targets scanned, 2 up, 1 missed, 2 open ports"
-            )
-        )
-        self.assertEqual(result["status"], "WARNING")
+        self.assertIn("1 target(s) not scanned", result["message"])
         self.assertIn("does-not-exist.invalid (asset web-01)", result["message"])
 
     def test_hostname_target_matched_by_xml_hostname(self):
@@ -215,8 +281,7 @@ class NmapOutputParserTest(TestCase):
         )
         self.assertEqual(port_22, ["a1", "a1b"])
         self.assertEqual(result["missed"], [])
-        self.assertEqual(result["status"], "EXECUTED")
-        self.assertTrue(result["message"].startswith("3/3 targets scanned, 3 up"))
+        self.assertTrue(result["message"].startswith("Targets successfully scanned"))
 
     def test_host_matching_no_target_keeps_asset_id_none(self):
         results = TargetExtractionResult(
@@ -237,116 +302,6 @@ class NmapOutputParserTest(TestCase):
             ["a.invalid", "b.invalid"],
         )
         self.assertEqual(NmapOutputParser.unresolved_targets(None), [])
-
-    # ----------------------------------------------------------------
-    # Per-target outcomes and the global status
-    # ----------------------------------------------------------------
-
-    def test_outcomes_up_down_and_unresolved(self):
-        """(a) One host up with open ports, one host down, one hostname not
-        resolved: three outcomes EXECUTED / WARNING / WARNING, global WARNING with
-        the counts."""
-        results = TargetExtractionResult(
-            targets=["10.0.0.1", "10.0.0.2", "does-not-exist.invalid"],
-            ip_to_asset_id_map={
-                "10.0.0.1": "a1",
-                "10.0.0.2": "a2",
-                "does-not-exist.invalid": "a3",
-            },
-            resolutions=[
-                TargetResolution("10.0.0.1", "a1", "web-01"),
-                TargetResolution("10.0.0.2", "a2", "db-02"),
-                TargetResolution("does-not-exist.invalid", "a3", "app-03"),
-            ],
-        )
-        down_host = (
-            '<host><status state="up" reason="user-set"/>'
-            '<address addr="10.0.0.2" addrtype="ipv4"/><hostnames/>'
-            '<ports><extraports state="filtered" count="1000"/></ports></host>'
-        )
-        up_host = (
-            '<host><status state="up" reason="user-set"/>'
-            '<address addr="10.0.0.1" addrtype="ipv4"/><hostnames/><ports>'
-            '<port protocol="tcp" portid="22"><state state="open"/>'
-            '<service name="ssh"/></port>'
-            '<port protocol="tcp" portid="443"><state state="open"/>'
-            '<service name="https"/></port></ports></host>'
-        )
-        result = NmapOutputParser.xmlparse(
-            _report(up_host, down_host),
-            "asset-groups",
-            results,
-            stderr=b'Failed to resolve "does-not-exist.invalid".\n',
-        )
-
-        self.assertEqual(
-            [(o.status, o.describe()) for o in result["outcomes"]],
-            [
-                ("EXECUTED", "10.0.0.1 (asset web-01): host up, 2 open ports"),
-                ("WARNING", "10.0.0.2 (asset db-02): host down or no response"),
-                (
-                    "WARNING",
-                    "does-not-exist.invalid (asset app-03): not scanned, "
-                    "hostname did not resolve",
-                ),
-            ],
-        )
-        self.assertEqual(result["status"], "WARNING")
-        self.assertTrue(
-            result["message"].startswith(
-                "2/3 targets scanned, 1 up, 2 missed, 2 open ports"
-            )
-        )
-        # Findings are kept for the host that answered.
-        self.assertEqual(sorted(result["outputs"]["ports"]), [22, 443])
-
-    def test_outcomes_all_hosts_up(self):
-        """(b) Every target answered: global EXECUTED."""
-        results = TargetExtractionResult(
-            targets=["10.0.0.1", "10.0.0.2"],
-            ip_to_asset_id_map={"10.0.0.1": "a1", "10.0.0.2": "a2"},
-        )
-        result = NmapOutputParser.xmlparse(
-            _report(_host("10.0.0.1", 22), _host("10.0.0.2", 80)), "assets", results
-        )
-        self.assertEqual(result["status"], "EXECUTED")
-        self.assertEqual([o.status for o in result["outcomes"]], ["EXECUTED"] * 2)
-        self.assertEqual(
-            result["message"], "2/2 targets scanned, 2 up, 0 missed, 2 open ports"
-        )
-
-    def test_host_up_with_only_closed_ports(self):
-        host = (
-            '<host><status state="up" reason="user-set"/>'
-            '<address addr="10.0.0.1" addrtype="ipv4"/><hostnames/>'
-            '<ports><extraports state="closed" count="1000"/></ports></host>'
-        )
-        result = NmapOutputParser.xmlparse(
-            _report(host),
-            "assets",
-            TargetExtractionResult(
-                targets=["10.0.0.1"], ip_to_asset_id_map={"10.0.0.1": "a1"}
-            ),
-        )
-        self.assertEqual(
-            result["outcomes"][0].describe(),
-            "10.0.0.1 (asset a1): host up, no open port",
-        )
-        self.assertEqual(result["status"], "EXECUTED")
-
-    def test_nonzero_exit_code_with_report_is_warning(self):
-        """(c) parser side: the exit code turns the status to WARNING and is named."""
-        result = NmapOutputParser.xmlparse(
-            _report(_host("10.0.0.1", 22)),
-            "assets",
-            TargetExtractionResult(
-                targets=["10.0.0.1"], ip_to_asset_id_map={"10.0.0.1": "a1"}
-            ),
-            exit_code=1,
-        )
-        self.assertEqual(result["status"], "WARNING")
-        self.assertIn("nmap exited with code 1, results kept", result["message"])
-        self.assertEqual(result["outputs"]["ports"], [22])
 
     def test_truncated_xml_raises(self):
         """Genuinely malformed/truncated XML: lxml itself rejects it before
