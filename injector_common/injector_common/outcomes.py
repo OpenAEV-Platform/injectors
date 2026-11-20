@@ -15,14 +15,13 @@ from typing import Iterable, Optional
 
 from pyoaev.helpers import OpenAEVInjectorHelper
 
+from injector_common.inject_gone import InjectGoneError, is_inject_gone
 from injector_common.targets import (
     NO_RESULT_REASON,
     MissedTarget,
     SkippedAsset,
     TargetResolution,
 )
-from injector_common.inject_gone import InjectGoneError, is_inject_gone
-from injector_common.targets import NO_RESULT_REASON, MissedTarget, TargetResolution
 
 # Execution trace statuses understood by the platform (ExecutionTraceStatus).
 # WARNING counts as a successful execution; INFO is not counted.
