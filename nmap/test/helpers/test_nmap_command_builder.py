@@ -38,6 +38,26 @@ class TestNmapCommandBuilder(unittest.TestCase):
             ["nmap", "-Pn", "-sF", "-oX", "-", sentinel.target],
         )
 
+    def test_build_args_tcp_syn_version_scan(self):
+        contract_id = module.TCP_SYN_VERSION_SCAN_CONTRACT
+        targets = [sentinel.target]
+
+        args = module.NmapCommandBuilder.build_args(contract_id, targets)
+
+        self.assertEqual(
+            args,
+            ["nmap", "-Pn", "-sS", "-sV", "-oX", "-", sentinel.target],
+        )
+
+    def test_default_contracts_do_not_detect_versions(self):
+        for contract_id in (
+            module.TCP_SYN_SCAN_CONTRACT,
+            module.TCP_CONNECT_SCAN_CONTRACT,
+            module.FIN_SCAN_CONTRACT,
+        ):
+            args = module.NmapCommandBuilder.build_args(contract_id, ["10.0.0.5"])
+            self.assertNotIn("-sV", args)
+
     def test_build_args_other(self):
         contract_id = sentinel.contract_id
         targets = [sentinel.target]
