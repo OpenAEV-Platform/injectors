@@ -155,7 +155,7 @@ Targets are resolved through the shared selection logic of `injector_common`:
 1. An agentless asset (no agent installed) with a hostname is scanned at its `asset_hostname`.
 2. Otherwise, at its `asset_seen_ip` (the address the platform saw the endpoint at) when it is a valid IP.
 3. Otherwise, at the first valid entry of `asset_ips`.
-4. Otherwise the asset is skipped and a warning is written in the injector log.
+4. Otherwise the asset is skipped (see below).
 
 A valid IP is neither loopback, unspecified nor link-local. With `Automatic`, the execution message lists the field
 used and the value for each asset, e.g. `asset web-01: hostname web-01.example.com (automatic, agentless)` or
@@ -166,6 +166,20 @@ and hostnames Nmap reports for each host, never by position.
 
 For manual targets, provide hostnames or IP addresses as comma-separated values. Invalid, loopback and link-local
 addresses are filtered out.
+
+### Skipped assets
+
+An asset that has no usable value for the target property is not scanned. It is reported on the inject, not only in
+the injector log:
+
+- one `WARNING` trace on that asset, e.g. `web-02: not scanned, seen IP 127.0.0.1 is loopback (target property
+  seen_ip)` or `db-03: not scanned, no seen IP (target property seen_ip)`; an invalid value names the field and the
+  value (loopback, unspecified, link-local, not a valid IP address);
+- the execution message ends with `N of M assets skipped` and one line per skipped asset;
+- the inject ends `WARNING` when at least one asset was skipped and the others were scanned;
+- when every asset is skipped, Nmap is not run and the inject ends `ERROR` with that message.
+
+Which value is chosen for each property does not change; the warning line in the injector log stays.
 
 ## Per-target outcomes and status
 

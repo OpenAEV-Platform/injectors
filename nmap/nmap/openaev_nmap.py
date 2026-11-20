@@ -13,7 +13,10 @@ from pyoaev.signatures.models import (
 from injector_common.dump_config import intercept_dump_argument
 from injector_common.inject_gone import abort_on_inject_gone, is_inject_gone
 from injector_common.outcomes import (
+    EXECUTED,
+    WARNING,
     send_scan_progress_trace,
+    send_skipped_asset_traces,
     send_target_outcome_traces,
 )
 from injector_common.targets import Targets
@@ -65,6 +68,11 @@ class OpenAEVNmap:
             data=callback_data,
         )
 
+        # Assets that got no target value are not scanned: one WARNING trace each,
+        # on its asset, with the reason.
+        skipped = Targets.skipped_of(msg_data.target_results)
+        send_skipped_asset_traces(self.helper, msg_data.inject_id, skipped, start)
+
         # One run covers every target: say how many, and the platform timeout a long
         # run may hit, before it starts.
         send_scan_progress_trace(
@@ -82,6 +90,15 @@ class OpenAEVNmap:
         send_target_outcome_traces(
             self.helper, msg_data.inject_id, result.get("outcomes"), start
         )
+        if skipped:
+            # A skipped asset is a partial result: the completion says how many and
+            # is WARNING, as for a target the scan missed.
+            result["message"] = (
+                f"{result.get('message', '')}\n"
+                f"{msg_data.target_results.describe_skipped()}"
+            ).lstrip("\n")
+            if (result.get("status") or EXECUTED) == EXECUTED:
+                result["status"] = WARNING
         return result
 
     @staticmethod
@@ -109,7 +126,7 @@ class OpenAEVNmap:
             ) from None
 
     def _report_pre_execution_failure(
-        self, data: dict, start: float, err: Exception
+        self, data: dict, start: float, err: Exception, skipped=None
     ) -> None:
         # Per-inject errors must never escape process_message: even when the
         # inject fails before nmap runs, the platform must still get a terminal
@@ -130,6 +147,8 @@ class OpenAEVNmap:
         self.helper.api.inject.execution_reception(
             inject_id=inject_id, data={"tracking_total_count": 1}
         )
+        # Every asset skipped: one WARNING trace each before the ERROR completion.
+        send_skipped_asset_traces(self.helper, inject_id, skipped, start)
         self.helper.api.inject.execution_callback(
             inject_id=inject_id,
             data={
@@ -152,6 +171,7 @@ class OpenAEVNmap:
         # unpacking the message, resolving targets and building the pre-execution
         # signatures can all raise (invalid payload, no targets, signature setup);
         # guard them so a failure is reported instead of propagating out.
+        msg_data = None
         try:
             msg_data = MessageData(data, self.helper)
             targets = msg_data.get_targets()
@@ -160,7 +180,10 @@ class OpenAEVNmap:
                 network_injector_configs
             )
         except Exception as err:
-            self._report_pre_execution_failure(data, start, err)
+            # When every asset was skipped get_targets raises and nmap never runs; the
+            # skipped assets still get their traces.
+            skipped = Targets.skipped_of(msg_data.target_results) if msg_data else []
+            self._report_pre_execution_failure(data, start, err, skipped=skipped)
             return
 
         # create execution details object
