@@ -46,6 +46,7 @@ class OpenAEVNmap:
             selector_key=msg_data.selector_key,
             data=msg_data.raw_data,
             command_args=nmap_args,
+            target_results=msg_data.target_results,
         )
 
         callback_data = {
@@ -71,9 +72,36 @@ class OpenAEVNmap:
         )
 
         nmap_result = subprocess.run(nmap_args, check=True, capture_output=True)
-        return NmapOutputParser.xmlparse(
-            nmap_result.stdout, msg_data.selector_key, msg_data.target_results
+        result = NmapOutputParser.xmlparse(
+            nmap_result.stdout,
+            msg_data.selector_key,
+            msg_data.target_results,
+            stderr=nmap_result.stderr,
         )
+        self._report_missed_targets(msg_data.inject_id, result.get("missed"), start)
+        return result
+
+    def _report_missed_targets(self, inject_id: str, missed, start: float) -> None:
+        """One WARNING trace per target nmap returned nothing for (an unresolved
+        hostname exits 0 and emits no <host>), scoped to its asset when it has one."""
+        for miss in missed or []:
+            data = {
+                "execution_message": miss.describe(),
+                "execution_status": "WARNING",
+                "execution_duration": int(time.time() - start),
+                "execution_action": "command_execution",
+            }
+            if miss.resolution.asset_id:
+                data["execution_context_identifiers"] = [miss.resolution.asset_id]
+            self.helper.injector_logger.warning(miss.describe())
+            try:
+                self.helper.api.inject.execution_callback(
+                    inject_id=inject_id, data=data
+                )
+            except Exception as exc:  # noqa: BLE001
+                self.helper.injector_logger.error(
+                    f"Failed to send the not-scanned trace for inject {inject_id}: {exc}"
+                )
 
     def _report_pre_execution_failure(
         self, data: dict, start: float, err: Exception
@@ -166,9 +194,17 @@ class OpenAEVNmap:
         }
 
         # formatting callback data and tool_output
+        if tool_error_info:
+            execution_status = "ERROR"
+        elif execution_result and execution_result.get("missed"):
+            # At least one target was not scanned: the inject ran, but the result is
+            # partial. WARNING counts as a successful execution on the platform.
+            execution_status = "WARNING"
+        else:
+            execution_status = "SUCCESS"
         callback_data = {
             "execution_message": execution_message,
-            "execution_status": "ERROR" if tool_error_info else "SUCCESS",
+            "execution_status": execution_status,
             "execution_action": "complete",
         }
         if execution_result:

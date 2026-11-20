@@ -141,12 +141,28 @@ Targets are resolved through the shared selection logic of `injector_common`:
 - Target property selector (for assets / asset groups): `automatic` (default), `seen_ip`, `local_ip` (first), or
   `hostname`.
 
-| Target property   | Asset field used                            |
-|-------------------|---------------------------------------------|
-| Automatic         | Hostname for agentless assets, else first valid IP |
-| Seen IP           | `asset_seen_ip`                             |
-| Local IP (first)  | First valid entry in `asset_ips`            |
-| Hostname          | `asset_hostname`                            |
+| Target property   | Asset field used                                                                  |
+|-------------------|-----------------------------------------------------------------------------------|
+| Automatic         | See the order below                                                               |
+| Seen IP           | `asset_seen_ip`                                                                   |
+| Local IP (first)  | First valid entry in `asset_ips`                                                  |
+| Hostname          | `asset_hostname`                                                                  |
+
+`Automatic` resolves each asset in this order:
+
+1. An agentless asset (no agent installed) with a hostname is scanned at its `asset_hostname`.
+2. Otherwise, at its `asset_seen_ip` (the address the platform saw the endpoint at) when it is a valid IP.
+3. Otherwise, at the first valid entry of `asset_ips`.
+4. Otherwise the asset is skipped and a warning is written in the injector log.
+
+A valid IP is neither loopback, unspecified nor link-local. With `Automatic`, the execution message lists the field
+used and the value for each asset, e.g. `asset web-01: hostname web-01.example.com (automatic, agentless)` or
+`asset db-02: seen IP 203.0.113.5 (automatic)`.
+
+A hostname is resolved by the DNS of the host the injector runs on. A target that does not resolve, or that Nmap
+returns no result for, is reported: one `WARNING` trace per target (`<target> (asset <name>): not scanned, hostname did
+not resolve`) on its asset, and the inject ends with the `WARNING` status instead of `SUCCESS`. Results are attributed
+to assets by the address and hostnames Nmap reports for each host, never by position.
 
 For manual targets, provide hostnames or IP addresses as comma-separated values. Invalid, loopback and link-local
 addresses are filtered out.
