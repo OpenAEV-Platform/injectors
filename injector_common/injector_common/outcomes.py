@@ -271,7 +271,11 @@ def send_scan_progress_trace(
 ) -> None:
     """INFO trace before a batch run: how many targets it covers, and the platform
     timeout a long run may hit (a result sent after it is recorded, but the inject
-    keeps the timed-out error status)."""
+    keeps the timed-out error status).
+
+    The injector does not know the threshold the platform applies (environment,
+    Settings > Parameters or configuration default), so the trace names the setting
+    and never a value: the platform's own timeout trace states the minutes applied."""
     if target_count <= 0:
         return
     try:
@@ -280,10 +284,11 @@ def send_scan_progress_trace(
             data={
                 "execution_message": (
                     f"{label}: {target_count} target(s) in one run. The platform "
-                    f"finalizes an inject still running after {THRESHOLD_SETTING} "
-                    "(default 10) as timed out; a result sent later is recorded but "
-                    "the inject stays in error. For a large group, raise that "
-                    "threshold or split the group."
+                    f"finalizes an inject still running after the {THRESHOLD_SETTING} "
+                    "minutes set on the platform as timed out (its timeout trace "
+                    "states the minutes applied); a result sent later is recorded "
+                    "but the inject stays in error. For a large group, check that "
+                    "setting or split the group."
                 ),
                 "execution_status": INFO,
                 "execution_duration": int(time.time() - start),
