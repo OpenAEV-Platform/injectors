@@ -2,8 +2,48 @@ from lxml import objectify
 
 from injector_common.targets import TargetExtractionResult
 
+SERVICE_PROBED = "probed"
+SERVICE_GUESSED = "guessed"
+
 
 class NmapOutputParser:
+    @staticmethod
+    def service_details(port) -> dict:
+        """The service of an open port, labelled by how nmap identified it.
+
+        Without version detection (-sV) nmap names the service from its static port
+        table (<service method="table">): a guess, e.g. 9100/tcp is always
+        "jetdirect". The label says so ("jetdirect, guessed from port") and
+        service_confidence is "guessed". A service nmap probed (method="probed")
+        is labelled with its name plus the product, version and extra info read
+        from the probe, and service_confidence is "probed".
+        """
+        service = port.find("service")
+        if service is None:
+            return {"service": "missing name", "service_confidence": SERVICE_GUESSED}
+        name = service.get("name") or "missing name"
+        if service.get("method") != SERVICE_PROBED:
+            return {
+                "service": f"{name}, guessed from port",
+                "service_confidence": SERVICE_GUESSED,
+            }
+        details = " ".join(
+            v for v in (service.get("product"), service.get("version")) if v
+        )
+        # No parentheses in the label: OpenAEV shows a finding as
+        # "host:port (service)".
+        details = ", ".join(
+            value for value in (details, service.get("extrainfo")) if value
+        )
+        result = {
+            "service": f"{name}, {details}" if details else name,
+            "service_confidence": SERVICE_PROBED,
+        }
+        for key in ("product", "version", "extrainfo"):
+            if service.get(key):
+                result[f"service_{key}"] = service.get(key)
+        return result
+
     @staticmethod
     def xmlparse(
         stdout: bytes, selector_key: str, target_results: TargetExtractionResult
@@ -33,7 +73,7 @@ class NmapOutputParser:
 
                     port_result = {
                         "port": portid,
-                        "service": port.service.get("name", "missing name"),
+                        **NmapOutputParser.service_details(port),
                         "asset_id": None,
                         "host": None,
                     }
