@@ -3,6 +3,8 @@ from typing import Dict, Optional
 
 from pyoaev.helpers import OpenAEVInjectorHelper
 
+from injector_common.inject_gone import InjectGoneError, is_inject_gone
+
 
 def send_per_target_traces(
     helper: OpenAEVInjectorHelper,
@@ -28,6 +30,11 @@ def send_per_target_traces(
     The ``command_execution`` action keeps these traces intermediate so they never
     trigger the terminal-completion handling reserved for the final aggregated
     ``complete`` callback, which the caller still sends globally.
+
+    A 404 means the inject was deleted on the platform: the loop stops at the
+    first one and raises ``InjectGoneError`` so the caller aborts without
+    launching the tool, instead of logging one error per remaining target.
+    Any other failure is logged and the remaining targets still get theirs.
     """
     if not ip_to_asset_id_map:
         return
@@ -56,6 +63,8 @@ def send_per_target_traces(
                 f"(target '{target}', asset {asset_id})"
             )
         except Exception as exc:  # noqa: BLE001
+            if is_inject_gone(exc):
+                raise InjectGoneError(inject_id, exc) from exc
             logger.error(
                 f"Failed to send per-target execution trace for inject {inject_id} "
                 f"(target '{target}', asset {asset_id}): {exc}"
