@@ -31,6 +31,7 @@ from nmap.contracts.nmap_constants import (
     FIN_SCAN_CONTRACT,
     TCP_CONNECT_SCAN_CONTRACT,
     TCP_SYN_SCAN_CONTRACT,
+    TCP_SYN_VERSION_SCAN_CONTRACT,
     TYPE,
 )
 
@@ -236,6 +237,26 @@ class NmapContracts:
             domains=[SecurityDomains.NETWORK.value],
             contract_attack_patterns_external_ids=["T1046"],
         )
+        # SYN scan plus service/version detection (-sV): slower, but the service of
+        # each open port is probed instead of guessed from nmap's port table.
+        syn_version_scan_contract = Contract(
+            contract_id=TCP_SYN_VERSION_SCAN_CONTRACT,
+            config=contract_config,
+            label={
+                SupportedLanguage.en: "Nmap - SYN Scan with service/version detection",
+                SupportedLanguage.fr: "Nmap - SYN Scan avec détection de version",
+            },
+            fields=nmap_contract_fields,
+            outputs=nmap_contract_outputs,
+            manual=False,
+            domains=[SecurityDomains.NETWORK.value],
+            contract_attack_patterns_external_ids=["T1046"],
+        )
         return prepare_contracts(
-            [syn_scan_contract, tcp_scan_contract, fin_scan_contract]
+            [
+                syn_scan_contract,
+                tcp_scan_contract,
+                fin_scan_contract,
+                syn_version_scan_contract,
+            ]
         )
