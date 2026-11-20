@@ -15,6 +15,7 @@ from typing import Iterable, Optional
 
 from pyoaev.helpers import OpenAEVInjectorHelper
 
+from injector_common.inject_gone import InjectGoneError, is_inject_gone
 from injector_common.targets import NO_RESULT_REASON, MissedTarget, TargetResolution
 
 # Execution trace statuses understood by the platform (ExecutionTraceStatus).
@@ -183,6 +184,9 @@ def send_target_outcome_traces(
             helper.api.inject.execution_callback(inject_id=inject_id, data=data)
             sent += 1
         except Exception as exc:  # noqa: BLE001
+            # A 404 means the inject was deleted: stop at the first one.
+            if is_inject_gone(exc):
+                raise InjectGoneError(inject_id, exc) from exc
             logger.error(
                 f"Failed to send the target outcome trace for inject {inject_id} "
                 f"(target '{outcome.resolution.target}'): {exc}"
@@ -221,6 +225,9 @@ def send_scan_progress_trace(
             },
         )
     except Exception as exc:  # noqa: BLE001
+        # A 404 means the inject was deleted: the caller aborts before the run.
+        if is_inject_gone(exc):
+            raise InjectGoneError(inject_id, exc) from exc
         helper.injector_logger.error(
             f"Failed to send the progress trace for inject {inject_id}: {exc}"
         )

@@ -649,24 +649,20 @@ class TestOpenAEVNmap(unittest.TestCase):
         m_msgdata,
         _,
     ):
-        # The inject is deleted after the command_execution callback: the first
-        # per-target trace answers 404. nmap must not run, the remaining targets
-        # get no trace, one abort line is logged and nothing escapes.
+        # The inject is deleted after the command_execution callback: the progress
+        # trace sent before the scan answers 404. nmap must not run, no outcome
+        # trace is sent, one abort line is logged and nothing escapes.
         m_helper.return_value.injector_logger = MagicMock()
         m_helper.return_value.api = MagicMock()
         injector = module.OpenAEVNmap()
 
         message_data = MagicMock()
         message_data.inject_id = "inject-id"
-        message_data.target_results.ip_to_asset_id_map = {
-            "10.0.0.1": "asset-1",
-            "10.0.0.2": "asset-2",
-            "10.0.0.3": "asset-3",
-        }
+        message_data.get_targets.return_value = ["10.0.0.1", "10.0.0.2", "10.0.0.3"]
         m_msgdata.return_value = message_data
         injector.helper.api.inject.execution_callback.side_effect = [
             None,  # global command_execution trace
-            _not_found(),  # first per-target trace
+            _not_found(),  # progress trace, before the scan
         ]
 
         injector.process_message({"injection": {"inject_id": "inject-id"}})

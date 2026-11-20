@@ -1,6 +1,7 @@
 from unittest import TestCase
 from unittest.mock import MagicMock
 
+from injector_common.inject_gone import InjectGoneError
 from injector_common.outcomes import (
     HOST_DOWN,
     HOST_UP,
@@ -13,6 +14,10 @@ from injector_common.outcomes import (
     summarize_outcomes,
 )
 from injector_common.targets import TargetResolution
+
+
+class _NotFound(Exception):
+    response_code = 404
 
 
 def _outcomes():
@@ -118,6 +123,21 @@ class SendTracesTest(TestCase):
         send_target_outcome_traces(self.helper, "inject-1", _outcomes()[:3], 0.0)
         self.assertEqual(self.helper.api.inject.execution_callback.call_count, 3)
         self.helper.injector_logger.error.assert_called_once()
+
+    def test_outcome_trace_404_stops_with_inject_gone(self):
+        self.helper.api.inject.execution_callback.side_effect = [_NotFound()]
+        with self.assertRaises(InjectGoneError):
+            send_target_outcome_traces(self.helper, "inject-1", _outcomes()[:3], 0.0)
+        self.assertEqual(self.helper.api.inject.execution_callback.call_count, 1)
+        self.helper.injector_logger.error.assert_not_called()
+
+    def test_progress_trace_404_raises_inject_gone(self):
+        self.helper.api.inject.execution_callback.side_effect = _NotFound()
+        with self.assertRaises(InjectGoneError):
+            send_scan_progress_trace(
+                self.helper, "inject-1", 3, label="nmap scan", start=0
+            )
+        self.helper.injector_logger.error.assert_not_called()
 
     def test_progress_trace(self):
         send_scan_progress_trace(
