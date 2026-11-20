@@ -1,4 +1,4 @@
-FROM python:3.13-alpine AS builder
+FROM python:3.15-alpine AS builder
 
 RUN apk --no-cache upgrade && apk --no-cache add git curl
 
@@ -20,7 +20,7 @@ WORKDIR ${installdir}
 RUN poetry install && \
     python3 -m pip install --no-cache-dir -U pip certifi
 
-FROM python:3.13-alpine AS runner
+FROM python:3.15-alpine AS runner
 
 RUN apk --no-cache upgrade
 RUN pip install --no-cache-dir -U pip certifi
