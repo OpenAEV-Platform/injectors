@@ -12,11 +12,8 @@ from pyoaev.signatures.models import (
 
 from injector_common.dump_config import intercept_dump_argument
 from injector_common.inject_gone import abort_on_inject_gone, is_inject_gone
-from injector_common.outcomes import (
-    send_scan_progress_trace,
-    send_target_outcome_traces,
-)
 from injector_common.targets import Targets
+from injector_common.traces import send_per_target_traces
 from nmap.configuration.config_loader import ConfigLoader
 from nmap.helpers.nmap_command_builder import NmapCommandBuilder
 from nmap.helpers.nmap_output_parser import NmapOutputParser
@@ -36,10 +33,9 @@ class OpenAEVNmap:
 
     def nmap_execution(self, start: float, msg_data: MessageData) -> dict:
         # Build Arguments to execute
-        targets = msg_data.get_targets()
         nmap_args = NmapCommandBuilder.build_args(
             msg_data.contract_id,
-            targets,
+            msg_data.get_targets(),
         )
 
         self.helper.injector_logger.info(
@@ -65,48 +61,47 @@ class OpenAEVNmap:
             data=callback_data,
         )
 
-        # One run covers every target: say how many, and the platform timeout a long
-        # run may hit, before it starts.
-        send_scan_progress_trace(
+        # Per-target traces so each asset-backed endpoint's result view shows the
+        # scan reached it; the batched scan only sends a global callback otherwise.
+        send_per_target_traces(
             self.helper,
             msg_data.inject_id,
-            len(targets or []),
+            msg_data.target_results.ip_to_asset_id_map,
             label="nmap scan",
             start=start,
         )
 
-        nmap_result = subprocess.run(nmap_args, check=False, capture_output=True)
-        result = self._parse_result(nmap_args, nmap_result, msg_data)
-        # After the run: one trace per target with its outcome (host up with its open
-        # ports, host down or no response, not scanned), on its asset.
-        send_target_outcome_traces(
-            self.helper, msg_data.inject_id, result.get("outcomes"), start
+        nmap_result = subprocess.run(nmap_args, check=True, capture_output=True)
+        result = NmapOutputParser.xmlparse(
+            nmap_result.stdout,
+            msg_data.selector_key,
+            msg_data.target_results,
+            stderr=nmap_result.stderr,
         )
+        self._report_missed_targets(msg_data.inject_id, result.get("missed"), start)
         return result
 
-    @staticmethod
-    def _parse_result(nmap_args, nmap_result, msg_data: MessageData) -> dict:
-        """Parse the report. On a non-zero exit, a report that still parses is kept
-        (the inject ends WARNING with the exit code); one that does not raises the
-        CalledProcessError so the inject ends ERROR with nmap's stderr."""
-        returncode = nmap_result.returncode
-        try:
-            return NmapOutputParser.xmlparse(
-                nmap_result.stdout,
-                msg_data.selector_key,
-                msg_data.target_results,
-                stderr=nmap_result.stderr,
-                exit_code=returncode,
-            )
-        except Exception:
-            if not returncode:
-                raise
-            raise subprocess.CalledProcessError(
-                returncode,
-                nmap_args,
-                output=nmap_result.stdout,
-                stderr=nmap_result.stderr,
-            ) from None
+    def _report_missed_targets(self, inject_id: str, missed, start: float) -> None:
+        """One WARNING trace per target nmap returned nothing for (an unresolved
+        hostname exits 0 and emits no <host>), scoped to its asset when it has one."""
+        for miss in missed or []:
+            data = {
+                "execution_message": miss.describe(),
+                "execution_status": "WARNING",
+                "execution_duration": int(time.time() - start),
+                "execution_action": "command_execution",
+            }
+            if miss.resolution.asset_id:
+                data["execution_context_identifiers"] = [miss.resolution.asset_id]
+            self.helper.injector_logger.warning(miss.describe())
+            try:
+                self.helper.api.inject.execution_callback(
+                    inject_id=inject_id, data=data
+                )
+            except Exception as exc:  # noqa: BLE001
+                self.helper.injector_logger.error(
+                    f"Failed to send the not-scanned trace for inject {inject_id}: {exc}"
+                )
 
     def _report_pre_execution_failure(
         self, data: dict, start: float, err: Exception
@@ -180,9 +175,7 @@ class OpenAEVNmap:
         try:
             execution_result = self.nmap_execution(start, msg_data)
         except subprocess.CalledProcessError as err:
-            execution_message = (err.stderr or b"").strip().decode(
-                "utf-8", errors="replace"
-            ) or f"nmap exited with code {err.returncode}"
+            execution_message = str(err.stderr.strip().decode())
             tool_error_info = {
                 "exit_code": int(err.returncode),
             }
@@ -203,10 +196,12 @@ class OpenAEVNmap:
         # formatting callback data and tool_output
         if tool_error_info:
             execution_status = "ERROR"
+        elif execution_result and execution_result.get("missed"):
+            # At least one target was not scanned: the inject ran, but the result is
+            # partial. WARNING counts as a successful execution on the platform.
+            execution_status = "WARNING"
         else:
-            # EXECUTED when every target answered; WARNING (a success on the
-            # platform) when some were missed or nmap exited non-zero with a report.
-            execution_status = execution_result.get("status") or "EXECUTED"
+            execution_status = "SUCCESS"
         callback_data = {
             "execution_message": execution_message,
             "execution_status": execution_status,
