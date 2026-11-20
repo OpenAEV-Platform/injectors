@@ -201,8 +201,12 @@ The global status of the inject:
 
 - `EXECUTED` when every target answered;
 - `WARNING` (a successful execution on the platform) when some targets were missed, or when Nmap exited with a
-  non-zero code but its report could be parsed (the results are kept and the exit code is in the message);
-- `ERROR` only when the scan failed and produced no usable report (the message is Nmap's stderr).
+  non-zero code but its report could be parsed and scanned at least one target (the results are kept, the exit
+  code and Nmap's stderr are in the message);
+- `ERROR` when the scan failed: Nmap exited with a non-zero code and scanned no target (the message carries the
+  exit code and Nmap's stderr), or produced no usable report (the message is Nmap's stderr).
+
+Nmap's stderr is trimmed and capped at 1,000 characters in the message.
 
 The global message starts with the counts, e.g. `2/3 targets scanned, 1 up, 2 missed, 2 open ports`, then lists
 the targets that were missed.

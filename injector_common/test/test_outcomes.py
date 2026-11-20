@@ -5,6 +5,7 @@ from injector_common.inject_gone import InjectGoneError
 from injector_common.outcomes import (
     HOST_DOWN,
     HOST_UP,
+    MAX_STDERR_LENGTH,
     MAX_TRACE_MESSAGE_LENGTH,
     NOT_SCANNED,
     TargetOutcome,
@@ -77,6 +78,51 @@ class SummaryTest(TestCase):
         summary = summarize_outcomes([_outcomes()[0]], 3, exit_code=2, tool="nmap")
         self.assertEqual(summary.status, "WARNING")
         self.assertIn("(nmap exited with code 2, results kept)", summary.headline())
+
+    def test_non_zero_exit_with_partial_results_is_warning_with_stderr(self):
+        outcomes = [_outcomes()[0], _outcomes()[2]]
+        summary = summarize_outcomes(
+            outcomes, 3, exit_code=1, tool="nmap", stderr=b"  some warning\n"
+        )
+        self.assertEqual(summary.status, "WARNING")
+        message = build_global_message(summary, outcomes)
+        self.assertIn("(nmap exited with code 1, results kept)", message)
+        self.assertTrue(message.endswith("nmap stderr:\nsome warning"))
+
+    def test_non_zero_exit_with_nothing_scanned_is_error_with_stderr(self):
+        outcomes = [_outcomes()[2]]
+        stderr = b"NSE: failed to initialize the script engine\n"
+        summary = summarize_outcomes(
+            outcomes, 0, exit_code=1, tool="nmap", stderr=stderr
+        )
+        self.assertEqual(summary.status, "ERROR")
+        message = build_global_message(summary, outcomes)
+        self.assertTrue(
+            message.startswith(
+                "0/1 targets scanned, 0 up, 1 missed, 0 open ports "
+                "(nmap exited with code 1, no target scanned)"
+            )
+        )
+        self.assertIn(
+            "nmap stderr:\nNSE: failed to initialize the script engine", message
+        )
+
+    def test_non_zero_exit_with_no_target_at_all_is_error(self):
+        summary = summarize_outcomes([], 0, exit_code=1, tool="nmap")
+        self.assertEqual(summary.status, "ERROR")
+
+    def test_zero_exit_drops_stderr_and_keeps_status(self):
+        outcomes = [_outcomes()[2]]
+        summary = summarize_outcomes(outcomes, 0, stderr=b"progress noise")
+        self.assertEqual(summary.status, "WARNING")
+        self.assertNotIn("stderr", build_global_message(summary, outcomes))
+
+    def test_stderr_is_capped(self):
+        summary = summarize_outcomes(
+            [_outcomes()[0]], 3, exit_code=1, tool="nmap", stderr="e" * 5000
+        )
+        self.assertEqual(len(summary.stderr), MAX_STDERR_LENGTH)
+        self.assertTrue(summary.stderr.endswith("..."))
 
 
 class SendTracesTest(TestCase):

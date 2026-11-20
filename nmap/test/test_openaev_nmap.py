@@ -377,6 +377,96 @@ class TestOpenAEVNmap(unittest.TestCase):
         self.assertEqual(ctx.exception.returncode, 255)
         self.assertEqual(ctx.exception.stderr, b"QUITTING!")
 
+    @patch.object(module.subprocess, "run")
+    @patch.object(module.Targets, "build_execution_message")
+    @patch.object(module.NmapCommandBuilder, "build_args")
+    def test_openaev_nmap_execution_nonzero_exit_empty_report_is_error(
+        self,
+        m_build_args,
+        m_build_execution_message,
+        m_subprocess_run,
+        m_configloader,
+        m_helper,
+        m_msgdata,
+        _,
+    ):
+        """(e) nmap exits non-zero and its report has the nmaprun header but no host:
+        no target scanned, the status is ERROR and the message carries nmap's
+        stderr."""
+        from injector_common.targets import TargetExtractionResult
+
+        m_helper.return_value.api = MagicMock()
+        m_helper.return_value.injector_logger = MagicMock()
+        injector = module.OpenAEVNmap()
+        message_data = MagicMock()
+        message_data.selector_key = "assets"
+        message_data.target_results = TargetExtractionResult(
+            targets=["10.0.0.1"], ip_to_asset_id_map={"10.0.0.1": "a1"}
+        )
+        m_subprocess_run.return_value = MagicMock(
+            returncode=1,
+            stdout=b'<?xml version="1.0"?><nmaprun scanner="nmap"></nmaprun>',
+            stderr=b"NSE: failed to initialize the script engine\n",
+        )
+
+        result = injector.nmap_execution(1, message_data)
+
+        self.assertEqual(result["status"], "ERROR")
+        self.assertEqual(result["exit_code"], 1)
+        self.assertIn("nmap exited with code 1, no target scanned", result["message"])
+        self.assertIn(
+            "nmap stderr:\nNSE: failed to initialize the script engine",
+            result["message"],
+        )
+
+    @patch.object(module.OpenAEVNmap, "nmap_execution")
+    @patch.object(module, "ExecutionDetails")
+    @patch.object(module, "SignatureManager")
+    @patch.object(module, "build_network_configs")
+    def test_openaev_nmap_process_message_nothing_scanned_completes_error(
+        self,
+        m_build_network_configs,
+        m_signaturemanager,
+        m_executiondetails,
+        m_nmap_execution,
+        m_configloader,
+        m_helper,
+        m_msgdata,
+        _,
+    ):
+        """A parsed report with no target scanned on a non-zero exit completes the
+        inject ERROR with the message and the exit code in the error info."""
+        m_helper.return_value.injector_logger = MagicMock()
+        m_helper.return_value.api = MagicMock()
+        injector = module.OpenAEVNmap()
+        message_data = MagicMock()
+        message_data.inject_id = "inject-id"
+        m_msgdata.return_value = message_data
+        message = (
+            "0/1 targets scanned, 0 up, 1 missed, 0 open ports "
+            "(nmap exited with code 1, no target scanned)\n"
+            "nmap stderr:\nNSE: failed to initialize the script engine"
+        )
+        m_nmap_execution.return_value = {
+            "message": message,
+            "outputs": {"scan_results": [], "ports": []},
+            "outcomes": [],
+            "status": "ERROR",
+            "exit_code": 1,
+        }
+
+        injector.process_message(MagicMock())
+
+        data = injector.helper.api.inject.execution_callback.call_args.kwargs["data"]
+        self.assertEqual(data["execution_status"], "ERROR")
+        self.assertEqual(data["execution_message"], message)
+        self.assertEqual(data["execution_action"], "complete")
+        m_signaturemanager.return_value.post_execution_updates.assert_called_once_with(
+            m_executiondetails.return_value,
+            m_signaturemanager.return_value.build_execution_signatures.return_value,
+            {"error_info": {"exit_code": 1}},
+        )
+
     @patch.object(module.OpenAEVNmap, "nmap_execution")
     @patch.object(module, "ExecutionDetails")
     @patch.object(module, "SignatureManager")

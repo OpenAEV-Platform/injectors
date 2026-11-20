@@ -144,7 +144,9 @@ class NmapOutputParser:
         Each target also gets an outcome (host up with its open ports, host down or
         no response, not scanned) under "outcomes", and the global "status" is
         EXECUTED when every target answered, WARNING otherwise or when nmap exited
-        with a non-zero ``exit_code`` but its report was kept.
+        with a non-zero ``exit_code`` but its report kept at least one scanned target,
+        ERROR when nmap exited non-zero and no target was scanned. On a non-zero
+        ``exit_code`` the message ends with nmap's stderr.
         """
         xml_parser = objectify.makeparser(resolve_entities=False)
         xml_tree = objectify.fromstring(stdout, xml_parser)
@@ -236,7 +238,11 @@ class NmapOutputParser:
             resolutions, missed, answered, open_ports_by_value
         )
         summary = summarize_outcomes(
-            outcomes, len(ports_results), exit_code=exit_code, tool="nmap"
+            outcomes,
+            len(ports_results),
+            exit_code=exit_code,
+            tool="nmap",
+            stderr=stderr,
         )
 
         return {
@@ -245,6 +251,7 @@ class NmapOutputParser:
             "missed": missed,
             "outcomes": outcomes,
             "status": summary.status,
+            "exit_code": exit_code,
         }
 
     @staticmethod

@@ -419,6 +419,38 @@ class NmapOutputParserTest(TestCase):
         self.assertIn("nmap exited with code 1, results kept", result["message"])
         self.assertEqual(result["outputs"]["ports"], [22])
 
+    def test_nonzero_exit_code_with_no_host_is_error_with_stderr(self):
+        """An nmaprun header with no host on a non-zero exit: nothing was scanned,
+        the status is ERROR and nmap's stderr closes the message."""
+        result = NmapOutputParser.xmlparse(
+            b'<?xml version="1.0"?><nmaprun scanner="nmap"></nmaprun>',
+            "assets",
+            TargetExtractionResult(
+                targets=["10.0.0.1"], ip_to_asset_id_map={"10.0.0.1": "a1"}
+            ),
+            stderr=b"NSE: failed to initialize the script engine\n",
+            exit_code=1,
+        )
+        self.assertEqual(result["status"], "ERROR")
+        self.assertTrue(
+            result["message"].endswith(
+                "nmap stderr:\nNSE: failed to initialize the script engine"
+            )
+        )
+
+    def test_zero_exit_code_with_no_host_is_unchanged(self):
+        """Exit 0 with no host keeps the former WARNING and no stderr line."""
+        result = NmapOutputParser.xmlparse(
+            b'<?xml version="1.0"?><nmaprun scanner="nmap"></nmaprun>',
+            "assets",
+            TargetExtractionResult(
+                targets=["10.0.0.1"], ip_to_asset_id_map={"10.0.0.1": "a1"}
+            ),
+            stderr=b"Starting Nmap\n",
+        )
+        self.assertEqual(result["status"], "WARNING")
+        self.assertNotIn("stderr", result["message"])
+
     def test_truncated_xml_raises(self):
         """Genuinely malformed/truncated XML: lxml itself rejects it before
         the root-tag check ever runs."""

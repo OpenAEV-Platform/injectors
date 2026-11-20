@@ -13,6 +13,7 @@ from pyoaev.signatures.models import (
 from injector_common.dump_config import intercept_dump_argument
 from injector_common.inject_gone import abort_on_inject_gone, is_inject_gone
 from injector_common.outcomes import (
+    ERROR,
     EXECUTED,
     WARNING,
     send_scan_progress_trace,
@@ -103,9 +104,10 @@ class OpenAEVNmap:
 
     @staticmethod
     def _parse_result(nmap_args, nmap_result, msg_data: MessageData) -> dict:
-        """Parse the report. On a non-zero exit, a report that still parses is kept
-        (the inject ends WARNING with the exit code); one that does not raises the
-        CalledProcessError so the inject ends ERROR with nmap's stderr."""
+        """Parse the report. On a non-zero exit, a report that still parses is kept:
+        the inject ends WARNING with the exit code and nmap's stderr when at least one
+        target was scanned, ERROR when none was. A report that does not parse raises
+        the CalledProcessError so the inject ends ERROR with nmap's stderr."""
         returncode = nmap_result.returncode
         try:
             return NmapOutputParser.xmlparse(
@@ -219,6 +221,12 @@ class OpenAEVNmap:
             }
         else:
             execution_message = execution_result["message"]
+            if execution_result.get("status") == ERROR:
+                # nmap exited non-zero and scanned no target: a failed run, whose
+                # message already carries the exit code and nmap's stderr.
+                tool_error_info = {
+                    "exit_code": int(execution_result.get("exit_code") or 1),
+                }
         tool_output = {
             "error_info": tool_error_info,
         }
@@ -228,7 +236,8 @@ class OpenAEVNmap:
             execution_status = "ERROR"
         else:
             # EXECUTED when every target answered; WARNING (a success on the
-            # platform) when some were missed or nmap exited non-zero with a report.
+            # platform) when some were missed or nmap exited non-zero with partial
+            # results kept.
             execution_status = execution_result.get("status") or "EXECUTED"
         callback_data = {
             "execution_message": execution_message,
