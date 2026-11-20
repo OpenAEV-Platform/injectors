@@ -14,6 +14,7 @@ from pyoaev.signatures import (
 from pyoaev.signatures.models import ExecutionDetails
 
 from injector_common.dump_config import intercept_dump_argument
+from injector_common.inject_gone import abort_on_inject_gone, is_inject_gone
 from injector_common.targets import Targets
 from injector_common.traces import send_per_target_traces
 from nuclei.configuration.config_loader import ConfigLoader
@@ -266,6 +267,12 @@ class OpenAEVNuclei:
         )
 
     def process_message(self, data: Dict) -> None:
+        # A 404 on any callback means the inject was deleted on the platform:
+        # stop with one log line, never a traceback in the per-message thread.
+        with abort_on_inject_gone(self.helper.injector_logger, data):
+            self._process_message(data)
+
+    def _process_message(self, data: Dict) -> None:
         start = time.time()
 
         # unpacking the message can raise (invalid payload, no targets); guard it
@@ -329,6 +336,9 @@ class OpenAEVNuclei:
                 execution_result_outputs = execution_result.get("outputs")
                 execution_status = "SUCCESS"
             except Exception as e:
+                if is_inject_gone(e):
+                    # Deleted before the scan: nuclei never ran.
+                    raise
                 execution_message = str(e)
                 execution_status = "ERROR"
                 tool_output = {"error_info": {"exit_code": 1}}

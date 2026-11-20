@@ -15,6 +15,7 @@ from pyoaev.signatures.models import (
 from injector_common.constants import TARGET_PROPERTY_SELECTOR_KEY, TARGET_SELECTOR_KEY
 from injector_common.data_helpers import DataHelpers
 from injector_common.dump_config import intercept_dump_argument
+from injector_common.inject_gone import abort_on_inject_gone, is_inject_gone
 from injector_common.targets import TargetProperty, Targets
 from injector_common.traces import send_per_target_traces
 from netexec.configuration.config_loader import ConfigLoader
@@ -292,6 +293,12 @@ class OpenAEVNetExecInjector:
         )
 
     def process_message(self, data: dict) -> None:
+        # A 404 on any callback means the inject was deleted on the platform:
+        # stop with one log line, never a traceback in the per-message thread.
+        with abort_on_inject_gone(self.helper.injector_logger, data):
+            self._process_message(data)
+
+    def _process_message(self, data: dict) -> None:
         start = time.time()
         inject_id = DataHelpers.get_inject_id(data)
 
@@ -352,6 +359,9 @@ class OpenAEVNetExecInjector:
                 )
 
         except Exception as e:
+            if is_inject_gone(e):
+                # Deleted before or during the run: nothing left to report to.
+                raise
             self.helper.injector_logger.error(
                 "Execution failed for inject %s: %s", inject_id, e
             )

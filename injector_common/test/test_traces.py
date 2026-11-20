@@ -1,6 +1,9 @@
 from unittest import TestCase
 from unittest.mock import MagicMock
 
+from pyoaev.exceptions import OpenAEVUpdateError
+
+from injector_common.inject_gone import InjectGoneError
 from injector_common.traces import send_per_target_traces
 
 
@@ -82,6 +85,42 @@ class SendPerTargetTracesTest(TestCase):
             "inject-1",
             {"10.0.0.1": "asset-1", "10.0.0.2": "asset-2"},
             label="NetExec",
+            start=0.0,
+        )
+
+        self.assertEqual(self.helper.api.inject.execution_callback.call_count, 2)
+        self.helper.injector_logger.error.assert_called_once()
+
+    def test_stops_at_first_404_and_raises_inject_gone(self):
+        # The inject was deleted: one 404 is enough, no error per target.
+        self.helper.api.inject.execution_callback.side_effect = OpenAEVUpdateError(
+            "Inject not found", 404, b""
+        )
+
+        with self.assertRaises(InjectGoneError) as ctx:
+            send_per_target_traces(
+                self.helper,
+                "inject-1",
+                {"10.0.0.1": "asset-1", "10.0.0.2": "asset-2", "10.0.0.3": "asset-3"},
+                label="nmap scan",
+                start=0.0,
+            )
+
+        self.assertEqual(ctx.exception.inject_id, "inject-1")
+        self.assertEqual(self.helper.api.inject.execution_callback.call_count, 1)
+        self.helper.injector_logger.error.assert_not_called()
+
+    def test_non_404_http_error_keeps_going(self):
+        self.helper.api.inject.execution_callback.side_effect = [
+            OpenAEVUpdateError("boom", 500, b""),
+            None,
+        ]
+
+        send_per_target_traces(
+            self.helper,
+            "inject-1",
+            {"10.0.0.1": "asset-1", "10.0.0.2": "asset-2"},
+            label="nmap scan",
             start=0.0,
         )
 

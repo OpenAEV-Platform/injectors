@@ -47,7 +47,8 @@ class NmapOutputParserTest(TestCase):
         self.assertEqual(scan["asset_id"], "asset-123")
         self.assertEqual(scan["host"], "45.33.32.156")
         self.assertEqual(scan["port"], 22)
-        self.assertEqual(scan["service"], "ssh")
+        self.assertEqual(scan["service"], "ssh, guessed from port")
+        self.assertEqual(scan["service_confidence"], "guessed")
 
     def test_parse_target_asset_groups(self):
         """Ensure target_selector='asset-groups' also uses asset_list."""
@@ -65,7 +66,7 @@ class NmapOutputParserTest(TestCase):
         self.assertEqual(scan["asset_id"], "group-asset-555")
         self.assertEqual(scan["host"], "45.33.32.156")
         self.assertEqual(scan["port"], 22)
-        self.assertEqual(scan["service"], "ssh")
+        self.assertEqual(scan["service"], "ssh, guessed from port")
 
     def test_parse_target_manual(self):
         """Ensure target_selector='manual' sets asset_id=None."""
@@ -92,6 +93,76 @@ class NmapOutputParserTest(TestCase):
 
         self.assertIsNone(scan["asset_id"])
         self.assertIsNone(scan["host"])
+
+    # ----------------------------------------------------------------
+    # service labels: guessed from nmap's port table vs probed by -sV
+    # ----------------------------------------------------------------
+
+    @staticmethod
+    def _single_port_report(service_element: str) -> bytes:
+        return (
+            '<?xml version="1.0" encoding="UTF-8"?><nmaprun scanner="nmap">'
+            '<host><status state="up"/><address addr="10.0.0.5" addrtype="ipv4"/>'
+            '<ports><port protocol="tcp" portid="9100">'
+            '<state state="open" reason="syn-ack"/>'
+            f"{service_element}</port></ports></host></nmaprun>"
+        ).encode()
+
+    def _scan_of(self, service_element: str) -> dict:
+        result = NmapOutputParser.xmlparse(
+            self._single_port_report(service_element),
+            "manual",
+            TargetExtractionResult(ip_to_asset_id_map={}, targets=["10.0.0.5"]),
+        )
+        return result["outputs"]["scan_results"][0]
+
+    def test_service_from_port_table_is_marked_guessed(self):
+        """Without -sV nmap names 9100/tcp 'jetdirect' from its port table: the
+        finding must say the label is a guess, not a detected printer."""
+        scan = self._scan_of('<service name="jetdirect" method="table" conf="3"/>')
+
+        self.assertEqual(scan["port"], 9100)
+        self.assertEqual(scan["service"], "jetdirect, guessed from port")
+        self.assertEqual(scan["service_confidence"], "guessed")
+        self.assertNotIn("service_product", scan)
+
+    def test_probed_service_carries_product_and_version(self):
+        scan = self._scan_of(
+            '<service name="http" product="Prometheus node_exporter" version="1.x" '
+            'method="probed" conf="10"/>'
+        )
+
+        self.assertEqual(scan["service"], "http, Prometheus node_exporter 1.x")
+        self.assertEqual(scan["service_confidence"], "probed")
+        self.assertEqual(scan["service_product"], "Prometheus node_exporter")
+        self.assertEqual(scan["service_version"], "1.x")
+
+    def test_probed_service_with_extrainfo(self):
+        scan = self._scan_of(
+            '<service name="ssh" product="OpenSSH" version="9.6p1" '
+            'extrainfo="protocol 2.0" method="probed" conf="10"/>'
+        )
+
+        self.assertEqual(scan["service"], "ssh, OpenSSH 9.6p1, protocol 2.0")
+        self.assertEqual(scan["service_extrainfo"], "protocol 2.0")
+
+    def test_probed_service_without_product_keeps_its_name(self):
+        scan = self._scan_of('<service name="http" method="probed" conf="10"/>')
+
+        self.assertEqual(scan["service"], "http")
+        self.assertEqual(scan["service_confidence"], "probed")
+
+    def test_port_without_service_element(self):
+        scan = self._scan_of("")
+
+        self.assertEqual(scan["service"], "missing name")
+        self.assertEqual(scan["service_confidence"], "guessed")
+
+    def test_scan_results_keep_the_chaining_keys(self):
+        scan = self._scan_of('<service name="jetdirect" method="table" conf="3"/>')
+
+        for key in ("asset_id", "host", "port", "service"):
+            self.assertIn(key, scan)
 
     # ----------------------------------------------------------------
     # action_output: raw XML report, always routed on a successful parse,

@@ -27,8 +27,48 @@ _FAILED_TO_RESOLVE = re.compile(r'Failed to resolve "([^"]+)"')
 # reason "user-set", so the status alone does not say it responded).
 _ANSWERED_PORT_STATES = {"open", "closed", "unfiltered"}
 
+SERVICE_PROBED = "probed"
+SERVICE_GUESSED = "guessed"
+
 
 class NmapOutputParser:
+    @staticmethod
+    def service_details(port) -> dict:
+        """The service of an open port, labelled by how nmap identified it.
+
+        Without version detection (-sV) nmap names the service from its static port
+        table (<service method="table">): a guess, e.g. 9100/tcp is always
+        "jetdirect". The label says so ("jetdirect, guessed from port") and
+        service_confidence is "guessed". A service nmap probed (method="probed")
+        is labelled with its name plus the product, version and extra info read
+        from the probe, and service_confidence is "probed".
+        """
+        service = port.find("service")
+        if service is None:
+            return {"service": "missing name", "service_confidence": SERVICE_GUESSED}
+        name = service.get("name") or "missing name"
+        if service.get("method") != SERVICE_PROBED:
+            return {
+                "service": f"{name}, guessed from port",
+                "service_confidence": SERVICE_GUESSED,
+            }
+        details = " ".join(
+            v for v in (service.get("product"), service.get("version")) if v
+        )
+        # No parentheses in the label: OpenAEV shows a finding as
+        # "host:port (service)".
+        details = ", ".join(
+            value for value in (details, service.get("extrainfo")) if value
+        )
+        result = {
+            "service": f"{name}, {details}" if details else name,
+            "service_confidence": SERVICE_PROBED,
+        }
+        for key in ("product", "version", "extrainfo"):
+            if service.get(key):
+                result[f"service_{key}"] = service.get(key)
+        return result
+
     @staticmethod
     def unresolved_targets(stderr: Optional[bytes]) -> List[str]:
         """Targets nmap reported it could not resolve, read from its stderr."""
@@ -144,12 +184,7 @@ class NmapOutputParser:
                 portid = int(port.get("portid"))
                 ports_results.append(portid)
                 host_open_ports += 1
-                service_node = port.find("service")
-                service = (
-                    service_node.get("name", "missing name")
-                    if service_node is not None
-                    else "missing name"
-                )
+                service_details = NmapOutputParser.service_details(port)
 
                 if selector_is_asset:
                     owners = [m for m in matches if m.asset_id] or [None]
@@ -157,7 +192,7 @@ class NmapOutputParser:
                         ports_scans_results.append(
                             {
                                 "port": portid,
-                                "service": service,
+                                **service_details,
                                 "asset_id": owner.asset_id if owner else None,
                                 "host": address,
                             }
@@ -166,7 +201,7 @@ class NmapOutputParser:
                     ports_scans_results.append(
                         {
                             "port": portid,
-                            "service": service,
+                            **service_details,
                             "asset_id": None,
                             "host": matches[0].target if matches else None,
                         }
