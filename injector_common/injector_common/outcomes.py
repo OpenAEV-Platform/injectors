@@ -11,7 +11,7 @@ stays in each injector; nmap is the reference implementation.
 
 import time
 from dataclasses import dataclass
-from typing import Iterable, Optional
+from typing import Iterable, Optional, Union
 
 from pyoaev.helpers import OpenAEVInjectorHelper
 
@@ -38,6 +38,8 @@ NOT_SCANNED = "not_scanned"
 MAX_TRACE_MESSAGE_LENGTH = 300
 # Lines listing the targets that were missed, in the global message.
 MAX_LISTED_TARGETS = 50
+# Characters of the tool's stderr kept in the global message on a non-zero exit.
+MAX_STDERR_LENGTH = 1000
 
 THRESHOLD_SETTING = "inject.execution.threshold.minutes"
 
@@ -46,6 +48,15 @@ def _cap(message: str, limit: int = MAX_TRACE_MESSAGE_LENGTH) -> str:
     if len(message) <= limit:
         return message
     return message[: limit - 3] + "..."
+
+
+def stderr_text(stderr: Union[bytes, str, None]) -> str:
+    """The tool's stderr as text for a message: decoded, trimmed, capped."""
+    if not stderr:
+        return ""
+    if isinstance(stderr, bytes):
+        stderr = stderr.decode("utf-8", errors="replace")
+    return _cap(stderr.strip(), MAX_STDERR_LENGTH)
 
 
 @dataclass
@@ -100,11 +111,20 @@ class ScanSummary:
     open_ports: int
     exit_code: int = 0
     tool: str = "the scan"
+    stderr: str = ""
+
+    @property
+    def failed(self) -> bool:
+        """The tool exited non-zero and no target was scanned: nothing was kept."""
+        return bool(self.exit_code) and self.scanned == 0
 
     @property
     def status(self) -> str:
-        """EXECUTED when every target answered; WARNING (a success on the platform)
-        when some were missed or the tool exited non-zero but its output was kept."""
+        """EXECUTED when every target answered; ERROR when the tool exited non-zero
+        and no target was scanned; WARNING (a success on the platform) when some
+        were missed or the tool exited non-zero with partial results kept."""
+        if self.failed:
+            return ERROR
         if self.missed or self.exit_code:
             return WARNING
         return EXECUTED
@@ -115,7 +135,8 @@ class ScanSummary:
             f"{self.missed} missed, {self.open_ports} open ports"
         )
         if self.exit_code:
-            text += f" ({self.tool} exited with code {self.exit_code}, results kept)"
+            kept = "no target scanned" if self.failed else "results kept"
+            text += f" ({self.tool} exited with code {self.exit_code}, {kept})"
         return text
 
 
@@ -124,9 +145,11 @@ def summarize_outcomes(
     open_ports: int,
     exit_code: int = 0,
     tool: str = "the scan",
+    stderr: Union[bytes, str, None] = None,
 ) -> ScanSummary:
     """Counts of a run. ``open_ports`` is the number of open ports the tool found,
-    hosts matching no target included, so it is passed by the caller."""
+    hosts matching no target included, so it is passed by the caller. ``stderr`` is
+    kept for the message only when ``exit_code`` is non-zero."""
     outcomes = list(outcomes)
     up = sum(1 for o in outcomes if o.state == HOST_UP)
     scanned = sum(1 for o in outcomes if o.scanned)
@@ -138,19 +161,23 @@ def summarize_outcomes(
         open_ports=open_ports,
         exit_code=exit_code,
         tool=tool,
+        stderr=stderr_text(stderr) if exit_code else "",
     )
 
 
 def build_global_message(
     summary: ScanSummary, outcomes: Iterable[TargetOutcome]
 ) -> str:
-    """The headline with the counts, then one line per target that was missed."""
+    """The headline with the counts, then one line per target that was missed, then
+    the tool's stderr when it exited non-zero."""
     missed = [o for o in outcomes if o.state != HOST_UP]
     lines = [summary.headline()]
     for outcome in missed[:MAX_LISTED_TARGETS]:
         lines.append(f"- {outcome.describe()}")
     if len(missed) > MAX_LISTED_TARGETS:
         lines.append(f"- and {len(missed) - MAX_LISTED_TARGETS} more")
+    if summary.stderr:
+        lines.append(f"{summary.tool} stderr:\n{summary.stderr}")
     return "\n".join(lines)
 
 
