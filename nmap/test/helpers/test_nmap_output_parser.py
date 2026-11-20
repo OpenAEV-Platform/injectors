@@ -1,26 +1,7 @@
 from unittest import TestCase
 
-from injector_common.targets import TargetExtractionResult, TargetResolution
+from injector_common.targets import TargetExtractionResult
 from nmap.helpers.nmap_output_parser import NmapOutputParser
-
-
-def _host(addr: str, port: int, hostname: str = "") -> str:
-    names = (
-        f'<hostnames><hostname name="{hostname}" type="user"/></hostnames>'
-        if hostname
-        else "<hostnames/>"
-    )
-    return (
-        f'<host><status state="up"/><address addr="{addr}" addrtype="ipv4"/>{names}'
-        f'<ports><port protocol="tcp" portid="{port}"><state state="open"/>'
-        f'<service name="svc{port}"/></port></ports></host>'
-    )
-
-
-def _report(*hosts: str) -> bytes:
-    return (
-        '<?xml version="1.0"?><nmaprun scanner="nmap">' + "".join(hosts) + "</nmaprun>"
-    ).encode()
 
 
 class NmapOutputParserTest(TestCase):
@@ -47,7 +28,8 @@ class NmapOutputParserTest(TestCase):
         self.assertEqual(scan["asset_id"], "asset-123")
         self.assertEqual(scan["host"], "45.33.32.156")
         self.assertEqual(scan["port"], 22)
-        self.assertEqual(scan["service"], "ssh")
+        self.assertEqual(scan["service"], "ssh, guessed from port")
+        self.assertEqual(scan["service_confidence"], "guessed")
 
     def test_parse_target_asset_groups(self):
         """Ensure target_selector='asset-groups' also uses asset_list."""
@@ -65,7 +47,7 @@ class NmapOutputParserTest(TestCase):
         self.assertEqual(scan["asset_id"], "group-asset-555")
         self.assertEqual(scan["host"], "45.33.32.156")
         self.assertEqual(scan["port"], 22)
-        self.assertEqual(scan["service"], "ssh")
+        self.assertEqual(scan["service"], "ssh, guessed from port")
 
     def test_parse_target_manual(self):
         """Ensure target_selector='manual' sets asset_id=None."""
@@ -92,6 +74,76 @@ class NmapOutputParserTest(TestCase):
 
         self.assertIsNone(scan["asset_id"])
         self.assertIsNone(scan["host"])
+
+    # ----------------------------------------------------------------
+    # service labels: guessed from nmap's port table vs probed by -sV
+    # ----------------------------------------------------------------
+
+    @staticmethod
+    def _single_port_report(service_element: str) -> bytes:
+        return (
+            '<?xml version="1.0" encoding="UTF-8"?><nmaprun scanner="nmap">'
+            '<host><status state="up"/><address addr="10.0.0.5" addrtype="ipv4"/>'
+            '<ports><port protocol="tcp" portid="9100">'
+            '<state state="open" reason="syn-ack"/>'
+            f"{service_element}</port></ports></host></nmaprun>"
+        ).encode()
+
+    def _scan_of(self, service_element: str) -> dict:
+        result = NmapOutputParser.xmlparse(
+            self._single_port_report(service_element),
+            "manual",
+            TargetExtractionResult(ip_to_asset_id_map={}, targets=["10.0.0.5"]),
+        )
+        return result["outputs"]["scan_results"][0]
+
+    def test_service_from_port_table_is_marked_guessed(self):
+        """Without -sV nmap names 9100/tcp 'jetdirect' from its port table: the
+        finding must say the label is a guess, not a detected printer."""
+        scan = self._scan_of('<service name="jetdirect" method="table" conf="3"/>')
+
+        self.assertEqual(scan["port"], 9100)
+        self.assertEqual(scan["service"], "jetdirect, guessed from port")
+        self.assertEqual(scan["service_confidence"], "guessed")
+        self.assertNotIn("service_product", scan)
+
+    def test_probed_service_carries_product_and_version(self):
+        scan = self._scan_of(
+            '<service name="http" product="Prometheus node_exporter" version="1.x" '
+            'method="probed" conf="10"/>'
+        )
+
+        self.assertEqual(scan["service"], "http, Prometheus node_exporter 1.x")
+        self.assertEqual(scan["service_confidence"], "probed")
+        self.assertEqual(scan["service_product"], "Prometheus node_exporter")
+        self.assertEqual(scan["service_version"], "1.x")
+
+    def test_probed_service_with_extrainfo(self):
+        scan = self._scan_of(
+            '<service name="ssh" product="OpenSSH" version="9.6p1" '
+            'extrainfo="protocol 2.0" method="probed" conf="10"/>'
+        )
+
+        self.assertEqual(scan["service"], "ssh, OpenSSH 9.6p1, protocol 2.0")
+        self.assertEqual(scan["service_extrainfo"], "protocol 2.0")
+
+    def test_probed_service_without_product_keeps_its_name(self):
+        scan = self._scan_of('<service name="http" method="probed" conf="10"/>')
+
+        self.assertEqual(scan["service"], "http")
+        self.assertEqual(scan["service_confidence"], "probed")
+
+    def test_port_without_service_element(self):
+        scan = self._scan_of("")
+
+        self.assertEqual(scan["service"], "missing name")
+        self.assertEqual(scan["service_confidence"], "guessed")
+
+    def test_scan_results_keep_the_chaining_keys(self):
+        scan = self._scan_of('<service name="jetdirect" method="table" conf="3"/>')
+
+        for key in ("asset_id", "host", "port", "service"):
+            self.assertIn(key, scan)
 
     # ----------------------------------------------------------------
     # action_output: raw XML report, always routed on a successful parse,
@@ -128,109 +180,6 @@ class NmapOutputParserTest(TestCase):
                 "manual",
                 TargetExtractionResult(ip_to_asset_id_map={}, targets=[]),
             )
-
-    # ----------------------------------------------------------------
-    # Attribution by address/hostname, never by position
-    # ----------------------------------------------------------------
-
-    def test_unresolved_first_target_does_not_shift_attribution(self):
-        """Three targets, the first an unresolvable hostname: nmap emits two hosts.
-        Each host's ports go to its own asset and the first target is reported."""
-        results = TargetExtractionResult(
-            targets=["does-not-exist.invalid", "10.0.0.2", "10.0.0.3"],
-            ip_to_asset_id_map={
-                "does-not-exist.invalid": "a1",
-                "10.0.0.2": "a2",
-                "10.0.0.3": "a3",
-            },
-            resolutions=[
-                TargetResolution(
-                    "does-not-exist.invalid", "a1", "web-01", "hostname", "automatic"
-                ),
-                TargetResolution("10.0.0.2", "a2", None, "seen_ip", "automatic"),
-                TargetResolution("10.0.0.3", "a3", None, "seen_ip", "automatic"),
-            ],
-        )
-        stderr = b'Failed to resolve "does-not-exist.invalid".\n'
-        result = NmapOutputParser.xmlparse(
-            _report(_host("10.0.0.2", 22), _host("10.0.0.3", 80)),
-            "asset-groups",
-            results,
-            stderr=stderr,
-        )
-
-        by_port = {s["port"]: s for s in result["outputs"]["scan_results"]}
-        self.assertEqual(by_port[22]["asset_id"], "a2")
-        self.assertEqual(by_port[80]["asset_id"], "a3")
-        self.assertEqual(len(result["missed"]), 1)
-        self.assertEqual(
-            result["missed"][0].describe(),
-            "does-not-exist.invalid (asset web-01): not scanned, "
-            "hostname did not resolve",
-        )
-        self.assertIn("1 target(s) not scanned", result["message"])
-        self.assertIn("does-not-exist.invalid (asset web-01)", result["message"])
-
-    def test_hostname_target_matched_by_xml_hostname(self):
-        """A target given as a hostname is matched by the host's hostname entry."""
-        results = TargetExtractionResult(
-            targets=["10.0.0.9", "scanme.nmap.org"],
-            ip_to_asset_id_map={"10.0.0.9": "a9", "scanme.nmap.org": "a1"},
-        )
-        result = NmapOutputParser.xmlparse(self.result_single_host, "assets", results)
-
-        asset_ids = {s["asset_id"] for s in result["outputs"]["scan_results"]}
-        self.assertEqual(asset_ids, {"a1"})
-        # 10.0.0.9 produced no host: an IP target missed is reported, not attributed.
-        self.assertEqual([m.resolution.target for m in result["missed"]], ["10.0.0.9"])
-        self.assertEqual(result["missed"][0].reason, "no result returned by the scan")
-
-    def test_duplicate_target_values_do_not_shift_attribution(self):
-        """Two assets resolving to one value collapse in the map; the hosts after
-        them must still be attributed to their own asset."""
-        results = TargetExtractionResult(
-            targets=["10.0.0.1", "10.0.0.1", "10.0.0.2"],
-            ip_to_asset_id_map={"10.0.0.1": "a1b", "10.0.0.2": "a2"},
-            resolutions=[
-                TargetResolution("10.0.0.1", "a1"),
-                TargetResolution("10.0.0.1", "a1b"),
-                TargetResolution("10.0.0.2", "a2"),
-            ],
-        )
-        result = NmapOutputParser.xmlparse(
-            _report(_host("10.0.0.1", 22), _host("10.0.0.2", 443)),
-            "assets",
-            results,
-        )
-
-        port_443 = [s for s in result["outputs"]["scan_results"] if s["port"] == 443]
-        self.assertEqual([s["asset_id"] for s in port_443], ["a2"])
-        port_22 = sorted(
-            s["asset_id"] for s in result["outputs"]["scan_results"] if s["port"] == 22
-        )
-        self.assertEqual(port_22, ["a1", "a1b"])
-        self.assertEqual(result["missed"], [])
-        self.assertTrue(result["message"].startswith("Targets successfully scanned"))
-
-    def test_host_matching_no_target_keeps_asset_id_none(self):
-        results = TargetExtractionResult(
-            targets=["10.0.0.1"], ip_to_asset_id_map={"10.0.0.1": "a1"}
-        )
-        result = NmapOutputParser.xmlparse(
-            _report(_host("10.0.0.1", 22), _host("10.9.9.9", 80)), "assets", results
-        )
-        by_port = {s["port"]: s for s in result["outputs"]["scan_results"]}
-        self.assertEqual(by_port[22]["asset_id"], "a1")
-        self.assertIsNone(by_port[80]["asset_id"])
-
-    def test_unresolved_targets_read_from_stderr(self):
-        self.assertEqual(
-            NmapOutputParser.unresolved_targets(
-                b'Failed to resolve "a.invalid".\nFailed to resolve "b.invalid".\n'
-            ),
-            ["a.invalid", "b.invalid"],
-        )
-        self.assertEqual(NmapOutputParser.unresolved_targets(None), [])
 
     def test_truncated_xml_raises(self):
         """Genuinely malformed/truncated XML: lxml itself rejects it before

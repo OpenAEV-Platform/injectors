@@ -114,8 +114,24 @@ completes.
 | Nmap - SYN Scan       | TCP SYN scan     | `nmap -Pn -sS -oX - <targets>` |
 | Nmap - TCP Connect Scan | TCP connect scan | `nmap -Pn -sT -oX - <targets>` |
 | Nmap - FIN Scan       | TCP FIN scan     | `nmap -Pn -sF -oX - <targets>` |
+| Nmap - SYN Scan with service/version detection | TCP SYN scan plus service/version detection | `nmap -Pn -sS -sV -oX - <targets>` |
 
 `-Pn` skips host discovery (treat all hosts as online). Nmap output is produced as XML (`-oX -`) and converted to JSON before being parsed into open ports and services.
+
+### Service labels: guessed or probed
+
+Without version detection, nmap does not probe the services: it names each open port from its static port table, so an
+open 9100/tcp is always `jetdirect` (a printer), whatever really listens on it. Each `scan_results` entry says how its
+service was identified:
+
+| Contract | `service` | `service_confidence` | Extra keys |
+|----------|-----------|----------------------|------------|
+| SYN, TCP Connect, FIN | `jetdirect, guessed from port` | `guessed` | none |
+| SYN with service/version detection | `http, Prometheus node_exporter 1.x` (name, product, version, extra info) | `probed` | `service_product`, `service_version`, `service_extrainfo` when nmap reports them |
+
+A port version detection could not identify keeps its port-table name, marked `guessed`. The keys used for chaining
+(`asset_id`, `host`, `port`, `service`) are unchanged. Version detection sends probes to every open port: it is slower
+and noisier than the plain scans, which is why it is a contract of its own.
 
 ## Target selection
 
@@ -125,28 +141,12 @@ Targets are resolved through the shared selection logic of `injector_common`:
 - Target property selector (for assets / asset groups): `automatic` (default), `seen_ip`, `local_ip` (first), or
   `hostname`.
 
-| Target property   | Asset field used                                                                  |
-|-------------------|-----------------------------------------------------------------------------------|
-| Automatic         | See the order below                                                               |
-| Seen IP           | `asset_seen_ip`                                                                   |
-| Local IP (first)  | First valid entry in `asset_ips`                                                  |
-| Hostname          | `asset_hostname`                                                                  |
-
-`Automatic` resolves each asset in this order:
-
-1. An agentless asset (no agent installed) with a hostname is scanned at its `asset_hostname`.
-2. Otherwise, at its `asset_seen_ip` (the address the platform saw the endpoint at) when it is a valid IP.
-3. Otherwise, at the first valid entry of `asset_ips`.
-4. Otherwise the asset is skipped and a warning is written in the injector log.
-
-A valid IP is neither loopback, unspecified nor link-local. With `Automatic`, the execution message lists the field
-used and the value for each asset, e.g. `asset web-01: hostname web-01.example.com (automatic, agentless)` or
-`asset db-02: seen IP 203.0.113.5 (automatic)`.
-
-A hostname is resolved by the DNS of the host the injector runs on. A target that does not resolve, or that Nmap
-returns no result for, is reported: one `WARNING` trace per target (`<target> (asset <name>): not scanned, hostname did
-not resolve`) on its asset, and the inject ends with the `WARNING` status instead of `SUCCESS`. Results are attributed
-to assets by the address and hostnames Nmap reports for each host, never by position.
+| Target property   | Asset field used                            |
+|-------------------|---------------------------------------------|
+| Automatic         | Hostname for agentless assets, else first valid IP |
+| Seen IP           | `asset_seen_ip`                             |
+| Local IP (first)  | First valid entry in `asset_ips`            |
+| Hostname          | `asset_hostname`                            |
 
 For manual targets, provide hostnames or IP addresses as comma-separated values. Invalid, loopback and link-local
 addresses are filtered out.
@@ -174,4 +174,4 @@ deployments, the most common issue is a missing `nmap` binary on the `PATH`.
 ## Additional information
 
 - Official Nmap documentation: [https://nmap.org/docs.html](https://nmap.org/docs.html)
-- Scan option reference: `-Pn` (skip host discovery), `-sS` (SYN scan), `-sT` (TCP connect scan), `-sF` (FIN scan).
+- Scan option reference: `-Pn` (skip host discovery), `-sS` (SYN scan), `-sT` (TCP connect scan), `-sF` (FIN scan), `-sV` (service/version detection).
