@@ -239,7 +239,12 @@ class NmapOutputParserTest(TestCase):
             "does-not-exist.invalid (asset web-01): not scanned, "
             "hostname did not resolve",
         )
-        self.assertIn("1 target(s) not scanned", result["message"])
+        self.assertTrue(
+            result["message"].startswith(
+                "2/3 targets scanned, 2 up, 1 missed, 2 open ports"
+            )
+        )
+        self.assertEqual(result["status"], "WARNING")
         self.assertIn("does-not-exist.invalid (asset web-01)", result["message"])
 
     def test_hostname_target_matched_by_xml_hostname(self):
@@ -281,7 +286,8 @@ class NmapOutputParserTest(TestCase):
         )
         self.assertEqual(port_22, ["a1", "a1b"])
         self.assertEqual(result["missed"], [])
-        self.assertTrue(result["message"].startswith("Targets successfully scanned"))
+        self.assertEqual(result["status"], "EXECUTED")
+        self.assertTrue(result["message"].startswith("3/3 targets scanned, 3 up"))
 
     def test_host_matching_no_target_keeps_asset_id_none(self):
         results = TargetExtractionResult(
@@ -302,6 +308,116 @@ class NmapOutputParserTest(TestCase):
             ["a.invalid", "b.invalid"],
         )
         self.assertEqual(NmapOutputParser.unresolved_targets(None), [])
+
+    # ----------------------------------------------------------------
+    # Per-target outcomes and the global status
+    # ----------------------------------------------------------------
+
+    def test_outcomes_up_down_and_unresolved(self):
+        """(a) One host up with open ports, one host down, one hostname not
+        resolved: three outcomes EXECUTED / WARNING / WARNING, global WARNING with
+        the counts."""
+        results = TargetExtractionResult(
+            targets=["10.0.0.1", "10.0.0.2", "does-not-exist.invalid"],
+            ip_to_asset_id_map={
+                "10.0.0.1": "a1",
+                "10.0.0.2": "a2",
+                "does-not-exist.invalid": "a3",
+            },
+            resolutions=[
+                TargetResolution("10.0.0.1", "a1", "web-01"),
+                TargetResolution("10.0.0.2", "a2", "db-02"),
+                TargetResolution("does-not-exist.invalid", "a3", "app-03"),
+            ],
+        )
+        down_host = (
+            '<host><status state="up" reason="user-set"/>'
+            '<address addr="10.0.0.2" addrtype="ipv4"/><hostnames/>'
+            '<ports><extraports state="filtered" count="1000"/></ports></host>'
+        )
+        up_host = (
+            '<host><status state="up" reason="user-set"/>'
+            '<address addr="10.0.0.1" addrtype="ipv4"/><hostnames/><ports>'
+            '<port protocol="tcp" portid="22"><state state="open"/>'
+            '<service name="ssh"/></port>'
+            '<port protocol="tcp" portid="443"><state state="open"/>'
+            '<service name="https"/></port></ports></host>'
+        )
+        result = NmapOutputParser.xmlparse(
+            _report(up_host, down_host),
+            "asset-groups",
+            results,
+            stderr=b'Failed to resolve "does-not-exist.invalid".\n',
+        )
+
+        self.assertEqual(
+            [(o.status, o.describe()) for o in result["outcomes"]],
+            [
+                ("EXECUTED", "10.0.0.1 (asset web-01): host up, 2 open ports"),
+                ("WARNING", "10.0.0.2 (asset db-02): host down or no response"),
+                (
+                    "WARNING",
+                    "does-not-exist.invalid (asset app-03): not scanned, "
+                    "hostname did not resolve",
+                ),
+            ],
+        )
+        self.assertEqual(result["status"], "WARNING")
+        self.assertTrue(
+            result["message"].startswith(
+                "2/3 targets scanned, 1 up, 2 missed, 2 open ports"
+            )
+        )
+        # Findings are kept for the host that answered.
+        self.assertEqual(sorted(result["outputs"]["ports"]), [22, 443])
+
+    def test_outcomes_all_hosts_up(self):
+        """(b) Every target answered: global EXECUTED."""
+        results = TargetExtractionResult(
+            targets=["10.0.0.1", "10.0.0.2"],
+            ip_to_asset_id_map={"10.0.0.1": "a1", "10.0.0.2": "a2"},
+        )
+        result = NmapOutputParser.xmlparse(
+            _report(_host("10.0.0.1", 22), _host("10.0.0.2", 80)), "assets", results
+        )
+        self.assertEqual(result["status"], "EXECUTED")
+        self.assertEqual([o.status for o in result["outcomes"]], ["EXECUTED"] * 2)
+        self.assertEqual(
+            result["message"], "2/2 targets scanned, 2 up, 0 missed, 2 open ports"
+        )
+
+    def test_host_up_with_only_closed_ports(self):
+        host = (
+            '<host><status state="up" reason="user-set"/>'
+            '<address addr="10.0.0.1" addrtype="ipv4"/><hostnames/>'
+            '<ports><extraports state="closed" count="1000"/></ports></host>'
+        )
+        result = NmapOutputParser.xmlparse(
+            _report(host),
+            "assets",
+            TargetExtractionResult(
+                targets=["10.0.0.1"], ip_to_asset_id_map={"10.0.0.1": "a1"}
+            ),
+        )
+        self.assertEqual(
+            result["outcomes"][0].describe(),
+            "10.0.0.1 (asset a1): host up, no open port",
+        )
+        self.assertEqual(result["status"], "EXECUTED")
+
+    def test_nonzero_exit_code_with_report_is_warning(self):
+        """(c) parser side: the exit code turns the status to WARNING and is named."""
+        result = NmapOutputParser.xmlparse(
+            _report(_host("10.0.0.1", 22)),
+            "assets",
+            TargetExtractionResult(
+                targets=["10.0.0.1"], ip_to_asset_id_map={"10.0.0.1": "a1"}
+            ),
+            exit_code=1,
+        )
+        self.assertEqual(result["status"], "WARNING")
+        self.assertIn("nmap exited with code 1, results kept", result["message"])
+        self.assertEqual(result["outputs"]["ports"], [22])
 
     def test_truncated_xml_raises(self):
         """Genuinely malformed/truncated XML: lxml itself rejects it before

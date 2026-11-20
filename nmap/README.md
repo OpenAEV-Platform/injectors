@@ -21,6 +21,8 @@ discovered open ports and services back to OpenAEV as structured results.
   - [Usage](#usage)
   - [Inject contracts](#inject-contracts)
   - [Target selection](#target-selection)
+  - [Per-target outcomes and status](#per-target-outcomes-and-status)
+    - [Large asset groups and the platform timeout](#large-asset-groups-and-the-platform-timeout)
   - [Behavior](#behavior)
   - [Debugging](#debugging)
   - [Additional information](#additional-information)
@@ -159,13 +161,45 @@ A valid IP is neither loopback, unspecified nor link-local. With `Automatic`, th
 used and the value for each asset, e.g. `asset web-01: hostname web-01.example.com (automatic, agentless)` or
 `asset db-02: seen IP 203.0.113.5 (automatic)`.
 
-A hostname is resolved by the DNS of the host the injector runs on. A target that does not resolve, or that Nmap
-returns no result for, is reported: one `WARNING` trace per target (`<target> (asset <name>): not scanned, hostname did
-not resolve`) on its asset, and the inject ends with the `WARNING` status instead of `SUCCESS`. Results are attributed
-to assets by the address and hostnames Nmap reports for each host, never by position.
+A hostname is resolved by the DNS of the host the injector runs on. Results are attributed to assets by the address
+and hostnames Nmap reports for each host, never by position.
 
 For manual targets, provide hostnames or IP addresses as comma-separated values. Invalid, loopback and link-local
 addresses are filtered out.
+
+## Per-target outcomes and status
+
+One Nmap run covers every target. After it, each asset-backed target gets one trace under its own target in the
+execution view:
+
+| Outcome                              | Trace status | Message                                                       |
+|--------------------------------------|--------------|---------------------------------------------------------------|
+| Host answered, with open ports       | `EXECUTED`   | `10.0.0.1 (asset web-01): host up, 2 open ports`              |
+| Host answered, no open port          | `EXECUTED`   | `10.0.0.1 (asset web-01): host up, no open port`              |
+| Host down or no response             | `WARNING`    | `10.0.0.2 (asset db-02): host down or no response`            |
+| Hostname did not resolve             | `WARNING`    | `app.invalid (asset app-03): not scanned, hostname did not resolve` |
+| IP with no result in the report      | `WARNING`    | `10.0.0.9 (asset db-09): not scanned, no result returned by the scan` |
+
+With `-Pn` Nmap reports every host as up; a host counts as answering when at least one port is open, closed or
+unfiltered. A manual target without an asset gets a trace only when it was not scanned.
+
+The global status of the inject:
+
+- `EXECUTED` when every target answered;
+- `WARNING` (a successful execution on the platform) when some targets were missed, or when Nmap exited with a
+  non-zero code but its report could be parsed (the results are kept and the exit code is in the message);
+- `ERROR` only when the scan failed and produced no usable report (the message is Nmap's stderr).
+
+The global message starts with the counts, e.g. `2/3 targets scanned, 1 up, 2 missed, 2 open ports`, then lists
+the targets that were missed.
+
+### Large asset groups and the platform timeout
+
+Before the run, an `INFO` trace states the number of targets. The platform finalizes an inject still running after
+`inject.execution.threshold.minutes` (default 10) as timed out with the `ERROR` status. A result Nmap sends later is
+still recorded (ports, structured output), but the inject keeps the `ERROR` status. A large group (a hundred addresses
+or more, a SYN scan) can run past that threshold: raise `inject.execution.threshold.minutes` on the platform, or split
+the group.
 
 ## Behavior
 
@@ -180,7 +214,8 @@ flowchart LR
 ```
 
 On each job the injector acknowledges reception, resolves the targets, builds and runs the Nmap command, uses Python to convert the XML to JSON, parses the open ports and services, and returns a structured result (linked to the scanned
-asset when applicable) together with a success or error status.
+asset when applicable), one outcome trace per target and a global status (see
+[Per-target outcomes and status](#per-target-outcomes-and-status)).
 
 ## Debugging
 
