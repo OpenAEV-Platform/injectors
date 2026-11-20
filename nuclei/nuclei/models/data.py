@@ -13,7 +13,11 @@ class MessageData:
 
         self.inject_content = data["injection"]["inject_content"]
         self.selector_key = self.inject_content[TARGET_SELECTOR_KEY]
-        self.selector_property = self.inject_content[TARGET_PROPERTY_SELECTOR_KEY]
+        # The contract shows the property selector for assets and asset groups
+        # only: a manual target list carries no such field, so default it.
+        self.selector_property = self.inject_content.get(
+            TARGET_PROPERTY_SELECTOR_KEY, TargetProperty.AUTOMATIC.name.lower()
+        )
 
         self.target_results = Targets.extract_targets(
             self.selector_key, self.selector_property, data, helper

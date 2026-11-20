@@ -139,3 +139,28 @@ class TestMessageData(unittest.TestCase):
 
         with self.assertRaises(ValueError):
             message_data.get_targets()
+
+    def test_messagedata_manual_targets_without_property_selector(self):
+        # A manual target list carries no target_property_selector (the
+        # contract shows it for assets and asset groups only): the message is
+        # read with the automatic default instead of raising a KeyError.
+        data = {
+            "injection": {
+                "inject_id": sentinel.inject_id,
+                "inject_injector_contract": {
+                    "injector_contract_id": sentinel.injector_contract_id,
+                },
+                "inject_content": {
+                    module.TARGET_SELECTOR_KEY: "manual",
+                    "targets": "10.0.0.1, scanme.example.org,10.0.0.1",
+                    "expectations": [],
+                },
+            }
+        }
+        helper = MagicMock()
+
+        message_data = module.MessageData(data, helper)
+
+        self.assertEqual(message_data.selector_property, "automatic")
+        self.assertEqual(message_data.get_targets(), ["10.0.0.1", "scanme.example.org"])
+        self.assertEqual(message_data.targets_meta, [])
