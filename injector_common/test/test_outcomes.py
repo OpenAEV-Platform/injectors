@@ -194,6 +194,19 @@ class SendTracesTest(TestCase):
         self.assertIn("120 target(s)", data["execution_message"])
         self.assertIn("inject.execution.threshold.minutes", data["execution_message"])
 
+    def test_progress_trace_states_no_threshold_value(self):
+        # The platform setting may differ from its default: the trace never
+        # claims a value the injector cannot read.
+        send_scan_progress_trace(
+            self.helper, "inject-1", 120, label="nmap scan", start=0
+        )
+        message = self.helper.api.inject.execution_callback.call_args.kwargs["data"][
+            "execution_message"
+        ]
+        self.assertNotIn("default", message)
+        self.assertNotRegex(message, r"\(\s*\d+\s*\)")
+        self.assertIn("timeout trace states the minutes applied", message)
+
     def test_no_progress_trace_without_targets(self):
         send_scan_progress_trace(self.helper, "inject-1", 0, label="nmap scan", start=0)
         self.helper.api.inject.execution_callback.assert_not_called()
