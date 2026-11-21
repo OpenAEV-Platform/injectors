@@ -21,6 +21,10 @@ class TestDnsEnumCommandBuilder(unittest.TestCase):
         )
         self.assertEqual(DnsEnumCommandBuilder.subfinder_args("f", 1, 30)[-1], "1")
 
+    def test_passive_budget_is_half_the_timeout(self):
+        self.assertEqual(DnsEnumCommandBuilder.passive_budget(600), 300)
+        self.assertEqual(DnsEnumCommandBuilder.passive_budget(1), 1)
+
     def test_dnsx_args(self):
         self.assertEqual(
             DnsEnumCommandBuilder.dnsx_args("/tmp/h.txt", ["A", "CNAME", "TXT"], 100),

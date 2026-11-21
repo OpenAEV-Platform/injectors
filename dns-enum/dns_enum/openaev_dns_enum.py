@@ -3,7 +3,7 @@ import os
 import subprocess
 import tempfile
 import time
-from typing import Dict, List
+from typing import Dict, List, Optional, Tuple, Union
 
 from dns_enum.configuration.config_loader import ConfigLoader
 from dns_enum.contracts.dns_enum_constants import HOSTNAMES_FIELD
@@ -29,6 +29,14 @@ def _write_lines(directory: str, name: str, lines: List[str]) -> str:
     return path
 
 
+def _decode(output: Optional[Union[bytes, str]]) -> str:
+    if output is None:
+        return ""
+    if isinstance(output, bytes):
+        return output.decode("utf-8", errors="replace")
+    return output
+
+
 class OpenAEVDnsEnum:
     def __init__(self):
         self.config = OpenAEVConfigHelper.from_configuration_object(
@@ -40,12 +48,23 @@ class OpenAEVDnsEnum:
         )
         self.signature_manager = SignatureManager(self.helper.api)
 
-    def _run(self, args: List[str], timeout: float) -> str:
+    def _run(self, args: List[str], timeout: float) -> Tuple[str, bool]:
+        """Run one tool; on its deadline, keep what it printed so far.
+
+        Returns (stdout, timed_out). subprocess.run kills the process on
+        TimeoutExpired and attaches the output collected until then.
+        """
         self.helper.injector_logger.info("Executing: " + " ".join(args))
-        result = subprocess.run(
-            args, check=True, capture_output=True, timeout=max(1, timeout)
-        )
-        return result.stdout.decode("utf-8", errors="replace")
+        try:
+            result = subprocess.run(
+                args, check=True, capture_output=True, timeout=max(1, timeout)
+            )
+        except subprocess.TimeoutExpired as err:
+            self.helper.injector_logger.warning(
+                f"{args[0]} reached its deadline; keeping its partial output"
+            )
+            return _decode(err.stdout), True
+        return _decode(result.stdout), False
 
     def _callback(self, inject_id: str, start: float, message: str) -> None:
         self.helper.api.inject.execution_callback(
@@ -62,14 +81,20 @@ class OpenAEVDnsEnum:
         """Collect candidates (roots, passive sources, wordlist), resolve them with dnsx."""
         deadline = start + msg_data.timeout
         candidates: List[str] = list(msg_data.domains)
+        timed_out = False
         with tempfile.TemporaryDirectory() as workdir:
             if msg_data.passive_sources:
                 domains_file = _write_lines(workdir, "domains.txt", msg_data.domains)
+                # Passive collection gets half of the budget at most, so dnsx
+                # always keeps the other half to resolve the candidates.
+                passive_budget = DnsEnumCommandBuilder.passive_budget(msg_data.timeout)
                 args = DnsEnumCommandBuilder.subfinder_args(
-                    domains_file, msg_data.rate_limit, msg_data.timeout
+                    domains_file, msg_data.rate_limit, passive_budget
                 )
                 self._callback(msg_data.inject_id, start, " ".join(args))
-                passive = self._run(args, deadline - time.time())
+                passive, _ = self._run(
+                    args, min(passive_budget, deadline - time.time())
+                )
                 for line in passive.splitlines():
                     host = line.strip().lower().rstrip(".")
                     if (
@@ -93,12 +118,13 @@ class OpenAEVDnsEnum:
                 start,
                 f"{' '.join(args)} ({len(candidates)} candidate hosts)",
             )
-            resolved = self._run(args, deadline - time.time())
+            resolved, timed_out = self._run(args, deadline - time.time())
         hosts = DnsEnumOutputParser.parse_hosts(resolved, msg_data.domains)
         return {
             "hosts": hosts,
             "outputs": DnsEnumOutputParser.build_outputs(hosts, resolved),
             "candidates": len(candidates),
+            "timed_out": timed_out,
         }
 
     def _report_pre_execution_failure(
@@ -161,6 +187,13 @@ class OpenAEVDnsEnum:
                 f"{len(result['hosts'])} hosts resolved out of "
                 f"{result['candidates']} candidates"
             )
+            if result["timed_out"]:
+                execution_message += (
+                    f" (resolution stopped at the {msg_data.timeout} s deadline:"
+                    " partial results)"
+                )
+                if not result["hosts"]:
+                    tool_error_info = {"exit_code": 124}
             if msg_data.create_endpoints:
                 imported = EndpointImporter(
                     self.helper.api, self.helper.injector_logger

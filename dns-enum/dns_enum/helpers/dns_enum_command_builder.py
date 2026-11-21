@@ -6,8 +6,16 @@ DNSX_BINARY = "dnsx"
 
 class DnsEnumCommandBuilder:
     @staticmethod
+    def passive_budget(timeout: int) -> int:
+        """Seconds subfinder may use: half of the timeout, dnsx keeps the rest."""
+        return max(1, timeout // 2)
+
+    @staticmethod
     def subfinder_args(domains_file: str, rate_limit: int, timeout: int) -> List[str]:
-        """Passive subdomain enumeration of every root domain listed in domains_file."""
+        """Passive subdomain enumeration of every root domain listed in domains_file.
+
+        timeout is the passive budget in seconds (see passive_budget).
+        """
         return [
             SUBFINDER_BINARY,
             "-dL",
