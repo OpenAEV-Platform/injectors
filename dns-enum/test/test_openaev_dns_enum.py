@@ -104,6 +104,50 @@ class TestOpenAEVDnsEnum(unittest.TestCase):
         self.assertNotIn("execution_output_structured", data)
 
     @patch.object(module.subprocess, "run")
+    def test_subfinder_gets_half_of_the_budget(
+        self, m_run, _open, _loader, _config, m_helper, _dump
+    ):
+        injector = self._injector(m_helper)
+        m_run.side_effect = [_completed("www.example.com\n"), _completed(DNSX)]
+        injector.process_message(_message(timeout=600))
+
+        subfinder_args = m_run.call_args_list[0].args[0]
+        self.assertEqual(subfinder_args[-1], "5")
+        self.assertLessEqual(m_run.call_args_list[0].kwargs["timeout"], 300)
+
+    @patch.object(module.subprocess, "run")
+    def test_dnsx_deadline_keeps_partial_results(
+        self, m_run, _open, _loader, _config, m_helper, _dump
+    ):
+        injector = self._injector(m_helper)
+        # The line cut by the kill is not valid JSON and is skipped.
+        partial = DNSX + '\n{"host": "cut.exa'
+        m_run.side_effect = subprocess.TimeoutExpired(
+            ["dnsx"], 600, output=partial.encode()
+        )
+        injector.process_message(_message(passive_sources=False))
+
+        data = self._final_callback(injector)
+        self.assertEqual(data["execution_status"], "SUCCESS")
+        self.assertIn("2 hosts resolved out of 1 candidates", data["execution_message"])
+        self.assertIn("partial results", data["execution_message"])
+        outputs = json.loads(data["execution_output_structured"])
+        self.assertEqual(outputs["hostnames"], ["api.example.com", "www.example.com"])
+
+    @patch.object(module.subprocess, "run")
+    def test_dnsx_deadline_without_output_is_an_error(
+        self, m_run, _open, _loader, _config, m_helper, _dump
+    ):
+        injector = self._injector(m_helper)
+        m_run.side_effect = subprocess.TimeoutExpired(["dnsx"], 600, output=None)
+        injector.process_message(_message(passive_sources=False))
+
+        data = self._final_callback(injector)
+        self.assertEqual(data["execution_status"], "ERROR")
+        self.assertIn("0 hosts resolved", data["execution_message"])
+        self.assertIn("partial results", data["execution_message"])
+
+    @patch.object(module.subprocess, "run")
     def test_invalid_domain_fails_before_execution(
         self, m_run, _open, _loader, _config, m_helper, _dump
     ):
