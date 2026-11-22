@@ -24,6 +24,8 @@ class TestDnsEnumContracts(unittest.TestCase):
         self.assertFalse(create["defaultValue"])
         brute = next(f for f in content["fields"] if f["key"] == "brute_force")
         self.assertFalse(brute["defaultValue"])
+        classify = next(f for f in content["fields"] if f["key"] == "classify_assets")
+        self.assertTrue(classify["defaultValue"])
 
     def test_outputs(self):
         content = json.loads(DnsEnumContracts.build_contract()[0]["contract_content"])

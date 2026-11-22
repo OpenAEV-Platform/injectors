@@ -13,6 +13,7 @@ TIMEOUT_KEY = "timeout"
 CREATE_ENDPOINTS_KEY = "create_endpoints"
 ENDPOINT_TAG_KEY = "endpoint_tag"
 ASSET_GROUP_ID_KEY = "asset_group_id"
+CLASSIFY_ASSETS_KEY = "classify_assets"
 
 # -- RECORD TYPES (dnsx flag and JSON key are the lower-case name) --
 RECORD_TYPES = ["A", "AAAA", "CNAME", "MX", "NS", "TXT"]

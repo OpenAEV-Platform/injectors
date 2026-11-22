@@ -50,6 +50,7 @@ Manual deployment: `poetry install` then `poetry run python -m dns_enum.openaev_
 | Create endpoints for discovered hosts  | off                | Import every resolved host that has an address as an endpoint (see below).                          |
 | Tag set on the created endpoints       | `discovered:dns`   | Tag created if missing and set on every imported endpoint.                                          |
 | Asset group ID                         | (empty)            | When set, the imported endpoints are added to this asset group (existing members are kept).        |
+| Classify the endpoints                 | on                 | Set the category, subcategory and URL of each imported endpoint and attach a name to the existing asset of its address (see below). |
 
 The root domains themselves are always resolved; hosts outside the requested root domains are dropped.
 
@@ -72,6 +73,21 @@ upsert (`POST /api/endpoints/agentless/upsert`):
 - name and hostname: the host; IPs: its A and AAAA addresses; internet facing; the tag above;
 - external reference `dns-enum:<host>`: the platform matches an existing endpoint on it first, so a rerun updates the
   same endpoint and never creates a duplicate.
+
+With "Classify the endpoints" on (the default):
+
+- a name that shares an address with another discovered name (virtual hosts behind one ingress or load balancer), or
+  whose CNAME points at a CDN (CloudFront, Akamai, Fastly, Cloudflare, Azure Front Door, ...), is a web application:
+  category `WEB_APPLICATION`, subcategory `WEBSITE`, URL `https://<name>`;
+- a name alone on its addresses is a host: category `HOST`, subcategory `SERVER`;
+- the classification is written only on an asset nobody classified yet (new, or `HOST` / `GENERIC_ASSET` with no
+  subcategory): a category, subcategory or criticality a person set is never changed, and a rerun changes nothing;
+- a name that would be a host on the address of an asset another source created (a collector, an agent, a person) is
+  not imported as a second asset: it is attached to that asset (added to the asset group when one is set) and listed
+  in the execution message.
+
+The classification reads the platform's asset inventory (`POST /api/assets/search`); when it cannot be read, the hosts
+are imported without classification and the message says so.
 
 A host resolving only to a CNAME is reported as a finding but not imported. With the option off, no asset is created
 or changed.

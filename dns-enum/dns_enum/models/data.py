@@ -4,6 +4,7 @@ from typing import List
 from dns_enum.contracts.dns_enum_constants import (
     ASSET_GROUP_ID_KEY,
     BRUTE_FORCE_KEY,
+    CLASSIFY_ASSETS_KEY,
     CREATE_ENDPOINTS_KEY,
     DEFAULT_ENDPOINT_TAG,
     DEFAULT_RATE_LIMIT,
@@ -126,6 +127,7 @@ class MessageData:
             str(content.get(ENDPOINT_TAG_KEY) or "").strip() or DEFAULT_ENDPOINT_TAG
         )
         self.asset_group_id = str(content.get(ASSET_GROUP_ID_KEY) or "").strip() or None
+        self.classify_assets = _as_bool(content.get(CLASSIFY_ASSETS_KEY, True))
 
         self.expectation_types = [
             expectation.get("expectation_type")
