@@ -1,9 +1,21 @@
+import uuid
 from typing import Dict, List, Optional
 
 from dns_enum.contracts.dns_enum_constants import (
     ENDPOINT_TAG_COLOR,
     EXTERNAL_REFERENCE_PREFIX,
 )
+from dns_enum.helpers.asset_classifier import (
+    classify,
+    is_unclassified,
+    is_web,
+    shared_addresses,
+)
+
+# Size of one page of the platform's endpoint search (the API allows 1,000).
+SEARCH_PAGE_SIZE = 500
+# Values per filter of one search, so a large run never sends an unbounded filter.
+SEARCH_CHUNK = 200
 
 
 def external_reference(hostname: str) -> str:
@@ -12,7 +24,9 @@ def external_reference(hostname: str) -> str:
     return EXTERNAL_REFERENCE_PREFIX + hostname.strip().rstrip(".").lower()
 
 
-def build_endpoint_input(host: Dict, tag_id: Optional[str]) -> Dict:
+def build_endpoint_input(
+    host: Dict, tag_id: Optional[str], classification: Optional[Dict] = None
+) -> Dict:
     hostname = host["host"]
     endpoint = {
         "asset_name": hostname,
@@ -25,6 +39,8 @@ def build_endpoint_input(host: Dict, tag_id: Optional[str]) -> Dict:
         endpoint["asset_ips"] = list(host["ips"])
     if tag_id:
         endpoint["asset_tags"] = [tag_id]
+    if classification:
+        endpoint.update(classification)
     return endpoint
 
 
@@ -42,6 +58,16 @@ def dedupe_hosts(hosts: List[Dict]) -> List[Dict]:
         seen.add(reference)
         unique.append(host)
     return unique
+
+
+def _filter(key: str, values: List[str]) -> Dict:
+    return {
+        "id": str(uuid.uuid4()),
+        "key": key,
+        "mode": "or",
+        "operator": "eq",
+        "values": values,
+    }
 
 
 class EndpointImporter:
@@ -72,20 +98,129 @@ class EndpointImporter:
             post_data={"asset_group_assets": merged},
         )
 
+    def _search(self, key: str, values: List[str]) -> List[Dict]:
+        """Every asset (any category) whose `key` equals one of `values`, all pages
+        read, through the unified inventory search of the platform."""
+        found: List[Dict] = []
+        for start in range(0, len(values), SEARCH_CHUNK):
+            chunk = values[start : start + SEARCH_CHUNK]
+            page = 0
+            while True:
+                result = self.api.http_post(
+                    "/assets/search",
+                    post_data={
+                        "page": page,
+                        "size": SEARCH_PAGE_SIZE,
+                        "filterGroup": {
+                            "mode": "and",
+                            "filters": [_filter(key, chunk)],
+                        },
+                    },
+                )
+                content = list((result or {}).get("content") or [])
+                found.extend(content)
+                if (result or {}).get("last", True) or len(content) < SEARCH_PAGE_SIZE:
+                    break
+                page += 1
+        return found
+
+    def _existing_by_reference(self, hosts: List[Dict]) -> Dict[str, Dict]:
+        references = [external_reference(host["host"]) for host in hosts]
+        return {
+            asset.get("asset_external_reference"): asset
+            for asset in self._search("asset_external_reference", references)
+            if asset.get("asset_external_reference")
+        }
+
+    def _foreign_owner(
+        self, ip: str, cache: Dict[str, Optional[Dict]]
+    ) -> Optional[Dict]:
+        """The first asset on `ip` this injector did not create, if any."""
+        if ip not in cache:
+            cache[ip] = next(
+                (
+                    asset
+                    for asset in self._search("asset_ips", [ip])
+                    if not str(asset.get("asset_external_reference") or "").startswith(
+                        EXTERNAL_REFERENCE_PREFIX
+                    )
+                ),
+                None,
+            )
+        return cache[ip]
+
     def import_hosts(
-        self, hosts: List[Dict], tag_name: str, asset_group_id: Optional[str] = None
+        self,
+        hosts: List[Dict],
+        tag_name: str,
+        asset_group_id: Optional[str] = None,
+        classify_assets: bool = True,
     ) -> Dict:
-        """Upsert one endpoint per resolved host; returns counts and the asset ids."""
+        """Upsert one endpoint per resolved host; returns counts and the asset ids.
+
+        With classify_assets on, each host gets the category its addresses give it
+        (asset_classifier), filled only on an asset nobody classified yet, and a host
+        that would be a plain HOST on the address of an asset another source created
+        is attached to that asset instead of becoming a duplicate.
+        """
         tag_id = self._tag_id(tag_name)
+        unique = dedupe_hosts(hosts)
         asset_ids: List[str] = []
         failed: List[str] = []
-        for host in dedupe_hosts(hosts):
+        attached: List[str] = []
+        web = 0
+        lookup_error = None
+        existing: Dict[str, Dict] = {}
+        shared = shared_addresses(unique) if classify_assets else set()
+        if classify_assets:
             try:
-                endpoint = self.api.endpoint.upsert(build_endpoint_input(host, tag_id))
+                existing = self._existing_by_reference(unique)
+            except Exception as err:  # never classify blind: import as before
+                lookup_error = str(err)
+                self.logger.error(f"Existing endpoint lookup failed: {err}")
+        owners: Dict[str, Optional[Dict]] = {}
+        for host in unique:
+            classification = None
+            if classify_assets and lookup_error is None:
+                reference = external_reference(host["host"])
+                classification = classify(host, shared)
+                if reference not in existing and not is_web(classification):
+                    try:
+                        owner = next(
+                            (
+                                found
+                                for found in (
+                                    self._foreign_owner(ip, owners)
+                                    for ip in host["ips"]
+                                )
+                                if found
+                            ),
+                            None,
+                        )
+                    except Exception as err:
+                        owner = None
+                        self.logger.error(
+                            f"Address lookup failed for {host['host']}: {err}"
+                        )
+                    if owner and owner.get("asset_id"):
+                        attached.append(
+                            f"{host['host']} -> {owner.get('asset_name') or owner['asset_id']}"
+                        )
+                        if owner["asset_id"] not in asset_ids:
+                            asset_ids.append(owner["asset_id"])
+                        continue
+                if not is_unclassified(existing.get(reference)):
+                    classification = None
+            try:
+                endpoint = self.api.endpoint.upsert(
+                    build_endpoint_input(host, tag_id, classification)
+                )
             except Exception as err:
                 self.logger.error(f"Endpoint upsert failed for {host['host']}: {err}")
                 failed.append(host["host"])
                 continue
+            if is_web(classification):
+                web += 1
             asset_id = (endpoint or {}).get("asset_id")
             if asset_id and asset_id not in asset_ids:
                 asset_ids.append(asset_id)
@@ -100,4 +235,7 @@ class EndpointImporter:
             "asset_ids": asset_ids,
             "failed": failed,
             "asset_group_error": group_error,
+            "web_applications": web,
+            "attached": attached,
+            "lookup_error": lookup_error,
         }

@@ -4,6 +4,7 @@ from dns_enum.contracts.dns_enum_constants import (
     ACTION_OUTPUT_FIELD,
     ASSET_GROUP_ID_KEY,
     BRUTE_FORCE_KEY,
+    CLASSIFY_ASSETS_KEY,
     CREATE_ENDPOINTS_KEY,
     DEFAULT_ENDPOINT_TAG,
     DEFAULT_RATE_LIMIT,
@@ -115,6 +116,17 @@ class DnsEnumContracts:
             visibleConditionFields=[CREATE_ENDPOINTS_KEY],
             visibleConditionValues={CREATE_ENDPOINTS_KEY: True},
         )
+        classify_assets = ContractCheckbox(
+            key=CLASSIFY_ASSETS_KEY,
+            label=(
+                "Classify the endpoints (shared address or CDN: web application with"
+                " its URL; else host) and attach a name to the existing asset of its"
+                " address"
+            ),
+            defaultValue=True,
+            visibleConditionFields=[CREATE_ENDPOINTS_KEY],
+            visibleConditionValues={CREATE_ENDPOINTS_KEY: True},
+        )
         expectations = ContractExpectations(
             key="expectations",
             label="Expectations",
@@ -162,6 +174,7 @@ class DnsEnumContracts:
                     create_endpoints,
                     endpoint_tag,
                     asset_group_id,
+                    classify_assets,
                     expectations,
                 ]
             )

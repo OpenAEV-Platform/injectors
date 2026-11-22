@@ -198,12 +198,30 @@ class OpenAEVDnsEnum:
                 imported = EndpointImporter(
                     self.helper.api, self.helper.injector_logger
                 ).import_hosts(
-                    result["hosts"], msg_data.endpoint_tag, msg_data.asset_group_id
+                    result["hosts"],
+                    msg_data.endpoint_tag,
+                    msg_data.asset_group_id,
+                    msg_data.classify_assets,
                 )
                 execution_message += (
                     f"; {len(imported['asset_ids'])} endpoints created or updated"
                     f" (tag {msg_data.endpoint_tag})"
                 )
+                if imported.get("web_applications"):
+                    execution_message += (
+                        f"; {imported['web_applications']} classified as web"
+                        " applications"
+                    )
+                if imported.get("attached"):
+                    execution_message += (
+                        "; attached to an existing asset of the same address:"
+                        f" {', '.join(imported['attached'])}"
+                    )
+                if imported.get("lookup_error"):
+                    execution_message += (
+                        "; existing assets unreadable, imported without"
+                        f" classification: {imported['lookup_error']}"
+                    )
                 if imported["failed"]:
                     execution_message += (
                         f"; endpoint import failed for {', '.join(imported['failed'])}"

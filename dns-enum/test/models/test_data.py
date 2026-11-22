@@ -60,6 +60,7 @@ class TestMessageData(unittest.TestCase):
         self.assertFalse(msg.create_endpoints)
         self.assertEqual(msg.endpoint_tag, "discovered:dns")
         self.assertIsNone(msg.asset_group_id)
+        self.assertTrue(msg.classify_assets)
 
     def test_options(self):
         msg = MessageData(
@@ -74,6 +75,7 @@ class TestMessageData(unittest.TestCase):
                 create_endpoints="true",
                 endpoint_tag="ext",
                 asset_group_id=" group-1 ",
+                classify_assets="false",
                 expectations=[{"expectation_type": "DETECTION"}, {}],
             )
         )
@@ -85,6 +87,7 @@ class TestMessageData(unittest.TestCase):
         self.assertTrue(msg.create_endpoints)
         self.assertEqual(msg.endpoint_tag, "ext")
         self.assertEqual(msg.asset_group_id, "group-1")
+        self.assertFalse(msg.classify_assets)
         self.assertEqual(msg.expectation_types, ["DETECTION"])
 
     def test_invalid_values(self):
