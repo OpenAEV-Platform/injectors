@@ -1,0 +1,18 @@
+{
+  "title": "Strix",
+  "slug": "openaev_strix",
+  "description": "Run Strix autonomous AI penetration-testing agents from OpenAEV against authorized network targets or code repositories, turning validated findings (with proofs-of-concept) into actionable exposure results.",
+  "short_description": "Run autonomous AI penetration tests with Strix",
+  "use_cases": ["Technical"],
+  "verified": false,
+  "last_verified_date": "",
+  "playbook_supported": false,
+  "max_confidence_level": 80,
+  "support_version": "",
+  "subscription_link": "https://strix.ai",
+  "source_code": "https://github.com/usestrix/strix",
+  "manager_supported": true,
+  "container_version": "rolling",
+  "container_image": "openaev/injector-strix",
+  "container_type": "INJECTOR"
+}
