@@ -363,7 +363,7 @@ class OpenAEVNetExecInjector:
                 # Deleted before or during the run: nothing left to report to.
                 raise
             self.helper.injector_logger.error(
-                "Execution failed for inject %s: %s", inject_id, e
+                f"Execution failed for inject {inject_id}: {e}"
             )
             callback_data = {
                 "execution_message": str(e),
