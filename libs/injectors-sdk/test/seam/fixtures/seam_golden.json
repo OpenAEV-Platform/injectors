@@ -1,0 +1,26 @@
+{
+  "injectors_sdk.seam.helpers.SEAM_VERSION": {
+    "kind": "assignment",
+    "sha256": "c26dc544bb2976ca7c5a7465be69719edcc7893657a494ef17b0285e7e2a37db"
+  },
+  "injectors_sdk.seam.helpers.ports.ConfigLookupPort": {
+    "kind": "class",
+    "sha256": "20b25cc46c49e9a24cdcfd042cb3c4279609e43e55717fa85cbc796c1753e294"
+  },
+  "injectors_sdk.seam.helpers.ports.InjectorRegistrationPort": {
+    "kind": "class",
+    "sha256": "fce63918f45e7930bbc8dec091ca0983d33ff60595fca6e6a6a6fc055ee614ff"
+  },
+  "injectors_sdk.seam.helpers.ports.MqSslPort": {
+    "kind": "class",
+    "sha256": "9f99b081264a2d7284c718aaa8f715a794419d1da815705ed337773bd3d21d3e"
+  },
+  "injectors_sdk.seam.helpers.ports.QueueConsumerPort": {
+    "kind": "class",
+    "sha256": "cd84d0bc32a6280236e99ee8bbc1798bcc729b7efc74b0eb9c7ec3f2e924eee6"
+  },
+  "injectors_sdk.seam.helpers.ports.QueueListenerProtocol": {
+    "kind": "class",
+    "sha256": "e1bdd8883520ea4ffe69cdbadcd45089834a85c44e302beecce1033e32945d23"
+  }
+}
