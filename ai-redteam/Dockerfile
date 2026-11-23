@@ -1,14 +1,14 @@
-FROM python:3.13-slim AS builder
+FROM python:3.14-slim AS builder
 
 RUN pip3 install --no-cache-dir -U pip certifi
 RUN pip3 install --no-cache-dir poetry==2.3.2
-RUN apt-get update && apt-get upgrade -y && rm -rf /var/lib/apt/lists/*
+RUN apt-get update && apt-get upgrade -y
 
 ARG installdir=/injector
 ADD . ${installdir}
 RUN cd ${installdir} && poetry build
 
-FROM python:3.13-slim AS runner
+FROM python:3.14-slim AS runner
 
 ARG installdir=/injector
 
@@ -26,7 +26,7 @@ RUN cd ${installdir}/dist && pip3 install --no-cache-dir "$(ls *.whl)[prod]"
 
 RUN if [ "${PYOAEV_GIT_BRANCH_OVERRIDE}" ] ; then \
         echo "Forcing specific version of client-python" && \
-        apt-get update && apt-get install -y --no-install-recommends git && \
+        apt-get update && apt-get upgrade -y && apt-get install -y --no-install-recommends git && \
         pip install --no-cache-dir pip3-autoremove && \
         pip-autoremove pyoaev -y && \
         pip install --no-cache-dir "git+https://github.com/OpenAEV-Platform/client-python@${PYOAEV_GIT_BRANCH_OVERRIDE}" ; \
@@ -35,9 +35,10 @@ RUN if [ "${PYOAEV_GIT_BRANCH_OVERRIDE}" ] ; then \
 # Optional: best-effort install of the OSS red-team engines. Failures here never break the image;
 # the corresponding engines simply report that the tool is unavailable.
 RUN if [ "${INSTALL_OSS_ENGINES}" = "true" ] ; then \
-        apt-get update && apt-get install -y --no-install-recommends nodejs npm git ; \
-        pip3 install --no-cache-dir garak pyrit || echo "skip garak/pyrit" ; \
-        npm install -g promptfoo || echo "skip promptfoo" ; \
+        apt-get update && apt-get upgrade -y && apt-get install -y --no-install-recommends nodejs npm git ; \
+        pip3 install --no-cache-dir garak || echo "warning: skip garak" ; \
+        pip3 install --no-cache-dir pyrit || echo "warning: skip pyrit" ; \
+        npm install -g promptfoo || echo "warning: skip promptfoo" ; \
     fi
 
 # necessary for icon location

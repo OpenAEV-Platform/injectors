@@ -60,7 +60,7 @@ marked `SUCCESS` when Gmail replies with `200 OK`, otherwise `ERROR` with the Gm
 - A Google Workspace domain, a Google Cloud service account with a JSON key, and domain-wide delegation authorized for
   the `https://www.googleapis.com/auth/gmail.send` scope - see [Google Workspace setup](#google-workspace-setup).
 - Outbound HTTPS access from the injector to `oauth2.googleapis.com` and `gmail.googleapis.com`.
-- For a manual (non-Docker) deployment: Python >= 3.11 and [Poetry](https://python-poetry.org/) >= 2.1.
+- For a manual (non-Docker) deployment: Python >= 3.14 and [Poetry](https://python-poetry.org/) >= 2.1.
 
 ## Google Workspace setup
 
