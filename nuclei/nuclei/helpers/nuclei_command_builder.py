@@ -27,13 +27,20 @@ class NucleiCommandBuilder:
     }
 
     def __init__(
-        self, nuclei_configs, contract_id: str, content: dict, targets: list[str]
+        self,
+        nuclei_configs,
+        contract_id: str,
+        content: dict,
+        targets: list[str],
+        variables: dict[str, str] | None = None,
     ):
         self.args = []
         self.nuclei_configs = nuclei_configs
         self.contract_id = contract_id
         self.content = content
         self.targets = targets
+        # Template variables (credentials, operator values), passed as -var.
+        self.variables = variables or {}
 
     def build(self):
         self.args = []
@@ -44,6 +51,7 @@ class NucleiCommandBuilder:
             ._with_tags()
             ._with_templates()
             ._with_options()
+            ._with_variables()
             ._with_jsonl_output()
         )
         return build._to_args()
@@ -98,6 +106,14 @@ class NucleiCommandBuilder:
         if options:
             options_parsed = shlex.split(options)
             self.args += options_parsed
+        return self
+
+    def _with_variables(self):
+        # Values the template reads as {{name}} (credentials of an authenticated
+        # template, operator inputs).
+        # Nuclei Flags: -V, -var
+        for name, value in self.variables.items():
+            self.args += ["-var", f"{name}={value}"]
         return self
 
     def _with_jsonl_output(self):

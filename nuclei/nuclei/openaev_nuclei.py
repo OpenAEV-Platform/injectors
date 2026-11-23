@@ -5,6 +5,10 @@ import threading
 import time
 from typing import Dict, Optional
 
+from injector_common.dump_config import intercept_dump_argument
+from injector_common.inject_gone import abort_on_inject_gone, is_inject_gone
+from injector_common.targets import Targets
+from injector_common.traces import send_per_target_traces
 from pyoaev.helpers import OpenAEVConfigHelper, OpenAEVInjectorHelper
 from pyoaev.signatures import (
     ExtraSignatureData,
@@ -13,15 +17,23 @@ from pyoaev.signatures import (
 )
 from pyoaev.signatures.models import ExecutionDetails
 
-from injector_common.dump_config import intercept_dump_argument
-from injector_common.inject_gone import abort_on_inject_gone, is_inject_gone
-from injector_common.targets import Targets
-from injector_common.traces import send_per_target_traces
 from nuclei.configuration.config_loader import ConfigLoader
 from nuclei.helpers.nuclei_command_builder import NucleiCommandBuilder
 from nuclei.helpers.nuclei_output_parser import NucleiOutputParser
 from nuclei.helpers.nuclei_process import NucleiProcess
 from nuclei.helpers.scan_coordination import TemplateAccessLock
+from nuclei.helpers.template_analysis import (
+    analyze_template_file,
+    resolve_template_path,
+)
+from nuclei.helpers.template_inputs import (
+    MissingTemplateInputs,
+    TemplateNotFound,
+    check_templates_exist,
+    collect_template_variables,
+    credential_resolver,
+    redact_args,
+)
 from nuclei.helpers.template_url import TemplateUrlError, materialize_template_url
 from nuclei.models.data import MessageData
 from nuclei.nuclei_contracts.external_contracts import ExternalContractsScheduler
@@ -139,24 +151,33 @@ class OpenAEVNuclei:
                             f"{detail[-_STDERR_LOG_TAIL:]}"
                         ) from exc
 
+            # A template that needs credentials or operator values never runs
+            # without them: it would send empty-credential logins and report a
+            # no-match that tested nothing (MissingTemplateInputs, not executed).
+            variables = self._template_variables(msg_data, content, tmp_template_path)
+
             # Nuclei Args Builder
-            nuclei_builder = NucleiCommandBuilder(
+            builder_kwargs = dict(
                 nuclei_configs=self.config_loader.nuclei,
                 contract_id=msg_data.contract_id,
                 content=content,
                 targets=targets,
             )
+            if variables:
+                builder_kwargs["variables"] = variables
+            nuclei_builder = NucleiCommandBuilder(**builder_kwargs)
             nuclei_args = nuclei_builder.build()
+            shown_args = redact_args(nuclei_args)
 
             self.helper.injector_logger.info(
-                "Executing nuclei with: " + " ".join(nuclei_args)
+                "Executing nuclei with: " + " ".join(shown_args)
             )
 
             callback_data = {
                 "execution_message": Targets.build_execution_message(
                     selector_key=msg_data.selector_key,
                     data=msg_data.raw_data,
-                    command_args=nuclei_args,
+                    command_args=shown_args,
                 ),
                 "execution_status": "INFO",
                 "execution_duration": int(time.time() - start),
@@ -233,6 +254,23 @@ class OpenAEVNuclei:
             )
         finally:
             _safe_remove(tmp_template_path)
+
+    def _template_variables(
+        self, msg_data: MessageData, content, tmp_template_path: Optional[str]
+    ) -> Dict[str, str]:
+        """The -var values of the template the inject runs (empty for a tag scan
+        or a template that needs none); MissingTemplateInputs when one is absent."""
+        if not isinstance(content, dict):
+            return {}
+        # An unknown template id or path is never a silent no-match.
+        check_templates_exist(content)
+        path = tmp_template_path or resolve_template_path(content.get("template"))
+        analysis = analyze_template_file(path)
+        return collect_template_variables(
+            analysis,
+            content,
+            credential_resolver(self.helper.api, msg_data.inject_id, msg_data.raw_data),
+        )
 
     def _report_pre_execution_failure(
         self, data: Dict, start: float, err: Exception
@@ -335,6 +373,11 @@ class OpenAEVNuclei:
                 execution_message = execution_result.get("message")
                 execution_result_outputs = execution_result.get("outputs")
                 execution_status = "SUCCESS"
+            except (MissingTemplateInputs, TemplateNotFound) as e:
+                # Not executed: an explicit inconclusive result, never a no-match.
+                execution_message = str(e)
+                execution_status = "PREREQUISITE_FAILED"
+                tool_output = {"error_info": {"exit_code": 1}}
             except Exception as e:
                 if is_inject_gone(e):
                     # Deleted before the scan: nuclei never ran.

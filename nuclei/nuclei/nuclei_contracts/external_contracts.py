@@ -3,7 +3,9 @@ import sched
 import subprocess
 import time
 import uuid
+from dataclasses import dataclass, field
 from multiprocessing import Process
+from typing import Any, Dict, Optional
 
 import requests
 from pyoaev.apis.inputs.search import (
@@ -12,12 +14,40 @@ from pyoaev.apis.inputs.search import (
     InjectorContractSearchPaginationInput,
 )
 from pyoaev.client import OpenAEV
-from pyoaev.contracts.contract_config import ContractText
+from pyoaev.contracts.contract_config import (
+    Contract,
+    ContractReferencedCredential,
+    ContractText,
+)
+from pyoaev.contracts.contract_utils import ContractCardinality
+from pyoaev.credential.types import CredentialType
 from pyoaev.security_domain.types import SecurityDomains
 from pyoaev.utils import setup_logging_config
 
 from nuclei.helpers.nuclei_process import NucleiProcess
+from nuclei.helpers.template_analysis import (
+    CREDENTIAL_VARIABLES,
+    TemplateAnalysis,
+    analyze_template_file,
+    resolve_template_path,
+)
 from nuclei.nuclei_contracts.nuclei_contracts import NucleiContracts
+
+# Contract field holding the value of a template variable other than the
+# credentials: "var_<name>", passed to Nuclei as -var <name>=<value>.
+TEMPLATE_VARIABLE_FIELD_PREFIX = "var_"
+
+
+@dataclass
+class NucleiTemplateContract(Contract):
+    """A CVE contract with what its template needs and does, readable by any
+    client of the injector contract API in ``injector_contract_content``."""
+
+    template_metadata: Optional[Dict[str, Any]] = field(default=None)
+
+
+def template_variable_field(name: str) -> str:
+    return TEMPLATE_VARIABLE_FIELD_PREFIX + name
 
 
 class ExternalContractsScheduler:
@@ -159,10 +189,54 @@ class ExternalContractsManager:
     def make_contract_update(self, contract_id, template):
         return self._make_contract(contract_id, template).to_contract_update_input()
 
+    def _analyze(self, template) -> Optional[TemplateAnalysis]:
+        try:
+            return analyze_template_file(
+                resolve_template_path(template.get("file_path"))
+            )
+        except Exception as e:  # never let one template stop the maintenance
+            self._logger.error(
+                "Could not analyse template {}: {}".format(template.get("ID"), e)
+            )
+            return None
+
+    @staticmethod
+    def _input_fields(analysis: Optional[TemplateAnalysis]):
+        """The inputs a template needs: one credential reference (username and
+        password, resolved as a secret at execution) and one text field per other
+        variable."""
+        if analysis is None:
+            return []
+        fields = []
+        if analysis.needs_credentials:
+            fields.append(
+                ContractReferencedCredential(
+                    label=(
+                        "Credentials of the target application (required: the "
+                        "template logs in before testing)"
+                    ),
+                    credential_reference_type=CredentialType.IDENTITY,
+                    cardinality=ContractCardinality.One,
+                )
+            )
+        for name in analysis.variables:
+            if name in CREDENTIAL_VARIABLES:
+                continue
+            fields.append(
+                ContractText(
+                    key=template_variable_field(name),
+                    label="Template variable {} (required, -var)".format(name),
+                    mandatory=False,
+                )
+            )
+        return fields
+
     def _make_contract(self, contract_id: str, template):
         config = NucleiContracts.base_contract_config()
+        analysis = self._analyze(template)
         fields = (
             NucleiContracts.core_contract_fields()
+            + self._input_fields(analysis)
             + [
                 ContractText(
                     key="template",
@@ -180,7 +254,7 @@ class ExternalContractsManager:
             ]
         )
         outputs = NucleiContracts.core_outputs()
-        contract = NucleiContracts.build_contract(
+        base = NucleiContracts.build_contract(
             contract_id,
             self.theoretical_external_id(template),
             config,
@@ -190,6 +264,13 @@ class ExternalContractsManager:
             template["ID"],
             [SecurityDomains.NETWORK.value],
         )
+        contract = base
+        if analysis is not None:
+            # Unreadable template (not on disk yet): the plain contract, unchanged.
+            contract = NucleiTemplateContract(
+                **{name: getattr(base, name) for name in base.__dataclass_fields__},
+                template_metadata=analysis.to_metadata(),
+            )
         contract.add_vulnerability(template["ID"])
         return contract
 
