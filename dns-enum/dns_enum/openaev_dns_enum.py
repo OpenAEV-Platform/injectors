@@ -212,10 +212,19 @@ class OpenAEVDnsEnum:
                         f"; {imported['web_applications']} classified as web"
                         " applications"
                     )
+                if imported.get("servers"):
+                    execution_message += (
+                        f"; {imported['servers']} classified as servers"
+                    )
                 if imported.get("attached"):
                     execution_message += (
-                        "; attached to an existing asset of the same address:"
-                        f" {', '.join(imported['attached'])}"
+                        "; attached to an existing asset of the same address"
+                        f" (left unchanged): {', '.join(imported['attached'])}"
+                    )
+                if imported.get("skipped"):
+                    execution_message += (
+                        "; not imported, their address could not be checked"
+                        f" against existing assets: {', '.join(imported['skipped'])}"
                     )
                 if imported.get("lookup_error"):
                     execution_message += (

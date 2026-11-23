@@ -278,17 +278,132 @@ class TestClassifiedImport(unittest.TestCase):
             self.assertNotIn("asset_url", endpoint)
         self.assertEqual(result["attached"], [])
 
-    def test_option_off_sends_no_classification_and_no_search(self):
+    def test_option_off_sends_no_classification(self):
         api, upserted = _search_api([])
         EndpointImporter(api, MagicMock()).import_hosts(
             [_host("a.example.com", ["10.0.0.1"])], "t", classify_assets=False
         )
-        api.http_post.assert_not_called()
+        # Only the address check runs: no lookup of the existing endpoints.
+        keys = {
+            c.kwargs["post_data"]["filterGroup"]["filters"][0]["key"]
+            for c in api.http_post.call_args_list
+        }
+        self.assertEqual(keys, {"asset_ips"})
         self.assertNotIn("asset_category", upserted["dns-enum:a.example.com"])
+
+    def test_shared_address_name_on_a_classified_foreign_asset_is_attached(self):
+        # Three names share the address of an asset a collector created and already
+        # classified: none is upserted (the platform would match the collector's asset
+        # on hostname + IP and rename or reclassify it), all are attached to it.
+        collector_asset = {
+            "asset_id": "ovh-1",
+            "asset_name": "ww-onedev-control-001",
+            "asset_hostname": "control-001.onedev.ww.example.com",
+            "asset_external_reference": "ovh:ns-123",
+            "asset_category": "HOST",
+            "asset_subcategory": "SERVER",
+            "asset_ips": ["10.0.0.7"],
+        }
+        api, upserted = _search_api([collector_asset])
+        result = EndpointImporter(api, MagicMock()).import_hosts(
+            [
+                _host("control-001.onedev.ww.example.com", ["10.0.0.7"]),
+                _host("metis.onedev.ww.example.com", ["10.0.0.7"]),
+                _host("hubble.onedev.example.com", ["10.0.0.7"]),
+                _host("validation.onedev.example.com", ["10.0.0.7"]),
+            ],
+            "t",
+        )
+        self.assertEqual(upserted, {})
+        api.endpoint.upsert.assert_not_called()
+        self.assertEqual(result["asset_ids"], ["ovh-1"])
+        self.assertEqual(len(result["attached"]), 4)
+        self.assertTrue(
+            all(
+                line.endswith("-> ww-onedev-control-001") for line in result["attached"]
+            )
+        )
+        self.assertEqual(result["web_applications"], 0)
+        # The collector's asset is never written: same name, same category.
+        self.assertEqual(collector_asset["asset_name"], "ww-onedev-control-001")
+        self.assertEqual(collector_asset["asset_category"], "HOST")
+
+    def test_foreign_asset_is_protected_with_classification_off(self):
+        api, upserted = _search_api(
+            [
+                {
+                    "asset_id": "srv-1",
+                    "asset_name": "mail-server",
+                    "asset_external_reference": None,
+                    "asset_ips": ["10.0.0.9"],
+                }
+            ]
+        )
+        result = EndpointImporter(api, MagicMock()).import_hosts(
+            [_host("mail.example.com", ["10.0.0.9"])], "t", classify_assets=False
+        )
+        self.assertEqual(upserted, {})
+        self.assertEqual(result["asset_ids"], ["srv-1"])
+
+    def test_foreign_asset_on_a_second_address_is_found(self):
+        api, upserted = _search_api(
+            [
+                {
+                    "asset_id": "srv-2",
+                    "asset_name": "edge",
+                    "asset_ips": ["2001:db8::1"],
+                }
+            ]
+        )
+        result = EndpointImporter(api, MagicMock()).import_hosts(
+            [_host("edge.example.com", ["10.0.0.3", "2001:db8::1"])], "t"
+        )
+        self.assertEqual(upserted, {})
+        self.assertEqual(result["asset_ids"], ["srv-2"])
+
+    def test_address_lookup_failure_skips_the_host(self):
+        api, upserted = _search_api([])
+
+        def search(path, post_data):
+            key = post_data["filterGroup"]["filters"][0]["key"]
+            if key == "asset_ips":
+                raise RuntimeError("timeout")
+            return {"content": [], "last": True}
+
+        api.http_post.side_effect = search
+        result = EndpointImporter(api, MagicMock()).import_hosts(
+            [_host("a.example.com", ["10.0.0.1"])], "t"
+        )
+        self.assertEqual(upserted, {})
+        self.assertEqual(result["skipped"], ["a.example.com"])
+        self.assertEqual(result["asset_ids"], [])
+
+    def test_name_alone_on_its_address_is_counted_as_a_server(self):
+        api, upserted = _search_api([])
+        result = EndpointImporter(api, MagicMock()).import_hosts(
+            [
+                _host("a.example.com", ["10.0.0.1"]),
+                _host("b.example.com", ["10.0.0.1"]),
+                _host("solo.example.com", ["10.0.0.2"]),
+            ],
+            "t",
+        )
+        self.assertEqual(result["web_applications"], 2)
+        self.assertEqual(result["servers"], 1)
+        self.assertEqual(
+            upserted["dns-enum:solo.example.com"]["asset_subcategory"], "SERVER"
+        )
 
     def test_lookup_failure_imports_without_classification(self):
         api, upserted = _search_api([])
-        api.http_post.side_effect = RuntimeError("403")
+
+        def search(path, post_data):
+            key = post_data["filterGroup"]["filters"][0]["key"]
+            if key == "asset_external_reference":
+                raise RuntimeError("403")
+            return {"content": [], "last": True}
+
+        api.http_post.side_effect = search
         result = EndpointImporter(api, MagicMock()).import_hosts(
             [_host("a.example.com", ["10.0.0.1"])], "t"
         )

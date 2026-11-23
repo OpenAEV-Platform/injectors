@@ -72,7 +72,13 @@ upsert (`POST /api/endpoints/agentless/upsert`):
 
 - name and hostname: the host; IPs: its A and AAAA addresses; internet facing; the tag above;
 - external reference `dns-enum:<host>`: the platform matches an existing endpoint on it first, so a rerun updates the
-  same endpoint and never creates a duplicate.
+  same endpoint and never creates a duplicate;
+- a host on the address of an asset another source created (a collector, an agent, a person) is never upserted, with
+  or without classification: it is attached to that asset (added to the asset group when one is set) and listed in
+  the execution message. That asset's name, category, subcategory and every other field are left unchanged (the
+  platform's upsert matches on hostname + IP, so sending the host could rename or reclassify it);
+- a host whose addresses cannot be checked against the inventory (`POST /api/assets/search` fails) is not imported
+  and is listed in the execution message.
 
 With "Classify the endpoints" on (the default):
 
@@ -82,12 +88,11 @@ With "Classify the endpoints" on (the default):
 - a name alone on its addresses is a host: category `HOST`, subcategory `SERVER`;
 - the classification is written only on an asset nobody classified yet (new, or `HOST` / `GENERIC_ASSET` with no
   subcategory): a category, subcategory or criticality a person set is never changed, and a rerun changes nothing;
-- a name that would be a host on the address of an asset another source created (a collector, an agent, a person) is
-  not imported as a second asset: it is attached to that asset (added to the asset group when one is set) and listed
-  in the execution message.
+- the execution message counts the hosts classified in this run as web applications and as servers.
 
-The classification reads the platform's asset inventory (`POST /api/assets/search`); when it cannot be read, the hosts
-are imported without classification and the message says so.
+When the existing endpoints cannot be read, the hosts are imported without classification and the message says so.
+An endpoint created from a name alone has no agent, so its platform stays `Unknown`: that is expected, the category
+and subcategory carry the classification.
 
 A host resolving only to a CNAME is reported as a finding but not imported. With the option off, no asset is created
 or changed.

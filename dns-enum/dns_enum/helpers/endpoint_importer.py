@@ -24,6 +24,13 @@ def external_reference(hostname: str) -> str:
     return EXTERNAL_REFERENCE_PREFIX + hostname.strip().rstrip(".").lower()
 
 
+def is_own_asset(asset: Dict) -> bool:
+    """True for an asset this injector created (its external reference)."""
+    return str(asset.get("asset_external_reference") or "").startswith(
+        EXTERNAL_REFERENCE_PREFIX
+    )
+
+
 def build_endpoint_input(
     host: Dict, tag_id: Optional[str], classification: Optional[Dict] = None
 ) -> Dict:
@@ -141,13 +148,19 @@ class EndpointImporter:
                 (
                     asset
                     for asset in self._search("asset_ips", [ip])
-                    if not str(asset.get("asset_external_reference") or "").startswith(
-                        EXTERNAL_REFERENCE_PREFIX
-                    )
+                    if asset.get("asset_id") and not is_own_asset(asset)
                 ),
                 None,
             )
         return cache[ip]
+
+    def _owner_of(self, host: Dict, cache: Dict[str, Optional[Dict]]) -> Optional[Dict]:
+        """The asset another source created on one of the host's addresses."""
+        for ip in host["ips"]:
+            owner = self._foreign_owner(ip, cache)
+            if owner:
+                return owner
+        return None
 
     def import_hosts(
         self,
@@ -158,59 +171,51 @@ class EndpointImporter:
     ) -> Dict:
         """Upsert one endpoint per resolved host; returns counts and the asset ids.
 
-        With classify_assets on, each host gets the category its addresses give it
-        (asset_classifier), filled only on an asset nobody classified yet, and a host
-        that would be a plain HOST on the address of an asset another source created
-        is attached to that asset instead of becoming a duplicate.
+        A host on the address of an asset another source created (a collector, an
+        agent, a person) is attached to that asset and never upserted: the platform's
+        upsert matches on hostname + IP, so sending it could rename or reclassify that
+        asset. A host whose addresses cannot be checked is skipped for the same reason.
+
+        With classify_assets on, each other host gets the category its addresses give
+        it (asset_classifier), filled only on an asset nobody classified yet.
         """
         tag_id = self._tag_id(tag_name)
         unique = dedupe_hosts(hosts)
         asset_ids: List[str] = []
         failed: List[str] = []
         attached: List[str] = []
+        skipped: List[str] = []
         web = 0
+        servers = 0
         lookup_error = None
         existing: Dict[str, Dict] = {}
         shared = shared_addresses(unique) if classify_assets else set()
         if classify_assets:
             try:
                 existing = self._existing_by_reference(unique)
-            except Exception as err:  # never classify blind: import as before
+            except Exception as err:  # never classify blind: import unclassified
                 lookup_error = str(err)
                 self.logger.error(f"Existing endpoint lookup failed: {err}")
         owners: Dict[str, Optional[Dict]] = {}
         for host in unique:
+            try:
+                owner = self._owner_of(host, owners)
+            except Exception as err:  # never upsert blind over another source
+                self.logger.error(f"Address lookup failed for {host['host']}: {err}")
+                skipped.append(host["host"])
+                continue
+            if owner:
+                attached.append(
+                    f"{host['host']} -> {owner.get('asset_name') or owner['asset_id']}"
+                )
+                if owner["asset_id"] not in asset_ids:
+                    asset_ids.append(owner["asset_id"])
+                continue
             classification = None
             if classify_assets and lookup_error is None:
                 reference = external_reference(host["host"])
-                classification = classify(host, shared)
-                if reference not in existing and not is_web(classification):
-                    try:
-                        owner = next(
-                            (
-                                found
-                                for found in (
-                                    self._foreign_owner(ip, owners)
-                                    for ip in host["ips"]
-                                )
-                                if found
-                            ),
-                            None,
-                        )
-                    except Exception as err:
-                        owner = None
-                        self.logger.error(
-                            f"Address lookup failed for {host['host']}: {err}"
-                        )
-                    if owner and owner.get("asset_id"):
-                        attached.append(
-                            f"{host['host']} -> {owner.get('asset_name') or owner['asset_id']}"
-                        )
-                        if owner["asset_id"] not in asset_ids:
-                            asset_ids.append(owner["asset_id"])
-                        continue
-                if not is_unclassified(existing.get(reference)):
-                    classification = None
+                if is_unclassified(existing.get(reference)):
+                    classification = classify(host, shared)
             try:
                 endpoint = self.api.endpoint.upsert(
                     build_endpoint_input(host, tag_id, classification)
@@ -221,6 +226,8 @@ class EndpointImporter:
                 continue
             if is_web(classification):
                 web += 1
+            elif classification:
+                servers += 1
             asset_id = (endpoint or {}).get("asset_id")
             if asset_id and asset_id not in asset_ids:
                 asset_ids.append(asset_id)
@@ -236,6 +243,8 @@ class EndpointImporter:
             "failed": failed,
             "asset_group_error": group_error,
             "web_applications": web,
+            "servers": servers,
             "attached": attached,
+            "skipped": skipped,
             "lookup_error": lookup_error,
         }
