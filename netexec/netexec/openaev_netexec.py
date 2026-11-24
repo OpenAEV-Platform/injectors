@@ -150,7 +150,7 @@ class OpenAEVNetExecInjector:
         callback_data = {
             "execution_message": Targets.build_execution_message(
                 selector_key=selector_key,
-                data=parsed_data,
+                data=data,
                 command_args=_redact_cmd(cmd),
             ),
             "execution_status": "INFO",
