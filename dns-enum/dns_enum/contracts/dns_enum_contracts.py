@@ -103,7 +103,7 @@ class DnsEnumContracts:
         )
         endpoint_tag = ContractText(
             key=ENDPOINT_TAG_KEY,
-            label="Tag set on the created endpoints",
+            label="Tags set on the created endpoints (comma-separated)",
             defaultValue=DEFAULT_ENDPOINT_TAG,
             mandatory=False,
             visibleConditionFields=[CREATE_ENDPOINTS_KEY],

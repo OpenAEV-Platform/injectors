@@ -48,7 +48,7 @@ Manual deployment: `poetry install` then `poetry run python -m dns_enum.openaev_
 | Rate limit                             | 100                | DNS queries per second (1 to 1,000), applied to subfinder and dnsx.                                 |
 | Timeout                                | 600                | Seconds for the whole enumeration (1 to 3,600).                                                     |
 | Create endpoints for discovered hosts  | off                | Import every resolved host that has an address as an endpoint (see below).                          |
-| Tag set on the created endpoints       | `discovered:dns`   | Tag created if missing and set on every imported endpoint.                                          |
+| Tags set on the created endpoints      | `discovered:dns`   | One or more tags, comma-separated; each is created if missing and set on every imported endpoint.   |
 | Asset group ID                         | (empty)            | When set, the imported endpoints are added to this asset group (existing members are kept).        |
 | Classify the endpoints                 | on                 | Set the category, subcategory and URL of each imported endpoint and attach a name to the existing asset of its address (see below). |
 
@@ -96,6 +96,19 @@ and subcategory carry the classification.
 
 A host resolving only to a CNAME is reported as a finding but not imported. With the option off, no asset is created
 or changed.
+
+### Keeping a group current (dynamic membership)
+
+"Asset group ID" adds the imported endpoints to a static group; members are never removed. To keep a group in step
+with every run, make it a dynamic asset group whose rule is `Tags = <one of the endpoint tags above>`: every endpoint
+the injector tags joins it, and an endpoint whose tag is removed leaves it, without any asset group ID on the inject.
+
+### Hosts that stop resolving
+
+After the import, each endpoint this injector created earlier (external reference `dns-enum:<host>`) under the
+requested root domains that did not resolve in this run is named in the execution message as no longer resolving.
+Nothing is deleted or changed: review or remove them, or remove their tag so they leave a dynamic group. A run stopped
+at its deadline is partial, so no endpoint is reported as stale then.
 
 ## Behavior
 

@@ -31,8 +31,14 @@ def is_own_asset(asset: Dict) -> bool:
     )
 
 
+def in_scope(hostname: str, domains: List[str]) -> bool:
+    """True when `hostname` is one of `domains` or a subdomain of one."""
+    name = hostname.strip().rstrip(".").lower()
+    return any(name == domain or name.endswith("." + domain) for domain in domains)
+
+
 def build_endpoint_input(
-    host: Dict, tag_id: Optional[str], classification: Optional[Dict] = None
+    host: Dict, tag_ids, classification: Optional[Dict] = None
 ) -> Dict:
     hostname = host["host"]
     endpoint = {
@@ -44,8 +50,11 @@ def build_endpoint_input(
     }
     if host.get("ips"):
         endpoint["asset_ips"] = list(host["ips"])
-    if tag_id:
-        endpoint["asset_tags"] = [tag_id]
+    if isinstance(tag_ids, str):
+        tag_ids = [tag_ids]
+    tag_ids = [tag_id for tag_id in (tag_ids or []) if tag_id]
+    if tag_ids:
+        endpoint["asset_tags"] = tag_ids
     if classification:
         endpoint.update(classification)
     return endpoint
@@ -67,12 +76,12 @@ def dedupe_hosts(hosts: List[Dict]) -> List[Dict]:
     return unique
 
 
-def _filter(key: str, values: List[str]) -> Dict:
+def _filter(key: str, values: List[str], operator: str = "eq") -> Dict:
     return {
         "id": str(uuid.uuid4()),
         "key": key,
         "mode": "or",
-        "operator": "eq",
+        "operator": operator,
         "values": values,
     }
 
@@ -81,6 +90,14 @@ class EndpointImporter:
     def __init__(self, api, logger):
         self.api = api
         self.logger = logger
+
+    def _tag_ids(self, tag_names: List[str]) -> List[str]:
+        ids: List[str] = []
+        for tag_name in tag_names:
+            tag_id = self._tag_id(tag_name)
+            if tag_id and tag_id not in ids:
+                ids.append(tag_id)
+        return ids
 
     def _tag_id(self, tag_name: str) -> Optional[str]:
         try:
@@ -105,8 +122,8 @@ class EndpointImporter:
             post_data={"asset_group_assets": merged},
         )
 
-    def _search(self, key: str, values: List[str]) -> List[Dict]:
-        """Every asset (any category) whose `key` equals one of `values`, all pages
+    def _search(self, key: str, values: List[str], operator: str = "eq") -> List[Dict]:
+        """Every asset (any category) whose `key` matches one of `values`, all pages
         read, through the unified inventory search of the platform."""
         found: List[Dict] = []
         for start in range(0, len(values), SEARCH_CHUNK):
@@ -120,7 +137,7 @@ class EndpointImporter:
                         "size": SEARCH_PAGE_SIZE,
                         "filterGroup": {
                             "mode": "and",
-                            "filters": [_filter(key, chunk)],
+                            "filters": [_filter(key, chunk, operator)],
                         },
                     },
                 )
@@ -162,10 +179,31 @@ class EndpointImporter:
                 return owner
         return None
 
+    def stale_endpoints(self, hosts: List[Dict], domains: List[str]) -> List[Dict]:
+        """The endpoints this injector created under `domains` whose host did not
+        resolve in this run (no address): candidates for review or removal."""
+        resolved = {
+            external_reference(host["host"]) for host in hosts if host.get("ips")
+        }
+        stale: List[Dict] = []
+        seen = set()
+        for asset in self._search(
+            "asset_external_reference", [EXTERNAL_REFERENCE_PREFIX], "starts_with"
+        ):
+            reference = str(asset.get("asset_external_reference") or "")
+            if not reference.startswith(EXTERNAL_REFERENCE_PREFIX) or reference in seen:
+                continue
+            seen.add(reference)
+            hostname = reference[len(EXTERNAL_REFERENCE_PREFIX) :]
+            if in_scope(hostname, domains) and reference not in resolved:
+                stale.append(asset)
+        stale.sort(key=lambda asset: str(asset.get("asset_external_reference")))
+        return stale
+
     def import_hosts(
         self,
         hosts: List[Dict],
-        tag_name: str,
+        tag_name,
         asset_group_id: Optional[str] = None,
         classify_assets: bool = True,
     ) -> Dict:
@@ -179,7 +217,8 @@ class EndpointImporter:
         With classify_assets on, each other host gets the category its addresses give
         it (asset_classifier), filled only on an asset nobody classified yet.
         """
-        tag_id = self._tag_id(tag_name)
+        tag_names = [tag_name] if isinstance(tag_name, str) else list(tag_name or [])
+        tag_ids = self._tag_ids(tag_names)
         unique = dedupe_hosts(hosts)
         asset_ids: List[str] = []
         failed: List[str] = []
@@ -218,7 +257,7 @@ class EndpointImporter:
                     classification = classify(host, shared)
             try:
                 endpoint = self.api.endpoint.upsert(
-                    build_endpoint_input(host, tag_id, classification)
+                    build_endpoint_input(host, tag_ids, classification)
                 )
             except Exception as err:
                 self.logger.error(f"Endpoint upsert failed for {host['host']}: {err}")

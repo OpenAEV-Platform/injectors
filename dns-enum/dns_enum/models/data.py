@@ -82,6 +82,17 @@ def parse_record_types(raw) -> List[str]:
     return [record_type for record_type in RECORD_TYPES if record_type in requested]
 
 
+def parse_tags(raw, default: str) -> List[str]:
+    """Comma-separated (or listed) tag names, trimmed, order kept, the default when empty."""
+    items = raw if isinstance(raw, (list, tuple)) else str(raw or "").split(",")
+    tags: List[str] = []
+    for item in items:
+        tag = str(item or "").strip()
+        if tag and tag not in tags:
+            tags.append(tag)
+    return tags or [default]
+
+
 def parse_wordlist(raw: str) -> List[str]:
     """One label per line (commas accepted), invalid lines dropped, capped in size."""
     words: List[str] = []
@@ -123,9 +134,10 @@ class MessageData:
             "Timeout",
         )
         self.create_endpoints = _as_bool(content.get(CREATE_ENDPOINTS_KEY, False))
-        self.endpoint_tag = (
-            str(content.get(ENDPOINT_TAG_KEY) or "").strip() or DEFAULT_ENDPOINT_TAG
+        self.endpoint_tags = parse_tags(
+            content.get(ENDPOINT_TAG_KEY), DEFAULT_ENDPOINT_TAG
         )
+        self.endpoint_tag = ", ".join(self.endpoint_tags)
         self.asset_group_id = str(content.get(ASSET_GROUP_ID_KEY) or "").strip() or None
         self.classify_assets = _as_bool(content.get(CLASSIFY_ASSETS_KEY, True))
 
