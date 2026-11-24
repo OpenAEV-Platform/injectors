@@ -206,6 +206,20 @@ In addition to the static contracts, a background scheduler maintains one contra
 per-CVE contracts. Each per-CVE contract is labelled with the CVE/template ID and pre-fills the template path of that
 CVE.
 
+Each per-CVE contract is built from its template as well:
+
+- **Template inputs.** A template that sends `{{username}}` / `{{password}}` (or is tagged `authenticated`) gets a
+  credential reference field (identity, username/password); every other unresolved `{{name}}` it sends gets a text
+  field `var_<name>`. They are passed to Nuclei as `-var name=value`; the password is redacted from logs and traces.
+- **Never a silent no-match.** When a required value is missing, or when a template file or `-id` named by the inject
+  is not in the template set, the template is not run: no request is sent and the inject ends with
+  `PREREQUISITE_FAILED` and the message `Not executed, inconclusive: missing credentials (...)` or
+  `Not executed: template not found: <id>`.
+- **Readable metadata.** `template_metadata` in the contract content (`injector_contract_content` of the injector
+  contract API) carries `authenticated`, `intrusive` (a POST/PUT/PATCH/DELETE request, tags `rce`, `intrusive`,
+  `dos`, `fuzz`, or the `code`/`javascript` protocols), `read_only`, `required_variables` and the `prerequisites`
+  stated in the template description, so a client can tell what a negative result means.
+
 Common inject fields and outputs:
 
 - Inputs: target selector (`Assets`, `Asset groups` (default), `Manual`), targeted assets / asset groups, the targeted
