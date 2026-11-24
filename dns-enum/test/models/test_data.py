@@ -86,9 +86,20 @@ class TestMessageData(unittest.TestCase):
         self.assertEqual(msg.timeout, 30)
         self.assertTrue(msg.create_endpoints)
         self.assertEqual(msg.endpoint_tag, "ext")
+        self.assertEqual(msg.endpoint_tags, ["ext"])
         self.assertEqual(msg.asset_group_id, "group-1")
         self.assertFalse(msg.classify_assets)
         self.assertEqual(msg.expectation_types, ["DETECTION"])
+
+    def test_several_endpoint_tags(self):
+        msg = MessageData(
+            _data(domains="example.com", endpoint_tag=" ext , internet,ext,, ")
+        )
+        self.assertEqual(msg.endpoint_tags, ["ext", "internet"])
+        self.assertEqual(
+            MessageData(_data(domains="example.com", endpoint_tag=" , ")).endpoint_tags,
+            ["discovered:dns"],
+        )
 
     def test_invalid_values(self):
         with self.assertRaises(ValueError):

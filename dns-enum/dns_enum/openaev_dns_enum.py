@@ -127,6 +127,29 @@ class OpenAEVDnsEnum:
             "timed_out": timed_out,
         }
 
+    def _stale_report(
+        self, importer: EndpointImporter, result: Dict, domains: List[str]
+    ) -> str:
+        """Endpoints this injector created under the root domains that did not
+        resolve in this run, named in the message; never deleted or changed.
+        A run stopped at its deadline is incomplete, so nothing is called stale."""
+        if result["timed_out"]:
+            return "; stale endpoints not checked (partial run)"
+        try:
+            stale = importer.stale_endpoints(result["hosts"], domains)
+        except Exception as err:
+            self.helper.injector_logger.error(f"Stale endpoint lookup failed: {err}")
+            return f"; stale endpoints not checked: {err}"
+        if not stale:
+            return ""
+        names = [
+            str(asset.get("asset_name") or asset.get("asset_id")) for asset in stale
+        ]
+        return (
+            f"; {len(stale)} endpoint(s) created by earlier runs no longer resolve"
+            f" (left unchanged, review or remove them): {', '.join(names)}"
+        )
+
     def _report_pre_execution_failure(
         self, data: dict, start: float, err: Exception
     ) -> None:
@@ -195,11 +218,12 @@ class OpenAEVDnsEnum:
                 if not result["hosts"]:
                     tool_error_info = {"exit_code": 124}
             if msg_data.create_endpoints:
-                imported = EndpointImporter(
+                importer = EndpointImporter(
                     self.helper.api, self.helper.injector_logger
-                ).import_hosts(
+                )
+                imported = importer.import_hosts(
                     result["hosts"],
-                    msg_data.endpoint_tag,
+                    msg_data.endpoint_tags,
                     msg_data.asset_group_id,
                     msg_data.classify_assets,
                 )
@@ -239,6 +263,9 @@ class OpenAEVDnsEnum:
                     execution_message += (
                         f"; asset group update failed: {imported['asset_group_error']}"
                     )
+                execution_message += self._stale_report(
+                    importer, result, msg_data.domains
+                )
             else:
                 execution_message += "; no endpoint created (option off)"
 

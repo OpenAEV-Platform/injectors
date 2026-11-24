@@ -6,6 +6,7 @@ from dns_enum.helpers.endpoint_importer import (
     build_endpoint_input,
     dedupe_hosts,
     external_reference,
+    in_scope,
 )
 
 
@@ -14,6 +15,61 @@ def _host(name, ips):
 
 
 class TestEndpointImporter(unittest.TestCase):
+    def test_several_tags_are_upserted_and_set(self):
+        api = MagicMock()
+        api.tag.upsert.side_effect = [{"tag_id": "t1"}, {"tag_id": "t2"}]
+        api.endpoint.upsert.return_value = {"asset_id": "asset-1"}
+        EndpointImporter(api, MagicMock()).import_hosts(
+            [_host("a.example.com", ["1.1.1.1"])],
+            ["ext", "internet"],
+            classify_assets=False,
+        )
+        self.assertEqual(api.tag.upsert.call_count, 2)
+        self.assertEqual(
+            api.endpoint.upsert.call_args.args[0]["asset_tags"], ["t1", "t2"]
+        )
+
+    def test_in_scope(self):
+        self.assertTrue(in_scope("a.example.com", ["example.com"]))
+        self.assertTrue(in_scope("Example.com.", ["example.com"]))
+        self.assertFalse(in_scope("badexample.com", ["example.com"]))
+
+    def test_stale_endpoints_are_own_in_scope_and_unresolved(self):
+        api = MagicMock()
+        api.http_post.return_value = {
+            "content": [
+                {
+                    "asset_id": "1",
+                    "asset_name": "a.example.com",
+                    "asset_external_reference": "dns-enum:a.example.com",
+                },
+                {
+                    "asset_id": "2",
+                    "asset_name": "old.example.com",
+                    "asset_external_reference": "dns-enum:old.example.com",
+                },
+                {
+                    "asset_id": "3",
+                    "asset_name": "x.other.org",
+                    "asset_external_reference": "dns-enum:x.other.org",
+                },
+                {
+                    "asset_id": "4",
+                    "asset_name": "collector",
+                    "asset_external_reference": "collector:old.example.com",
+                },
+            ],
+            "last": True,
+        }
+        stale = EndpointImporter(api, MagicMock()).stale_endpoints(
+            [_host("a.example.com", ["1.1.1.1"]), _host("c.example.com", [])],
+            ["example.com"],
+        )
+        self.assertEqual([asset["asset_id"] for asset in stale], ["2"])
+        sent = api.http_post.call_args.kwargs["post_data"]["filterGroup"]["filters"][0]
+        self.assertEqual(sent["operator"], "starts_with")
+        self.assertEqual(sent["values"], ["dns-enum:"])
+
     def test_external_reference_is_stable(self):
         self.assertEqual(
             external_reference("WWW.Example.com."), "dns-enum:www.example.com"
