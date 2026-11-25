@@ -18,6 +18,14 @@ SEARCH_PAGE_SIZE = 500
 SEARCH_CHUNK = 200
 
 
+def _is_uuid(value: str) -> bool:
+    try:
+        uuid.UUID(str(value))
+    except ValueError:
+        return False
+    return True
+
+
 def external_reference(hostname: str) -> str:
     """Stable reference of a discovered host: the platform's upsert matches on it
     first, so a rerun updates the same endpoint instead of creating a second one."""
@@ -91,13 +99,47 @@ class EndpointImporter:
         self.api = api
         self.logger = logger
 
-    def _tag_ids(self, tag_names: List[str]) -> List[str]:
-        ids: List[str] = []
-        for tag_name in tag_names:
-            tag_id = self._tag_id(tag_name)
-            if tag_id and tag_id not in ids:
-                ids.append(tag_id)
-        return ids
+    def _existing_tags(self, values: List[str]) -> Dict[str, str]:
+        """The values that are ids of existing tags, mapped to the tag name.
+
+        The tags field is a tag picker (ids); an inject saved before the picker holds
+        tag names. Each value is looked up as an id first (POST /tags/options).
+        """
+        if not values:
+            return {}
+        options = self.api.http_post("/tags/options", post_data=list(values))
+        return {
+            option["id"]: option.get("label") or option["id"]
+            for option in (options if isinstance(options, list) else [])
+            if isinstance(option, dict) and option.get("id")
+        }
+
+    def resolve_tags(self, values: List[str]) -> List[Dict[str, str]]:
+        """Tag ids and names of `values`, each an existing tag id or a tag name.
+
+        An existing tag id is used as is; any other value is a name, created if
+        missing (an inject saved before the tag picker). When the id lookup fails, a
+        value shaped like an id is skipped rather than created as a tag name.
+        """
+        try:
+            existing = self._existing_tags(values)
+            lookup_failed = False
+        except Exception as err:  # names still work without the lookup
+            self.logger.error(f"Tag lookup by id failed: {err}")
+            existing = {}
+            lookup_failed = True
+        tags: List[Dict[str, str]] = []
+        for value in values:
+            if value in existing:
+                tag_id, name = value, existing[value]
+            elif lookup_failed and _is_uuid(value):
+                self.logger.error(f"Tag {value!r} skipped: its id could not be checked")
+                continue
+            else:
+                tag_id, name = self._tag_id(value), value
+            if tag_id and tag_id not in [tag["id"] for tag in tags]:
+                tags.append({"id": tag_id, "name": name})
+        return tags
 
     def _tag_id(self, tag_name: str) -> Optional[str]:
         try:
@@ -217,8 +259,9 @@ class EndpointImporter:
         With classify_assets on, each other host gets the category its addresses give
         it (asset_classifier), filled only on an asset nobody classified yet.
         """
-        tag_names = [tag_name] if isinstance(tag_name, str) else list(tag_name or [])
-        tag_ids = self._tag_ids(tag_names)
+        tag_values = [tag_name] if isinstance(tag_name, str) else list(tag_name or [])
+        tags = self.resolve_tags(tag_values)
+        tag_ids = [tag["id"] for tag in tags]
         unique = dedupe_hosts(hosts)
         asset_ids: List[str] = []
         failed: List[str] = []
@@ -279,6 +322,7 @@ class EndpointImporter:
                 self.logger.error(f"Asset group update failed: {err}")
         return {
             "asset_ids": asset_ids,
+            "tags": [tag["name"] for tag in tags],
             "failed": failed,
             "asset_group_error": group_error,
             "web_applications": web,

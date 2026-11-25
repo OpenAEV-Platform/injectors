@@ -27,6 +27,21 @@ class TestDnsEnumContracts(unittest.TestCase):
         classify = next(f for f in content["fields"] if f["key"] == "classify_assets")
         self.assertTrue(classify["defaultValue"])
 
+    def test_asset_group_and_tags_pickers(self):
+        content = json.loads(DnsEnumContracts.build_contract()[0]["contract_content"])
+        fields = {f["key"]: f for f in content["fields"]}
+        group = fields["asset_group_id"]
+        self.assertEqual(group["type"], "asset-group-reference")
+        self.assertEqual(group["cardinality"], "1")
+        self.assertFalse(group["mandatory"])
+        self.assertEqual(group["visibleConditionFields"], ["create_endpoints"])
+        tags = fields["endpoint_tag"]
+        self.assertEqual(tags["type"], "tags")
+        self.assertEqual(tags["cardinality"], "n")
+        self.assertFalse(tags["mandatory"])
+        # A tags field holds ids: no name as default value.
+        self.assertEqual(tags["defaultValue"], [])
+
     def test_outputs(self):
         content = json.loads(DnsEnumContracts.build_contract()[0]["contract_content"])
         outputs = {o["field"]: o for o in content["outputs"]}

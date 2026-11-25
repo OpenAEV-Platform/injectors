@@ -229,7 +229,7 @@ class OpenAEVDnsEnum:
                 )
                 execution_message += (
                     f"; {len(imported['asset_ids'])} endpoints created or updated"
-                    f" (tag {msg_data.endpoint_tag})"
+                    f" (tag {', '.join(imported.get('tags') or [])})"
                 )
                 if imported.get("web_applications"):
                     execution_message += (
