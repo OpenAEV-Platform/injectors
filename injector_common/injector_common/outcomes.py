@@ -96,7 +96,13 @@ class TargetOutcome:
             else:
                 detail = "host up, no open port"
         elif self.state == HOST_DOWN:
-            detail = "host down or no response"
+            # The tool may say why nothing answered (every port filtered with no
+            # reply, an ICMP reject): kept apart from the bare 'no response'.
+            detail = (
+                f"no response, {self.reason}"
+                if self.reason
+                else "host down or no response"
+            )
         else:
             detail = f"not scanned, {self.reason or NO_RESULT_REASON}"
         return _cap(f"{self._subject()}: {detail}")

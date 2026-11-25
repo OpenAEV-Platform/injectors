@@ -29,11 +29,29 @@ from injector_common.constants import (
 from injector_common.targets import TargetProperty, target_property_choices_dict
 from nmap.contracts.nmap_constants import (
     FIN_SCAN_CONTRACT,
+    HOST_TIMEOUT_KEY,
+    MAX_RETRIES_KEY,
+    MAX_RTT_TIMEOUT_KEY,
+    MIN_RATE_KEY,
+    PORTS_KEY,
     TCP_CONNECT_SCAN_CONTRACT,
     TCP_SYN_SCAN_CONTRACT,
     TCP_SYN_VERSION_SCAN_CONTRACT,
+    TIMING_DEFAULT,
+    TIMING_KEY,
+    TIMING_TEMPLATES,
+    TOP_PORTS_KEY,
     TYPE,
 )
+
+_TIMING_LABELS = {
+    "T0": "T0 paranoid",
+    "T1": "T1 sneaky",
+    "T2": "T2 polite",
+    "T3": "T3 normal",
+    "T4": "T4 aggressive",
+    "T5": "T5 insane",
+}
 
 
 class NmapContracts:
@@ -101,6 +119,48 @@ class NmapContracts:
             mandatoryConditionValues={target_selector.key: "manual"},
             visibleConditionFields=[target_selector.key],
             visibleConditionValues={target_selector.key: "manual"},
+        )
+
+        # -- TUNING (optional; an empty field keeps nmap's default) --
+        timing = ContractSelect(
+            key=TIMING_KEY,
+            label="Timing template",
+            defaultValue=[TIMING_DEFAULT],
+            mandatory=False,
+            choices={
+                TIMING_DEFAULT: "nmap default (T3)",
+                **{t: _TIMING_LABELS[t] for t in TIMING_TEMPLATES},
+            },
+        )
+        max_retries = ContractText(
+            key=MAX_RETRIES_KEY,
+            label="Max retries per port (--max-retries, empty = nmap default)",
+            mandatory=False,
+        )
+        host_timeout = ContractText(
+            key=HOST_TIMEOUT_KEY,
+            label="Give up on a host after (seconds, --host-timeout)",
+            mandatory=False,
+        )
+        max_rtt_timeout = ContractText(
+            key=MAX_RTT_TIMEOUT_KEY,
+            label="Max probe round trip (milliseconds, --max-rtt-timeout)",
+            mandatory=False,
+        )
+        min_rate = ContractText(
+            key=MIN_RATE_KEY,
+            label="Min packets per second (--min-rate)",
+            mandatory=False,
+        )
+        top_ports = ContractText(
+            key=TOP_PORTS_KEY,
+            label="Scan the N most common ports (--top-ports, empty = nmap default 1,000)",
+            mandatory=False,
+        )
+        ports = ContractText(
+            key=PORTS_KEY,
+            label="Ports to scan (-p, e.g. 22,80,443,8000-8100; instead of top ports)",
+            mandatory=False,
         )
 
         expectation_items = [
@@ -181,6 +241,13 @@ class NmapContracts:
                     target_asset_groups,
                     target_property_selector,
                     targets_manual,
+                    timing,
+                    max_retries,
+                    host_timeout,
+                    max_rtt_timeout,
+                    min_rate,
+                    top_ports,
+                    ports,
                     expectations,
                 ]
             )

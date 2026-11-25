@@ -354,7 +354,7 @@ class NmapOutputParserTest(TestCase):
             [(o.status, o.describe()) for o in result["outcomes"]],
             [
                 ("EXECUTED", "10.0.0.1 (asset web-01): host up, 2 open ports"),
-                ("WARNING", "10.0.0.2 (asset db-02): host down or no response"),
+                ("WARNING", "10.0.0.2 (asset db-02): no response, 1000 ports filtered"),
                 (
                     "WARNING",
                     "does-not-exist.invalid (asset app-03): not scanned, "
@@ -370,6 +370,64 @@ class NmapOutputParserTest(TestCase):
         )
         # Findings are kept for the host that answered.
         self.assertEqual(sorted(result["outputs"]["ports"]), [22, 443])
+
+    @staticmethod
+    def _silent_outcome(
+        ports_xml: str, status: str = '<status state="up" reason="user-set"/>'
+    ) -> str:
+        host = (
+            f"<host>{status}"
+            '<address addr="10.0.0.2" addrtype="ipv4"/><hostnames/>'
+            f"{ports_xml}</host>"
+        )
+        result = NmapOutputParser.xmlparse(
+            _report(host),
+            "assets",
+            TargetExtractionResult(
+                targets=["10.0.0.2"], ip_to_asset_id_map={"10.0.0.2": "a2"}
+            ),
+        )
+        return result["outcomes"][0].describe()
+
+    def test_all_ports_filtered_with_no_reply_is_named(self):
+        """-Pn with every probe unanswered: no reply, told apart from a reject."""
+        self.assertEqual(
+            self._silent_outcome(
+                '<ports><extraports state="filtered" count="1000">'
+                '<extrareasons reason="no-response" count="1000"/>'
+                "</extraports></ports>"
+            ),
+            "10.0.0.2 (asset a2): no response, 1000 ports filtered, no reply "
+            "(host down or every probe dropped)",
+        )
+
+    def test_ports_rejected_by_icmp_say_a_firewall_answered(self):
+        self.assertEqual(
+            self._silent_outcome(
+                '<ports><extraports state="filtered" count="999">'
+                '<extrareasons reason="admin-prohibited" count="999"/>'
+                "</extraports>"
+                '<port protocol="tcp" portid="22"><state state="filtered" '
+                'reason="no-response"/></port></ports>'
+            ),
+            "10.0.0.2 (asset a2): no response, 1000 ports filtered, 999 rejected "
+            "by ICMP admin-prohibited (a firewall answered)",
+        )
+
+    def test_host_discovery_down_is_named(self):
+        self.assertEqual(
+            self._silent_outcome(
+                "", status='<status state="down" reason="no-response"/>'
+            ),
+            "10.0.0.2 (asset a2): no response, host down (no reply to host "
+            "discovery)",
+        )
+
+    def test_silent_host_without_ports_keeps_the_generic_wording(self):
+        self.assertEqual(
+            self._silent_outcome("", status='<status state="up" reason="user-set"/>'),
+            "10.0.0.2 (asset a2): host down or no response",
+        )
 
     def test_outcomes_all_hosts_up(self):
         """(b) Every target answered: global EXECUTED."""

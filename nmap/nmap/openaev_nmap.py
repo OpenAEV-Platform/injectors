@@ -44,6 +44,7 @@ class OpenAEVNmap:
         nmap_args = NmapCommandBuilder.build_args(
             msg_data.contract_id,
             targets,
+            msg_data.scan_options,
         )
 
         self.helper.injector_logger.info(

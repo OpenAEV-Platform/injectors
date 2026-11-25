@@ -27,6 +27,18 @@ _FAILED_TO_RESOLVE = re.compile(r'Failed to resolve "([^"]+)"')
 # reason "user-set", so the status alone does not say it responded).
 _ANSWERED_PORT_STATES = {"open", "closed", "unfiltered"}
 
+# ICMP answers nmap names as the reason of a filtered port: something on the path
+# replied, so the probes reached it (a firewall rule, not a dropped scan).
+_ICMP_REJECT_REASONS = {
+    "admin-prohibited",
+    "host-prohibited",
+    "net-prohibited",
+    "host-unreach",
+    "net-unreach",
+    "port-unreach",
+    "proto-unreach",
+}
+
 SERVICE_PROBED = "probed"
 SERVICE_GUESSED = "guessed"
 
@@ -120,6 +132,57 @@ class NmapOutputParser:
         return status is not None and status.get("reason") is None
 
     @staticmethod
+    def _silence_reason(host) -> Optional[str]:
+        """Why a host that did not answer gave no answer, from the report: a host
+        discovery that said down, every scanned port filtered with no reply, or every
+        port filtered with an ICMP reject (a firewall that answered). None when the
+        report says nothing more."""
+        status = host.find("status")
+        if status is not None and status.get("state") == "down":
+            return "host down (no reply to host discovery)"
+        ports = host.find("ports")
+        if ports is None:
+            return None
+        filtered = 0
+        reasons: Dict[str, int] = {}
+        for extra in ports.iterchildren(tag="extraports"):
+            if extra.get("state") not in ("filtered", "open|filtered"):
+                continue
+            count = int(extra.get("count") or 0)
+            filtered += count
+            listed = 0
+            for extra_reason in extra.iterchildren(tag="extrareasons"):
+                n = int(extra_reason.get("count") or 0)
+                listed += n
+                key = extra_reason.get("reason") or ""
+                reasons[key] = reasons.get(key, 0) + n
+            if count > listed:
+                reasons[""] = reasons.get("", 0) + count - listed
+        for port in ports.iterchildren(tag="port"):
+            state = port.find("state")
+            if state is None or state.get("state") not in ("filtered", "open|filtered"):
+                continue
+            filtered += 1
+            key = state.get("reason") or ""
+            reasons[key] = reasons.get(key, 0) + 1
+        if not filtered:
+            return None
+        plural = "port" if filtered == 1 else "ports"
+        rejected = {r: n for r, n in reasons.items() if r in _ICMP_REJECT_REASONS}
+        if rejected:
+            names = ", ".join(sorted(rejected))
+            return (
+                f"{filtered} {plural} filtered, {sum(rejected.values())} rejected by "
+                f"ICMP {names} (a firewall answered)"
+            )
+        if "no-response" in reasons and set(reasons) <= {"no-response", ""}:
+            return (
+                f"{filtered} {plural} filtered, no reply (host down or every probe "
+                "dropped)"
+            )
+        return f"{filtered} {plural} filtered"
+
+    @staticmethod
     def _matching_resolutions(
         values: Set[str], resolutions: Iterable[TargetResolution]
     ) -> List[TargetResolution]:
@@ -162,6 +225,7 @@ class NmapOutputParser:
         reached_values: Set[str] = set()
         # Per target value: whether a host for it answered, and its open ports.
         answered: Dict[str, bool] = {}
+        silence_by_value: Dict[str, str] = {}
         open_ports_by_value: Dict[str, int] = {}
 
         for host in xml_tree.iterchildren(tag="host"):
@@ -175,6 +239,7 @@ class NmapOutputParser:
                 else "missing IP"
             )
             host_answered = NmapOutputParser._host_answered(host)
+            silence = None if host_answered else NmapOutputParser._silence_reason(host)
             host_open_ports = 0
 
             ports = host.find("ports")
@@ -211,6 +276,8 @@ class NmapOutputParser:
 
             for value in values:
                 answered[value] = answered.get(value, False) or host_answered
+                if silence and value not in silence_by_value:
+                    silence_by_value[value] = silence
                 open_ports_by_value[value] = (
                     open_ports_by_value.get(value, 0) + host_open_ports
                 )
@@ -235,7 +302,7 @@ class NmapOutputParser:
             outputs["action_output"] = raw_stdout
 
         outcomes = NmapOutputParser._outcomes(
-            resolutions, missed, answered, open_ports_by_value
+            resolutions, missed, answered, open_ports_by_value, silence_by_value
         )
         summary = summarize_outcomes(
             outcomes,
@@ -260,8 +327,12 @@ class NmapOutputParser:
         missed: List[MissedTarget],
         answered: Dict[str, bool],
         open_ports_by_value: Dict[str, int],
+        silence_by_value: Optional[Dict[str, str]] = None,
     ) -> List[TargetOutcome]:
-        """One outcome per target, in the order the targets were resolved."""
+        """One outcome per target, in the order the targets were resolved. A target
+        that gave no answer carries why, when the report says (all ports filtered
+        with no reply, or rejected by ICMP)."""
+        silence_by_value = silence_by_value or {}
         missed_by_value = {m.resolution.target.lower(): m for m in missed}
         outcomes: List[TargetOutcome] = []
         for resolution in resolutions:
@@ -278,5 +349,9 @@ class NmapOutputParser:
                     TargetOutcome(resolution, HOST_UP, open_ports=open_ports)
                 )
             else:
-                outcomes.append(TargetOutcome(resolution, HOST_DOWN))
+                outcomes.append(
+                    TargetOutcome(
+                        resolution, HOST_DOWN, reason=silence_by_value.get(value)
+                    )
+                )
         return outcomes
