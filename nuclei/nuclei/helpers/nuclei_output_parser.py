@@ -11,11 +11,18 @@ class NucleiOutputParser:
         )
         others = []
         seen = set()
+        # Lines kept in action_output: everything but the per-request
+        # matcher-status false events (-matcher-status), which only feed the
+        # reachability verdict and would flood the raw output.
+        kept_lines = []
 
         for line in stdout.splitlines():
             try:
                 j = json.loads(line)
-                if j.get("matcher-status"):
+                if isinstance(j, dict) and j.get("matcher-status") is False:
+                    continue
+                kept_lines.append(line)
+                if isinstance(j, dict) and j.get("matcher-status"):
                     cve_ids = (
                         j.get("info", {})
                         .get("classification", {})
@@ -39,6 +46,7 @@ class NucleiOutputParser:
                             group["host"].add(host)
                             group["severity"] = severity
             except json.JSONDecodeError:
+                kept_lines.append(line)
                 clean_line = re.sub(r"\x1b\[[0-9;]*m", "", line)
                 if clean_line.strip():
                     others.append(clean_line)
@@ -67,8 +75,9 @@ class NucleiOutputParser:
         # (isFindingCompatible=False on the contract side), but stays usable as
         # a chaining/event filter. Additive — "others" keeps behaving exactly
         # as it does today.
-        if stdout.strip():
-            outputs["action_output"] = stdout.strip()
+        action_output = "\n".join(kept_lines).strip()
+        if action_output:
+            outputs["action_output"] = action_output
 
         return {
             "message": "Nuclei completed: " + " ".join(message_parts),

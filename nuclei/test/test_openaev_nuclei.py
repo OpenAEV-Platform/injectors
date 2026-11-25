@@ -115,20 +115,88 @@ class TestOpenAEVNuclei(unittest.TestCase):
             "10.0.0.2": "asset-2",
         }
         m_builder.return_value.build.return_value = ["nuclei", "-jsonl"]
+        # 10.0.0.1 answered without a match; 10.0.0.2 refused every request.
+        m_nucleiprocess.nuclei_execute.return_value.stdout = "\n".join(
+            [
+                json.dumps({"host": "http://10.0.0.1", "matcher-status": False}),
+                json.dumps(
+                    {
+                        "host": "http://10.0.0.2",
+                        "matcher-status": False,
+                        "error": "connection refused",
+                    }
+                ),
+            ]
+        ).encode("utf-8")
+        m_nucleiprocess.nuclei_execute.return_value.stderr = b""
+        m_parser.return_value.parse.return_value = {"message": "Nothing Found"}
 
-        injector.nuclei_execution(1, message_data)
+        result = injector.nuclei_execution(1, message_data)
 
         calls = m_helper.return_value.api.inject.execution_callback.call_args_list
-        target_calls = [
-            c for c in calls if c.kwargs["data"].get("execution_context_identifiers")
-        ]
-        self.assertEqual(len(target_calls), 2)
-        identifiers = sorted(
-            c.kwargs["data"]["execution_context_identifiers"][0] for c in target_calls
+        target_calls = {
+            c.kwargs["data"]["execution_context_identifiers"][0]: c.kwargs["data"]
+            for c in calls
+            if c.kwargs["data"].get("execution_context_identifiers")
+        }
+        self.assertEqual(sorted(target_calls), ["asset-1", "asset-2"])
+        for data in target_calls.values():
+            self.assertEqual(data["execution_action"], "command_execution")
+        # Sent after the scan with the real outcome, never before it.
+        self.assertEqual(target_calls["asset-1"]["execution_status"], "EXECUTED")
+        self.assertEqual(target_calls["asset-2"]["execution_status"], "ERROR")
+        self.assertIn(
+            "not reached: connection refused",
+            target_calls["asset-2"]["execution_message"],
         )
-        self.assertEqual(identifiers, ["asset-1", "asset-2"])
-        for c in target_calls:
-            self.assertEqual(c.kwargs["data"]["execution_action"], "command_execution")
+        # One target reached: the scan keeps its verdict, the miss is listed.
+        self.assertNotIn("status", result)
+        self.assertIn("1/2 target(s) not reached", result["message"])
+
+    @patch.object(module.Targets, "build_execution_message")
+    @patch.object(module, "NucleiCommandBuilder")
+    def test_openaev_nuclei_execution_no_target_reached_is_error(
+        self,
+        m_builder,
+        m_build_execution_message,
+        m_configloader,
+        m_confighelper,
+        m_helper,
+        m_nucleiprocess,
+        m_parser,
+        m_msgdata,
+        _,
+    ):
+        # Nuclei exits 0 when it never reached the host: the inject must not end
+        # SUCCESS (which the platform turns into "Not vulnerable").
+        m_helper.return_value.api = MagicMock()
+        m_helper.return_value.injector_logger = MagicMock()
+        injector = module.OpenAEVNuclei()
+
+        message_data = MagicMock()
+        message_data.inject_id = "inject-id"
+        message_data.get_targets.return_value = ["unknown.invalid"]
+        message_data.target_results.ip_to_asset_id_map = {"unknown.invalid": "asset-1"}
+        m_builder.return_value.build.return_value = ["nuclei", "-jsonl"]
+        m_nucleiprocess.nuclei_execute.return_value.stdout = b""
+        m_nucleiprocess.nuclei_execute.return_value.stderr = (
+            b"[WRN] [CVE-2023-28432] Skipped unknown.invalid:80 from target list "
+            b"as found unresponsive 30 times\n"
+        )
+        m_parser.return_value.parse.return_value = {
+            "message": "Nuclei completed: Good News: Nothing Found !"
+        }
+
+        result = injector.nuclei_execution(1, message_data)
+
+        self.assertEqual(result["status"], "ERROR")
+        self.assertIn("1/1 target(s) not reached", result["message"])
+        trace = m_helper.return_value.api.inject.execution_callback.call_args.kwargs[
+            "data"
+        ]
+        self.assertEqual(trace["execution_context_identifiers"], ["asset-1"])
+        self.assertEqual(trace["execution_status"], "ERROR")
+        self.assertIn("found unresponsive 30 times", trace["execution_message"])
 
     @patch.object(module.Targets, "build_execution_message")
     @patch.object(module, "NucleiCommandBuilder")
@@ -329,6 +397,44 @@ class TestOpenAEVNuclei(unittest.TestCase):
         self.assertEqual(callback_data["execution_action"], "complete")
         self.assertIn("Pre-execution failure", callback_data["execution_message"])
         m_signaturemanager.return_value.send_signatures.assert_not_called()
+
+    @patch.object(module.OpenAEVNuclei, "nuclei_execution")
+    @patch.object(module, "ExecutionDetails")
+    @patch.object(module, "SignatureManager")
+    @patch.object(module, "build_network_configs")
+    def test_openaev_nuclei_process_message_no_target_reached_is_error(
+        self,
+        m_build_network_configs,
+        m_signaturemanager,
+        m_executiondetails,
+        m_nuclei_execution,
+        m_configloader,
+        m_confighelper,
+        m_helper,
+        m_nucleiprocess,
+        m_parser,
+        m_msgdata,
+        _,
+    ):
+        m_helper.return_value.injector_logger = MagicMock()
+        m_helper.return_value.api = MagicMock()
+        injector = module.OpenAEVNuclei()
+        message_data = MagicMock()
+        message_data.inject_id = "inject-id"
+        m_msgdata.return_value = message_data
+        m_nuclei_execution.return_value = {
+            "message": "1/1 target(s) not reached",
+            "outputs": {},
+            "status": "ERROR",
+        }
+
+        injector.process_message(MagicMock())
+
+        callback_data = injector.helper.api.inject.execution_callback.call_args.kwargs[
+            "data"
+        ]
+        self.assertEqual(callback_data["execution_status"], "ERROR")
+        self.assertEqual(callback_data["execution_action"], "complete")
 
     @patch.object(module.OpenAEVNuclei, "nuclei_execution")
     @patch.object(module, "SignatureManager")

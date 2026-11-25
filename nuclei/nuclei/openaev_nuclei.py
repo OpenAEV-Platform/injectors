@@ -16,11 +16,15 @@ from pyoaev.signatures.models import ExecutionDetails
 from injector_common.dump_config import intercept_dump_argument
 from injector_common.inject_gone import abort_on_inject_gone, is_inject_gone
 from injector_common.targets import Targets
-from injector_common.traces import send_per_target_traces
 from nuclei.configuration.config_loader import ConfigLoader
 from nuclei.helpers.nuclei_command_builder import NucleiCommandBuilder
 from nuclei.helpers.nuclei_output_parser import NucleiOutputParser
 from nuclei.helpers.nuclei_process import NucleiProcess
+from nuclei.helpers.nuclei_reachability import (
+    assess_reachability,
+    send_reachability_traces,
+    unreached_summary,
+)
 from nuclei.helpers.scan_coordination import TemplateAccessLock
 from nuclei.helpers.template_analysis import (
     analyze_template_file,
@@ -189,16 +193,6 @@ class OpenAEVNuclei:
                 data=callback_data,
             )
 
-            # Per-target traces so each asset-backed endpoint's result view shows
-            # the scan reached it; the batched scan only sends a global callback.
-            send_per_target_traces(
-                self.helper,
-                msg_data.inject_id,
-                msg_data.target_results.ip_to_asset_id_map,
-                label="nuclei scan",
-                start=start,
-            )
-
             input_data = ("\n".join(targets) + "\n").encode("utf-8")
             scan_timeout = self.config_loader.nuclei.scan_timeout
             try:
@@ -248,10 +242,32 @@ class OpenAEVNuclei:
                     f"{stderr_tail[-_STDERR_LOG_TAIL:]}"
                 )
 
-            return self.parser.parse(
-                result.stdout.decode("utf-8"),
+            stdout = result.stdout.decode("utf-8")
+            parsed = self.parser.parse(
+                stdout,
                 msg_data.target_results.ip_to_asset_id_map,
             )
+
+            # Nuclei exits 0 when every request failed: whether each target was
+            # reached is read from the -matcher-status events and the host errors.
+            reachability = assess_reachability(stdout, stderr_tail, targets)
+            send_reachability_traces(
+                self.helper,
+                msg_data.inject_id,
+                reachability,
+                msg_data.target_results.ip_to_asset_id_map,
+                start,
+            )
+            unreached = {t: r for t, r in reachability.items() if r is not None}
+            if unreached:
+                parsed["message"] = (
+                    f"{parsed.get('message', '')}\n"
+                    + unreached_summary(unreached, len(reachability))
+                )
+            if reachability and len(unreached) == len(reachability):
+                # No target was reached: nothing was tested, so no verdict.
+                parsed["status"] = "ERROR"
+            return parsed
         finally:
             _safe_remove(tmp_template_path)
 
@@ -372,7 +388,8 @@ class OpenAEVNuclei:
                 execution_result = self.nuclei_execution(start, msg_data)
                 execution_message = execution_result.get("message")
                 execution_result_outputs = execution_result.get("outputs")
-                execution_status = "SUCCESS"
+                # SUCCESS only when the scan reached at least one target.
+                execution_status = execution_result.get("status") or "SUCCESS"
             except (MissingTemplateInputs, TemplateNotFound) as e:
                 # Not executed: an explicit inconclusive result, never a no-match.
                 execution_message = str(e)

@@ -129,6 +129,23 @@ class NucleiOutputParserTest(TestCase):
         self.assertEqual(result["outputs"]["action_output"], stdout)
         self.assertEqual(len(result["outputs"]["cve"]), 1)
 
+    def test_matcher_status_false_lines_are_not_findings(self):
+        # -matcher-status writes one event per request without a match (and per
+        # failed request): never a finding, never in the raw output.
+        no_match = json.dumps({"host": "http://10.0.0.1", "matcher-status": False})
+        failed = json.dumps(
+            {
+                "host": "http://unknown.invalid",
+                "matcher-status": False,
+                "error": "no address found for host",
+            }
+        )
+        result = parser.parse("\n".join([no_match, failed]), {})
+        self.assertEqual(result["outputs"]["cve"], [])
+        self.assertEqual(result["outputs"]["others"], [])
+        self.assertNotIn("action_output", result["outputs"])
+        self.assertIn("Nothing Found", result["message"])
+
     def test_action_output_absent_for_blank_stdout(self):
         result = parser.parse("   \n  ", {})
         self.assertNotIn("action_output", result["outputs"])

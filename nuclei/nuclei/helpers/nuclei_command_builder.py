@@ -120,6 +120,11 @@ class NucleiCommandBuilder:
         # Write output in JSONL(ines) format.
         # Nuclei Flags: -j, -jsonl
         self.args += ["-jsonl"]
+        # One event per request outcome, a failed match included: without it a
+        # target that answered without a match cannot be told from a target the
+        # scan never reached (Nuclei exits 0 in both cases).
+        # Nuclei Flags: -ms, -matcher-status
+        self.args += ["-matcher-status"]
         return self
 
     def _with_configs(self):
