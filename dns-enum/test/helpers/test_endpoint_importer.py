@@ -29,6 +29,54 @@ class TestEndpointImporter(unittest.TestCase):
             api.endpoint.upsert.call_args.args[0]["asset_tags"], ["t1", "t2"]
         )
 
+    def test_tag_ids_of_the_picker_are_used_as_is(self):
+        api = MagicMock()
+        api.http_post.side_effect = lambda path, post_data: (
+            [{"id": "tag-id-1", "label": "ext"}]
+            if path == "/tags/options"
+            else {"content": [], "last": True}
+        )
+        api.endpoint.upsert.return_value = {"asset_id": "asset-1"}
+        result = EndpointImporter(api, MagicMock()).import_hosts(
+            [_host("a.example.com", ["1.1.1.1"])],
+            ["tag-id-1"],
+            classify_assets=False,
+        )
+        api.http_post.assert_any_call("/tags/options", post_data=["tag-id-1"])
+        api.tag.upsert.assert_not_called()
+        self.assertEqual(
+            api.endpoint.upsert.call_args.args[0]["asset_tags"], ["tag-id-1"]
+        )
+        self.assertEqual(result["tags"], ["ext"])
+
+    def test_tag_names_and_ids_mixed(self):
+        api = MagicMock()
+        api.http_post.return_value = [{"id": "tag-id-1", "label": "ext"}]
+        api.tag.upsert.return_value = {"tag_id": "tag-id-2"}
+        importer = EndpointImporter(api, MagicMock())
+        tags = importer.resolve_tags(["tag-id-1", "discovered:dns", "tag-id-1"])
+        api.tag.upsert.assert_called_once_with(
+            {"tag_name": "discovered:dns", "tag_color": "#00897b"}
+        )
+        self.assertEqual(
+            tags,
+            [
+                {"id": "tag-id-1", "name": "ext"},
+                {"id": "tag-id-2", "name": "discovered:dns"},
+            ],
+        )
+
+    def test_failed_id_lookup_never_creates_a_tag_named_like_an_id(self):
+        api = MagicMock()
+        api.http_post.side_effect = RuntimeError("403")
+        api.tag.upsert.return_value = {"tag_id": "tag-id-2"}
+        tag_uuid = "0b2d6f0e-6a6c-4a55-8f43-0c1a7d3b9e21"
+        tags = EndpointImporter(api, MagicMock()).resolve_tags([tag_uuid, "ext"])
+        api.tag.upsert.assert_called_once_with(
+            {"tag_name": "ext", "tag_color": "#00897b"}
+        )
+        self.assertEqual(tags, [{"id": "tag-id-2", "name": "ext"}])
+
     def test_in_scope(self):
         self.assertTrue(in_scope("a.example.com", ["example.com"]))
         self.assertTrue(in_scope("Example.com.", ["example.com"]))
@@ -200,6 +248,8 @@ def _search_api(assets):
     upserted = {}
 
     def search(path, post_data):
+        if path == "/tags/options":
+            return []
         assert path == "/assets/search"
         flt = post_data["filterGroup"]["filters"][0]
         key, values = flt["key"], flt["values"]
@@ -343,6 +393,7 @@ class TestClassifiedImport(unittest.TestCase):
         keys = {
             c.kwargs["post_data"]["filterGroup"]["filters"][0]["key"]
             for c in api.http_post.call_args_list
+            if c.args[0] == "/assets/search"
         }
         self.assertEqual(keys, {"asset_ips"})
         self.assertNotIn("asset_category", upserted["dns-enum:a.example.com"])

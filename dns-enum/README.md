@@ -48,8 +48,8 @@ Manual deployment: `poetry install` then `poetry run python -m dns_enum.openaev_
 | Rate limit                             | 100                | DNS queries per second (1 to 1,000), applied to subfinder and dnsx.                                 |
 | Timeout                                | 600                | Seconds for the whole enumeration (1 to 3,600).                                                     |
 | Create endpoints for discovered hosts  | off                | Import every resolved host that has an address as an endpoint (see below).                          |
-| Tags set on the created endpoints      | `discovered:dns`   | One or more tags, comma-separated; each is created if missing and set on every imported endpoint.   |
-| Asset group ID                         | (empty)            | When set, the imported endpoints are added to this asset group (existing members are kept).        |
+| Tags set on the created endpoints      | `discovered:dns`   | Tag picker: the chosen tags are set on every imported endpoint; with none chosen, `discovered:dns` (created if missing). An inject saved before the picker keeps its comma-separated tag names: each is created if missing. |
+| Asset group                            | (empty)            | Asset group picker: when set, the imported endpoints are added to this asset group (existing members are kept). An inject saved before the picker keeps its asset group ID. |
 | Classify the endpoints                 | on                 | Set the category, subcategory and URL of each imported endpoint and attach a name to the existing asset of its address (see below). |
 
 The root domains themselves are always resolved; hosts outside the requested root domains are dropped.
@@ -99,9 +99,9 @@ or changed.
 
 ### Keeping a group current (dynamic membership)
 
-"Asset group ID" adds the imported endpoints to a static group; members are never removed. To keep a group in step
+"Asset group" adds the imported endpoints to a static group; members are never removed. To keep a group in step
 with every run, make it a dynamic asset group whose rule is `Tags = <one of the endpoint tags above>`: every endpoint
-the injector tags joins it, and an endpoint whose tag is removed leaves it, without any asset group ID on the inject.
+the injector tags joins it, and an endpoint whose tag is removed leaves it, without any asset group on the inject.
 
 ### Hosts that stop resolving
 

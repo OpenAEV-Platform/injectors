@@ -91,6 +91,29 @@ class TestMessageData(unittest.TestCase):
         self.assertFalse(msg.classify_assets)
         self.assertEqual(msg.expectation_types, ["DETECTION"])
 
+    def test_picker_values(self):
+        msg = MessageData(
+            _data(
+                domains="example.com",
+                endpoint_tag=["tag-id-1", "tag-id-2", "tag-id-1"],
+                asset_group_id="group-id-1",
+            )
+        )
+        self.assertEqual(msg.endpoint_tags, ["tag-id-1", "tag-id-2"])
+        self.assertEqual(msg.asset_group_id, "group-id-1")
+        # An API write may store the single asset group id as a list.
+        msg = MessageData(
+            _data(domains="example.com", asset_group_id=["", "group-id-2"])
+        )
+        self.assertEqual(msg.asset_group_id, "group-id-2")
+        self.assertIsNone(
+            MessageData(_data(domains="example.com", asset_group_id=[])).asset_group_id
+        )
+        self.assertEqual(
+            MessageData(_data(domains="example.com", endpoint_tag=[])).endpoint_tags,
+            ["discovered:dns"],
+        )
+
     def test_several_endpoint_tags(self):
         msg = MessageData(
             _data(domains="example.com", endpoint_tag=" ext , internet,ext,, ")

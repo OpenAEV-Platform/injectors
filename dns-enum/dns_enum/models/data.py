@@ -1,5 +1,5 @@
 import re
-from typing import List
+from typing import List, Optional
 
 from dns_enum.contracts.dns_enum_constants import (
     ASSET_GROUP_ID_KEY,
@@ -83,7 +83,8 @@ def parse_record_types(raw) -> List[str]:
 
 
 def parse_tags(raw, default: str) -> List[str]:
-    """Comma-separated (or listed) tag names, trimmed, order kept, the default when empty."""
+    """Tag ids of the picker (a list) or tag names of an inject saved before it
+    (comma-separated text), trimmed, order kept, the default when empty."""
     items = raw if isinstance(raw, (list, tuple)) else str(raw or "").split(",")
     tags: List[str] = []
     for item in items:
@@ -91,6 +92,14 @@ def parse_tags(raw, default: str) -> List[str]:
         if tag and tag not in tags:
             tags.append(tag)
     return tags or [default]
+
+
+def parse_asset_group_id(raw) -> Optional[str]:
+    """The asset group id of the picker (one id), or of an API write holding a list
+    (its first id), or of the former free-text field; None when empty."""
+    if isinstance(raw, (list, tuple)):
+        raw = next((item for item in raw if str(item or "").strip()), None)
+    return str(raw or "").strip() or None
 
 
 def parse_wordlist(raw: str) -> List[str]:
@@ -138,7 +147,7 @@ class MessageData:
             content.get(ENDPOINT_TAG_KEY), DEFAULT_ENDPOINT_TAG
         )
         self.endpoint_tag = ", ".join(self.endpoint_tags)
-        self.asset_group_id = str(content.get(ASSET_GROUP_ID_KEY) or "").strip() or None
+        self.asset_group_id = parse_asset_group_id(content.get(ASSET_GROUP_ID_KEY))
         self.classify_assets = _as_bool(content.get(CLASSIFY_ASSETS_KEY, True))
 
         self.expectation_types = [

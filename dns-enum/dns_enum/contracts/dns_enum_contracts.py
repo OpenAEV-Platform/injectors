@@ -29,6 +29,7 @@ from dns_enum.contracts.dns_enum_constants import (
 from pyoaev.contracts import ContractBuilder
 from pyoaev.contracts.contract_config import (
     Contract,
+    ContractAssetGroupReference,
     ContractCardinality,
     ContractCheckbox,
     ContractConfig,
@@ -37,6 +38,7 @@ from pyoaev.contracts.contract_config import (
     ContractOutputElement,
     ContractOutputType,
     ContractSelect,
+    ContractTags,
     ContractText,
     ContractTextArea,
     Expectation,
@@ -101,17 +103,21 @@ class DnsEnumContracts:
             label="Create endpoints for discovered hosts",
             defaultValue=False,
         )
-        endpoint_tag = ContractText(
+        # Tag picker: the inject content holds tag ids. An inject saved before the
+        # picker holds tag names (comma-separated text); the injector accepts both.
+        endpoint_tag = ContractTags(
             key=ENDPOINT_TAG_KEY,
-            label="Tags set on the created endpoints (comma-separated)",
-            defaultValue=DEFAULT_ENDPOINT_TAG,
+            label=f"Tags set on the created endpoints (default {DEFAULT_ENDPOINT_TAG})",
             mandatory=False,
             visibleConditionFields=[CREATE_ENDPOINTS_KEY],
             visibleConditionValues={CREATE_ENDPOINTS_KEY: True},
         )
-        asset_group_id = ContractText(
+        # Asset group picker; the selected id is stored under the same key as the
+        # former free-text ID field, so existing injects keep working.
+        asset_group_id = ContractAssetGroupReference(
             key=ASSET_GROUP_ID_KEY,
-            label="Asset group ID to add the created endpoints to (optional)",
+            label="Asset group to add the created endpoints to (optional)",
+            cardinality=ContractCardinality.One,
             mandatory=False,
             visibleConditionFields=[CREATE_ENDPOINTS_KEY],
             visibleConditionValues={CREATE_ENDPOINTS_KEY: True},
