@@ -106,6 +106,11 @@ disable_error_code = [
     "misc",
 ]
 
+[tool.cmw]
+install-command = "poetry install"
+config-dump-command = "poetry run python -m prowler --dump-config-schema"
+icon-path = "prowler/img/icon-prowler.png"
+
 [build-system]
 requires = [
     "poetry-core",
