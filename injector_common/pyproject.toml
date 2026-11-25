@@ -4,7 +4,7 @@ version="1.0.0"
 requires-python = ">=3.14,<4.0"
 
 [tool.poetry.dependencies]
-pyoaev = "3.261118.0"
+pyoaev = "3.261126.0"
 
 [tool.poetry.group.dev.dependencies]
 black = "^26.3.0"
