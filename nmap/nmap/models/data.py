@@ -2,6 +2,7 @@ from pyoaev.helpers import OpenAEVInjectorHelper
 
 from injector_common.constants import TARGET_PROPERTY_SELECTOR_KEY, TARGET_SELECTOR_KEY
 from injector_common.targets import TargetProperty, Targets
+from nmap.contracts.nmap_constants import TUNING_KEYS
 
 
 class MessageData:
@@ -25,6 +26,10 @@ class MessageData:
         self.targets_meta = Targets.extract_target_meta(
             self.selector_key, self.selector_property, data, helper
         )
+
+        # Optional timing, retry and port selection fields, validated when the
+        # command is built.
+        self.scan_options = {key: content.get(key) for key in TUNING_KEYS}
 
         self.expectation_types = [
             expectation.get("expectation_type")
