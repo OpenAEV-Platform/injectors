@@ -1,17 +1,27 @@
 FROM python:3.14-slim AS builder
 
+RUN apt-get update && apt-get upgrade -y && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /opt/injector_common
+COPY --from=injector_common ./ ./
+
 RUN pip3 install --no-cache-dir -U pip certifi
 RUN pip3 install --no-cache-dir poetry==2.3.2
-RUN apt-get update && apt-get upgrade -y
 
-ARG installdir=/injector
+ARG installdir=/opt/injector
 WORKDIR ${installdir}
 ADD . ${installdir}
 RUN cd ${installdir} && poetry build
 
 FROM python:3.14-slim AS runner
 
-ARG installdir=/injector
+RUN apt-get update && apt-get upgrade -y && rm -rf /var/lib/apt/lists/*
+RUN pip3 install --no-cache-dir -U pip certifi
+
+WORKDIR /opt/injector_common
+COPY --from=injector_common ./ ./
+
+ARG installdir=/opt/injector
 WORKDIR ${installdir}
 
 # Declare the build argument
@@ -19,9 +29,6 @@ ARG PYOAEV_GIT_BRANCH_OVERRIDE
 # Set to "true" to bake the heavy OSS engines (Garak, PyRIT, Promptfoo) into the image. The native
 # and internal multi-turn engines always work; Garak/Promptfoo report a clear error when absent.
 ARG INSTALL_OSS_ENGINES=false
-
-RUN apt-get update && apt-get upgrade -y && rm -rf /var/lib/apt/lists/*
-RUN pip3 install --no-cache-dir -U pip certifi
 
 COPY --from=builder ${installdir} ${installdir}
 RUN cd ${installdir}/dist && pip3 install --no-cache-dir "$(ls *.whl)"
@@ -31,13 +38,14 @@ RUN if [ "${PYOAEV_GIT_BRANCH_OVERRIDE}" ] ; then \
         apt-get update && apt-get upgrade -y && apt-get install -y --no-install-recommends git && \
         pip install --no-cache-dir pip3-autoremove && \
         pip-autoremove pyoaev -y && \
-        pip install --no-cache-dir "git+https://github.com/OpenAEV-Platform/client-python@${PYOAEV_GIT_BRANCH_OVERRIDE}" ; \
+        pip install --no-cache-dir "git+https://github.com/OpenAEV-Platform/client-python@${PYOAEV_GIT_BRANCH_OVERRIDE}" && \
+        rm -rf /var/lib/apt/lists/* ; \
     fi
 
 # Optional: best-effort install of the OSS red-team engines. Failures here never break the image;
 # the corresponding engines simply report that the tool is unavailable.
 RUN if [ "${INSTALL_OSS_ENGINES}" = "true" ] ; then \
-        apt-get update && apt-get upgrade -y && apt-get install -y --no-install-recommends nodejs npm git ; \
+        apt-get update && apt-get upgrade -y && apt-get install -y --no-install-recommends nodejs npm git && rm -rf /var/lib/apt/lists/* ; \
         pip3 install --no-cache-dir garak || echo "warning: skip garak" ; \
         pip3 install --no-cache-dir pyrit || echo "warning: skip pyrit" ; \
         npm install -g promptfoo || echo "warning: skip promptfoo" ; \

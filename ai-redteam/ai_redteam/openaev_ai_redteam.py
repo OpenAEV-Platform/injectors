@@ -8,12 +8,7 @@ from ai_redteam.engines import build_registry, contract_engine_map
 from ai_redteam.targets.target_resolver import resolve_targets
 from pyoaev.helpers import OpenAEVConfigHelper, OpenAEVInjectorHelper
 
-try:
-    from injector_common.dump_config import intercept_dump_argument
-except ImportError:  # pragma: no cover - dump tooling is optional in local dev
-
-    def intercept_dump_argument(_):
-        return None
+from injector_common.dump_config import intercept_dump_argument
 
 
 class OpenAEVAiRedTeam:
