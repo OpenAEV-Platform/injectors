@@ -11,7 +11,7 @@ surface.
 
 - OpenAEV Platform reachable from the injector (along with its RabbitMQ broker)
 - For a manual (non-Docker) deployment:
-  - Python >= 3.11 and [Poetry](https://python-poetry.org/) >= 2.1
+  - Python >= 3.14 and [Poetry](https://python-poetry.org/) >= 2.1
   - The `subfinder` and `dnsx` binaries on the `PATH` (the Docker image bundles pinned versions, tracked by Renovate)
 - The token must allow creating tags and endpoints when the endpoint import option is used, and writing the asset
   group when one is given.
