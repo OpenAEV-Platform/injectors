@@ -51,7 +51,9 @@ class TestOpenAEVNmap(unittest.TestCase):
         nmap_output = injector.nmap_execution(start, message_data)
 
         m_build_args.assert_called_once_with(
-            message_data.contract_id, message_data.get_targets.return_value
+            message_data.contract_id,
+            message_data.get_targets.return_value,
+            message_data.scan_options,
         )
         m_build_execution_message.assert_called_once_with(
             selector_key=message_data.selector_key,
