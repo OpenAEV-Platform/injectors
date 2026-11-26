@@ -197,6 +197,40 @@ class NmapOutputParser:
         return [r for r in resolutions if r.target and r.target.lower() in values]
 
     @staticmethod
+    def host_outcomes(
+        host_xml: bytes, target_results: TargetExtractionResult
+    ) -> List[TargetOutcome]:
+        """The outcome of each target one finished <host> element answers for,
+        read while nmap still runs (nmap_stream_runner). A host matching no target
+        gives no outcome; a report that does not parse gives none either, the
+        final report then carries the target."""
+        try:
+            host = objectify.fromstring(
+                host_xml, objectify.makeparser(resolve_entities=False)
+            )
+        except Exception:  # noqa: BLE001
+            return []
+        if host.tag != "host":
+            return []
+        values = NmapOutputParser._host_values(host)
+        matches = NmapOutputParser._matching_resolutions(
+            values, Targets.resolutions_of(target_results)
+        )
+        if not matches:
+            return []
+        answered = NmapOutputParser._host_answered(host)
+        if not answered:
+            reason = NmapOutputParser._silence_reason(host)
+            return [TargetOutcome(m, HOST_DOWN, reason=reason) for m in matches]
+        ports = host.find("ports")
+        open_ports = 0
+        for port in [] if ports is None else ports.iterchildren(tag="port"):
+            state = port.find("state")
+            if state is not None and state.get("state") == "open":
+                open_ports += 1
+        return [TargetOutcome(m, HOST_UP, open_ports=open_ports) for m in matches]
+
+    @staticmethod
     def salvage_partial(stdout: Optional[bytes]) -> bytes:
         """A parseable report out of the output of an nmap run killed at its time
         limit: the completed <host> elements kept, the rest cut, the root closed.

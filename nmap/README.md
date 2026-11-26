@@ -89,6 +89,14 @@ When the limit is reached nmap is terminated, the hosts it finished are kept (on
 the structured output), every other target gets `not scanned, scan time limit reached`, and the inject ends
 `WARNING` (`ERROR` when no host was finished). The terminal callback is always sent.
 
+### Results per host as the scan runs
+
+The injector reads nmap's XML report as nmap writes it: each target's trace is sent the moment nmap finishes that
+host, not only when the whole asset group is done. A large group shows its results while it runs, and a run cut by
+the scan time limit has already reported every host it finished. The terminal callback and the per-target traces are
+retried on a transient network error (connection error, timeout, HTTP 502/503/504: 2 s, 5 s, then 10 s); any other
+error, a deleted inject (404) included, is not retried.
+
 ## Deployment
 
 ### Docker Deployment

@@ -10,6 +10,7 @@ from pyoaev.signatures.models import (
     build_network_configs,
 )
 
+from injector_common.callbacks import call_with_retry
 from injector_common.dump_config import intercept_dump_argument
 from injector_common.inject_gone import abort_on_inject_gone, is_inject_gone
 from injector_common.outcomes import (
@@ -26,6 +27,7 @@ from nmap.configuration.config_loader import ConfigLoader
 from nmap.contracts.nmap_constants import HOST_TIMEOUT_KEY, MAX_RETRIES_KEY
 from nmap.helpers.nmap_command_builder import NmapCommandBuilder
 from nmap.helpers.nmap_output_parser import NmapOutputParser
+from nmap.helpers.nmap_stream_runner import run_nmap
 from nmap.models.data import MessageData
 
 
@@ -90,10 +92,23 @@ class OpenAEVNmap:
             start=start,
         )
 
+        # Each host is reported the moment nmap finishes it (its <host> element is
+        # written to stdout then), not only once the whole group is scanned.
+        reported: set = set()
+
+        def report_host(host_xml: bytes) -> None:
+            outcomes = [
+                o
+                for o in NmapOutputParser.host_outcomes(
+                    host_xml, msg_data.target_results
+                )
+                if o.resolution.target.lower() not in reported
+            ]
+            reported.update(o.resolution.target.lower() for o in outcomes)
+            send_target_outcome_traces(self.helper, msg_data.inject_id, outcomes, start)
+
         try:
-            nmap_result = subprocess.run(
-                nmap_args, check=False, capture_output=True, timeout=scan_timeout
-            )
+            nmap_result = run_nmap(nmap_args, timeout=scan_timeout, on_host=report_host)
         except subprocess.TimeoutExpired as exc:
             # nmap is killed at the scan time limit, below the platform inject
             # execution threshold, so the inject still gets its results: the hosts
@@ -112,10 +127,17 @@ class OpenAEVNmap:
             )
         else:
             result = self._parse_result(nmap_args, nmap_result, msg_data)
-        # After the run: one trace per target with its outcome (host up with its open
-        # ports, host down or no response, not scanned), on its asset.
+        # After the run: one trace per target not reported while nmap ran (not
+        # scanned, unresolved), on its asset.
         send_target_outcome_traces(
-            self.helper, msg_data.inject_id, result.get("outcomes"), start
+            self.helper,
+            msg_data.inject_id,
+            [
+                o
+                for o in result.get("outcomes") or []
+                if o.resolution.target.lower() not in reported
+            ],
+            start,
         )
         if skipped:
             # A skipped asset is a partial result: the completion says how many and
@@ -295,8 +317,14 @@ class OpenAEVNmap:
 
         # sending execution callback
         callback_data["execution_duration"] = int(time.time() - start)
-        self.helper.api.inject.execution_callback(
-            inject_id=msg_data.inject_id, data=callback_data
+        # The terminal callback carries the whole scan: bounded retry on a
+        # transient network error (a 404 or any other error raises at once).
+        call_with_retry(
+            lambda: self.helper.api.inject.execution_callback(
+                inject_id=msg_data.inject_id, data=callback_data
+            ),
+            self.helper.injector_logger,
+            f"Terminal callback of inject {msg_data.inject_id}",
         )
 
         # update post execution

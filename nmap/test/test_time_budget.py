@@ -172,7 +172,7 @@ class TestScanTimeLimit(unittest.TestCase):
         injector = self._injector(m_configloader, m_helper)
         self.assertEqual(injector.tuning_defaults(), SAFE_DEFAULTS)
 
-    @patch.object(module.subprocess, "run")
+    @patch.object(module, "run_nmap")
     def test_timeout_keeps_partial_results_and_sends_traces(
         self, m_run, m_configloader, m_helper, _
     ):
