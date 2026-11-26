@@ -48,6 +48,8 @@ the AI target endpoint being tested.
 
 - A running OpenAEV platform, reachable from the injector (along with its RabbitMQ broker)
 - Outbound network access to the AI target endpoints you want to test
+- The Docker image must be built with `--build-context injector_common=../injector_common`, because the injector depends
+  on the shared `injector_common` package located one level above this directory.
 - Engines:
   - The `native` engine and the `PyRIT multi-turn campaign` (built-in escalation loop) work out of the box, with no
     extra tooling.
@@ -98,10 +100,11 @@ require no authentication (e.g. a local model deployment) simply carry no token.
 
 ### Docker Deployment
 
-This injector does not depend on the shared `injector_common` package, so a plain build context is enough:
+This injector depends on the shared `injector_common` package, so the image must be built with a build context that
+exposes it:
 
 ```shell
-docker build . -t openaev/injector-ai-redteam:latest
+docker build --build-context injector_common=../injector_common . -t openaev/injector-ai-redteam:latest
 ```
 
 To bake the heavy OSS engines (Garak, PyRIT, Promptfoo) into the image, pass the build argument:
@@ -126,12 +129,12 @@ docker compose up -d
 Create a `config.yml` from `config.yml.sample`, then install and run the injector:
 
 ```shell
-poetry install --extras prod
+poetry install
 poetry run python -m ai_redteam.openaev_ai_redteam
 ```
 
 > For local development against a checkout of [client-python](https://github.com/OpenAEV-Platform/client-python)
-> (cloned at `../../client-python`), use `poetry install --extras dev`. To enable the Garak and Promptfoo engines,
+> (cloned at `../../client-python`), use `poetry install --with dev,test`. To enable the Garak and Promptfoo engines,
 > also install `garak` (`pip install garak`) and `promptfoo` (`npm install -g promptfoo`).
 
 ## Usage
