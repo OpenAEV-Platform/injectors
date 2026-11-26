@@ -252,6 +252,7 @@ class ExternalContractsManager:
                     mandatory=False,
                 )
             ]
+            + [NucleiContracts.scan_timeout_field()]
         )
         outputs = NucleiContracts.core_outputs()
         base = NucleiContracts.build_contract(

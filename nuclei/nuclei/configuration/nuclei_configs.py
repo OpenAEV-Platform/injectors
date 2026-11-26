@@ -1,6 +1,6 @@
 """Configuration for Nuclei injector."""
 
-from typing import Literal
+from typing import Literal, Optional
 
 from pydantic import Field, PositiveInt, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -50,16 +50,19 @@ class ConfigLoaderNuclei(BaseSettings):
         ),
     )
 
-    scan_timeout: PositiveInt = Field(
-        default=540,
+    scan_timeout: Optional[PositiveInt] = Field(
+        default=None,
         description=(
             "Hard ceiling in seconds for a whole Nuclei scan. When exceeded, the "
-            "scan process is terminated and the inject is reported as a timeout "
-            "error instead of hanging forever (Nuclei's own -timeout is "
-            "per-request and never bounds the total run). Keep it below the "
-            "platform's inject.execution.threshold.minutes (default 10 min) so "
-            "the injector reports the timeout before the platform marks the "
-            "inject stale. Not a Nuclei flag."
+            "scan process is terminated, the findings already produced are "
+            "reported and the inject ends TIMEOUT with partial results "
+            "(Nuclei's own -timeout is per-request and never bounds the total "
+            "run). Unset (default): derived from the platform's inject execution "
+            "threshold (runtime setting inject_execution_threshold_minutes) minus "
+            "60 s, or 540 s when the platform does not expose it. An inject may "
+            "set its own ceiling with the scan_timeout_seconds field. Any "
+            "ceiling is capped below the platform threshold, past which the "
+            "platform no longer accepts the results. Not a Nuclei flag."
         ),
     )
 
@@ -188,6 +191,15 @@ class ConfigLoaderNuclei(BaseSettings):
             "inject field. A larger download is rejected. Not a Nuclei flag."
         ),
     )
+
+    @field_validator("scan_timeout", mode="before")
+    @classmethod
+    def empty_scan_timeout_is_unset(cls, value):
+        # docker-compose passes NUCLEI_SCAN_TIMEOUT=${NUCLEI_SCAN_TIMEOUT}: an
+        # unset variable arrives as "" and means "derive the ceiling".
+        if isinstance(value, str) and not value.strip():
+            return None
+        return value
 
     @field_validator(
         "exclude_type",
