@@ -54,6 +54,7 @@ class TestOpenAEVNmap(unittest.TestCase):
             message_data.contract_id,
             message_data.get_targets.return_value,
             message_data.scan_options,
+            defaults=injector.tuning_defaults(),
         )
         m_build_execution_message.assert_called_once_with(
             selector_key=message_data.selector_key,
@@ -71,7 +72,10 @@ class TestOpenAEVNmap(unittest.TestCase):
             },
         )
         m_subprocess_run.assert_called_once_with(
-            m_build_args.return_value, check=False, capture_output=True
+            m_build_args.return_value,
+            check=False,
+            capture_output=True,
+            timeout=ANY,
         )
         m_xmlparse.assert_called_once_with(
             m_subprocess_run.return_value.stdout,

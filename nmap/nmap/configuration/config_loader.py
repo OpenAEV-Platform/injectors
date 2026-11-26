@@ -2,12 +2,17 @@ from pydantic import Field
 from pyoaev.configuration import ConfigLoaderOAEV, Configuration, SettingsLoader
 
 from nmap.configuration.injector_config_override import InjectorConfigOverride
+from nmap.configuration.nmap_configs import ConfigLoaderNmap
 from nmap.contracts.nmap_contracts import NmapContracts
 
 
 class ConfigLoader(SettingsLoader):
     openaev: ConfigLoaderOAEV = Field(default_factory=ConfigLoaderOAEV)
     injector: InjectorConfigOverride = Field(default_factory=InjectorConfigOverride)
+    nmap: ConfigLoaderNmap = Field(
+        default_factory=ConfigLoaderNmap,
+        description="Nmap configurations (safe defaults and scan time limit).",
+    )
 
     def to_daemon_config(self) -> Configuration:
         return Configuration(

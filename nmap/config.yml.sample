@@ -9,3 +9,10 @@ injector:
   name: 'Nmap'
   log_level: 'error'
 
+nmap:
+  # applied when an inject leaves the field empty
+  default_host_timeout_seconds: 300
+  default_max_retries: 2
+  # whole-run time limit in seconds; unset = platform inject execution threshold - 60 s
+  # scan_timeout: 540
+

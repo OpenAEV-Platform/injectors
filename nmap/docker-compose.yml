@@ -9,4 +9,8 @@ services:
       - INJECTOR_ID=${INJECTOR_ID}
       - INJECTOR_NAME=${INJECTOR_NAME}
       - INJECTOR_LOG_LEVEL=${INJECTOR_LOG_LEVEL}
+      # optional: safe defaults for empty timing fields and the whole-run time limit
+      - NMAP_DEFAULT_HOST_TIMEOUT_SECONDS=${NMAP_DEFAULT_HOST_TIMEOUT_SECONDS}
+      - NMAP_DEFAULT_MAX_RETRIES=${NMAP_DEFAULT_MAX_RETRIES}
+      - NMAP_SCAN_TIMEOUT=${NMAP_SCAN_TIMEOUT}
     restart: always
