@@ -2,6 +2,9 @@ FROM python:3.14-alpine AS builder
 
 RUN apk --no-cache upgrade && apk --no-cache add git
 
+WORKDIR /opt/injector_common
+COPY --from=injector_common ./ ./
+
 WORKDIR /
 RUN git clone https://github.com/OpenAEV-Platform/client-python
 
@@ -21,6 +24,9 @@ FROM python:3.14-alpine AS runner
 
 RUN apk --no-cache upgrade
 RUN pip install --no-cache-dir -U pip certifi
+
+WORKDIR /opt/injector_common
+COPY --from=injector_common ./ ./
 
 ARG installdir=/opt/injector
 WORKDIR ${installdir}

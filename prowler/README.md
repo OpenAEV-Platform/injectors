@@ -6,6 +6,8 @@ Run Prowler cloud-security assessments from OpenAEV and return the results to th
 
 - An OpenAEV instance and valid connection configuration
 - Prowler 5.36.0, reachable at `PROWLER_EXECUTABLE_PATH` (default `/usr/local/bin/prowler`)
+- The Docker image must be built with `--build-context injector_common=../injector_common`, because the injector depends
+  on the shared `injector_common` package located one level above this directory.
 - Python 3.14 or later when running from source
 
 The injector emits Prowler 5.36.0 CLI arguments. The Docker image bundles Prowler 5.36.0 in its own virtual environment, linked to `/usr/local/bin/prowler`: the Prowler package uses the same `prowler` import name as this injector and pins a different pydantic version, so the two cannot share an environment. When running from source, install Prowler the same way and point `PROWLER_EXECUTABLE_PATH` at its `prowler` executable.
@@ -26,7 +28,14 @@ Copy `config.yml.sample` to the ignored `config.yml`, or provide equivalent envi
 
 ## Run
 
-With Docker, using the `openaev/injector-prowler` image and the provided `docker-compose.yml`:
+This injector depends on the shared `injector_common` package, so the image must be built with a build context that
+exposes it:
+
+```shell
+docker build --build-context injector_common=../injector_common . -t openaev/injector-prowler:latest
+```
+
+Create a `.env` file from `.env.sample` and fill in your values, then start the injector with the provided `docker-compose.yml`:
 
 ```shell
 docker compose up -d
