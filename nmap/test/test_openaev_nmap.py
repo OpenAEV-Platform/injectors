@@ -24,7 +24,7 @@ class TestOpenAEVNmap(unittest.TestCase):
         self.assertIsInstance(injector.signature_manager, module.SignatureManager)
 
     @patch.object(module.NmapOutputParser, "xmlparse")
-    @patch.object(module.subprocess, "run")
+    @patch.object(module, "run_nmap")
     @patch.object(module.Targets, "build_execution_message")
     @patch.object(module.NmapCommandBuilder, "build_args")
     def test_openaev_nmap_execution(
@@ -73,9 +73,8 @@ class TestOpenAEVNmap(unittest.TestCase):
         )
         m_subprocess_run.assert_called_once_with(
             m_build_args.return_value,
-            check=False,
-            capture_output=True,
             timeout=ANY,
+            on_host=ANY,
         )
         m_xmlparse.assert_called_once_with(
             m_subprocess_run.return_value.stdout,
@@ -87,7 +86,7 @@ class TestOpenAEVNmap(unittest.TestCase):
         self.assertEqual(nmap_output, m_xmlparse.return_value)
 
     @patch.object(module.NmapOutputParser, "xmlparse")
-    @patch.object(module.subprocess, "run")
+    @patch.object(module, "run_nmap")
     @patch.object(module.Targets, "build_execution_message")
     @patch.object(module.NmapCommandBuilder, "build_args")
     def test_openaev_nmap_execution_reports_missed_targets_as_warning(
@@ -171,7 +170,7 @@ class TestOpenAEVNmap(unittest.TestCase):
         calls = m_helper.return_value.api.inject.execution_callback.call_args_list
         return result, [c.kwargs["data"] for c in calls]
 
-    @patch.object(module.subprocess, "run")
+    @patch.object(module, "run_nmap")
     @patch.object(module.NmapCommandBuilder, "build_args")
     def test_openaev_nmap_execution_reports_skipped_assets(
         self, m_build_args, m_subprocess_run, m_configloader, m_helper, m_msgdata, _
@@ -210,7 +209,7 @@ class TestOpenAEVNmap(unittest.TestCase):
         # The command execution message carries the summary too.
         self.assertIn("2 of 3 assets skipped", traces[0]["execution_message"])
 
-    @patch.object(module.subprocess, "run")
+    @patch.object(module, "run_nmap")
     @patch.object(module.NmapCommandBuilder, "build_args")
     def test_openaev_nmap_execution_without_skipped_assets_is_unchanged(
         self, m_build_args, m_subprocess_run, m_configloader, m_helper, m_msgdata, _
@@ -239,7 +238,7 @@ class TestOpenAEVNmap(unittest.TestCase):
         self.assertNotIn("skipped", result["message"])
 
     @patch.object(module.NmapOutputParser, "xmlparse")
-    @patch.object(module.subprocess, "run")
+    @patch.object(module, "run_nmap")
     @patch.object(module.Targets, "build_execution_message")
     @patch.object(module.NmapCommandBuilder, "build_args")
     def test_openaev_nmap_execution_emits_per_target_traces(
@@ -313,7 +312,7 @@ class TestOpenAEVNmap(unittest.TestCase):
         for c in target_calls:
             self.assertEqual(c.kwargs["data"]["execution_action"], "command_execution")
 
-    @patch.object(module.subprocess, "run")
+    @patch.object(module, "run_nmap")
     @patch.object(module.Targets, "build_execution_message")
     @patch.object(module.NmapCommandBuilder, "build_args")
     def test_openaev_nmap_execution_nonzero_exit_with_report_keeps_results(
@@ -355,7 +354,7 @@ class TestOpenAEVNmap(unittest.TestCase):
         self.assertEqual(result["outputs"]["ports"], [22])
         self.assertIn("nmap exited with code 1", result["message"])
 
-    @patch.object(module.subprocess, "run")
+    @patch.object(module, "run_nmap")
     @patch.object(module.Targets, "build_execution_message")
     @patch.object(module.NmapCommandBuilder, "build_args")
     def test_openaev_nmap_execution_nonzero_exit_without_report_raises(
@@ -383,7 +382,7 @@ class TestOpenAEVNmap(unittest.TestCase):
         self.assertEqual(ctx.exception.returncode, 255)
         self.assertEqual(ctx.exception.stderr, b"QUITTING!")
 
-    @patch.object(module.subprocess, "run")
+    @patch.object(module, "run_nmap")
     @patch.object(module.Targets, "build_execution_message")
     @patch.object(module.NmapCommandBuilder, "build_args")
     def test_openaev_nmap_execution_nonzero_exit_empty_report_is_error(
@@ -885,7 +884,7 @@ class TestOpenAEVNmap(unittest.TestCase):
     @patch.object(module, "ExecutionDetails")
     @patch.object(module, "SignatureManager")
     @patch.object(module, "build_network_configs")
-    @patch.object(module.subprocess, "run")
+    @patch.object(module, "run_nmap")
     @patch.object(module.Targets, "build_execution_message")
     @patch.object(module.NmapCommandBuilder, "build_args")
     def test_openaev_nmap_inject_deleted_before_scan_aborts(

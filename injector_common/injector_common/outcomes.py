@@ -15,6 +15,7 @@ from typing import Iterable, Optional, Union
 
 from pyoaev.helpers import OpenAEVInjectorHelper
 
+from injector_common.callbacks import call_with_retry
 from injector_common.inject_gone import InjectGoneError, is_inject_gone
 from injector_common.targets import (
     NO_RESULT_REASON,
@@ -219,7 +220,15 @@ def send_target_outcome_traces(
         else:
             logger.warning(message)
         try:
-            helper.api.inject.execution_callback(inject_id=inject_id, data=data)
+            # A transient network error must not lose a result the scan took
+            # minutes to get: bounded retry (injector_common.callbacks).
+            call_with_retry(
+                lambda: helper.api.inject.execution_callback(
+                    inject_id=inject_id, data=data
+                ),
+                logger,
+                f"Target outcome trace for '{outcome.resolution.target}'",
+            )
             sent += 1
         except Exception as exc:  # noqa: BLE001
             # A 404 means the inject was deleted: stop at the first one.
