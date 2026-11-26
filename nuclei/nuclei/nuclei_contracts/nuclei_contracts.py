@@ -148,6 +148,17 @@ class NucleiContracts:
         ]
 
     @staticmethod
+    def scan_timeout_field():
+        # Per-inject whole-scan ceiling (seconds). Empty: the deployment value
+        # (NUCLEI_SCAN_TIMEOUT), else derived from the platform inject execution
+        # threshold. Key mirrored by openaev_nuclei.SCAN_TIMEOUT_FIELD.
+        return ContractText(
+            key="scan_timeout_seconds",
+            label="Scan time limit in seconds (empty: deployment default)",
+            mandatory=False,
+        )
+
+    @staticmethod
     def core_outputs():
         output_expectation_signatures = ContractOutputElement(
             type=ContractOutputType.ExpectationSignature,
@@ -242,7 +253,8 @@ class NucleiContracts:
                             label="Options",
                             mandatory=False,
                         )
-                    ],
+                    ]
+                    + [NucleiContracts.scan_timeout_field()],
                     NucleiContracts.core_outputs(),
                     f"Nuclei - {en}",
                     f"Nuclei - {fr}",

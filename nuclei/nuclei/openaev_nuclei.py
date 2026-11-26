@@ -56,6 +56,19 @@ SECURITY_PLATFORM_LOGO_PATH = "nuclei/img/nuclei.jpg"
 # noisy scan cannot flood the injector logs.
 _STDERR_LOG_TAIL = 2000
 
+# Inject field holding the per-inject whole-scan ceiling, in seconds.
+SCAN_TIMEOUT_FIELD = "scan_timeout_seconds"
+# Ceiling used when neither the inject, the deployment nor the platform gives one.
+DEFAULT_SCAN_TIMEOUT = 540
+# Margin kept below the platform inject execution threshold: past the threshold
+# the platform finalizes the inject itself and refuses the injector's results.
+THRESHOLD_MARGIN_SECONDS = 60
+# Runtime setting of OpenAEV (GET /api/settings, runtime_settings).
+THRESHOLD_SETTING_KEY = "inject_execution_threshold_minutes"
+# Execution status of a scan terminated at its ceiling (an error status of the
+# platform: the inject is not reported as a completed scan).
+TIMEOUT_STATUS = "TIMEOUT"
+
 
 def _safe_remove(path: Optional[str]) -> None:
     """Best-effort delete of a temporary template file; never raises."""
@@ -70,6 +83,28 @@ def _safe_remove(path: Optional[str]) -> None:
 def _decode(raw: Optional[bytes]) -> str:
     """Best-effort decode of captured subprocess output for logging/errors."""
     return (raw or b"").decode("utf-8", "replace").strip()
+
+
+def _positive_int(value) -> Optional[int]:
+    """A strictly positive integer out of an inject or setting value, else None."""
+    if isinstance(value, bool):
+        return None
+    if isinstance(value, list):
+        value = value[0] if value else None
+    if isinstance(value, int):
+        return value if value > 0 else None
+    if isinstance(value, str) and value.strip().isdigit():
+        number = int(value.strip())
+        return number if number > 0 else None
+    return None
+
+
+class ScanTimedOut(RuntimeError):
+    """A scan terminated at its ceiling; carries the partial parsed result."""
+
+    def __init__(self, message: str, result: Dict):
+        super().__init__(message)
+        self.result = result
 
 
 class OpenAEVNuclei:
@@ -200,7 +235,7 @@ class OpenAEVNuclei:
             )
 
             input_data = ("\n".join(targets) + "\n").encode("utf-8")
-            scan_timeout = self.config_loader.nuclei.scan_timeout
+            scan_timeout = self.scan_timeout_for(msg_data.inject_content)
             try:
                 # Bound concurrency (one slot per running Nuclei subprocess) and
                 # take the reader side of the templates lock so a scan never
@@ -212,17 +247,19 @@ class OpenAEVNuclei:
             except subprocess.TimeoutExpired as exc:
                 # A hung scan must not block the consumer forever: Nuclei's own
                 # -timeout is per-request, so only this ceiling bounds the run.
+                # The JSONL findings Nuclei wrote before the kill are kept.
                 stderr_tail = _decode(exc.stderr)
                 self.helper.injector_logger.error(
                     f"Nuclei scan timed out after {scan_timeout}s for inject "
                     f"{msg_data.inject_id} and was terminated. Nuclei stderr "
                     f"tail: {stderr_tail[-_STDERR_LOG_TAIL:] or '<none>'}"
                 )
-                raise RuntimeError(
-                    f"Nuclei scan timed out after {scan_timeout} seconds and was "
-                    "terminated before completion. Reduce the scan scope (tags / "
-                    "manual template path / fewer targets) or raise "
-                    "NUCLEI_SCAN_TIMEOUT."
+                partial = self.parser.parse(
+                    _decode(exc.stdout),
+                    msg_data.target_results.ip_to_asset_id_map,
+                )
+                raise ScanTimedOut(
+                    self._timeout_message(scan_timeout, partial), partial
                 ) from exc
             except subprocess.CalledProcessError as exc:
                 # Non-zero exit: bubble up the stderr so the terminal error trace
@@ -254,6 +291,71 @@ class OpenAEVNuclei:
             )
         finally:
             _safe_remove(tmp_template_path)
+
+    @staticmethod
+    def _timeout_message(scan_timeout: int, partial: Dict) -> str:
+        outputs = partial.get("outputs") or {}
+        cves = len(outputs.get("cve") or [])
+        others = len(outputs.get("others") or [])
+        return (
+            f"Nuclei scan terminated at its {scan_timeout} s time limit before "
+            f"completion: results partial ({cves} CVE(s), {others} other "
+            "finding(s) reported from the part scanned). Raise the limit with the "
+            f"inject field '{SCAN_TIMEOUT_FIELD}' or the NUCLEI_SCAN_TIMEOUT key "
+            "of the injector deployment (catalog configuration), or reduce the "
+            "scan scope (tags, template, fewer targets)."
+        )
+
+    def _platform_threshold_seconds(self) -> Optional[int]:
+        """The platform inject execution threshold in seconds, or None.
+
+        Read per inject (an administrator changes it at runtime) from the
+        runtime_settings of GET /api/settings. Best-effort: an older platform,
+        a missing setting or a failed read answers None.
+        """
+        try:
+            settings = self.helper.api.http_get("/settings")
+        except Exception as err:
+            self.helper.injector_logger.warning(
+                "Could not read the platform inject execution threshold: " + str(err)
+            )
+            return None
+        items = settings.get("runtime_settings") if isinstance(settings, dict) else None
+        for item in items if isinstance(items, list) else []:
+            if isinstance(item, dict) and item.get("key") == THRESHOLD_SETTING_KEY:
+                minutes = _positive_int(item.get("value"))
+                return minutes * 60 if minutes else None
+        return None
+
+    def scan_timeout_for(self, inject_content) -> int:
+        """The whole-scan ceiling of one inject, in seconds.
+
+        The inject field scan_timeout_seconds, else the deployment value
+        (NUCLEI_SCAN_TIMEOUT), else the platform inject execution threshold
+        minus a margin, else 540 s. Capped below the platform threshold when
+        it is known: past it the platform finalizes the inject itself and the
+        scan results are refused.
+        """
+        requested = None
+        if isinstance(inject_content, dict):
+            requested = _positive_int(inject_content.get(SCAN_TIMEOUT_FIELD))
+        if requested is None:
+            requested = _positive_int(self.config_loader.nuclei.scan_timeout)
+        threshold = self._platform_threshold_seconds()
+        ceiling = (
+            max(threshold - THRESHOLD_MARGIN_SECONDS, THRESHOLD_MARGIN_SECONDS)
+            if threshold
+            else None
+        )
+        if requested is None:
+            return ceiling or DEFAULT_SCAN_TIMEOUT
+        if ceiling and requested > ceiling:
+            self.helper.injector_logger.warning(
+                f"Scan time limit {requested}s capped to {ceiling}s, below the "
+                f"platform inject execution threshold ({threshold}s)."
+            )
+            return ceiling
+        return requested
 
     def _template_variables(
         self, msg_data: MessageData, content, tmp_template_path: Optional[str]
@@ -373,6 +475,16 @@ class OpenAEVNuclei:
                 execution_message = execution_result.get("message")
                 execution_result_outputs = execution_result.get("outputs")
                 execution_status = "SUCCESS"
+            except ScanTimedOut as e:
+                # Terminated at the ceiling: report what was found, as partial.
+                execution_message = str(e)
+                execution_result_outputs = dict(e.result.get("outputs") or {})
+                if not execution_result_outputs.get("cve"):
+                    # No CVE found before the kill: an empty list would read as
+                    # "scanned, not vulnerable" for every target on the platform.
+                    execution_result_outputs.pop("cve", None)
+                execution_status = TIMEOUT_STATUS
+                tool_output = {"error_info": {"exit_code": 1}}
             except (MissingTemplateInputs, TemplateNotFound) as e:
                 # Not executed: an explicit inconclusive result, never a no-match.
                 execution_message = str(e)
