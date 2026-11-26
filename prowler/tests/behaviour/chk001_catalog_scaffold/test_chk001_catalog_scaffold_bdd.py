@@ -4,7 +4,7 @@ import json
 import logging
 from pathlib import Path
 from typing import cast
-from unittest.mock import Mock
+from unittest.mock import Mock, patch
 
 import pytest
 from pydantic import BaseModel, ValidationError
@@ -183,8 +183,11 @@ def test_startup_registers_the_base_assessment_contracts(
     _then_base_contracts_are_registered(config, helper)
 
 
+@patch.object(prowler_main, "intercept_dump_argument")
 def test_startup_registers_the_injector_with_its_bundled_icon(
-    standard_injector_environment: None, monkeypatch: pytest.MonkeyPatch
+    m_intercept_dump_argument,
+    standard_injector_environment: None,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """Registration uploads the bundled icon instead of an empty icon part."""
     helper = Mock()

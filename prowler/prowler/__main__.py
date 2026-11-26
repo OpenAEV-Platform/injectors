@@ -7,6 +7,7 @@ from pathlib import Path
 from pydantic import ValidationError
 from pyoaev.helpers import OpenAEVConfigHelper, OpenAEVInjectorHelper
 
+from injector_common.dump_config import intercept_dump_argument
 from prowler.injector import ProwlerInjector
 from prowler.models import ConfigLoader
 
@@ -18,6 +19,8 @@ def main() -> None:
     logger = logging.getLogger(__name__)
     try:
         config = ConfigLoader()
+        intercept_dump_argument(config.to_daemon_config())
+
         # Load the injector icon for the helper
         icon_bytes = (
             Path(__file__).parents[1] / str(config.injector.icon_filepath)
