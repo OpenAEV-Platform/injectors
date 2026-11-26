@@ -1,6 +1,7 @@
 from pyoaev.helpers import OpenAEVInjectorHelper
 
 from injector_common.constants import TARGET_PROPERTY_SELECTOR_KEY, TARGET_SELECTOR_KEY
+from injector_common.scan_budget import SCAN_TIMEOUT_FIELD
 from injector_common.targets import TargetProperty, Targets
 from nmap.contracts.nmap_constants import TUNING_KEYS
 
@@ -30,6 +31,8 @@ class MessageData:
         # Optional timing, retry and port selection fields, validated when the
         # command is built.
         self.scan_options = {key: content.get(key) for key in TUNING_KEYS}
+        # Optional whole-run time limit in seconds (empty: deployment default).
+        self.scan_timeout = content.get(SCAN_TIMEOUT_FIELD)
 
         self.expectation_types = [
             expectation.get("expectation_type")

@@ -43,6 +43,24 @@ class NmapCommandBuilder:
         return str(value).strip() if value is not None else ""
 
     @staticmethod
+    def with_defaults(
+        options: Optional[Dict], defaults: Optional[Dict]
+    ) -> Optional[Dict]:
+        """The inject options with the deployment safe defaults filled in for the
+        fields the inject left empty (missing, None, blank or an empty list). An
+        explicit value, 0 included, is kept. A default of 0 (or None) adds nothing."""
+        if not defaults:
+            return options
+        merged = dict(options or {})
+        for key, default in defaults.items():
+            if NmapCommandBuilder._text(merged, key):
+                continue
+            if default is None or int(default) == 0:
+                continue
+            merged[key] = str(int(default))
+        return merged
+
+    @staticmethod
     def tuning_args(options: Optional[Dict]) -> List[str]:
         """The optional timing, retry and port selection flags of the inject content.
 
@@ -98,9 +116,16 @@ class NmapCommandBuilder:
 
     @staticmethod
     def build_args(
-        contract_id: str, targets: List[str], options: Optional[Dict] = None
+        contract_id: str,
+        targets: List[str],
+        options: Optional[Dict] = None,
+        defaults: Optional[Dict] = None,
     ) -> List[str]:
-        """Build a list of nmap command-line arguments for a given contract."""
+        """Build a list of nmap command-line arguments for a given contract.
+
+        ``defaults`` maps a tuning field to the value used when the inject leaves it
+        empty (the injector's safe defaults: --host-timeout, --max-retries)."""
+        options = NmapCommandBuilder.with_defaults(options, defaults)
         args = ["nmap", "-Pn"]
 
         if contract_id == TCP_SYN_SCAN_CONTRACT:

@@ -26,6 +26,7 @@ from injector_common.constants import (
     TARGET_SELECTOR_KEY,
     TARGETS_KEY,
 )
+from injector_common.scan_budget import SCAN_TIMEOUT_FIELD
 from injector_common.targets import TargetProperty, target_property_choices_dict
 from nmap.contracts.nmap_constants import (
     FIN_SCAN_CONTRACT,
@@ -121,7 +122,8 @@ class NmapContracts:
             visibleConditionValues={target_selector.key: "manual"},
         )
 
-        # -- TUNING (optional; an empty field keeps nmap's default) --
+        # -- TUNING (optional; an empty field keeps nmap's default, except the host
+        # timeout and the retries, which get the injector's safe defaults) --
         timing = ContractSelect(
             key=TIMING_KEY,
             label="Timing template",
@@ -134,12 +136,19 @@ class NmapContracts:
         )
         max_retries = ContractText(
             key=MAX_RETRIES_KEY,
-            label="Max retries per port (--max-retries, empty = nmap default)",
+            label=(
+                "Max retries per port (--max-retries, empty = injector default, "
+                "2 unless the deployment sets NMAP_DEFAULT_MAX_RETRIES)"
+            ),
             mandatory=False,
         )
         host_timeout = ContractText(
             key=HOST_TIMEOUT_KEY,
-            label="Give up on a host after (seconds, --host-timeout)",
+            label=(
+                "Give up on a host after (seconds, --host-timeout, empty = injector "
+                "default, 300 unless the deployment sets "
+                "NMAP_DEFAULT_HOST_TIMEOUT_SECONDS; 0 = no limit)"
+            ),
             mandatory=False,
         )
         max_rtt_timeout = ContractText(
@@ -160,6 +169,14 @@ class NmapContracts:
         ports = ContractText(
             key=PORTS_KEY,
             label="Ports to scan (-p, e.g. 22,80,443,8000-8100; instead of top ports)",
+            mandatory=False,
+        )
+        # Whole-run ceiling (seconds). Empty: the deployment value
+        # (NMAP_SCAN_TIMEOUT), else derived from the platform inject execution
+        # threshold. On expiry the hosts already scanned are kept.
+        scan_timeout = ContractText(
+            key=SCAN_TIMEOUT_FIELD,
+            label="Scan time limit in seconds (empty: deployment default)",
             mandatory=False,
         )
 
@@ -248,6 +265,7 @@ class NmapContracts:
                     min_rate,
                     top_ports,
                     ports,
+                    scan_timeout,
                     expectations,
                 ]
             )

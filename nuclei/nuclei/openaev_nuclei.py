@@ -15,6 +15,12 @@ from pyoaev.signatures.models import ExecutionDetails
 
 from injector_common.dump_config import intercept_dump_argument
 from injector_common.inject_gone import abort_on_inject_gone, is_inject_gone
+from injector_common.scan_budget import (  # noqa: F401 (re-exported for tests)
+    DEFAULT_SCAN_TIMEOUT,
+    SCAN_TIMEOUT_FIELD,
+    THRESHOLD_SETTING_KEY,
+    resolve_scan_timeout,
+)
 from injector_common.targets import Targets
 from injector_common.traces import send_per_target_traces
 from nuclei.configuration.config_loader import ConfigLoader
@@ -56,15 +62,6 @@ SECURITY_PLATFORM_LOGO_PATH = "nuclei/img/nuclei.jpg"
 # noisy scan cannot flood the injector logs.
 _STDERR_LOG_TAIL = 2000
 
-# Inject field holding the per-inject whole-scan ceiling, in seconds.
-SCAN_TIMEOUT_FIELD = "scan_timeout_seconds"
-# Ceiling used when neither the inject, the deployment nor the platform gives one.
-DEFAULT_SCAN_TIMEOUT = 540
-# Margin kept below the platform inject execution threshold: past the threshold
-# the platform finalizes the inject itself and refuses the injector's results.
-THRESHOLD_MARGIN_SECONDS = 60
-# Runtime setting of OpenAEV (GET /api/settings, runtime_settings).
-THRESHOLD_SETTING_KEY = "inject_execution_threshold_minutes"
 # Execution status of a scan terminated at its ceiling (an error status of the
 # platform: the inject is not reported as a completed scan).
 TIMEOUT_STATUS = "TIMEOUT"
@@ -83,20 +80,6 @@ def _safe_remove(path: Optional[str]) -> None:
 def _decode(raw: Optional[bytes]) -> str:
     """Best-effort decode of captured subprocess output for logging/errors."""
     return (raw or b"").decode("utf-8", "replace").strip()
-
-
-def _positive_int(value) -> Optional[int]:
-    """A strictly positive integer out of an inject or setting value, else None."""
-    if isinstance(value, bool):
-        return None
-    if isinstance(value, list):
-        value = value[0] if value else None
-    if isinstance(value, int):
-        return value if value > 0 else None
-    if isinstance(value, str) and value.strip().isdigit():
-        number = int(value.strip())
-        return number if number > 0 else None
-    return None
 
 
 class ScanTimedOut(RuntimeError):
@@ -306,56 +289,13 @@ class OpenAEVNuclei:
             "scan scope (tags, template, fewer targets)."
         )
 
-    def _platform_threshold_seconds(self) -> Optional[int]:
-        """The platform inject execution threshold in seconds, or None.
-
-        Read per inject (an administrator changes it at runtime) from the
-        runtime_settings of GET /api/settings. Best-effort: an older platform,
-        a missing setting or a failed read answers None.
-        """
-        try:
-            settings = self.helper.api.http_get("/settings")
-        except Exception as err:
-            self.helper.injector_logger.warning(
-                "Could not read the platform inject execution threshold: " + str(err)
-            )
-            return None
-        items = settings.get("runtime_settings") if isinstance(settings, dict) else None
-        for item in items if isinstance(items, list) else []:
-            if isinstance(item, dict) and item.get("key") == THRESHOLD_SETTING_KEY:
-                minutes = _positive_int(item.get("value"))
-                return minutes * 60 if minutes else None
-        return None
-
     def scan_timeout_for(self, inject_content) -> int:
-        """The whole-scan ceiling of one inject, in seconds.
-
-        The inject field scan_timeout_seconds, else the deployment value
-        (NUCLEI_SCAN_TIMEOUT), else the platform inject execution threshold
-        minus a margin, else 540 s. Capped below the platform threshold when
-        it is known: past it the platform finalizes the inject itself and the
-        scan results are refused.
-        """
-        requested = None
-        if isinstance(inject_content, dict):
-            requested = _positive_int(inject_content.get(SCAN_TIMEOUT_FIELD))
-        if requested is None:
-            requested = _positive_int(self.config_loader.nuclei.scan_timeout)
-        threshold = self._platform_threshold_seconds()
-        ceiling = (
-            max(threshold - THRESHOLD_MARGIN_SECONDS, THRESHOLD_MARGIN_SECONDS)
-            if threshold
-            else None
+        """The whole-scan ceiling of one inject, in seconds: the inject field
+        scan_timeout_seconds, else NUCLEI_SCAN_TIMEOUT, else derived from the
+        platform inject execution threshold (injector_common.scan_budget)."""
+        return resolve_scan_timeout(
+            self.helper, inject_content, self.config_loader.nuclei.scan_timeout
         )
-        if requested is None:
-            return ceiling or DEFAULT_SCAN_TIMEOUT
-        if ceiling and requested > ceiling:
-            self.helper.injector_logger.warning(
-                f"Scan time limit {requested}s capped to {ceiling}s, below the "
-                f"platform inject execution threshold ({threshold}s)."
-            )
-            return ceiling
-        return requested
 
     def _template_variables(
         self, msg_data: MessageData, content, tmp_template_path: Optional[str]

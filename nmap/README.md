@@ -68,6 +68,27 @@ The injector is configured either through environment variables (recommended, re
 | Injector Name | `injector.name`      | `INJECTOR_NAME`             | Nmap    | No        | The name of the injector as shown in OpenAEV.                   |
 | Log Level     | `injector.log_level` | `INJECTOR_LOG_LEVEL`        | error   | No        | Verbosity of the logs. One of `debug`, `info`, `warn`, `error`. |
 
+### Nmap environment variables
+
+| Parameter                | config.yml                          | Docker environment variable         | Default | Description |
+|--------------------------|-------------------------------------|-------------------------------------|---------|-------------|
+| Default host timeout     | `nmap.default_host_timeout_seconds` | `NMAP_DEFAULT_HOST_TIMEOUT_SECONDS` | 300     | `--host-timeout` (seconds) used when an inject leaves *Give up on a host after* empty. `0`: no default (nmap's own, unbounded). |
+| Default max retries      | `nmap.default_max_retries`          | `NMAP_DEFAULT_MAX_RETRIES`          | 2       | `--max-retries` used when an inject leaves *Max retries per port* empty. |
+| Scan time limit          | `nmap.scan_timeout`                 | `NMAP_SCAN_TIMEOUT`                 | /       | Whole-run ceiling in seconds. Unset: the platform's inject execution threshold minus 60 s, or 540 s when the platform does not expose it. |
+
+### Timing defaults and the scan time limit
+
+An empty timing field no longer leaves the scan unbounded: the injector applies `--host-timeout 300s` and
+`--max-retries 2` (tunable above). A value set on the inject, `0` included, always wins; the timing template keeps
+nmap's default. Existing injects get these defaults with no edit.
+
+The whole run is bounded by a scan time limit: the inject field *Scan time limit in seconds*
+(`scan_timeout_seconds`), else `NMAP_SCAN_TIMEOUT`, else derived from the platform inject execution threshold. Any
+limit is capped 60 s below that threshold, past which the platform finalizes the inject and refuses late results.
+When the limit is reached nmap is terminated, the hosts it finished are kept (one trace each, ports and services in
+the structured output), every other target gets `not scanned, scan time limit reached`, and the inject ends
+`WARNING` (`ERROR` when no host was finished). The terminal callback is always sent.
+
 ## Deployment
 
 ### Docker Deployment
@@ -193,6 +214,7 @@ execution view:
 | Host down or no response             | `WARNING`    | `10.0.0.2 (asset db-02): host down or no response`            |
 | Hostname did not resolve             | `WARNING`    | `app.invalid (asset app-03): not scanned, hostname did not resolve` |
 | IP with no result in the report      | `WARNING`    | `10.0.0.9 (asset db-09): not scanned, no result returned by the scan` |
+| Not reached before the scan time limit | `WARNING`  | `10.0.0.7 (asset db-07): not scanned, scan time limit reached` |
 
 With `-Pn` Nmap reports every host as up; a host counts as answering when at least one port is open, closed or
 unfiltered. A manual target without an asset gets a trace only when it was not scanned.
@@ -215,9 +237,10 @@ the targets that were missed.
 
 Before the run, an `INFO` trace states the number of targets. The platform finalizes an inject still running after
 `inject.execution.threshold.minutes` (default 10) as timed out with the `ERROR` status. A result Nmap sends later is
-still recorded (ports, structured output), but the inject keeps the `ERROR` status. A large group (a hundred addresses
-or more, a SYN scan) can run past that threshold: raise `inject.execution.threshold.minutes` on the platform, or split
-the group.
+still recorded (ports, structured output), but the inject keeps the `ERROR` status. The scan time limit (see
+[Timing defaults and the scan time limit](#timing-defaults-and-the-scan-time-limit)) stops nmap before that
+threshold and keeps the hosts already scanned. To scan a large group whole, raise `inject.execution.threshold.minutes`
+on the platform, or split the group.
 
 ## Behavior
 

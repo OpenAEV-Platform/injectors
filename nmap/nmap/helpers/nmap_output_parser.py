@@ -4,19 +4,27 @@ from typing import Dict, Iterable, List, Optional, Set
 from lxml import objectify
 
 from injector_common.outcomes import (
+    ERROR,
     HOST_DOWN,
     HOST_UP,
     NOT_SCANNED,
+    WARNING,
     TargetOutcome,
     build_global_message,
     summarize_outcomes,
 )
+from injector_common.scan_budget import SCAN_TIMEOUT_FIELD
 from injector_common.targets import (
     MissedTarget,
     TargetExtractionResult,
     TargetResolution,
     Targets,
 )
+
+# Why a target got no result when nmap was terminated at its scan time limit.
+TIME_LIMIT_REASON = "scan time limit reached"
+# The report of a run killed before nmap wrote its XML header.
+_EMPTY_REPORT = b'<?xml version="1.0"?><nmaprun scanner="nmap"></nmaprun>'
 
 # nmap writes one line per target it cannot resolve on stderr, e.g.
 #   Failed to resolve "does-not-exist.invalid".
@@ -189,12 +197,32 @@ class NmapOutputParser:
         return [r for r in resolutions if r.target and r.target.lower() in values]
 
     @staticmethod
+    def salvage_partial(stdout: Optional[bytes]) -> bytes:
+        """A parseable report out of the output of an nmap run killed at its time
+        limit: the completed <host> elements kept, the rest cut, the root closed.
+
+        nmap writes each <host> of its XML report once the host is finished, so
+        the output of a killed run is a valid report truncated after some host.
+        Output with no <nmaprun> start gives an empty report (no host scanned)."""
+        data = stdout or b""
+        root = data.find(b"<nmaprun")
+        if root < 0 or data.find(b">", root) < 0:
+            return _EMPTY_REPORT
+        last_host = data.rfind(b"</host>")
+        if last_host >= 0:
+            end = last_host + len(b"</host>")
+        else:
+            end = data.find(b">", root) + 1
+        return data[:end] + b"</nmaprun>"
+
+    @staticmethod
     def xmlparse(
         stdout: bytes,
         selector_key: str,
         target_results: TargetExtractionResult,
         stderr: Optional[bytes] = None,
         exit_code: int = 0,
+        time_limit_seconds: Optional[int] = None,
     ) -> dict:
         """Parse XML formatted nmap outputs and extract open ports.
 
@@ -210,6 +238,11 @@ class NmapOutputParser:
         with a non-zero ``exit_code`` but its report kept at least one scanned target,
         ERROR when nmap exited non-zero and no target was scanned. On a non-zero
         ``exit_code`` the message ends with nmap's stderr.
+
+        ``time_limit_seconds`` is set when nmap was terminated at its scan time
+        limit (``stdout`` then comes from salvage_partial): a target with no <host>
+        is not scanned because the time limit was reached, and the status is
+        WARNING when at least one target was scanned, ERROR otherwise.
         """
         xml_parser = objectify.makeparser(resolve_entities=False)
         xml_tree = objectify.fromstring(stdout, xml_parser)
@@ -282,11 +315,22 @@ class NmapOutputParser:
                     open_ports_by_value.get(value, 0) + host_open_ports
                 )
 
+        unresolved = NmapOutputParser.unresolved_targets(stderr)
         missed: List[MissedTarget] = Targets.missed_targets(
-            target_results,
-            reached_values,
-            NmapOutputParser.unresolved_targets(stderr),
+            target_results, reached_values, unresolved
         )
+        if time_limit_seconds:
+            # Cut before nmap reached them: a hostname nmap said it could not
+            # resolve keeps that reason, every other miss is the time limit.
+            unresolved_values = {v.lower() for v in unresolved}
+            missed = [
+                (
+                    m
+                    if m.resolution.target.lower() in unresolved_values
+                    else MissedTarget(m.resolution, TIME_LIMIT_REASON)
+                )
+                for m in missed
+            ]
 
         outputs: Dict = {"scan_results": ports_scans_results, "ports": ports_results}
         # Raw stdout (the nmap XML report), stored as a single non-finding-compatible
@@ -312,12 +356,25 @@ class NmapOutputParser:
             stderr=stderr,
         )
 
+        message = build_global_message(summary, outcomes)
+        status = summary.status
+        if time_limit_seconds:
+            status = WARNING if summary.scanned else ERROR
+            message = (
+                f"nmap terminated at its {time_limit_seconds} s scan time limit: "
+                "results partial, the hosts finished before the limit are kept. "
+                f"Raise the limit with the inject field '{SCAN_TIMEOUT_FIELD}' or the "
+                "NMAP_SCAN_TIMEOUT key of the injector deployment, or reduce the "
+                "scan scope (fewer targets, ports or a faster timing template).\n"
+                + message
+            )
+
         return {
-            "message": build_global_message(summary, outcomes),
+            "message": message,
             "outputs": outputs,
             "missed": missed,
             "outcomes": outcomes,
-            "status": summary.status,
+            "status": status,
             "exit_code": exit_code,
         }
 
