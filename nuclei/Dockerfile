@@ -58,4 +58,8 @@ RUN unzip /tmp/nuclei_${NUCLEI_VERSION}_linux_amd64.zip -d /usr/local/bin/
 # refreshes them synchronously at startup and periodically afterwards.
 RUN nuclei -update-templates
 
+# Set by CI to the built commit, shown on the injector page of the platform
+ARG INJECTOR_COMMIT
+ENV INJECTOR_COMMIT=${INJECTOR_COMMIT}
+
 CMD ["python3", "-m", "nuclei.openaev_nuclei"]
