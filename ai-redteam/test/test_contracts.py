@@ -62,7 +62,6 @@ class TargetFieldsTest(TestCase):
             c.KEY_PROVIDER,
             c.KEY_ENDPOINT,
             c.KEY_MODEL,
-            c.KEY_TOKEN,
             c.KEY_SYSTEM_PROMPT,
         ):
             self.assertEqual(
