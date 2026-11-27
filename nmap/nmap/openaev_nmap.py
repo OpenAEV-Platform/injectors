@@ -21,7 +21,12 @@ from injector_common.outcomes import (
     send_skipped_asset_traces,
     send_target_outcome_traces,
 )
-from injector_common.scan_budget import SCAN_TIMEOUT_FIELD, resolve_scan_timeout
+from injector_common.scan_budget import (
+    SCAN_TIMEOUT_FIELD,
+    ScanTimeLimit,
+    resolve_scan_timeout,
+    send_scan_time_limit_trace,
+)
 from injector_common.targets import Targets
 from nmap.configuration.config_loader import ConfigLoader
 from nmap.contracts.nmap_constants import HOST_TIMEOUT_KEY, MAX_RETRIES_KEY
@@ -29,6 +34,9 @@ from nmap.helpers.nmap_command_builder import NmapCommandBuilder
 from nmap.helpers.nmap_output_parser import NmapOutputParser
 from nmap.helpers.nmap_stream_runner import run_nmap
 from nmap.models.data import MessageData
+
+# Deployment variable of the whole-run ceiling, named in the time limit traces.
+DEPLOYMENT_VARIABLE = "NMAP_SCAN_TIMEOUT"
 
 
 class OpenAEVNmap:
@@ -52,7 +60,8 @@ class OpenAEVNmap:
             msg_data.scan_options,
             defaults=self.tuning_defaults(),
         )
-        scan_timeout = self.scan_timeout_for(msg_data.scan_timeout)
+        time_limit = self.scan_time_limit_for(msg_data.scan_timeout)
+        scan_timeout = time_limit.seconds
 
         self.helper.injector_logger.info(
             "Executing nmap with command: " + " ".join(nmap_args)
@@ -91,6 +100,14 @@ class OpenAEVNmap:
             label="nmap scan",
             start=start,
         )
+        # The limit in force and its source, on every run, cut or not.
+        send_scan_time_limit_trace(
+            self.helper,
+            msg_data.inject_id,
+            time_limit,
+            DEPLOYMENT_VARIABLE,
+            start,
+        )
 
         # Each host is reported the moment nmap finishes it (its <host> element is
         # written to stdout then), not only once the whole group is scanned.
@@ -115,8 +132,9 @@ class OpenAEVNmap:
             # nmap finished (written to stdout as it goes) are kept, the others are
             # marked not scanned.
             self.helper.injector_logger.warning(
-                f"nmap terminated at its {scan_timeout}s scan time limit for inject "
-                f"{msg_data.inject_id}; keeping the hosts already scanned."
+                f"nmap terminated at its {scan_timeout}s scan time limit "
+                f"({time_limit.source}) for inject {msg_data.inject_id}; keeping the "
+                "hosts already scanned."
             )
             result = NmapOutputParser.xmlparse(
                 NmapOutputParser.salvage_partial(exc.stdout),
@@ -124,6 +142,7 @@ class OpenAEVNmap:
                 msg_data.target_results,
                 stderr=exc.stderr,
                 time_limit_seconds=scan_timeout,
+                time_limit_source=time_limit.source,
             )
         else:
             result = self._parse_result(nmap_args, nmap_result, msg_data)
@@ -158,15 +177,20 @@ class OpenAEVNmap:
             MAX_RETRIES_KEY: nmap_config.default_max_retries,
         }
 
-    def scan_timeout_for(self, inject_value) -> int:
-        """The whole-run ceiling of one inject, in seconds: the inject field
+    def scan_time_limit_for(self, inject_value) -> ScanTimeLimit:
+        """The whole-run ceiling of one inject and its source: the inject field
         scan_timeout_seconds, else NMAP_SCAN_TIMEOUT, else derived from the
         platform inject execution threshold (injector_common.scan_budget)."""
         return resolve_scan_timeout(
             self.helper,
             {SCAN_TIMEOUT_FIELD: inject_value},
             self.config_loader.nmap.scan_timeout,
+            DEPLOYMENT_VARIABLE,
         )
+
+    def scan_timeout_for(self, inject_value) -> int:
+        """The whole-run ceiling of one inject, in seconds."""
+        return self.scan_time_limit_for(inject_value).seconds
 
     @staticmethod
     def _parse_result(nmap_args, nmap_result, msg_data: MessageData) -> dict:

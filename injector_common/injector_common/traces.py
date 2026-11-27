@@ -14,6 +14,7 @@ def send_per_target_traces(
     label: str,
     start: float,
     status: str = "INFO",
+    message: str = "{label} executed against target {target}",
 ) -> None:
     """Emit one target-scoped execution trace per asset-backed target.
 
@@ -23,6 +24,9 @@ def send_per_target_traces(
     ``command_execution`` trace per target carrying the target's asset id via
     ``execution_context_identifiers`` so the platform lists it under that target's
     execution timeline.
+
+    ``message`` is the trace text, formatted with ``label`` and ``target``: a trace
+    sent before the run starts says the target is queued, never that it was scanned.
 
     Targets without an asset id are skipped - either because they are absent from
     ``ip_to_asset_id_map`` (manual/inline targets) or because their mapped asset id
@@ -48,7 +52,7 @@ def send_per_target_traces(
             helper.api.inject.execution_callback(
                 inject_id=inject_id,
                 data={
-                    "execution_message": f"{label} executed against target {target}",
+                    "execution_message": message.format(label=label, target=target),
                     "execution_status": status,
                     "execution_duration": duration,
                     "execution_action": "command_execution",

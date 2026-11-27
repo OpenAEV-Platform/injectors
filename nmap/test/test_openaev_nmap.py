@@ -62,7 +62,7 @@ class TestOpenAEVNmap(unittest.TestCase):
             command_args=m_build_args.return_value,
             target_results=message_data.target_results,
         )
-        m_helper.return_value.api.inject.execution_callback.assert_called_with(
+        m_helper.return_value.api.inject.execution_callback.assert_any_call(
             inject_id=message_data.inject_id,
             data={
                 "execution_message": m_build_execution_message.return_value,
@@ -232,7 +232,8 @@ class TestOpenAEVNmap(unittest.TestCase):
             any("(target property" in t["execution_message"] for t in traces)
         )
         self.assertEqual(
-            [t["execution_status"] for t in traces], ["INFO", "INFO", "EXECUTED"]
+            [t["execution_status"] for t in traces],
+            ["INFO", "INFO", "INFO", "EXECUTED"],
         )
         self.assertEqual(result["status"], "EXECUTED")
         self.assertNotIn("skipped", result["message"])
@@ -905,6 +906,12 @@ class TestOpenAEVNmap(unittest.TestCase):
         # trace is sent, one abort line is logged and nothing escapes.
         m_helper.return_value.injector_logger = MagicMock()
         m_helper.return_value.api = MagicMock()
+        # A readable platform threshold: no fallback ERROR line in this test.
+        m_helper.return_value.api.http_get.return_value = {
+            "runtime_settings": [
+                {"key": "inject_execution_threshold_minutes", "value": "10"}
+            ]
+        }
         injector = module.OpenAEVNmap()
 
         message_data = MagicMock()

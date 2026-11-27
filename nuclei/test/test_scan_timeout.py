@@ -147,6 +147,114 @@ class TestScanTimeout(unittest.TestCase):
         )
         self.assertIn("540 s time limit", str(ctx.exception))
         self.assertIn("results partial (2 CVE(s)", str(ctx.exception))
+        # No stats line on stderr: the coverage is said unknown (#576).
+        self.assertIn("coverage unknown", str(ctx.exception))
+        self.assertIn(
+            "source: deployment variable NUCLEI_SCAN_TIMEOUT", str(ctx.exception)
+        )
+
+    @patch.object(module.Targets, "build_execution_message")
+    @patch.object(module, "NucleiCommandBuilder")
+    def test_timeout_reports_coverage_at_cut_off(
+        self, m_builder, _bem, _cl, _ch, m_helper, m_process, _i
+    ):
+        injector = self._injector(m_helper, deployment=None, settings=_settings(61))
+        injector.parser = NucleiOutputParser()
+        m_builder.return_value.build.return_value = ["nuclei", "-jsonl"]
+        stats = {
+            "duration": "0:59:58",
+            "templates": "3100",
+            "hosts": "193",
+            "matched": "0",
+            "requests": "1234567",
+            "total": "3000000",
+            "errors": "0",
+            "percent": "41",
+        }
+        m_process.nuclei_execute.side_effect = module.subprocess.TimeoutExpired(
+            cmd="nuclei",
+            timeout=3600,
+            output=b"",
+            stderr=("[INF] start\n" + json.dumps(stats) + "\n").encode(),
+        )
+        message_data = MagicMock()
+        message_data.inject_content = {}
+        message_data.get_targets.return_value = ["10.0.0.1"]
+        message_data.target_results.ip_to_asset_id_map = {"10.0.0.1": "asset-1"}
+
+        with self.assertRaises(module.ScanTimedOut) as ctx:
+            injector.nuclei_execution(1, message_data)
+
+        message = str(ctx.exception)
+        self.assertIn("3600 s time limit", message)
+        self.assertIn(
+            "source: platform inject execution threshold (61 min) minus 60 s", message
+        )
+        self.assertIn(
+            "coverage at cut-off: 41% of requests (1,234,567 / 3,000,000), 193 "
+            "hosts, 3,100 templates, 0:59:58 elapsed",
+            message,
+        )
+        coverage = ctx.exception.result["outputs"][module.COVERAGE_KEY]
+        self.assertEqual(coverage["requests"], 1234567)
+        self.assertEqual(coverage["percent"], 41)
+        traces = [
+            c.kwargs["data"]["execution_message"]
+            for c in injector.helper.api.inject.execution_callback.call_args_list
+        ]
+        # Start trace with the limit and its source, then the queued target.
+        self.assertIn(
+            "scan time limit: 3600 s (source: platform inject execution threshold "
+            "(61 min) minus 60 s)",
+            traces,
+        )
+        self.assertIn("target 10.0.0.1 queued for nuclei scan", traces)
+        self.assertFalse(any("executed against" in t for t in traces))
+
+    @patch.object(module.Targets, "build_execution_message")
+    @patch.object(module, "NucleiCommandBuilder")
+    def test_completed_scan_reports_coverage(
+        self, m_builder, _bem, _cl, _ch, m_helper, m_process, _i
+    ):
+        injector = self._injector(m_helper, deployment=900, settings={})
+        injector.parser = NucleiOutputParser()
+        m_builder.return_value.build.return_value = ["nuclei", "-jsonl"]
+        stats = {
+            "duration": "0:02:10",
+            "templates": "10",
+            "hosts": "2",
+            "requests": "200",
+            "total": "200",
+            "errors": "0",
+        }
+        m_process.nuclei_execute.return_value.stdout = PARTIAL_STDOUT
+        m_process.nuclei_execute.return_value.stderr = json.dumps(stats).encode()
+        message_data = MagicMock()
+        message_data.inject_content = {}
+        message_data.get_targets.return_value = ["10.0.0.1", "10.0.0.2"]
+        message_data.target_results.ip_to_asset_id_map = {}
+
+        result = injector.nuclei_execution(1, message_data)
+
+        self.assertIn("coverage: 100% of requests (200 / 200)", result["message"])
+        self.assertIn("900 s time limit", result["message"])
+        self.assertEqual(result["outputs"][module.COVERAGE_KEY]["hosts"], 2)
+        self.assertEqual(len(result["outputs"]["cve"]), 2)
+
+    def test_fallback_start_trace_is_a_warning(self, _cl, _ch, m_helper, _np, _i):
+        injector = self._injector(
+            m_helper, deployment=None, settings=RuntimeError("404 /settings")
+        )
+        limit = injector.scan_time_limit_for({})
+        self.assertTrue(limit.fallback)
+        module.send_scan_time_limit_trace(
+            injector.helper, "inject-id", limit, module.DEPLOYMENT_VARIABLE, 0
+        )
+        data = injector.helper.api.inject.execution_callback.call_args.kwargs["data"]
+        self.assertIn("Warning: scan time limit: 540 s", data["execution_message"])
+        self.assertIn("NUCLEI_SCAN_TIMEOUT", data["execution_message"])
+        self.assertIn(module.SCAN_TIMEOUT_FIELD, data["execution_message"])
+        injector.helper.injector_logger.error.assert_called_once()
 
     # -- the terminal callback --
 

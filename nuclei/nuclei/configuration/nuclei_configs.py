@@ -66,6 +66,26 @@ class ConfigLoaderNuclei(BaseSettings):
         ),
     )
 
+    coverage_stats: bool = Field(
+        default=True,
+        description=(
+            "Ask Nuclei for its JSON progress statistics during a scan, so a scan "
+            "cut at its time limit (and a completed one) reports how much it "
+            "covered: requests sent / total, hosts, templates, elapsed. Off: no "
+            "statistics flag is passed and the coverage reads 'unknown'. "
+            "Nuclei Flags: -stats -stats-json -stats-interval"
+        ),
+    )
+
+    coverage_stats_interval: PositiveInt = Field(
+        default=30,
+        description=(
+            "Seconds between two Nuclei progress statistics lines (the coverage "
+            "reported at a cut-off is the last one written). "
+            "Nuclei Flags: -si, -stats-interval"
+        ),
+    )
+
     template_update_timeout: PositiveInt = Field(
         default=300,
         description=(

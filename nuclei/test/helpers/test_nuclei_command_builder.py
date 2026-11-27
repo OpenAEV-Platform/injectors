@@ -31,6 +31,8 @@ def nuclei_configs():
     config.exclude_type = ["headless"]
     config.exclude_severity = ["info"]
     config.disable_interactsh = False
+    config.coverage_stats = False
+    config.coverage_stats_interval = 30
     return config
 
 
@@ -137,6 +139,49 @@ def test_nuclei_builder_adds_no_interactsh_when_disabled(nuclei_configs):
     ).build()
 
     assert "-no-interactsh" in nuclei_args
+
+
+def test_nuclei_builder_adds_stats_flags_when_coverage_on(nuclei_configs):
+    # #576: JSON progress statistics (stderr) so a cut scan reports its coverage.
+    nuclei_configs.coverage_stats = True
+    nuclei_configs.coverage_stats_interval = 15
+
+    nuclei_args = NucleiCommandBuilder(
+        nuclei_configs=nuclei_configs,
+        contract_id=CVE_SCAN_CONTRACT,
+        content={},
+        targets=["http://example.com"],
+    ).build()
+
+    assert nuclei_args == BASE_ARGS + [
+        "-tags",
+        "cve",
+        "-stats",
+        "-stats-json",
+        "-stats-interval",
+        "15",
+        "-jsonl",
+    ]
+
+
+def test_nuclei_builder_omits_stats_flags_when_coverage_off(nuclei_configs):
+    nuclei_args = NucleiCommandBuilder(
+        nuclei_configs=nuclei_configs,
+        contract_id=CVE_SCAN_CONTRACT,
+        content={},
+        targets=["http://example.com"],
+    ).build()
+
+    assert "-stats" not in nuclei_args
+    assert "-stats-json" not in nuclei_args
+
+
+def test_coverage_stats_default_on():
+    from nuclei.configuration.nuclei_configs import ConfigLoaderNuclei
+
+    config = ConfigLoaderNuclei()
+    assert config.coverage_stats is True
+    assert config.coverage_stats_interval == 30
 
 
 def test_nuclei_builder_omits_no_interactsh_by_default(nuclei_configs):

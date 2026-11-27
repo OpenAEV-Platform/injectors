@@ -257,6 +257,7 @@ class NmapOutputParser:
         stderr: Optional[bytes] = None,
         exit_code: int = 0,
         time_limit_seconds: Optional[int] = None,
+        time_limit_source: Optional[str] = None,
     ) -> dict:
         """Parse XML formatted nmap outputs and extract open ports.
 
@@ -395,7 +396,9 @@ class NmapOutputParser:
         if time_limit_seconds:
             status = WARNING if summary.scanned else ERROR
             message = (
-                f"nmap terminated at its {time_limit_seconds} s scan time limit: "
+                f"nmap terminated at its {time_limit_seconds} s scan time limit"
+                + (f" (source: {time_limit_source})" if time_limit_source else "")
+                + ": "
                 "results partial, the hosts finished before the limit are kept. "
                 f"Raise the limit with the inject field '{SCAN_TIMEOUT_FIELD}' or the "
                 "NMAP_SCAN_TIMEOUT key of the injector deployment, or reduce the "
