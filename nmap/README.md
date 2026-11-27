@@ -74,7 +74,7 @@ The injector is configured either through environment variables (recommended, re
 |--------------------------|-------------------------------------|-------------------------------------|---------|-------------|
 | Default host timeout     | `nmap.default_host_timeout_seconds` | `NMAP_DEFAULT_HOST_TIMEOUT_SECONDS` | 300     | `--host-timeout` (seconds) used when an inject leaves *Give up on a host after* empty. `0`: no default (nmap's own, unbounded). |
 | Default max retries      | `nmap.default_max_retries`          | `NMAP_DEFAULT_MAX_RETRIES`          | 2       | `--max-retries` used when an inject leaves *Max retries per port* empty. |
-| Scan time limit          | `nmap.scan_timeout`                 | `NMAP_SCAN_TIMEOUT`                 | /       | Whole-run ceiling in seconds. Unset: the platform's inject execution threshold minus 60 s, or 540 s when the platform does not expose it. |
+| Scan time limit          | `nmap.scan_timeout`                 | `NMAP_SCAN_TIMEOUT`                 | /       | Whole-run ceiling in seconds. Unset: the platform's inject execution threshold minus 60 s (read on the platform route `/api/settings`, also for a tenant-scoped injector), or 540 s when it cannot be read. Every run starts with an INFO trace "scan time limit: N s (source: ...)"; the 540 s fallback is said there as a warning and logged once at ERROR. |
 
 ### Timing defaults and the scan time limit
 

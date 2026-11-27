@@ -70,7 +70,10 @@ class TestOpenAEVNuclei(unittest.TestCase):
             data=message_data.raw_data,
             command_args=m_builder.return_value.build.return_value,
         )
-        m_helper.return_value.api.inject.execution_callback.assert_called_once_with(
+        callback = m_helper.return_value.api.inject.execution_callback
+        # The command trace, then the scan time limit trace (#575).
+        self.assertEqual(callback.call_count, 2)
+        callback.assert_any_call(
             inject_id=message_data.inject_id,
             data={
                 "execution_message": m_build_execution_message.return_value,
@@ -78,6 +81,11 @@ class TestOpenAEVNuclei(unittest.TestCase):
                 "execution_duration": ANY,
                 "execution_action": "command_execution",
             },
+        )
+        self.assertEqual(
+            callback.call_args.kwargs["data"]["execution_message"],
+            "scan time limit: 540 s (source: deployment variable "
+            "NUCLEI_SCAN_TIMEOUT)",
         )
         m_nucleiprocess.nuclei_execute.assert_called_once_with(
             m_builder.return_value.build.return_value,

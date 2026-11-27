@@ -197,6 +197,11 @@ class TestScanTimeLimit(unittest.TestCase):
         self.assertEqual(_flag(args[0], "--host-timeout"), "300s")
         self.assertEqual(_flag(args[0], "--max-retries"), "2")
         self.assertEqual(result["status"], WARNING)
+        # #575: the TIMEOUT message and the start trace name the source.
+        self.assertIn(
+            "60 s scan time limit (source: deployment variable NMAP_SCAN_TIMEOUT)",
+            result["message"],
+        )
         traces = [
             c.kwargs["data"]
             for c in m_helper.return_value.api.inject.execution_callback.call_args_list
@@ -207,6 +212,24 @@ class TestScanTimeLimit(unittest.TestCase):
         self.assertIn("host up", per_target[("a1",)]["execution_message"])
         for asset in ("a2", "a3"):
             self.assertIn(TIME_LIMIT_REASON, per_target[(asset,)]["execution_message"])
+        self.assertIn(
+            "scan time limit: 60 s (source: deployment variable NMAP_SCAN_TIMEOUT)",
+            [t["execution_message"] for t in traces],
+        )
+
+    def test_tenant_injector_resolves_the_platform_threshold(
+        self, m_configloader, m_helper, _
+    ):
+        # #575: OPENAEV_TENANT_ID set; the threshold is read on /api/settings.
+        injector = self._injector(m_configloader, m_helper, threshold=120)
+        injector.helper.api.url = "https://openaev.test/"
+        injector.helper.api.tenant_id = "tenant-1"
+        limit = injector.scan_time_limit_for(None)
+        self.assertEqual(limit.seconds, 7140)
+        self.assertIn("platform inject execution threshold", limit.source)
+        injector.helper.api.http_get.assert_called_with(
+            "https://openaev.test/api/settings"
+        )
 
 
 if __name__ == "__main__":

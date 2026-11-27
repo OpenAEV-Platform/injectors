@@ -52,6 +52,7 @@ class NucleiCommandBuilder:
             ._with_templates()
             ._with_options()
             ._with_variables()
+            ._with_coverage_stats()
             ._with_jsonl_output()
         )
         return build._to_args()
@@ -114,6 +115,20 @@ class NucleiCommandBuilder:
         # Nuclei Flags: -V, -var
         for name, value in self.variables.items():
             self.args += ["-var", f"{name}={value}"]
+        return self
+
+    def _with_coverage_stats(self):
+        # JSON progress statistics (hosts, templates, requests / total, matched,
+        # errors, duration), one line on stderr every interval and a final one at
+        # exit, so a scan cut at its time limit can say how much it covered.
+        # Nuclei Flags: -stats, -sj -stats-json, -si -stats-interval
+        if getattr(self.nuclei_configs, "coverage_stats", False) is True:
+            self.args += [
+                "-stats",
+                "-stats-json",
+                "-stats-interval",
+                str(self.nuclei_configs.coverage_stats_interval),
+            ]
         return self
 
     def _with_jsonl_output(self):

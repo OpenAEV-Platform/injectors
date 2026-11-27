@@ -19,7 +19,9 @@ from injector_common.scan_budget import (  # noqa: F401 (re-exported for tests)
     DEFAULT_SCAN_TIMEOUT,
     SCAN_TIMEOUT_FIELD,
     THRESHOLD_SETTING_KEY,
+    ScanTimeLimit,
     resolve_scan_timeout,
+    send_scan_time_limit_trace,
 )
 from injector_common.targets import Targets
 from injector_common.traces import send_per_target_traces
@@ -27,6 +29,7 @@ from nuclei.configuration.config_loader import ConfigLoader
 from nuclei.helpers.nuclei_command_builder import NucleiCommandBuilder
 from nuclei.helpers.nuclei_output_parser import NucleiOutputParser
 from nuclei.helpers.nuclei_process import NucleiProcess
+from nuclei.helpers.nuclei_stats import describe_coverage, last_stats
 from nuclei.helpers.scan_coordination import TemplateAccessLock
 from nuclei.helpers.template_analysis import (
     analyze_template_file,
@@ -65,6 +68,12 @@ _STDERR_LOG_TAIL = 2000
 # Execution status of a scan terminated at its ceiling (an error status of the
 # platform: the inject is not reported as a completed scan).
 TIMEOUT_STATUS = "TIMEOUT"
+
+# Deployment variable of the whole-scan ceiling, named in the time limit traces.
+DEPLOYMENT_VARIABLE = "NUCLEI_SCAN_TIMEOUT"
+
+# Key of the scan coverage in execution_output_structured.
+COVERAGE_KEY = "coverage"
 
 
 def _safe_remove(path: Optional[str]) -> None:
@@ -207,18 +216,30 @@ class OpenAEVNuclei:
                 data=callback_data,
             )
 
-            # Per-target traces so each asset-backed endpoint's result view shows
-            # the scan reached it; the batched scan only sends a global callback.
+            # The limit in force and its source, on every scan, cut or not.
+            time_limit = self.scan_time_limit_for(msg_data.inject_content)
+            scan_timeout = time_limit.seconds
+            send_scan_time_limit_trace(
+                self.helper,
+                msg_data.inject_id,
+                time_limit,
+                DEPLOYMENT_VARIABLE,
+                start,
+            )
+
+            # Per-target traces so each asset-backed endpoint's result view lists
+            # the target; sent before the scan starts, so they say "queued", never
+            # "scanned" (Nuclei may not reach a target before the time limit).
             send_per_target_traces(
                 self.helper,
                 msg_data.inject_id,
                 msg_data.target_results.ip_to_asset_id_map,
                 label="nuclei scan",
                 start=start,
+                message="target {target} queued for {label}",
             )
 
             input_data = ("\n".join(targets) + "\n").encode("utf-8")
-            scan_timeout = self.scan_timeout_for(msg_data.inject_content)
             try:
                 # Bound concurrency (one slot per running Nuclei subprocess) and
                 # take the reader side of the templates lock so a scan never
@@ -241,8 +262,10 @@ class OpenAEVNuclei:
                     _decode(exc.stdout),
                     msg_data.target_results.ip_to_asset_id_map,
                 )
+                coverage = last_stats(exc.stderr)
+                self._attach_coverage(partial, coverage)
                 raise ScanTimedOut(
-                    self._timeout_message(scan_timeout, partial), partial
+                    self._timeout_message(time_limit, partial, coverage), partial
                 ) from exc
             except subprocess.CalledProcessError as exc:
                 # Non-zero exit: bubble up the stderr so the terminal error trace
@@ -268,10 +291,20 @@ class OpenAEVNuclei:
                     f"{stderr_tail[-_STDERR_LOG_TAIL:]}"
                 )
 
-            return self.parser.parse(
+            parsed = self.parser.parse(
                 result.stdout.decode("utf-8"),
                 msg_data.target_results.ip_to_asset_id_map,
             )
+            coverage = last_stats(result.stderr)
+            if isinstance(parsed, dict):
+                # The coverage of a completed scan sizes the next time limit.
+                self._attach_coverage(parsed, coverage)
+                parsed["message"] = (
+                    f"{parsed.get('message') or 'Nuclei completed'} "
+                    f"({describe_coverage(coverage)}; {time_limit.seconds} s time "
+                    f"limit, source: {time_limit.source})"
+                )
+            return parsed
         finally:
             _safe_remove(tmp_template_path)
 
@@ -282,26 +315,50 @@ class OpenAEVNuclei:
         return sorted({str(c["id"]) for c in outputs.get("cve") or [] if c.get("id")})
 
     @staticmethod
-    def _timeout_message(scan_timeout: int, partial: Dict) -> str:
+    def _attach_coverage(result: Dict, coverage: Optional[Dict]) -> None:
+        """The coverage under execution_output_structured's 'coverage' key."""
+        if not isinstance(result, dict):
+            return
+        outputs = result.get("outputs")
+        if not isinstance(outputs, dict):
+            outputs = {}
+            result["outputs"] = outputs
+        outputs[COVERAGE_KEY] = coverage or {"known": False}
+
+    @staticmethod
+    def _timeout_message(
+        time_limit: ScanTimeLimit, partial: Dict, coverage: Optional[Dict] = None
+    ) -> str:
+        if isinstance(time_limit, int):
+            time_limit = ScanTimeLimit(time_limit, "unknown")
         outputs = partial.get("outputs") or {}
         cves = len(outputs.get("cve") or [])
         others = len(outputs.get("others") or [])
         return (
-            f"Nuclei scan terminated at its {scan_timeout} s time limit before "
-            f"completion: results partial ({cves} CVE(s), {others} other "
-            "finding(s) reported from the part scanned). Raise the limit with the "
-            f"inject field '{SCAN_TIMEOUT_FIELD}' or the NUCLEI_SCAN_TIMEOUT key "
-            "of the injector deployment (catalog configuration), or reduce the "
-            "scan scope (tags, template, fewer targets)."
+            f"Nuclei scan terminated at its {time_limit.seconds} s time limit "
+            f"(source: {time_limit.source}) before completion: results partial "
+            f"({cves} CVE(s), {others} other finding(s) reported from the part "
+            f"scanned; {describe_coverage(coverage, 'coverage at cut-off')}). "
+            f"Raise the limit with the inject field '{SCAN_TIMEOUT_FIELD}' or the "
+            f"{DEPLOYMENT_VARIABLE} key of the injector deployment (catalog "
+            "configuration), or reduce the scan scope (tags, template, fewer "
+            "targets)."
         )
 
-    def scan_timeout_for(self, inject_content) -> int:
-        """The whole-scan ceiling of one inject, in seconds: the inject field
+    def scan_time_limit_for(self, inject_content) -> ScanTimeLimit:
+        """The whole-scan ceiling of one inject and its source: the inject field
         scan_timeout_seconds, else NUCLEI_SCAN_TIMEOUT, else derived from the
         platform inject execution threshold (injector_common.scan_budget)."""
         return resolve_scan_timeout(
-            self.helper, inject_content, self.config_loader.nuclei.scan_timeout
+            self.helper,
+            inject_content,
+            self.config_loader.nuclei.scan_timeout,
+            DEPLOYMENT_VARIABLE,
         )
+
+    def scan_timeout_for(self, inject_content) -> int:
+        """The whole-scan ceiling of one inject, in seconds."""
+        return self.scan_time_limit_for(inject_content).seconds
 
     def _template_variables(
         self, msg_data: MessageData, content, tmp_template_path: Optional[str]
