@@ -8,7 +8,10 @@ deployment sets none.
 
 import json
 import unittest
+from datetime import datetime, timezone
 from unittest.mock import ANY, MagicMock, patch
+
+from pyoaev.signatures.models import ExecutionDetails, ExecutionStatus, ToolOutput
 
 import nuclei.openaev_nuclei as module
 from nuclei.helpers.nuclei_output_parser import NucleiOutputParser
@@ -208,6 +211,76 @@ class TestScanTimeout(unittest.TestCase):
 
         self.assertEqual(data["execution_status"], module.TIMEOUT_STATUS)
         self.assertNotIn("cve", json.loads(data["execution_output_structured"]))
+
+    # -- the signature callback (#577) --
+
+    @patch.object(module.OpenAEVNuclei, "nuclei_execution")
+    @patch.object(module, "SignatureManager")
+    @patch.object(module, "build_network_configs")
+    @patch.object(module, "MessageData", autospec=True)
+    def _signature_tool_output(
+        self, side_effect, m_msgdata, _bnc, m_signatures, m_execution, m_helper
+    ):
+        injector = self._injector(m_helper, deployment=540, settings={})
+        message_data = MagicMock()
+        message_data.inject_id = "inject-id"
+        m_msgdata.return_value = message_data
+        m_execution.side_effect = side_effect
+        injector.process_message(MagicMock())
+        post = m_signatures.return_value.post_execution_updates
+        post.assert_called_once()
+        return post.call_args.kwargs["tool_output"]
+
+    @staticmethod
+    def _signature_status(tool_output):
+        # The real pyoaev models, as SignatureManager.post_execution_updates
+        # applies them to the execution details.
+        details = ExecutionDetails()
+        details.post_execution_update(
+            ToolOutput.model_validate(tool_output), datetime.now(timezone.utc)
+        )
+        return details.execution_status
+
+    def test_timeout_reaches_the_signature_layer_as_timeout(
+        self, _cl, _ch, m_helper, _np, _i
+    ):
+        cves = [
+            {"id": "CVE-2024-0002", "asset_id": ["a2"], "host": ["h2"]},
+            {"id": "CVE-2024-0001", "asset_id": ["a1"], "host": ["h1"]},
+        ]
+        tool_output = self._signature_tool_output(
+            module.ScanTimedOut(
+                "terminated, results partial",
+                {"message": "", "outputs": {"cve": cves, "others": []}},
+            ),
+            m_helper=m_helper,
+        )
+
+        self.assertNotIn("error_info", tool_output)
+        self.assertEqual(
+            tool_output["timeout_info"]["partial_results"],
+            ["CVE-2024-0001", "CVE-2024-0002"],
+        )
+        self.assertEqual(self._signature_status(tool_output), ExecutionStatus.TIMEOUT)
+
+    def test_timeout_without_findings_still_reads_timeout(
+        self, _cl, _ch, m_helper, _np, _i
+    ):
+        tool_output = self._signature_tool_output(
+            module.ScanTimedOut("terminated", {"message": "", "outputs": {}}),
+            m_helper=m_helper,
+        )
+
+        self.assertEqual(tool_output, {"timeout_info": {"partial_results": []}})
+        self.assertEqual(self._signature_status(tool_output), ExecutionStatus.TIMEOUT)
+
+    def test_generic_failure_still_reads_error(self, _cl, _ch, m_helper, _np, _i):
+        tool_output = self._signature_tool_output(
+            RuntimeError("nuclei crashed"), m_helper=m_helper
+        )
+
+        self.assertEqual(tool_output, {"error_info": {"exit_code": 1}})
+        self.assertEqual(self._signature_status(tool_output), ExecutionStatus.ERROR)
 
 
 if __name__ == "__main__":
