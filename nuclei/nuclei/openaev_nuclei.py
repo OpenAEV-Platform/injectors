@@ -3,7 +3,7 @@ import os
 import subprocess
 import threading
 import time
-from typing import Dict, Optional
+from typing import Dict, List, Optional
 
 from pyoaev.helpers import OpenAEVConfigHelper, OpenAEVInjectorHelper
 from pyoaev.signatures import (
@@ -276,6 +276,12 @@ class OpenAEVNuclei:
             _safe_remove(tmp_template_path)
 
     @staticmethod
+    def _partial_results(partial: Dict) -> List[str]:
+        """CVE ids found before the kill, for pyoaev's ToolTimeoutInfo."""
+        outputs = (partial or {}).get("outputs") or {}
+        return sorted({str(c["id"]) for c in outputs.get("cve") or [] if c.get("id")})
+
+    @staticmethod
     def _timeout_message(scan_timeout: int, partial: Dict) -> str:
         outputs = partial.get("outputs") or {}
         cves = len(outputs.get("cve") or [])
@@ -424,7 +430,11 @@ class OpenAEVNuclei:
                     # "scanned, not vulnerable" for every target on the platform.
                     execution_result_outputs.pop("cve", None)
                 execution_status = TIMEOUT_STATUS
-                tool_output = {"error_info": {"exit_code": 1}}
+                # A timeout, not a crash: pyoaev's signature layer reads
+                # error_info as ERROR before it ever looks at timeout_info.
+                tool_output = {
+                    "timeout_info": {"partial_results": self._partial_results(e.result)}
+                }
             except (MissingTemplateInputs, TemplateNotFound) as e:
                 # Not executed: an explicit inconclusive result, never a no-match.
                 execution_message = str(e)
